@@ -18,8 +18,9 @@ public:
 	virtual void Start() = 0;
 protected:
 	void Initialize();
-	virtual bool CheckDeviceCompatibility(VkPhysicalDevice, uint) = 0;
-	virtual void CreateSurfaceKHR(VkSurfaceKHR *) = 0;
+	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
+	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;
+	virtual VkExtent2D GetExtent() const = 0;
 	VkInstance instance;
 	VkSurfaceKHR surface;
 	VkDebugReportCallbackEXT debugReportCb;
@@ -31,6 +32,7 @@ protected:
 		QUEUE_INDEX_COUNT
 	};
 	VkQueue queue[QUEUE_INDEX_COUNT];
+	VkSwapchainKHR swapChain;
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
 	
@@ -45,8 +47,9 @@ public:
 	X11Compositor(uint, const Backend::X11Backend *);
 	virtual ~X11Compositor();
 	void Start();
-	bool CheckDeviceCompatibility(VkPhysicalDevice, uint);
-	void CreateSurfaceKHR(VkSurfaceKHR *);
+	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
+	void CreateSurfaceKHR(VkSurfaceKHR *) const;
+	VkExtent2D GetExtent() const;
 private:
 	const Backend::X11Backend *pbackend;
 };
