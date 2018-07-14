@@ -68,6 +68,7 @@ public:
 class FakeBackend : public Backend::Fake{
 public:
 	FakeBackend() : Fake(){
+		DebugPrintf(stdout,"Initializing a debug backend\n");
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -92,8 +93,10 @@ public:
 int main(sint argc, const char **pargv){	
 	args::ArgumentParser parser("xwm - A compositing window manager","");
 	args::HelpFlag help(parser,"help","Display this help menu",{'h',"help"});
+	args::Group group_backend(parser,"Backend",args::Group::Validators::DontCare);
+	args::Flag debugBackend(group_backend,"debugBackend","Create a test environment for the compositor engine without redirection.",{'d',"debug-backend"});
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
-	args::ValueFlag<uint> gpuIndex(group_comp,"id","GPU to use by its index",{"gpu-index"},0);
+	args::ValueFlag<uint> gpuIndex(group_comp,"id","GPU to use by its index. By default the first enumerated GPU will be used.",{"gpu-index"},0);
 
 	try{
 		parser.ParseCLI(argc,pargv);
@@ -141,7 +144,9 @@ int main(sint argc, const char **pargv){
 #else
 	Backend::X11Backend *pbackend;
 	try{
-		pbackend = new FakeBackend();
+		if(debugBackend.Get())
+			pbackend = new FakeBackend();
+		else pbackend = new RunBackend();
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		return 1;
