@@ -18,6 +18,7 @@ CompositorInterface::~CompositorInterface(){
 }
 
 void CompositorInterface::Initialize(){
+	//https://gist.github.com/graphitemaster/e162a24e57379af840d4
 	uint layerCount;
 	vkEnumerateInstanceLayerProperties(&layerCount,0);
 	VkLayerProperties *playerProps = new VkLayerProperties[layerCount];
@@ -176,7 +177,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-Default::Default(uint physicalDevIndex, const Backend::Default *pbackend) : CompositorInterface(physicalDevIndex){
+Default::Default(uint physicalDevIndex, const Backend::X11Backend *pbackend) : CompositorInterface(physicalDevIndex){
 	this->pbackend = pbackend;
 }
 
@@ -200,9 +201,10 @@ void Default::CreateSurfaceKHR(VkSurfaceKHR *psurface){
 	xcbSurfaceCreateInfo.connection = pbackend->pcon; //pcon
 	xcbSurfaceCreateInfo.window = pbackend->overlay;
 	//if(((PFN_vkCreateXcbSurfaceKHR)vkGetInstanceProcAddr(instance,"vkCreateXcbSurfaceKHR"))(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS)
-	if(vkCreateXcbSurfaceKHR(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS)
+	if(vkCreateXcbSurfaceKHR(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS){
 		//DebugPrintf(stderr,"Failed to create KHR surface.\n");
 		throw("Failed to create KHR surface.");
+	}
 	//
 	//PFN_vkCreateXcbSurfaceKHR
 }

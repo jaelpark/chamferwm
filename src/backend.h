@@ -24,7 +24,18 @@ protected:
 	virtual void DefineBindings() = 0;
 };
 
-class Default : public BackendInterface{
+class X11Backend : public BackendInterface{
+friend class Compositor::Default;
+public:
+	X11Backend();
+	virtual ~X11Backend();
+protected:
+	xcb_connection_t *pcon;
+	xcb_screen_t *pscr;
+	xcb_window_t overlay;
+};
+
+class Default : public X11Backend{
 friend class Compositor::Default;
 public:
 	Default();
@@ -33,10 +44,18 @@ public:
 	sint GetEventFileDescriptor();
 	bool HandleEvent();
 private:	
-	xcb_connection_t *pcon;
-	xcb_screen_t *pscr;
-	xcb_window_t overlay;
+	xcb_keycode_t exitKeycode;
+};
 
+class Fake : public X11Backend{
+friend class Compositor::Default;
+public:
+	Fake();
+	virtual ~Fake();
+	void Start();
+	sint GetEventFileDescriptor();
+	bool HandleEvent();
+private:
 	xcb_keycode_t exitKeycode;
 };
 

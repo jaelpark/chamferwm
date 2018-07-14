@@ -81,7 +81,15 @@ BackendInterface::~BackendInterface(){
 	//
 }
 
-Default::Default() : BackendInterface(){
+X11Backend::X11Backend(){
+	//
+}
+
+X11Backend::~X11Backend(){
+	//
+}
+
+Default::Default() : X11Backend(){
 	//
 }
 
@@ -286,6 +294,89 @@ bool Default::HandleEvent(){
 
 	free(pevent);
 	xcb_flush(pcon);
+
+	return true;
+}
+
+Fake::Fake() : X11Backend(){
+	//
+}
+
+Fake::~Fake(){
+	//
+}
+
+void Fake::Start(){
+		sint scount;
+	pcon = xcb_connect(0,&scount);
+	if(xcb_connection_has_error(pcon))
+		throw Exception("Failed to connect to X server.\n");
+
+	const xcb_setup_t *psetup = xcb_get_setup(pcon);
+	xcb_screen_iterator_t sm = xcb_setup_roots_iterator(psetup);
+	for(sint i = 0; i < scount; ++i)
+		xcb_screen_next(&sm);
+
+	pscr = sm.data;
+	if(!pscr)
+		throw Exception("Screen unavailable.\n");
+
+	DebugPrintf(stdout,"Screen size: %ux%u\n",pscr->width_in_pixels,pscr->height_in_pixels);
+
+	xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
+
+	//xcb_keycode_t kk = SymbolToKeycode(XK_Return,psymbols);
+	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,kk,
+		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_SHIFT|XCB_MOD_MASK_1,kk,
+		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+	exitKeycode = SymbolToKeycode(XK_E,psymbols);
+	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
+		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+	DefineBindings();
+
+	xcb_flush(pcon);
+
+	xcb_key_symbols_free(psymbols);
+
+	overlay = xcb_generate_id(pcon);
+
+	uint mask = XCB_CW_EVENT_MASK;
+	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
+		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
+		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
+	
+	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,overlay,pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pscr->root_visual,mask,values);
+	const char title[] = "xwm compositor debug mode";
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,overlay,XCB_ATOM_WM_NAME,XCB_ATOM_STRING,8,strlen(title),title);
+	
+	xcb_map_window(pcon,overlay);
+	xcb_flush(pcon);
+}
+
+sint Fake::GetEventFileDescriptor(){
+	sint fd = xcb_get_file_descriptor(pcon);
+	return fd;
+}
+
+bool Fake::HandleEvent(){
+	xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
+	if(!pevent){
+		if(xcb_connection_has_error(pcon)){
+			DebugPrintf(stderr,"X server connection lost\n");
+			return false;
+		}
+	}
+
+	//switch(pevent->response_type & ~0x80){
+	switch(pevent->response_type & 0x7F){
+	//case XCB_CONFIGURE_REQUEST:{
+	case XCB_CLIENT_MESSAGE:{
+	//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
+	//if(pev->data.data32[0] == wmD
+	}
+	break;
+	}
 
 	return true;
 }

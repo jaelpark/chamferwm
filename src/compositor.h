@@ -44,13 +44,13 @@ protected:
 //Default compositor assumes XCB for its surface
 class Default : public CompositorInterface{
 public:
-	Default(uint, const Backend::Default *);
+	Default(uint, const Backend::X11Backend *);
 	virtual ~Default();
 	void Start();
 	bool CheckDeviceCompatibility(VkPhysicalDevice, uint);
 	void CreateSurfaceKHR(VkSurfaceKHR *);
 private:
-	const Backend::Default *pbackend;
+	const Backend::X11Backend *pbackend;
 };
 
 }

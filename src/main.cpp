@@ -56,9 +56,23 @@ public:
 	RunBackend() : Default(){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
-	};
+	}
 	
-	~RunBackend(){};
+	~RunBackend(){}
+
+	void DefineBindings(){
+		DebugPrintf(stdout,"DefineKeybindings()\n");
+	}
+};
+
+class FakeBackend : public Backend::Fake{
+public:
+	FakeBackend() : Fake(){
+		Start();
+		DebugPrintf(stdout,"Backend initialized.\n");
+	}
+
+	~FakeBackend(){}
 
 	void DefineBindings(){
 		DebugPrintf(stdout,"DefineKeybindings()\n");
@@ -67,10 +81,11 @@ public:
 
 class RunCompositor : public Compositor::Default{
 public:
-	RunCompositor(uint gpuIndex, Backend::Default *pbackend) : Default(gpuIndex,pbackend){
+	RunCompositor(uint gpuIndex, Backend::X11Backend *pbackend) : Default(gpuIndex,pbackend){
 		Start();
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
+
 	~RunCompositor(){}
 };
 
@@ -115,7 +130,7 @@ int main(sint argc, const char **pargv){
 	event1.data.ptr = &sfd;
 	event1.events = EPOLLIN;
 	epoll_ctl(sfd,EPOLL_CTL_ADD,sfd,&event1);*/
-
+#if 0
 	RunBackend *pbackend;
 	try{
 		pbackend = new RunBackend();
@@ -123,6 +138,15 @@ int main(sint argc, const char **pargv){
 		DebugPrintf(stderr,"%s\n",e.what());
 		return 1;
 	}
+#else
+	Backend::X11Backend *pbackend;
+	try{
+		pbackend = new FakeBackend();
+	}catch(Exception e){
+		DebugPrintf(stderr,"%s\n",e.what());
+		return 1;
+	}
+#endif
 
 	sint fd = pbackend->GetEventFileDescriptor();
 	if(fd == -1){
