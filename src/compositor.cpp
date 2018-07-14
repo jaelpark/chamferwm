@@ -154,7 +154,7 @@ void CompositorInterface::Initialize(){
 	uint queueCount = 0;
 	for(uint queueFamilyIndex1 : queueSet){
 		//logical device
-		const float queuePriorities[] = {1.0f};
+		static const float queuePriorities[] = {1.0f};
 		queueCreateInfo[queueCount] = (VkDeviceQueueCreateInfo){};
 		queueCreateInfo[queueCount].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queueCreateInfo[queueCount].queueFamilyIndex = queueFamilyIndex1;
@@ -164,17 +164,39 @@ void CompositorInterface::Initialize(){
 	}
 
 	VkPhysicalDeviceFeatures physicalDevFeatures = {};
+	
+	uint devExtCount;
+	vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,0);
+	VkExtensionProperties *pdevExtProps = new VkExtensionProperties[devExtCount];
+	vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,pdevExtProps);
+
+	//device extensions
+	const char *pdevExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+	DebugPrintf(stdout,"Enumerating required device extensions\n");
+	uint devExtFound = 0;
+	for(uint i = 0; i < devExtCount; ++i)
+		for(uint j = 0; j < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]); ++j)
+			if(strcmp(pdevExtProps[i].extensionName,pdevExtensions[j]) == 0){
+				printf("%s\n",pdevExtensions[j]);
+				++devExtFound;
+			}
+	if(devExtFound < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]))
+		throw Exception("Could not find all required device extensions.");
+	//
 
 	VkDeviceCreateInfo devCreateInfo = {};
 	devCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	devCreateInfo.pQueueCreateInfos = queueCreateInfo;
 	devCreateInfo.queueCreateInfoCount = queueCount;
 	devCreateInfo.pEnabledFeatures = &physicalDevFeatures;
-	devCreateInfo.enabledExtensionCount = 0; //TODO: device extensions, surface?
+	devCreateInfo.ppEnabledExtensionNames = pdevExtensions;
+	devCreateInfo.enabledExtensionCount = sizeof(pdevExtensions)/sizeof(pdevExtensions[0]);
 	devCreateInfo.ppEnabledLayerNames = players;
 	devCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]);
 	if(vkCreateDevice(physicalDev,&devCreateInfo,0,&logicalDev) != VK_SUCCESS)
 		throw Exception("Failed to create a logical device.");
+	
+	delete []pdevExtProps;
 
 	for(uint i = 0; i < QUEUE_INDEX_COUNT; ++i)
 		vkGetDeviceQueue(logicalDev,queueFamilyIndex[i],0,&queue[i]);
