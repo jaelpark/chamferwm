@@ -131,7 +131,7 @@ void Default::Start(){
 		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_SHIFT|XCB_MOD_MASK_1,kk,
 		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-	exitKeycode = SymbolToKeycode(XK_E,psymbols);
+	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	DefineBindings();
@@ -330,7 +330,7 @@ void Fake::Start(){
 		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_SHIFT|XCB_MOD_MASK_1,kk,
 		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-	exitKeycode = SymbolToKeycode(XK_E,psymbols);
+	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	DefineBindings();
@@ -372,10 +372,20 @@ bool Fake::HandleEvent(){
 	switch(pevent->response_type & 0x7F){
 	//case XCB_CONFIGURE_REQUEST:{
 	case XCB_CLIENT_MESSAGE:{
-	//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
-	//if(pev->data.data32[0] == wmD
+		//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
+		//if(pev->data.data32[0] == wmD
 	}
 	break;
+	case XCB_KEY_PRESS:{
+		xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
+		xcb_flush(pcon);
+		DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
+
+		if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode)
+			return false;
+		//
+		}
+		break;
 	}
 
 	return true;

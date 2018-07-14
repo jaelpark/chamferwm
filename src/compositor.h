@@ -25,16 +25,14 @@ protected:
 	VkDebugReportCallbackEXT debugReportCb;
 	VkPhysicalDevice physicalDev;
 	VkDevice logicalDev;
-	VkQueue graphicsQueue;
-	VkQueue presentQueue;
-	uint physicalDevIndex;
-
 	enum QUEUE_INDEX{
 		QUEUE_INDEX_GRAPHICS,
 		QUEUE_INDEX_PRESENT,
 		QUEUE_INDEX_COUNT
 	};
+	VkQueue queue[QUEUE_INDEX_COUNT];
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
+	uint physicalDevIndex;
 	
 	//uint queue
 
@@ -42,10 +40,10 @@ protected:
 };
 
 //Default compositor assumes XCB for its surface
-class Default : public CompositorInterface{
+class X11Compositor: public CompositorInterface{
 public:
-	Default(uint, const Backend::X11Backend *);
-	virtual ~Default();
+	X11Compositor(uint, const Backend::X11Backend *);
+	virtual ~X11Compositor();
 	void Start();
 	bool CheckDeviceCompatibility(VkPhysicalDevice, uint);
 	void CreateSurfaceKHR(VkSurfaceKHR *);

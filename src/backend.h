@@ -7,7 +7,7 @@
 //class xcb_screen_t;
 
 namespace Compositor{
-class Default;
+class X11Compositor;
 }
 
 namespace Backend{
@@ -25,7 +25,7 @@ protected:
 };
 
 class X11Backend : public BackendInterface{
-friend class Compositor::Default;
+friend class Compositor::X11Compositor;
 public:
 	X11Backend();
 	virtual ~X11Backend();
@@ -36,7 +36,6 @@ protected:
 };
 
 class Default : public X11Backend{
-friend class Compositor::Default;
 public:
 	Default();
 	virtual ~Default();
@@ -48,7 +47,6 @@ private:
 };
 
 class Fake : public X11Backend{
-friend class Compositor::Default;
 public:
 	Fake();
 	virtual ~Fake();
