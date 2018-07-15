@@ -27,6 +27,13 @@ Container::Container() : pch(0), pnext(0), pclient(0){
 	//
 }
 
+Container::Container(Container *pParent) : pch(0), pnext(0), pclient(0){
+	Container **pn = &pParent->pch;
+	while(*pn)
+		pn = &(*pn)->pnext;
+	*pn = this;
+}
+
 Container::~Container(){
 	//
 }

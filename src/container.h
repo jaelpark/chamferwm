@@ -10,11 +10,14 @@ public:
 	virtual ~Client();
 	//
 	//virtual functions for the backend implementation
+	//SetTranslation
+	//SetLayer
 };
 
 class Container{
 public:
-	Container();
+	Container(); //root container
+	Container(Container *);
 	~Container();
 	//
 	Container *pch; //First children

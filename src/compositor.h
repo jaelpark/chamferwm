@@ -22,8 +22,23 @@ public:
 	class CompositorInterface *pcomp;
 };*/
 
+class CompositorPipeline{
+public:
+	CompositorPipeline(class CompositorInterface *);
+	~CompositorPipeline();
+	class CompositorInterface *pcomp;
+	VkShaderModule vertexShader;
+	VkShaderModule fragmentShader;
+	VkPipelineLayout pipelineLayout;
+	VkRenderPass renderPass;
+	VkPipeline pipeline;
+
+	static CompositorPipeline * CreateDefault(CompositorInterface *pcomp);
+};
+
 class CompositorInterface{
 //friend class FrameObject;
+friend class CompositorPipeline;
 public:
 	CompositorInterface(uint);
 	virtual ~CompositorInterface();
@@ -31,6 +46,7 @@ public:
 protected:
 	void Initialize();
 	VkShaderModule CreateShaderModule(const char *, size_t);
+	VkShaderModule CreateShaderModuleFromFile(const char *);
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;
 	virtual VkExtent2D GetExtent() const = 0;
@@ -46,6 +62,7 @@ protected:
 	};
 	VkQueue queue[QUEUE_INDEX_COUNT];
 	VkSwapchainKHR swapChain;
+	VkExtent2D imageExtent;
 	VkImage *pswapChainImages;
 	VkImageView *pswapChainImageViews;
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
