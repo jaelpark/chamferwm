@@ -1,6 +1,8 @@
 #include "main.h"
+#include "container.h"
 #include "backend.h"
 #include <cstdlib>
+#include <algorithm>
 
 #include <xcb/xcb.h>
 #include <xcb/randr.h>
@@ -296,6 +298,14 @@ bool Default::HandleEvent(){
 	xcb_flush(pcon);
 
 	return true;
+}
+
+FakeClient::FakeClient() : WManager::Client(){
+	//
+}
+
+FakeClient::~FakeClient(){
+	//
 }
 
 Fake::Fake() : X11Backend(){

@@ -2,22 +2,35 @@
 #define COMPOSITOR_H
 
 #include <vulkan/vulkan.h>
-//#include <xcb/xproto.h>
 #include <vulkan/vulkan_xcb.h>
+//#include <vector>
 
 namespace Backend{
-class Default;
+class X11Backend;
 };
 
 namespace Compositor{
 
+//class FrameObjectDesc
+
+/*class FrameObject{
+public:
+	//single frame object consists of window and the frame/decorations
+	FrameObject(class CompositorInterface *);
+	~FrameObject();
+	//SetTranslation
+	class CompositorInterface *pcomp;
+};*/
+
 class CompositorInterface{
+//friend class FrameObject;
 public:
 	CompositorInterface(uint);
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
 protected:
 	void Initialize();
+	VkShaderModule CreateShaderModule(const char *, size_t);
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;
 	virtual VkExtent2D GetExtent() const = 0;
@@ -38,9 +51,9 @@ protected:
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
 	uint swapChainImageCount;
-	
-	//uint queue
 
+	//std::vector<FrameObject *> frameObjects;
+	
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };
 

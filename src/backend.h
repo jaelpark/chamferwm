@@ -10,6 +10,10 @@ namespace Compositor{
 class X11Compositor;
 }
 
+namespace WManager{
+class Client;
+}
+
 namespace Backend{
 
 class BackendInterface{
@@ -22,6 +26,8 @@ public:
 protected:
 	//Functions called by the implementing backends.
 	virtual void DefineBindings() = 0;
+	//
+	//std::vector<Client *> clients;
 };
 
 class X11Backend : public BackendInterface{
@@ -44,6 +50,12 @@ public:
 	bool HandleEvent();
 private:	
 	xcb_keycode_t exitKeycode;
+};
+
+class FakeClient : public WManager::Client{
+public:
+	FakeClient();
+	~FakeClient();
 };
 
 class Fake : public X11Backend{

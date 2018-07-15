@@ -1,4 +1,5 @@
 #include "main.h"
+#include "container.h"
 #include "backend.h"
 #include "compositor.h"
 
@@ -133,15 +134,10 @@ int main(sint argc, const char **pargv){
 	event1.data.ptr = &sfd;
 	event1.events = EPOLLIN;
 	epoll_ctl(sfd,EPOLL_CTL_ADD,sfd,&event1);*/
-#if 0
-	RunBackend *pbackend;
-	try{
-		pbackend = new RunBackend();
-	}catch(Exception e){
-		DebugPrintf(stderr,"%s\n",e.what());
-		return 1;
-	}
-#else
+
+	WManager::Container *proot = new WManager::Container();
+	WManager::Container *pfocus = proot;
+
 	Backend::X11Backend *pbackend;
 	try{
 		if(debugBackend.Get())
@@ -151,7 +147,6 @@ int main(sint argc, const char **pargv){
 		DebugPrintf(stderr,"%s\n",e.what());
 		return 1;
 	}
-#endif
 
 	sint fd = pbackend->GetEventFileDescriptor();
 	if(fd == -1){
@@ -189,6 +184,7 @@ int main(sint argc, const char **pargv){
 
 	delete pcomp;
 	delete pbackend;
+	delete proot;
 
 	return 0;
 }

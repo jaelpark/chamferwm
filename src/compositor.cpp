@@ -1,10 +1,23 @@
 #include "main.h"
+#include "container.h"
 #include "backend.h"
 #include "compositor.h"
 #include <set>
 #include <cstdlib>
 
 namespace Compositor{
+
+/*FrameObject::FrameObject(CompositorInterface *pcomp){
+	pcomp->frameObjects.push_back(this);
+	this->pcomp = pcomp;
+}
+
+FrameObject::~FrameObject(){
+	std::vector<FrameObject *>::iterator m = std::find(
+		pcomp->frameObjects.begin(),pcomp->frameObjects.end(),this);
+	std::iter_swap(m,pcomp->frameObjects.end()-1);
+	pcomp->frameObjects.pop_back();
+}*/
 
 CompositorInterface::CompositorInterface(uint physicalDevIndex){
 	this->physicalDevIndex = physicalDevIndex;
@@ -282,6 +295,19 @@ void CompositorInterface::Initialize(){
 	}
 	
 	DebugPrintf(stdout,"Initialization success.\n");
+}
+
+VkShaderModule CompositorInterface::CreateShaderModule(const char *pbin, size_t binlen){
+	VkShaderModuleCreateInfo shaderModuleCreateInfo;
+	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	shaderModuleCreateInfo.codeSize = binlen;
+	shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(pbin);
+
+	VkShaderModule shaderModule;
+	if(vkCreateShaderModule(logicalDev,&shaderModuleCreateInfo,0,&shaderModule) != VK_SUCCESS)
+		return 0;
+	
+	return shaderModule;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){
