@@ -15,13 +15,11 @@ CompositorPipeline::~CompositorPipeline(){
 	vkDestroyShaderModule(pcomp->logicalDev,vertexShader,0);
 	vkDestroyShaderModule(pcomp->logicalDev,fragmentShader,0);
 	vkDestroyPipeline(pcomp->logicalDev,pipeline,0);
-	vkDestroyRenderPass(pcomp->logicalDev,renderPass,0);
 	vkDestroyPipelineLayout(pcomp->logicalDev,pipelineLayout,0);
 }
 
 CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcomp){
 	VkPipelineLayout pipelineLayout;
-	VkRenderPass renderPass;
 	VkPipeline pipeline;
 	//
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
@@ -115,35 +113,7 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 	layoutCreateInfo.pPushConstantRanges = 0;
 	if(vkCreatePipelineLayout(pcomp->logicalDev,&layoutCreateInfo,0,&pipelineLayout) != VK_SUCCESS)
 		return 0;
-	
-	VkAttachmentReference attachmentRef = {};
-	attachmentRef.attachment = 0;
-	attachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	VkSubpassDescription subpassDesc = {};
-	subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpassDesc.colorAttachmentCount = 1;
-	subpassDesc.pColorAttachments = &attachmentRef;
-
-	VkAttachmentDescription attachmentDesc = {};
-	attachmentDesc.format = VK_FORMAT_B8G8R8A8_UNORM;
-	attachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-	attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	attachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-	VkRenderPassCreateInfo renderPassCreateInfo = {};
-	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassCreateInfo.attachmentCount = 1;
-	renderPassCreateInfo.pAttachments = &attachmentDesc;
-	renderPassCreateInfo.subpassCount = 1;
-	renderPassCreateInfo.pSubpasses = &subpassDesc;
-	if(vkCreateRenderPass(pcomp->logicalDev,&renderPassCreateInfo,0,&renderPass) != VK_SUCCESS)
-		return 0;
-	
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	graphicsPipelineCreateInfo.stageCount = sizeof(shaderStageCreateInfo)/sizeof(shaderStageCreateInfo[0]);
@@ -157,7 +127,7 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 	graphicsPipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
 	graphicsPipelineCreateInfo.pDynamicState = 0;
 	graphicsPipelineCreateInfo.layout = pipelineLayout;
-	graphicsPipelineCreateInfo.renderPass = renderPass;
+	graphicsPipelineCreateInfo.renderPass = pcomp->renderPass;
 	graphicsPipelineCreateInfo.subpass = 0;
 	graphicsPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
 	graphicsPipelineCreateInfo.basePipelineIndex = -1;
@@ -169,7 +139,6 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 	pcompPipeline->vertexShader = vertexShader;
 	pcompPipeline->fragmentShader = fragmentShader;
 	pcompPipeline->pipelineLayout = pipelineLayout;
-	pcompPipeline->renderPass = renderPass;
 	pcompPipeline->pipeline = pipeline;
 
 	return pcompPipeline;
@@ -192,11 +161,15 @@ CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIn
 }
 
 CompositorInterface::~CompositorInterface(){
-	for(uint i = 0; i < swapChainImageCount; ++i)
+	for(uint i = 0; i < swapChainImageCount; ++i){
+		vkDestroyFramebuffer(logicalDev,pframebuffers[i],0);
 		vkDestroyImageView(logicalDev,pswapChainImageViews[i],0);
+	}
 	delete []pswapChainImageViews;
 	delete []pswapChainImages;
 	vkDestroySwapchainKHR(logicalDev,swapChain,0);
+
+	vkDestroyRenderPass(logicalDev,renderPass,0);
 
 	vkDestroyDevice(logicalDev,0);
 
@@ -410,6 +383,35 @@ void CompositorInterface::Initialize(){
 
 	for(uint i = 0; i < QUEUE_INDEX_COUNT; ++i)
 		vkGetDeviceQueue(logicalDev,queueFamilyIndex[i],0,&queue[i]);
+
+	//render pass (later an array of these for different purposes)
+	VkAttachmentReference attachmentRef = {};
+	attachmentRef.attachment = 0;
+	attachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpassDesc = {};
+	subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpassDesc.colorAttachmentCount = 1;
+	subpassDesc.pColorAttachments = &attachmentRef;
+
+	VkAttachmentDescription attachmentDesc = {};
+	attachmentDesc.format = VK_FORMAT_B8G8R8A8_UNORM;
+	attachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VkRenderPassCreateInfo renderPassCreateInfo = {};
+	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassCreateInfo.attachmentCount = 1;
+	renderPassCreateInfo.pAttachments = &attachmentDesc;
+	renderPassCreateInfo.subpassCount = 1;
+	renderPassCreateInfo.pSubpasses = &subpassDesc;
+	if(vkCreateRenderPass(logicalDev,&renderPassCreateInfo,0,&renderPass) != VK_SUCCESS)
+		throw Exception("Failed to create a render pass.");
 	
 	imageExtent = GetExtent();
 
@@ -458,10 +460,22 @@ void CompositorInterface::Initialize(){
 	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
 	imageViewCreateInfo.subresourceRange.layerCount = 1;
 	pswapChainImageViews = new VkImageView[swapChainImageCount];
+	pframebuffers = new VkFramebuffer[swapChainImageCount];
 	for(uint i = 0; i < swapChainImageCount; ++i){
 		imageViewCreateInfo.image = pswapChainImages[i];
 		if(vkCreateImageView(logicalDev,&imageViewCreateInfo,0,&pswapChainImageViews[i]) != VK_SUCCESS)
 			throw Exception("Failed to create a swap chain image view.");
+
+		VkFramebufferCreateInfo framebufferCreateInfo = {};
+		framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferCreateInfo.renderPass = renderPass;
+		framebufferCreateInfo.attachmentCount = 1;
+		framebufferCreateInfo.pAttachments = pswapChainImageViews;
+		framebufferCreateInfo.width = imageExtent.width;
+		framebufferCreateInfo.height = imageExtent.height;
+		framebufferCreateInfo.layers = 1;
+		if(vkCreateFramebuffer(logicalDev,&framebufferCreateInfo,0,&pframebuffers[i]) != VK_SUCCESS)
+			throw Exception("Failed to create a framebuffer.");
 	}
 	
 	DebugPrintf(stdout,"Initialization success.\n");

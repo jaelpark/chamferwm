@@ -30,7 +30,7 @@ public:
 	VkShaderModule vertexShader;
 	VkShaderModule fragmentShader;
 	VkPipelineLayout pipelineLayout;
-	VkRenderPass renderPass;
+	//renderPass default
 	VkPipeline pipeline;
 
 	static CompositorPipeline * CreateDefault(CompositorInterface *pcomp);
@@ -61,10 +61,12 @@ protected:
 		QUEUE_INDEX_COUNT
 	};
 	VkQueue queue[QUEUE_INDEX_COUNT];
+	VkRenderPass renderPass;
 	VkSwapchainKHR swapChain;
 	VkExtent2D imageExtent;
 	VkImage *pswapChainImages;
 	VkImageView *pswapChainImageViews;
+	VkFramebuffer *pframebuffers;
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
 	uint swapChainImageCount;
