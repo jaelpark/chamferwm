@@ -33,8 +33,11 @@ protected:
 	};
 	VkQueue queue[QUEUE_INDEX_COUNT];
 	VkSwapchainKHR swapChain;
+	VkImage *pswapChainImages;
+	VkImageView *pswapChainImageViews;
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
+	uint swapChainImageCount;
 	
 	//uint queue
 

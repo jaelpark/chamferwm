@@ -19,3 +19,5 @@ vk = [
 
 executable('xwm',sources:src,dependencies:[xcb,vk],cpp_args:['-std=c++14'])
 
+#http://mesonbuild.com/Custom-build-targets.html
+

@@ -11,7 +11,12 @@ CompositorInterface::CompositorInterface(uint physicalDevIndex){
 }
 
 CompositorInterface::~CompositorInterface(){
+	for(uint i = 0; i < swapChainImageCount; ++i)
+		vkDestroyImageView(logicalDev,pswapChainImageViews[i],0);
+	delete []pswapChainImageViews;
+	delete []pswapChainImages;
 	vkDestroySwapchainKHR(logicalDev,swapChain,0);
+
 	vkDestroyDevice(logicalDev,0);
 
 	((PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance,"vkDestroyDebugReportCallbackEXT"))(instance,debugReportCb,0);
@@ -251,6 +256,30 @@ void CompositorInterface::Initialize(){
 		throw Exception("Failed to create swap chain.");
 
 	DebugPrintf(stdout,"Swap chain image extent %ux%u\n",swapchainCreateInfo.imageExtent.width,swapchainCreateInfo.imageExtent.height);
+
+	vkGetSwapchainImagesKHR(logicalDev,swapChain,&swapChainImageCount,0);
+	pswapChainImages = new VkImage[swapChainImageCount];
+	vkGetSwapchainImagesKHR(logicalDev,swapChain,&swapChainImageCount,pswapChainImages);
+
+	VkImageViewCreateInfo imageViewCreateInfo = {};
+	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	imageViewCreateInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+	imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	imageViewCreateInfo.subresourceRange.levelCount = 1;
+	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	imageViewCreateInfo.subresourceRange.layerCount = 1;
+	pswapChainImageViews = new VkImageView[swapChainImageCount];
+	for(uint i = 0; i < swapChainImageCount; ++i){
+		imageViewCreateInfo.image = pswapChainImages[i];
+		if(vkCreateImageView(logicalDev,&imageViewCreateInfo,0,&pswapChainImageViews[i]) != VK_SUCCESS)
+			throw Exception("Failed to create a swap chain image view.");
+	}
 	
 	DebugPrintf(stdout,"Initialization success.\n");
 }
