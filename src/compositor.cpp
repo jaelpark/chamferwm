@@ -430,12 +430,23 @@ void CompositorInterface::Initialize(){
 	attachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	attachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
+	VkSubpassDependency subpassDependency = {};
+	subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	subpassDependency.srcAccessMask = 0;
+	subpassDependency.dstSubpass = 0;
+	subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	//subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_MEMORY_READ_BIT;
+
 	VkRenderPassCreateInfo renderPassCreateInfo = {};
 	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	renderPassCreateInfo.attachmentCount = 1;
 	renderPassCreateInfo.pAttachments = &attachmentDesc;
 	renderPassCreateInfo.subpassCount = 1;
 	renderPassCreateInfo.pSubpasses = &subpassDesc;
+	renderPassCreateInfo.dependencyCount = 1;
+	renderPassCreateInfo.pDependencies = &subpassDependency;
 	if(vkCreateRenderPass(logicalDev,&renderPassCreateInfo,0,&renderPass) != VK_SUCCESS)
 		throw Exception("Failed to create a render pass.");
 	
@@ -445,7 +456,7 @@ void CompositorInterface::Initialize(){
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	swapchainCreateInfo.surface = surface;
-	swapchainCreateInfo.minImageCount = 2;
+	swapchainCreateInfo.minImageCount = 3;
 	swapchainCreateInfo.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
 	swapchainCreateInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 	swapchainCreateInfo.imageExtent = imageExtent;
@@ -460,7 +471,8 @@ void CompositorInterface::Initialize(){
 	}else swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	swapchainCreateInfo.preTransform = surfaceCapabilities.currentTransform;
 	swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	swapchainCreateInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+	//swapchainCreateInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+	swapchainCreateInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
 	swapchainCreateInfo.clipped = VK_TRUE;
 	swapchainCreateInfo.oldSwapchain = 0;
 	if(vkCreateSwapchainKHR(logicalDev,&swapchainCreateInfo,0,&swapChain) != VK_SUCCESS)
@@ -496,7 +508,7 @@ void CompositorInterface::Initialize(){
 		framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		framebufferCreateInfo.renderPass = renderPass;
 		framebufferCreateInfo.attachmentCount = 1;
-		framebufferCreateInfo.pAttachments = pswapChainImageViews;
+		framebufferCreateInfo.pAttachments = &pswapChainImageViews[i];
 		framebufferCreateInfo.width = imageExtent.width;
 		framebufferCreateInfo.height = imageExtent.height;
 		framebufferCreateInfo.layers = 1;
@@ -551,7 +563,7 @@ VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc)
 	size_t len = ftell(pf);
 	fseek(pf,0,SEEK_SET);
 	
-	char *pbuf = new char[len+1];
+	char *pbuf = new char[len];
 	fread(pbuf,1,len,pf);
 	fclose(pf);
 
@@ -572,7 +584,7 @@ void CompositorInterface::GenerateCommandBuffers(){
 		if(vkBeginCommandBuffer(pcommandBuffers[i],&commandBufferBeginInfo) != VK_SUCCESS)
 			throw Exception("Failed to begin command buffer recording.");
 
-		static VkClearValue clearValue = {0.0f,0.0f,0.0f,1.0};
+		static const VkClearValue clearValue = {0.0f,0.0f,0.0f,1.0};
 		VkRenderPassBeginInfo renderPassBeginInfo = {};
 		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassBeginInfo.renderPass = renderPass;
@@ -596,10 +608,11 @@ void CompositorInterface::GenerateCommandBuffers(){
 
 void CompositorInterface::Present(){
 	uint imageIndex;
-	vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),semaphore[SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex);
+	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),semaphore[SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS)
+		throw Exception("Failed to acquire a swap chain image.\n");
 	//
-	//VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-	VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
+	VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+	//VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
 	
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -610,11 +623,8 @@ void CompositorInterface::Present(){
 	submitInfo.pSignalSemaphores = &semaphore[SEMAPHORE_INDEX_RENDER_FINISHED];
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &pcommandBuffers[imageIndex];
-	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,0) != VK_SUCCESS){
-		DebugPrintf(stderr,"Failed to submit a queue.");
-		//throw Exception("Failed to submit a queue.");
-		return;
-	}
+	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,0) != VK_SUCCESS)
+		throw Exception("Failed to submit a queue.");
 	
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -626,7 +636,7 @@ void CompositorInterface::Present(){
 	presentInfo.pResults = 0;
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
 
-	vkDeviceWaitIdle(logicalDev);
+	//vkDeviceWaitIdle(logicalDev);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){

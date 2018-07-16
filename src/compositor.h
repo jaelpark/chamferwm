@@ -82,6 +82,7 @@ protected:
 	uint physicalDevIndex;
 	uint swapChainImageCount;
 
+	//placeholder variables
 	CompositorPipeline *pdefaultPipeline; //temp?
 
 	//std::vector<FrameObject *> frameObjects;
