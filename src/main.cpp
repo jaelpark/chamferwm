@@ -85,12 +85,15 @@ class RunCompositor : public Compositor::X11Compositor{
 public:
 	RunCompositor(uint gpuIndex, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend){
 		Start();
-		GenerateCommandBuffers();
 		DebugPrintf(stdout,"Compositor enabled.\n");
-		Present();
 	}
 
 	~RunCompositor(){}
+
+	void Present(){
+		GenerateCommandBuffers();
+		Compositor::X11Compositor::Present();
+	}
 };
 
 int main(sint argc, const char **pargv){	
@@ -162,6 +165,7 @@ int main(sint argc, const char **pargv){
 	RunCompositor *pcomp;
 	try{
 		pcomp = new RunCompositor(gpuIndex.Get(),pbackend);
+		pcomp->Present();
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		delete pbackend;

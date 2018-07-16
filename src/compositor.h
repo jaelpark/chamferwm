@@ -28,6 +28,7 @@ public:
 	~CompositorPipeline();
 	class CompositorInterface *pcomp;
 	VkShaderModule vertexShader;
+	VkShaderModule geometryShader;
 	VkShaderModule fragmentShader;
 	VkPipelineLayout pipelineLayout;
 	//renderPass default

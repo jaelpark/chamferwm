@@ -376,6 +376,7 @@ bool Fake::HandleEvent(){
 			DebugPrintf(stderr,"X server connection lost\n");
 			return false;
 		}
+		return true;
 	}
 
 	//switch(pevent->response_type & ~0x80){

@@ -14,6 +14,7 @@ CompositorPipeline::CompositorPipeline(CompositorInterface *_pcomp) : pcomp(_pco
 
 CompositorPipeline::~CompositorPipeline(){
 	vkDestroyShaderModule(pcomp->logicalDev,vertexShader,0);
+	vkDestroyShaderModule(pcomp->logicalDev,geometryShader,0);
 	vkDestroyShaderModule(pcomp->logicalDev,fragmentShader,0);
 	vkDestroyPipeline(pcomp->logicalDev,pipeline,0);
 	vkDestroyPipelineLayout(pcomp->logicalDev,pipelineLayout,0);
@@ -32,26 +33,34 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
 	inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	//inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 	inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
 
-	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[2];
+	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[3];
 
 	//VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("15_vert.spv");
-	VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("filter_vertex.spv");
+	VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("frame_vertex.spv");
 	shaderStageCreateInfo[0] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 	shaderStageCreateInfo[0].module = vertexShader;
 	shaderStageCreateInfo[0].pName = "main";
 
-	VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("filter_fragment.spv");
-	//VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("15_frag.spv");
+	VkShaderModule geometryShader = pcomp->CreateShaderModuleFromFile("frame_geometry.spv");
 	shaderStageCreateInfo[1] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shaderStageCreateInfo[1].module = fragmentShader;
+	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_GEOMETRY_BIT;
+	shaderStageCreateInfo[1].module = geometryShader;
 	shaderStageCreateInfo[1].pName = "main";
+
+	VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("frame_fragment.spv");
+	//VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("15_frag.spv");
+	shaderStageCreateInfo[2] = (VkPipelineShaderStageCreateInfo){};
+	shaderStageCreateInfo[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStageCreateInfo[2].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shaderStageCreateInfo[2].module = fragmentShader;
+	shaderStageCreateInfo[2].pName = "main";
 
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
@@ -78,8 +87,10 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 	rasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
 	rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizationStateCreateInfo.lineWidth = 1.0f;
-	rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
+	//rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	//rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
 	rasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
 	rasterizationStateCreateInfo.depthBiasClamp = 0.0f;
@@ -139,6 +150,7 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 
 	CompositorPipeline *pcompPipeline = new CompositorPipeline(pcomp);
 	pcompPipeline->vertexShader = vertexShader;
+	pcompPipeline->geometryShader = geometryShader;
 	pcompPipeline->fragmentShader = fragmentShader;
 	pcompPipeline->pipelineLayout = pipelineLayout;
 	pcompPipeline->pipeline = pipeline;
@@ -163,6 +175,7 @@ CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIn
 }
 
 CompositorInterface::~CompositorInterface(){
+	DebugPrintf(stdout,"Compositor cleanup");
 	vkDeviceWaitIdle(logicalDev);
 
 	delete []pcommandBuffers;
@@ -359,6 +372,7 @@ void CompositorInterface::Initialize(){
 	}
 
 	VkPhysicalDeviceFeatures physicalDevFeatures = {};
+	physicalDevFeatures.geometryShader = VK_TRUE;
 	
 	uint devExtCount;
 	vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,0);
@@ -570,7 +584,8 @@ void CompositorInterface::GenerateCommandBuffers(){
 		vkCmdBeginRenderPass(pcommandBuffers[i],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
 		vkCmdBindPipeline(pcommandBuffers[i],VK_PIPELINE_BIND_POINT_GRAPHICS,pdefaultPipeline->pipeline);
-		vkCmdDraw(pcommandBuffers[i],3,1,0,0);
+		//vkCmdDraw(pcommandBuffers[i],3,1,0,0);
+		vkCmdDraw(pcommandBuffers[i],1,1,0,0);
 
 		vkCmdEndRenderPass(pcommandBuffers[i]);
 
@@ -595,8 +610,11 @@ void CompositorInterface::Present(){
 	submitInfo.pSignalSemaphores = &semaphore[SEMAPHORE_INDEX_RENDER_FINISHED];
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &pcommandBuffers[imageIndex];
-	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,0) != VK_SUCCESS)
-		throw Exception("Failed to submit a queue.");
+	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,0) != VK_SUCCESS){
+		DebugPrintf(stderr,"Failed to submit a queue.");
+		//throw Exception("Failed to submit a queue.");
+		return;
+	}
 	
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -608,6 +626,7 @@ void CompositorInterface::Present(){
 	presentInfo.pResults = 0;
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
 
+	vkDeviceWaitIdle(logicalDev);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){
