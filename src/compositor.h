@@ -48,6 +48,7 @@ protected:
 	VkShaderModule CreateShaderModule(const char *, size_t);
 	VkShaderModule CreateShaderModuleFromFile(const char *);
 	void GenerateCommandBuffers();
+	void Present();
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;
 	virtual VkExtent2D GetExtent() const = 0;
@@ -68,6 +69,12 @@ protected:
 	VkImage *pswapChainImages;
 	VkImageView *pswapChainImageViews;
 	VkFramebuffer *pframebuffers;
+	enum SEMAPHORE_INDEX{
+		SEMAPHORE_INDEX_IMAGE_AVAILABLE,
+		SEMAPHORE_INDEX_RENDER_FINISHED,
+		SEMAPHORE_INDEX_COUNT
+	};
+	VkSemaphore semaphore[SEMAPHORE_INDEX_COUNT];
 	VkCommandPool commandPool;
 	VkCommandBuffer *pcommandBuffers;
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //

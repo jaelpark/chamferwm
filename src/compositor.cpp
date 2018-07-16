@@ -4,6 +4,7 @@
 #include "compositor.h"
 #include <set>
 #include <cstdlib>
+#include <limits>
 
 namespace Compositor{
 
@@ -36,6 +37,7 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[2];
 
+	//VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("15_vert.spv");
 	VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("filter_vertex.spv");
 	shaderStageCreateInfo[0] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -44,6 +46,7 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 	shaderStageCreateInfo[0].pName = "main";
 
 	VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("filter_fragment.spv");
+	//VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("15_frag.spv");
 	shaderStageCreateInfo[1] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -128,10 +131,10 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 	graphicsPipelineCreateInfo.layout = pipelineLayout;
 	graphicsPipelineCreateInfo.renderPass = pcomp->renderPass;
 	graphicsPipelineCreateInfo.subpass = 0;
-	graphicsPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+	graphicsPipelineCreateInfo.basePipelineHandle = 0;
 	graphicsPipelineCreateInfo.basePipelineIndex = -1;
 
-	if(vkCreateGraphicsPipelines(pcomp->logicalDev,VK_NULL_HANDLE,1,&graphicsPipelineCreateInfo,0,&pipeline) != VK_SUCCESS)
+	if(vkCreateGraphicsPipelines(pcomp->logicalDev,0,1,&graphicsPipelineCreateInfo,0,&pipeline) != VK_SUCCESS)
 		return 0;
 
 	CompositorPipeline *pcompPipeline = new CompositorPipeline(pcomp);
@@ -160,11 +163,16 @@ CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIn
 }
 
 CompositorInterface::~CompositorInterface(){
+	vkDeviceWaitIdle(logicalDev);
+
 	delete []pcommandBuffers;
 
 	vkDestroyCommandPool(logicalDev,commandPool,0);
 
 	delete pdefaultPipeline;
+
+	for(uint i = 0; i < SEMAPHORE_INDEX_COUNT; ++i)
+		vkDestroySemaphore(logicalDev,semaphore[i],0);
 
 	for(uint i = 0; i < swapChainImageCount; ++i){
 		vkDestroyFramebuffer(logicalDev,pframebuffers[i],0);
@@ -482,6 +490,12 @@ void CompositorInterface::Initialize(){
 			throw Exception("Failed to create a framebuffer.");
 	}
 
+	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	for(uint i = 0; i < SEMAPHORE_INDEX_COUNT; ++i)
+		if(vkCreateSemaphore(logicalDev,&semaphoreCreateInfo,0,&semaphore[i]) != VK_SUCCESS)
+			throw Exception("Failed to create a semaphore.");
+
 	if(!(pdefaultPipeline = CompositorPipeline::CreateDefault(this)))
 		throw Exception("Failed to create the default compositor pipeline.");
 	
@@ -563,6 +577,37 @@ void CompositorInterface::GenerateCommandBuffers(){
 		if(vkEndCommandBuffer(pcommandBuffers[i]) != VK_SUCCESS)
 			throw Exception("Failed to end command buffer recording.");
 	}
+}
+
+void CompositorInterface::Present(){
+	uint imageIndex;
+	vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),semaphore[SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex);
+	//
+	//VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+	VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
+	
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = &semaphore[SEMAPHORE_INDEX_IMAGE_AVAILABLE];
+	submitInfo.pWaitDstStageMask = pipelineStageFlags;
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = &semaphore[SEMAPHORE_INDEX_RENDER_FINISHED];
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &pcommandBuffers[imageIndex];
+	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,0) != VK_SUCCESS)
+		throw Exception("Failed to submit a queue.");
+	
+	VkPresentInfoKHR presentInfo = {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = &semaphore[SEMAPHORE_INDEX_RENDER_FINISHED];
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &swapChain;
+	presentInfo.pImageIndices = &imageIndex;
+	presentInfo.pResults = 0;
+	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
+
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){

@@ -87,6 +87,7 @@ public:
 		Start();
 		GenerateCommandBuffers();
 		DebugPrintf(stdout,"Compositor enabled.\n");
+		Present();
 	}
 
 	~RunCompositor(){}
@@ -166,9 +167,6 @@ int main(sint argc, const char **pargv){
 		delete pbackend;
 		return 1;
 	}
-
-	//https://harrylovescode.gitbooks.io/vulkan-api/content/chap04/chap04-linux.html
-	//https://harrylovescode.gitbooks.io/vulkan-api/content/chap05/chap05-linux.html
 
 	for(bool r = true; r;){
 		for(sint n = epoll_wait(efd,events,MAX_EVENTS,-1), i = 0; i < n; ++i){
