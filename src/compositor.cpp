@@ -36,14 +36,14 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[2];
 
-	VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("vertex.hlsl");
+	VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("filter_vertex.spv");
 	shaderStageCreateInfo[0] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 	shaderStageCreateInfo[0].module = vertexShader;
 	shaderStageCreateInfo[0].pName = "main";
 
-	VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("fragment.hlsl");
+	VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("filter_fragment.spv");
 	shaderStageCreateInfo[1] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -85,8 +85,7 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 	VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo = {};
 	multisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;
-	multisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
+	multisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; 
 	//depth stencil
 
 	VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {};
@@ -161,6 +160,12 @@ CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIn
 }
 
 CompositorInterface::~CompositorInterface(){
+	delete []pcommandBuffers;
+
+	vkDestroyCommandPool(logicalDev,commandPool,0);
+
+	delete pdefaultPipeline;
+
 	for(uint i = 0; i < swapChainImageCount; ++i){
 		vkDestroyFramebuffer(logicalDev,pframebuffers[i],0);
 		vkDestroyImageView(logicalDev,pswapChainImageViews[i],0);
@@ -291,7 +296,6 @@ void CompositorInterface::Initialize(){
 	for(uint i = 0; i < formatCount; ++i)
 		if(pformats[i].format == VK_FORMAT_B8G8R8A8_UNORM && pformats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 			printf("Surface format ok.\n");
-	//VK_FORMAT_R8G8B8A8_UNORM;
 
 	uint presentModeCount;
 	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDev,surface,&presentModeCount,0);
@@ -477,12 +481,31 @@ void CompositorInterface::Initialize(){
 		if(vkCreateFramebuffer(logicalDev,&framebufferCreateInfo,0,&pframebuffers[i]) != VK_SUCCESS)
 			throw Exception("Failed to create a framebuffer.");
 	}
+
+	if(!(pdefaultPipeline = CompositorPipeline::CreateDefault(this)))
+		throw Exception("Failed to create the default compositor pipeline.");
 	
-	DebugPrintf(stdout,"Initialization success.\n");
+	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
+	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex[QUEUE_INDEX_GRAPHICS];
+	commandPoolCreateInfo.flags = 0; //TODO: flags
+	if(vkCreateCommandPool(logicalDev,&commandPoolCreateInfo,0,&commandPool) != VK_SUCCESS)
+		throw Exception("Failed to create a command pool.");
+	
+	pcommandBuffers = new VkCommandBuffer[swapChainImageCount];
+
+	VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
+	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	commandBufferAllocateInfo.commandPool = commandPool;
+	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	commandBufferAllocateInfo.commandBufferCount = swapChainImageCount;
+	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcommandBuffers) != VK_SUCCESS)
+		throw Exception("Failed to allocate command buffers.");
+
 }
 
 VkShaderModule CompositorInterface::CreateShaderModule(const char *pbin, size_t binlen){
-	VkShaderModuleCreateInfo shaderModuleCreateInfo;
+	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	shaderModuleCreateInfo.codeSize = binlen;
 	shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(pbin);
@@ -500,7 +523,7 @@ VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc)
 	size_t len = ftell(pf);
 	fseek(pf,0,SEEK_SET);
 	
-	char *pbuf = new char[len];
+	char *pbuf = new char[len+1];
 	fread(pbuf,1,len,pf);
 	fclose(pf);
 
@@ -508,6 +531,38 @@ VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc)
 	delete []pbuf;
 
 	return shaderModule;
+}
+
+void CompositorInterface::GenerateCommandBuffers(){
+	//TODO: improved mechanism to generate only the command buffer for the next frame.
+	//This function checks wether the command buffer has to be rerecorded
+	for(uint i = 0; i < swapChainImageCount; ++i){
+		VkCommandBufferBeginInfo commandBufferBeginInfo = {};
+		commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+		commandBufferBeginInfo.pInheritanceInfo = 0;
+		if(vkBeginCommandBuffer(pcommandBuffers[i],&commandBufferBeginInfo) != VK_SUCCESS)
+			throw Exception("Failed to begin command buffer recording.");
+
+		static VkClearValue clearValue = {0.0f,0.0f,0.0f,1.0};
+		VkRenderPassBeginInfo renderPassBeginInfo = {};
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.framebuffer = pframebuffers[i];
+		renderPassBeginInfo.renderArea.offset = {0,0};
+		renderPassBeginInfo.renderArea.extent = imageExtent;
+		renderPassBeginInfo.clearValueCount = 1;
+		renderPassBeginInfo.pClearValues = &clearValue;
+		vkCmdBeginRenderPass(pcommandBuffers[i],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
+
+		vkCmdBindPipeline(pcommandBuffers[i],VK_PIPELINE_BIND_POINT_GRAPHICS,pdefaultPipeline->pipeline);
+		vkCmdDraw(pcommandBuffers[i],3,1,0,0);
+
+		vkCmdEndRenderPass(pcommandBuffers[i]);
+
+		if(vkEndCommandBuffer(pcommandBuffers[i]) != VK_SUCCESS)
+			throw Exception("Failed to end command buffer recording.");
+	}
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){
@@ -539,12 +594,8 @@ void X11Compositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
 	xcbSurfaceCreateInfo.connection = pbackend->pcon; //pcon
 	xcbSurfaceCreateInfo.window = pbackend->overlay;
 	//if(((PFN_vkCreateXcbSurfaceKHR)vkGetInstanceProcAddr(instance,"vkCreateXcbSurfaceKHR"))(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS)
-	if(vkCreateXcbSurfaceKHR(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS){
-		//DebugPrintf(stderr,"Failed to create KHR surface.\n");
+	if(vkCreateXcbSurfaceKHR(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS)
 		throw("Failed to create KHR surface.");
-	}
-	//
-	//PFN_vkCreateXcbSurfaceKHR
 }
 
 VkExtent2D X11Compositor::GetExtent() const{

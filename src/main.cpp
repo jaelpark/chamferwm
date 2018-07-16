@@ -85,6 +85,7 @@ class RunCompositor : public Compositor::X11Compositor{
 public:
 	RunCompositor(uint gpuIndex, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend){
 		Start();
+		GenerateCommandBuffers();
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
 

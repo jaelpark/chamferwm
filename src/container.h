@@ -23,6 +23,10 @@ public:
 	Container *pch; //First children
 	Container *pnext; //Subsequent container in the parent container
 	Client *pclient;
+
+	//float wscale, hscale;
+	// = 1.0f: default size, scale with the number of containers
+	// < 1.0f: smaller than default, leaving the unscaled parallel containers more space
 	
 	/*enum{
 		MODE_VSPLIT,

@@ -47,6 +47,7 @@ protected:
 	void Initialize();
 	VkShaderModule CreateShaderModule(const char *, size_t);
 	VkShaderModule CreateShaderModuleFromFile(const char *);
+	void GenerateCommandBuffers();
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;
 	virtual VkExtent2D GetExtent() const = 0;
@@ -67,9 +68,13 @@ protected:
 	VkImage *pswapChainImages;
 	VkImageView *pswapChainImageViews;
 	VkFramebuffer *pframebuffers;
+	VkCommandPool commandPool;
+	VkCommandBuffer *pcommandBuffers;
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
 	uint swapChainImageCount;
+
+	CompositorPipeline *pdefaultPipeline; //temp?
 
 	//std::vector<FrameObject *> frameObjects;
 	
