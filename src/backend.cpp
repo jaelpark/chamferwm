@@ -83,6 +83,36 @@ BackendInterface::~BackendInterface(){
 	//
 }
 
+X11Client::X11Client(xcb_window_t _window, const X11Backend *_pbackend) : window(_window), pbackend(_pbackend){
+
+	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW};
+	xcb_change_window_attributes_checked(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
+	xcb_map_window(pbackend->pcon,window);
+
+	xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL); //before map?
+
+	windowPixmap = xcb_generate_id(pbackend->pcon);
+	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
+	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
+
+	//uint data[] = {XCB_ICCCM_WM_STATE_NORMAL,XCB_NONE};
+	//xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pev->window,atomWmState,atomWmState,32,2,data);
+}
+
+X11Client::~X11Client(){
+	//
+}
+
+WManager::Rectangle X11Client::GetRect() const{
+	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,window);
+	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
+	if(!pgeometryReply)
+		return (WManager::Rectangle){0,0,0,0};
+	WManager::Rectangle r = (WManager::Rectangle){pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
+	free(pgeometryReply);
+	return r;
+}
+
 X11Backend::X11Backend(){
 	//
 }
@@ -245,13 +275,10 @@ bool Default::HandleEvent(){
 		break;
 	case XCB_MAP_REQUEST:{
 		xcb_map_request_event_t *pev = (xcb_map_request_event_t*)pevent;
+		
+		//TODO: check if window already exists
+		X11Client *pclient = new X11Client(pev->window,this);
 
-		uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW};
-		xcb_change_window_attributes_checked(pcon,pev->window,XCB_CW_EVENT_MASK,values);
-		xcb_map_window(pcon,pev->window);
-
-		//uint data[] = {XCB_ICCCM_WM_STATE_NORMAL,XCB_NONE};
-		//xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pev->window,atomWmState,atomWmState,32,2,data);
 		xcb_flush(pcon);
 		DebugPrintf(stdout,"map request\n");
 		}
@@ -289,6 +316,11 @@ bool Default::HandleEvent(){
 	case XCB_UNMAP_NOTIFY:
 		DebugPrintf(stdout,"unmapping\n");
 		break;
+	case XCB_DESTROY_NOTIFY:{
+		xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
+		//destroy client
+		}
+		break;
 	default:
 		DebugPrintf(stdout,"default event\n");
 		break;
@@ -300,12 +332,17 @@ bool Default::HandleEvent(){
 	return true;
 }
 
-FakeClient::FakeClient() : WManager::Client(){
+FakeClient::FakeClient(sint _x, sint _y, sint _w, sint _h) : WManager::Client(), x(_x), y(_y), w(_w), h(_h){
 	//
 }
 
 FakeClient::~FakeClient(){
 	//
+}
+
+WManager::Rectangle FakeClient::GetRect() const{
+	//return (WManager::Rectangle){912-452,1,452,200};
+	return (WManager::Rectangle){x,y,w,h};
 }
 
 Fake::Fake() : X11Backend(){

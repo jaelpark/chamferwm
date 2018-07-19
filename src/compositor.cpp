@@ -2,6 +2,10 @@
 #include "container.h"
 #include "backend.h"
 #include "compositor.h"
+
+#define GLMF_SWIZZLE
+#include <glm/glm.hpp>
+//#include <glm/gtx/vec_swizzle.hpp>
 #include <set>
 #include <cstdlib>
 #include <limits>
@@ -39,7 +43,6 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[3];
 
-	//VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("15_vert.spv");
 	VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("frame_vertex.spv");
 	shaderStageCreateInfo[0] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -55,7 +58,6 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 	shaderStageCreateInfo[1].pName = "main";
 
 	VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("frame_fragment.spv");
-	//VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("15_frag.spv");
 	shaderStageCreateInfo[2] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[2].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -118,12 +120,17 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 	colorBlendStateCreateInfo.blendConstants[2] = 0.0f;
 	colorBlendStateCreateInfo.blendConstants[3] = 0.0f;
 
+	VkPushConstantRange pushConstantRange = {};
+	pushConstantRange.stageFlags = VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT;
+	pushConstantRange.offset = 0;
+	pushConstantRange.size = 32;
+
 	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
 	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	layoutCreateInfo.setLayoutCount = 0;
 	layoutCreateInfo.pSetLayouts = 0;
-	layoutCreateInfo.pushConstantRangeCount = 0;
-	layoutCreateInfo.pPushConstantRanges = 0;
+	layoutCreateInfo.pushConstantRangeCount = 1;
+	layoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 	if(vkCreatePipelineLayout(pcomp->logicalDev,&layoutCreateInfo,0,&pipelineLayout) != VK_SUCCESS)
 		return 0;
 
@@ -169,6 +176,58 @@ FrameObject::~FrameObject(){
 	std::iter_swap(m,pcomp->frameObjects.end()-1);
 	pcomp->frameObjects.pop_back();
 }*/
+
+RenderObject::RenderObject(const CompositorPipeline *_pPipeline, const CompositorInterface *_pcomp) : pPipeline(_pPipeline), pcomp(_pcomp){
+	//
+}
+
+RenderObject::~RenderObject(){
+	//
+}
+
+FrameObject::FrameObject(const CompositorPipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RenderObject(_pPipeline,_pcomp), frame(_frame){
+	//
+}
+
+FrameObject::~FrameObject(){
+	//
+}
+
+void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
+	/*glm::mat4 tr = glm::mat4(
+		2.0f,0.0f,0.0f,0.0f,
+		0.0f,1.0f,0.0f,0.0f,
+		0.0f,0.0f,2.0f,0.0f,
+		0.0f,0.0f,0.0f,1.0f);*/
+	/*glm::mat4 tr = glm::mat4(
+		1.0f,0.0f,0.0f,0.0f,
+		0.0f,0.5f,0.0f,0.0f,
+		0.0f,0.0f,1.0f,0.0f,
+		0.0f,0.0f,0.0f,1.0f);*/
+		//0.5f,0.0f,0.0f,1.0f);*/
+	/*glm::mat4 tr = glm::mat4(
+		0.7f,0.0f,0.0f,0.0f,
+		0.0f,0.7f*0.5f,0.0f,0.0f,
+		0.0f,0.0f,0.7f,0.0f,
+		0.0f,0.0f,0.0f,1.0f);*/
+	//TODO: need accurate coordinates, also add +0.5 for pixel centers
+	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
+	frameVec += 0.5f;
+	frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
+	frameVec *= 2.0f;
+	frameVec -= 1.0f;
+
+	float pushConstants[] = {
+		frameVec.x,frameVec.y,
+		frameVec.z,frameVec.w,
+		0,1,0,1
+		//(float)pcomp->imageExtent.height/(float)pcomp->imageExtent.width,0.0f,0.0f,0.0f //TODO: should be in separate constant
+	};
+	//aspectRatio, time, 0, 0
+	//vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT,0,64,&tr);
+	vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
+	vkCmdDraw(*pcommandBuffer,1,1,0,0);
+}
 
 CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex){
 	//
@@ -293,6 +352,7 @@ void CompositorInterface::Initialize(){
 		printf("%c %u: %s\n\t.deviceID: %u\n\t.vendorID: %u\n\t.deviceType: %u\n",
 			i == physicalDevIndex?'*':' ',
 			i,devProps.deviceName,devProps.deviceID,devProps.vendorID,devProps.deviceType);
+		printf("max push constant size: %u\n",devProps.limits.maxPushConstantsSize);
 	}
 
 	if(physicalDevIndex >= devCount){
@@ -544,7 +604,7 @@ void CompositorInterface::Initialize(){
 
 }
 
-VkShaderModule CompositorInterface::CreateShaderModule(const char *pbin, size_t binlen){
+VkShaderModule CompositorInterface::CreateShaderModule(const char *pbin, size_t binlen) const{
 	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	shaderModuleCreateInfo.codeSize = binlen;
@@ -557,7 +617,7 @@ VkShaderModule CompositorInterface::CreateShaderModule(const char *pbin, size_t 
 	return shaderModule;
 }
 
-VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc){
+VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc) const{
 	FILE *pf = fopen(psrc,"rb");
 	fseek(pf,0,SEEK_END);
 	size_t len = ftell(pf);
@@ -573,9 +633,39 @@ VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc)
 	return shaderModule;
 }
 
-void CompositorInterface::GenerateCommandBuffers(){
+void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer){
+	for(const WManager::Container *pcont = pcontainer; pcont; pcont = pcont->pnext){
+		if(!pcont->pclient)
+			continue;
+		WManager::Rectangle r = pcont->pclient->GetRect();
+		VkRect2D frame;
+		frame.offset = {r.x,r.y};
+		frame.extent = {r.w,r.h};
+
+		FrameObject &frameObject = frameObjectPool.emplace_back(pdefaultPipeline,this,frame);
+		renderQueue.push_back(&frameObject);
+		if(pcont->pch)
+			CreateRenderQueue(pcont->pch);
+		//worry about stacks later
+		//stacks: render in same order, except skip focus? Focus is rendered last.
+	}
+}
+
+void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot){
 	//TODO: improved mechanism to generate only the command buffer for the next frame.
 	//This function checks wether the command buffer has to be rerecorded
+	//constants:
+	//-aspect ratio
+	//-transformation 3x3 matrix
+	//-time since creation of the object
+	if(!proot)
+		return;
+
+	//Create a render list elements arranged from back to front
+	renderQueue.clear();
+	frameObjectPool.clear();
+	CreateRenderQueue(proot->pch);
+	//
 	for(uint i = 0; i < swapChainImageCount; ++i){
 		VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 		commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -596,8 +686,18 @@ void CompositorInterface::GenerateCommandBuffers(){
 		vkCmdBeginRenderPass(pcommandBuffers[i],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
 		vkCmdBindPipeline(pcommandBuffers[i],VK_PIPELINE_BIND_POINT_GRAPHICS,pdefaultPipeline->pipeline);
+		
 		//vkCmdDraw(pcommandBuffers[i],3,1,0,0);
-		vkCmdDraw(pcommandBuffers[i],1,1,0,0);
+		//vkCmdDraw(pcommandBuffers[i],1,1,0,0);
+		/*for(RenderObject *prenderObject : renderQueue){
+			//
+			prenderObject->Draw(&pcommandBuffers[i]);
+		}*/
+		//renderQueue[1]->Draw(&pcommandBuffers[i]);
+		//frameObjectPool[0].Draw(&pcommandBuffers[i]);
+		//frameObjectPool[1].Draw(&pcommandBuffers[i]);
+		for(uint j = 0, n = frameObjectPool.size(); j < n; ++j)
+			frameObjectPool[j].Draw(&pcommandBuffers[i]);
 
 		vkCmdEndRenderPass(pcommandBuffers[i]);
 

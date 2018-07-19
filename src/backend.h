@@ -30,7 +30,18 @@ protected:
 	//std::vector<Client *> clients;
 };
 
+class X11Client : public WManager::Client{
+public:
+	X11Client(xcb_window_t, const class X11Backend *);
+	~X11Client();
+	WManager::Rectangle GetRect() const;
+	xcb_window_t window;
+	xcb_pixmap_t windowPixmap;
+	const X11Backend *pbackend;
+};
+
 class X11Backend : public BackendInterface{
+friend class X11Client;
 friend class Compositor::X11Compositor;
 public:
 	X11Backend();
@@ -54,8 +65,10 @@ private:
 
 class FakeClient : public WManager::Client{
 public:
-	FakeClient();
+	FakeClient(sint, sint, sint, sint);
 	~FakeClient();
+	WManager::Rectangle GetRect() const;
+	sint x, y, w, h;
 };
 
 class Fake : public X11Backend{

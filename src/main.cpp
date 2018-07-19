@@ -14,9 +14,6 @@
 #include <signal.h>
 #include <sys/signalfd.h>
 
-typedef unsigned int uint;
-typedef int sint;
-
 Exception::Exception(){
 	this->pmsg = buffer;
 }
@@ -83,9 +80,9 @@ public:
 
 class RunCompositor : public Compositor::X11Compositor{
 public:
-	RunCompositor(uint gpuIndex, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend){
+	RunCompositor(uint gpuIndex, WManager::Container *proot, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend){
 		Start();
-		GenerateCommandBuffers(); //TODO: move to present
+		GenerateCommandBuffers(proot); //TODO: move to present
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
 
@@ -141,7 +138,10 @@ int main(sint argc, const char **pargv){
 	epoll_ctl(sfd,EPOLL_CTL_ADD,sfd,&event1);*/
 
 	WManager::Container *proot = new WManager::Container();
-	WManager::Container *pfocus = proot;
+	WManager::Container *pna = new WManager::Container(proot); //temp: testing
+	pna->pclient = new Backend::FakeClient(400,10,400,200);
+	WManager::Container *pnb = new WManager::Container(proot); //temp: testing
+	pnb->pclient = new Backend::FakeClient(10,10,400,800);
 
 	Backend::X11Backend *pbackend;
 	try{
@@ -164,7 +164,7 @@ int main(sint argc, const char **pargv){
 
 	RunCompositor *pcomp;
 	try{
-		pcomp = new RunCompositor(gpuIndex.Get(),pbackend);
+		pcomp = new RunCompositor(gpuIndex.Get(),proot,pbackend);
 		pcomp->Present();
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());

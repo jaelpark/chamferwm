@@ -3,7 +3,8 @@
 
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_xcb.h>
-//#include <vector>
+//#include <glm/glm.hpp>
+#include <vector> //render queue
 
 namespace Backend{
 class X11Backend;
@@ -37,18 +38,40 @@ public:
 	static CompositorPipeline * CreateDefault(CompositorInterface *pcomp);
 };
 
+//Render queue object: can be a frame, text etc.
+class RenderObject{
+public:
+	RenderObject(const CompositorPipeline *, const class CompositorInterface *);
+	virtual ~RenderObject();
+	virtual void Draw(const VkCommandBuffer *) = 0;
+	//If the pipeline changes, the renderer binds a new one
+	const CompositorPipeline *pPipeline;
+	const CompositorInterface *pcomp;
+};
+
+class FrameObject : public RenderObject{
+public:
+	FrameObject(const CompositorPipeline *, const class CompositorInterface *, VkRect2D);
+	~FrameObject();
+	void Draw(const VkCommandBuffer *);
+	VkRect2D frame;
+};
+
 class CompositorInterface{
 //friend class FrameObject;
 friend class CompositorPipeline;
+friend class RenderObject;
+friend class FrameObject;
 public:
 	CompositorInterface(uint);
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
 protected:
 	void Initialize();
-	VkShaderModule CreateShaderModule(const char *, size_t);
-	VkShaderModule CreateShaderModuleFromFile(const char *);
-	void GenerateCommandBuffers();
+	VkShaderModule CreateShaderModule(const char *, size_t) const;
+	VkShaderModule CreateShaderModuleFromFile(const char *) const;
+	void CreateRenderQueue(const WManager::Container *);
+	void GenerateCommandBuffers(const WManager::Container *);
 	void Present();
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;
@@ -85,7 +108,8 @@ protected:
 	//placeholder variables
 	CompositorPipeline *pdefaultPipeline; //temp?
 
-	//std::vector<FrameObject *> frameObjects;
+	std::vector<RenderObject *> renderQueue;
+	std::vector<FrameObject> frameObjectPool;
 	
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };

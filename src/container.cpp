@@ -23,15 +23,18 @@ Client::~Client(){
 	//
 }
 
-Container::Container() : pch(0), pnext(0), pclient(0){
+Container::Container() : pParent(0), pch(0), pnext(0), pfocus(this), pPrevFocus(this), pclient(0){
 	//
 }
 
-Container::Container(Container *pParent) : pch(0), pnext(0), pclient(0){
+Container::Container(Container *pParent) : pch(0), pnext(0), pfocus(this), pPrevFocus(this), pclient(0){
 	Container **pn = &pParent->pch;
 	while(*pn)
 		pn = &(*pn)->pnext;
 	*pn = this;
+	this->pParent = pParent;
+	pParent->pPrevFocus = pParent->pfocus;
+	pParent->pfocus = this;
 }
 
 Container::~Container(){
