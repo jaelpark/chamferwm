@@ -8,6 +8,7 @@
 
 namespace Compositor{
 class X11Compositor;
+class X11DebugCompositor;
 }
 
 namespace WManager{
@@ -26,8 +27,6 @@ public:
 protected:
 	//Functions called by the implementing backends.
 	virtual void DefineBindings() = 0;
-	//
-	//std::vector<Client *> clients;
 };
 
 class X11Client : public WManager::Client{
@@ -43,13 +42,13 @@ public:
 class X11Backend : public BackendInterface{
 friend class X11Client;
 friend class Compositor::X11Compositor;
+friend class Compositor::X11DebugCompositor;
 public:
 	X11Backend();
 	virtual ~X11Backend();
 protected:
 	xcb_connection_t *pcon;
 	xcb_screen_t *pscr;
-	xcb_window_t overlay;
 };
 
 class Default : public X11Backend{

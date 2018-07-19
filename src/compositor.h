@@ -67,7 +67,7 @@ public:
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
 protected:
-	void Initialize();
+	void InitializeRenderEngine();
 	VkShaderModule CreateShaderModule(const char *, size_t) const;
 	VkShaderModule CreateShaderModuleFromFile(const char *) const;
 	void CreateRenderQueue(const WManager::Container *);
@@ -118,13 +118,21 @@ protected:
 class X11Compositor: public CompositorInterface{
 public:
 	X11Compositor(uint, const Backend::X11Backend *);
-	virtual ~X11Compositor();
-	void Start();
+	~X11Compositor();
+	virtual void Start();
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
 	VkExtent2D GetExtent() const;
-private:
+protected:
 	const Backend::X11Backend *pbackend;
+	xcb_window_t overlay;
+};
+
+class X11DebugCompositor : public X11Compositor{
+public:
+	X11DebugCompositor(uint, const Backend::X11Backend *);
+	~X11DebugCompositor();
+	void Start();
 };
 
 }

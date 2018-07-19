@@ -3,6 +3,8 @@
 #include "backend.h"
 #include "compositor.h"
 
+#include <xcb/composite.h>
+
 #define GLMF_SWIZZLE
 #include <glm/glm.hpp>
 //#include <glm/gtx/vec_swizzle.hpp>
@@ -264,7 +266,7 @@ CompositorInterface::~CompositorInterface(){
 	vkDestroyInstance(instance,0);
 }
 
-void CompositorInterface::Initialize(){
+void CompositorInterface::InitializeRenderEngine(){
 	//https://gist.github.com/graphitemaster/e162a24e57379af840d4
 	uint layerCount;
 	vkEnumerateInstanceLayerProperties(&layerCount,0);
@@ -750,10 +752,54 @@ X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *p
 
 X11Compositor::~X11Compositor(){
 	//
+	/*xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
+	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_INPUT,0,0,XCB_XFIXES_REGION_NONE);
+
+	xcb_composite_release_overlay_window(pbackend->pcon,overlay);*/
+
 }
 
 void X11Compositor::Start(){
-	Initialize();
+
+	//compositor
+	xcb_composite_query_version_cookie_t compCookie = xcb_composite_query_version(pbackend->pcon,XCB_COMPOSITE_MAJOR_VERSION,XCB_COMPOSITE_MINOR_VERSION);
+	xcb_composite_query_version_reply_t *pcompReply = xcb_composite_query_version_reply(pbackend->pcon,compCookie,0);
+	if(!pcompReply)
+		throw Exception("XCompositor unavailable.\n");
+	DebugPrintf(stdout,"XComposite %u.%u\n",pcompReply->major_version,pcompReply->minor_version);
+	free(pcompReply);
+
+	//overlay
+	xcb_composite_get_overlay_window_cookie_t overlayCookie = xcb_composite_get_overlay_window(pbackend->pcon,pbackend->pscr->root);
+	xcb_composite_get_overlay_window_reply_t *poverlayReply = xcb_composite_get_overlay_window_reply(pbackend->pcon,overlayCookie,0);
+	if(!poverlayReply)
+		throw Exception("Unable to get overlay window.\n");
+	overlay = poverlayReply->overlay_win;
+	free(poverlayReply);
+
+	//xfixes
+	xcb_xfixes_query_version_cookie_t fixesCookie = xcb_xfixes_query_version(pbackend->pcon,XCB_XFIXES_MAJOR_VERSION,XCB_XFIXES_MINOR_VERSION);
+	xcb_xfixes_query_version_reply_t *pfixesReply = xcb_xfixes_query_version_reply(pbackend->pcon,fixesCookie,0);
+	if(!pfixesReply)
+		throw Exception("XFixes unavailable.\n");
+	DebugPrintf(stdout,"XFixes %u.%u\n",pfixesReply->major_version,pfixesReply->minor_version);
+
+	//allow overlay input passthrough
+	xcb_xfixes_region_t region = xcb_generate_id(pbackend->pcon);
+	xcb_void_cookie_t regionCookie = xcb_xfixes_create_region_checked(pbackend->pcon,region,0,0);
+	xcb_generic_error_t *perr = xcb_request_check(pbackend->pcon,regionCookie);
+	if(perr != 0){
+		snprintf(Exception::buffer,sizeof(Exception::buffer),"Unable to create overlay region (%d).",perr->error_code);
+		throw Exception();
+	}
+	xcb_discard_reply(pbackend->pcon,regionCookie.sequence);
+	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
+	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_INPUT,0,0,region);
+	xcb_xfixes_destroy_region(pbackend->pcon,region);
+
+	xcb_flush(pbackend->pcon);
+
+	InitializeRenderEngine();
 }
 
 bool X11Compositor::CheckPresentQueueCompatibility(VkPhysicalDevice physicalDev, uint queueFamilyIndex) const{
@@ -766,20 +812,48 @@ void X11Compositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
 	xcbSurfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
 	xcbSurfaceCreateInfo.pNext = 0;
 	xcbSurfaceCreateInfo.connection = pbackend->pcon; //pcon
-	xcbSurfaceCreateInfo.window = pbackend->overlay;
+	xcbSurfaceCreateInfo.window = overlay;
 	//if(((PFN_vkCreateXcbSurfaceKHR)vkGetInstanceProcAddr(instance,"vkCreateXcbSurfaceKHR"))(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS)
 	if(vkCreateXcbSurfaceKHR(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS)
 		throw("Failed to create KHR surface.");
 }
 
 VkExtent2D X11Compositor::GetExtent() const{
-	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,pbackend->overlay);
+	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,overlay);
 	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 	if(!pgeometryReply)
 		throw("Invalid geometry size - unable to retrieve.");
 	VkExtent2D e = (VkExtent2D){pgeometryReply->width,pgeometryReply->height};
 	free(pgeometryReply);
 	return e;
+}
+
+X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,pbackend){
+	//
+}
+
+X11DebugCompositor::~X11DebugCompositor(){
+	//
+}
+
+void X11DebugCompositor::Start(){
+	
+	overlay = xcb_generate_id(pbackend->pcon);
+
+	uint mask = XCB_CW_EVENT_MASK;
+	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
+		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
+		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
+	
+	xcb_create_window(pbackend->pcon,XCB_COPY_FROM_PARENT,overlay,pbackend->pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pbackend->pscr->root_visual,mask,values);
+	const char title[] = "xwm compositor debug mode";
+	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,overlay,XCB_ATOM_WM_NAME,XCB_ATOM_STRING,8,strlen(title),title);
+	
+	xcb_map_window(pbackend->pcon,overlay);
+
+	xcb_flush(pbackend->pcon);
+
+	InitializeRenderEngine();
 }
 
 }

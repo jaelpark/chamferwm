@@ -11,7 +11,6 @@
 #include <xcb/xcb_icccm.h>
 #include <xcb/xproto.h>
 #include <xcb/xcb_util.h>
-#include <xcb/composite.h>
 
 #include <X11/keysym.h>
 
@@ -85,14 +84,14 @@ BackendInterface::~BackendInterface(){
 
 X11Client::X11Client(xcb_window_t _window, const X11Backend *_pbackend) : window(_window), pbackend(_pbackend){
 
-	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW};
+	/*uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW};
 	xcb_change_window_attributes_checked(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 	xcb_map_window(pbackend->pcon,window);
 
 	xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL); //before map?
 
 	windowPixmap = xcb_generate_id(pbackend->pcon);
-	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
+	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);*/
 	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
 
 	//uint data[] = {XCB_ICCCM_WM_STATE_NORMAL,XCB_NONE};
@@ -126,11 +125,6 @@ Default::Default() : X11Backend(){
 }
 
 Default::~Default(){
-	xcb_xfixes_set_window_shape_region(pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
-	xcb_xfixes_set_window_shape_region(pcon,overlay,XCB_SHAPE_SK_INPUT,0,0,XCB_XFIXES_REGION_NONE);
-
-	xcb_composite_release_overlay_window(pcon,overlay);
-
 	//sigprocmask(SIG_UNBLOCK,&signals,0);
 
 	//cleanup
@@ -172,15 +166,13 @@ void Default::Start(){
 
 	xcb_key_symbols_free(psymbols);
 
-	xcb_generic_error_t *perr;
-
 	uint mask = XCB_CW_EVENT_MASK;
 	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
 
 	xcb_void_cookie_t cookie = xcb_change_window_attributes_checked(pcon,pscr->root,mask,values);
-	perr = xcb_request_check(pcon,cookie);
+	xcb_generic_error_t *perr = xcb_request_check(pcon,cookie);
 
 	xcb_flush(pcon);
 
@@ -188,44 +180,6 @@ void Default::Start(){
 		snprintf(Exception::buffer,sizeof(Exception::buffer),"Substructure redirection failed (%d). WM already present.\n",perr->error_code);
 		throw Exception();
 	}
-
-	//compositor
-	xcb_composite_query_version_cookie_t compCookie = xcb_composite_query_version(pcon,XCB_COMPOSITE_MAJOR_VERSION,XCB_COMPOSITE_MINOR_VERSION);
-	xcb_composite_query_version_reply_t *pcompReply = xcb_composite_query_version_reply(pcon,compCookie,0);
-	if(!pcompReply)
-		throw Exception("XCompositor unavailable.\n");
-	DebugPrintf(stdout,"XComposite %u.%u\n",pcompReply->major_version,pcompReply->minor_version);
-	free(pcompReply);
-
-	//overlay
-	xcb_composite_get_overlay_window_cookie_t overlayCookie = xcb_composite_get_overlay_window(pcon,pscr->root);
-	xcb_composite_get_overlay_window_reply_t *poverlayReply = xcb_composite_get_overlay_window_reply(pcon,overlayCookie,0);
-	if(!poverlayReply)
-		throw Exception("Unable to get overlay window.\n");
-	overlay = poverlayReply->overlay_win;
-	free(poverlayReply);
-
-	//xfixes
-	xcb_xfixes_query_version_cookie_t fixesCookie = xcb_xfixes_query_version(pcon,XCB_XFIXES_MAJOR_VERSION,XCB_XFIXES_MINOR_VERSION);
-	xcb_xfixes_query_version_reply_t *pfixesReply = xcb_xfixes_query_version_reply(pcon,fixesCookie,0);
-	if(!pfixesReply)
-		throw Exception("XFixes unavailable.\n");
-	DebugPrintf(stdout,"XFixes %u.%u\n",pfixesReply->major_version,pfixesReply->minor_version);
-
-	//allow overlay input passthrough
-	xcb_xfixes_region_t region = xcb_generate_id(pcon);
-	xcb_void_cookie_t regionCookie = xcb_xfixes_create_region_checked(pcon,region,0,0);
-	perr = xcb_request_check(pcon,regionCookie);
-	if(perr != 0){
-		snprintf(Exception::buffer,sizeof(Exception::buffer),"Unable to create overlay region (%d).",perr->error_code);
-		throw Exception();
-	}
-	xcb_discard_reply(pcon,regionCookie.sequence);
-	xcb_xfixes_set_window_shape_region(pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
-	xcb_xfixes_set_window_shape_region(pcon,overlay,XCB_SHAPE_SK_INPUT,0,0,region);
-	xcb_xfixes_destroy_region(pcon,region);
-
-	xcb_flush(pcon);
 
 	//const xcb_atom_t atomWmState = GetAtom(pcon,"WM_STATE");
 }
@@ -354,7 +308,7 @@ Fake::~Fake(){
 }
 
 void Fake::Start(){
-		sint scount;
+	sint scount;
 	pcon = xcb_connect(0,&scount);
 	if(xcb_connection_has_error(pcon))
 		throw Exception("Failed to connect to X server.\n");
@@ -385,20 +339,6 @@ void Fake::Start(){
 	xcb_flush(pcon);
 
 	xcb_key_symbols_free(psymbols);
-
-	overlay = xcb_generate_id(pcon);
-
-	uint mask = XCB_CW_EVENT_MASK;
-	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
-		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
-		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
-	
-	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,overlay,pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pscr->root_visual,mask,values);
-	const char title[] = "xwm compositor debug mode";
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,overlay,XCB_ATOM_WM_NAME,XCB_ATOM_STRING,8,strlen(title),title);
-	
-	xcb_map_window(pcon,overlay);
-	xcb_flush(pcon);
 }
 
 sint Fake::GetEventFileDescriptor(){

@@ -49,24 +49,29 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	va_end(args);
 }
 
-class RunBackend : public Backend::Default{
+class RunBackend{
 public:
-	RunBackend() : Default(){
+	RunBackend(){}
+	virtual ~RunBackend(){}
+};
+
+class DefaultBackend : public Backend::Default, public RunBackend{
+public:
+	DefaultBackend() : Default(), RunBackend(){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
 	
-	~RunBackend(){}
+	~DefaultBackend(){}
 
 	void DefineBindings(){
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 };
 
-class FakeBackend : public Backend::Fake{
+class FakeBackend : public Backend::Fake, public RunBackend{
 public:
-	FakeBackend() : Fake(){
-		DebugPrintf(stdout,"Initializing a debug backend\n");
+	FakeBackend() : Fake(), RunBackend(){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -78,18 +83,40 @@ public:
 	}
 };
 
-class RunCompositor : public Compositor::X11Compositor{
+class RunCompositor{
 public:
-	RunCompositor(uint gpuIndex, WManager::Container *proot, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend){
+	RunCompositor(){}
+	virtual ~RunCompositor(){}
+	virtual void Present() = 0;
+};
+
+class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
+public:
+	DefaultCompositor(uint gpuIndex, WManager::Container *proot, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend), RunCompositor(){
 		Start();
 		GenerateCommandBuffers(proot); //TODO: move to present
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
 
-	~RunCompositor(){}
+	~DefaultCompositor(){}
 
 	void Present(){
 		Compositor::X11Compositor::Present();
+	}
+};
+
+class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
+public:
+	DebugCompositor(uint gpuIndex, WManager::Container *proot, Backend::X11Backend *pbackend) : X11DebugCompositor(gpuIndex,pbackend), RunCompositor(){
+		Compositor::X11DebugCompositor::Start();
+		GenerateCommandBuffers(proot);
+		DebugPrintf(stdout,"Compositor enabled.\n");
+	}
+
+	~DebugCompositor(){}
+
+	void Present(){
+		Compositor::X11DebugCompositor::Present();
 	}
 };
 
@@ -143,17 +170,18 @@ int main(sint argc, const char **pargv){
 	WManager::Container *pnb = new WManager::Container(proot); //temp: testing
 	pnb->pclient = new Backend::FakeClient(10,10,400,800);
 
-	Backend::X11Backend *pbackend;
+	RunBackend *pbackend;
 	try{
 		if(debugBackend.Get())
 			pbackend = new FakeBackend();
-		else pbackend = new RunBackend();
+		else pbackend = new DefaultBackend();
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		return 1;
 	}
 
-	sint fd = pbackend->GetEventFileDescriptor();
+	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
+	sint fd = pbackend11->GetEventFileDescriptor();
 	if(fd == -1){
 		DebugPrintf(stderr,"XCB fd\n");
 		return 1;
@@ -164,7 +192,9 @@ int main(sint argc, const char **pargv){
 
 	RunCompositor *pcomp;
 	try{
-		pcomp = new RunCompositor(gpuIndex.Get(),proot,pbackend);
+		if(debugBackend.Get())
+			pcomp = new DebugCompositor(gpuIndex.Get(),proot,pbackend11);
+		else pcomp = new DefaultCompositor(gpuIndex.Get(),proot,pbackend11);
 		pcomp->Present();
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
@@ -175,7 +205,7 @@ int main(sint argc, const char **pargv){
 	for(bool r = true; r;){
 		for(sint n = epoll_wait(efd,events,MAX_EVENTS,-1), i = 0; i < n; ++i){
 			if(events[i].data.ptr == &fd){
-				r = pbackend->HandleEvent();
+				r = pbackend11->HandleEvent();
 				if(!r)
 					break;
 				try{
