@@ -89,6 +89,14 @@ public:
 		dynamic_cast<Compositor::X11Compositor *>(pcomp)->SetupClient(pclient);
 		DebugPrintf(stdout,"Client notification()\n");
 	}
+
+	void EventNotify(const Backend::BackendEvent *pevent){
+		//forward the event for the compositor
+		if(!pcomp)
+			return;
+		const Backend::X11Event *pevent11 = dynamic_cast<const Backend::X11Event *>(pevent);
+		dynamic_cast<Compositor::X11Compositor *>(pcomp)->FilterEvent(pevent11);
+	}
 };
 
 class FakeBackend : public Backend::Fake, public RunBackend{
@@ -104,8 +112,12 @@ public:
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
-	void ClientNotify(const WManager::Client *){
+	void ClientNotify(const WManager::Client *pclient){
 		DebugPrintf(stdout,"Client notification()\n");
+	}
+
+	void EventNotify(const Backend::BackendEvent *pevent){
+		//
 	}
 };
 
@@ -225,16 +237,27 @@ int main(sint argc, const char **pargv){
 
 	pbackend->SetCompositor(pcomp);
 
+	//https://github.com/karulont/i3lock-blur/blob/master/xcb.c
 	for(bool r = true; r;){
 		//for(sint n = epoll_wait(efd,events,MAX_EVENTS,-1), i = 0; i < n; ++i){
-		for(sint n = epoll_wait(efd,events,MAX_EVENTS,0), i = 0; i < n; ++i){
+		//for(sint n = epoll_wait(efd,events,MAX_EVENTS,0), i = 0; i < n; ++i){
+		sint n = epoll_wait(efd,events,MAX_EVENTS,0);
+		for(sint i = 0; i < n; ++i){
 			if(events[i].data.ptr == &fd){
 				r = pbackend11->HandleEvent();
 				if(!r)
 					break;
 			}
-		}
+			/*if(!q){
+			q = true;
+			try{
+				pcomp->Present();
 
+			}catch(Exception e){
+				DebugPrintf(stderr,"%s\n",e.what());
+				break;
+			}}*/
+		}
 		try{
 			pcomp->Present();
 

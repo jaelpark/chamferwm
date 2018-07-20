@@ -17,6 +17,12 @@ class Client;
 
 namespace Backend{
 
+class BackendEvent{
+public:
+	BackendEvent();
+	virtual ~BackendEvent();
+};
+
 class BackendInterface{
 public:
 	BackendInterface();
@@ -28,6 +34,14 @@ protected:
 	//Functions defined by the implementing backends.
 	virtual void DefineBindings() = 0;
 	virtual void ClientNotify(const WManager::Client *) = 0;
+	virtual void EventNotify(const BackendEvent *) = 0;
+};
+
+class X11Event : public BackendEvent{
+public:
+	X11Event(xcb_generic_event_t *);
+	~X11Event();
+	xcb_generic_event_t *pevent;
 };
 
 class X11Client : public WManager::Client{
@@ -47,6 +61,7 @@ friend class Compositor::X11DebugCompositor;
 public:
 	X11Backend();
 	virtual ~X11Backend();
+	bool QueryExtension(const char *, sint *, sint *) const;
 protected:
 	xcb_connection_t *pcon;
 	xcb_screen_t *pscr;

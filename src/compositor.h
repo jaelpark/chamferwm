@@ -126,12 +126,19 @@ public:
 	virtual void Start();
 	virtual void Stop();
 	void SetupClient(const WManager::Client *);
+	bool FilterEvent(const Backend::X11Event *);
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
 	VkExtent2D GetExtent() const;
 protected:
 	const Backend::X11Backend *pbackend;
 	xcb_window_t overlay;
+	sint compEventOffset;
+	sint compErrorOffset;
+	sint xfixesEventOffset;
+	sint xfixesErrorOffset;
+	sint damageEventOffset;
+	sint damageErrorOffset;
 };
 
 class X11DebugCompositor : public X11Compositor{

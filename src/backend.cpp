@@ -9,7 +9,6 @@
 #include <xcb/xcb_keysyms.h>
 #include <xcb/xcb_atom.h>
 #include <xcb/xcb_icccm.h>
-#include <xcb/xproto.h>
 #include <xcb/xcb_util.h>
 
 #include <X11/keysym.h>
@@ -74,11 +73,27 @@ static xcb_keycode_t SymbolToKeycode(xcb_keysym_t symbol, xcb_key_symbols_t *psy
 
 namespace Backend{
 
+BackendEvent::BackendEvent(){
+	//
+}
+
+BackendEvent::~BackendEvent(){
+	//
+}
+
 BackendInterface::BackendInterface(){
 	//
 }
 
 BackendInterface::~BackendInterface(){
+	//
+}
+
+X11Event::X11Event(xcb_generic_event_t *_pevent) : BackendEvent(), pevent(_pevent){
+	//
+}
+
+X11Event::~X11Event(){
 	//
 }
 
@@ -113,6 +128,18 @@ X11Backend::X11Backend(){
 
 X11Backend::~X11Backend(){
 	//
+}
+
+bool X11Backend::QueryExtension(const char *pname, sint *pfirstEvent, sint *pfirstError) const{
+	xcb_generic_error_t *perr;
+	xcb_query_extension_cookie_t queryExtCookie = xcb_query_extension(pcon,strlen(pname),pname);
+	xcb_query_extension_reply_t *pqueryExtReply = xcb_query_extension_reply(pcon,queryExtCookie,&perr);
+	if(!pqueryExtReply || perr)
+		return false;
+	*pfirstEvent = pqueryExtReply->first_event;
+	*pfirstError = pqueryExtReply->first_error;
+	free(pqueryExtReply);
+	return true;
 }
 
 Default::Default() : X11Backend(){
@@ -175,8 +202,6 @@ void Default::Start(){
 		snprintf(Exception::buffer,sizeof(Exception::buffer),"Substructure redirection failed (%d). WM already present.\n",perr->error_code);
 		throw Exception();
 	}
-
-	//const xcb_atom_t atomWmState = GetAtom(pcon,"WM_STATE");
 }
 
 sint Default::GetEventFileDescriptor(){
@@ -282,8 +307,18 @@ bool Default::HandleEvent(){
 		break;
 	default:
 		DebugPrintf(stdout,"default event\n");
+		X11Event event11(pevent);
+		EventNotify(&event11);
 		break;
 	}
+	
+	//extension notifications
+	/*case XCB_DAMAGE_NOTIFY+damageEventOffset:{
+		xcb_damage_notify_event_t *pev = (xcb_damage_notify_event_t*)pevent;
+		//
+		DebugPrintf(stdout,"Damage");
+		}
+		break;*/
 
 	free(pevent);
 	xcb_flush(pcon);
@@ -368,8 +403,8 @@ bool Fake::HandleEvent(){
 	case XCB_CLIENT_MESSAGE:{
 		//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
 		//if(pev->data.data32[0] == wmD
-	}
-	break;
+		}
+		break;
 	case XCB_KEY_PRESS:{
 		xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
 		xcb_flush(pcon);
@@ -378,6 +413,12 @@ bool Fake::HandleEvent(){
 		if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode)
 			return false;
 		//
+		}
+		break;
+	default:{
+		DebugPrintf(stdout,"default event\n");
+		X11Event event11(pevent);
+		EventNotify(&event11);
 		}
 		break;
 	}

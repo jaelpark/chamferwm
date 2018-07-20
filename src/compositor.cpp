@@ -4,6 +4,7 @@
 #include "compositor.h"
 
 #include <xcb/composite.h>
+#include <xcb/damage.h>
 
 #define GLMF_SWIZZLE
 #include <glm/glm.hpp>
@@ -520,7 +521,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	swapchainCreateInfo.surface = surface;
-	swapchainCreateInfo.minImageCount = 2;
+	swapchainCreateInfo.minImageCount = 3;
 	swapchainCreateInfo.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
 	swapchainCreateInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 	swapchainCreateInfo.imageExtent = imageExtent;
@@ -774,6 +775,8 @@ X11Compositor::~X11Compositor(){
 void X11Compositor::Start(){
 
 	//compositor
+	if(!pbackend->QueryExtension("Composite",&compEventOffset,&compErrorOffset))
+		throw Exception("XCompositor unavailable.\n");
 	xcb_composite_query_version_cookie_t compCookie = xcb_composite_query_version(pbackend->pcon,XCB_COMPOSITE_MAJOR_VERSION,XCB_COMPOSITE_MINOR_VERSION);
 	xcb_composite_query_version_reply_t *pcompReply = xcb_composite_query_version_reply(pbackend->pcon,compCookie,0);
 	if(!pcompReply)
@@ -790,6 +793,8 @@ void X11Compositor::Start(){
 	free(poverlayReply);
 
 	//xfixes
+	if(!pbackend->QueryExtension("XFIXES",&xfixesEventOffset,&xfixesErrorOffset))
+		throw Exception("XFixes unavailable.\n");
 	xcb_xfixes_query_version_cookie_t fixesCookie = xcb_xfixes_query_version(pbackend->pcon,XCB_XFIXES_MAJOR_VERSION,XCB_XFIXES_MINOR_VERSION);
 	xcb_xfixes_query_version_reply_t *pfixesReply = xcb_xfixes_query_version_reply(pbackend->pcon,fixesCookie,0);
 	if(!pfixesReply)
@@ -808,6 +813,14 @@ void X11Compositor::Start(){
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_INPUT,0,0,region);
 	xcb_xfixes_destroy_region(pbackend->pcon,region);
+
+	//damage
+	if(!pbackend->QueryExtension("DAMAGE",&damageEventOffset,&damageErrorOffset))
+		throw Exception("Damage extension unavailable.");
+
+	xcb_damage_query_version_cookie_t damageCookie = xcb_damage_query_version(pbackend->pcon,XCB_DAMAGE_MAJOR_VERSION,XCB_DAMAGE_MINOR_VERSION);
+	xcb_damage_query_version_reply_t *pdamageReply = xcb_damage_query_version_reply(pbackend->pcon,damageCookie,0);
+	free(pdamageReply);
 
 	xcb_flush(pbackend->pcon);
 
@@ -837,6 +850,15 @@ void X11Compositor::SetupClient(const WManager::Client *pclient){
 	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
 
 	//The contents of the pixmap are retrieved in GenerateCommandBuffers
+}
+
+bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
+	if(pevent->pevent->response_type == XCB_DAMAGE_NOTIFY+damageEventOffset){
+		DebugPrintf(stdout,"DAMAGE_EVENT\n");
+		return true;
+	}
+
+	return false;
 }
 
 bool X11Compositor::CheckPresentQueueCompatibility(VkPhysicalDevice physicalDev, uint queueFamilyIndex) const{

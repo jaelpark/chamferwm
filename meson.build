@@ -11,7 +11,8 @@ xcb = [
 	dependency('xcb'),
 	dependency('xcb-keysyms'),
 	dependency('xcb-xfixes'),
-	dependency('xcb-composite')
+	dependency('xcb-damage'),
+	dependency('xcb-composite'),
 ]
 
 vk = [
