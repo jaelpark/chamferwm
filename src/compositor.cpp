@@ -234,7 +234,7 @@ void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 }
 
-CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex){
+CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0){
 	//
 }
 
@@ -248,8 +248,11 @@ CompositorInterface::~CompositorInterface(){
 
 	delete pdefaultPipeline;
 
-	for(uint i = 0; i < SEMAPHORE_INDEX_COUNT; ++i)
-		vkDestroySemaphore(logicalDev,semaphore[i],0);
+	for(uint i = 0; i < 2; ++i){
+		vkDestroyFence(logicalDev,fence[i],0);
+		for(uint j = 0; j < SEMAPHORE_INDEX_COUNT; ++j)
+			vkDestroySemaphore(logicalDev,semaphore[i][j],0);
+	}
 
 	for(uint i = 0; i < swapChainImageCount; ++i){
 		vkDestroyFramebuffer(logicalDev,pframebuffers[i],0);
@@ -582,9 +585,18 @@ void CompositorInterface::InitializeRenderEngine(){
 
 	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
 	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	for(uint i = 0; i < SEMAPHORE_INDEX_COUNT; ++i)
-		if(vkCreateSemaphore(logicalDev,&semaphoreCreateInfo,0,&semaphore[i]) != VK_SUCCESS)
-			throw Exception("Failed to create a semaphore.");
+
+	VkFenceCreateInfo fenceCreateInfo = {};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	for(uint i = 0; i < 2; ++i){
+		if(vkCreateFence(logicalDev,&fenceCreateInfo,0,&fence[i]) != VK_SUCCESS)
+			throw Exception("Failed to create a fence.");
+		for(uint j = 0; j < SEMAPHORE_INDEX_COUNT; ++j)
+			if(vkCreateSemaphore(logicalDev,&semaphoreCreateInfo,0,&semaphore[i][j]) != VK_SUCCESS)
+				throw Exception("Failed to create a semaphore.");
+	}
 
 	if(!(pdefaultPipeline = CompositorPipeline::CreateDefault(this)))
 		throw Exception("Failed to create the default compositor pipeline.");
@@ -727,8 +739,12 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 }
 
 void CompositorInterface::Present(){
+	if(vkWaitForFences(logicalDev,1,&fence[currentFrame],VK_TRUE,0) == VK_TIMEOUT)
+		return;
+	vkResetFences(logicalDev,1,&fence[currentFrame]);
+
 	uint imageIndex;
-	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),semaphore[SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS)
+	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),semaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS)
 		throw Exception("Failed to acquire a swap chain image.\n");
 	//
 	VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -737,24 +753,26 @@ void CompositorInterface::Present(){
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.waitSemaphoreCount = 1;
-	submitInfo.pWaitSemaphores = &semaphore[SEMAPHORE_INDEX_IMAGE_AVAILABLE];
+	submitInfo.pWaitSemaphores = &semaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE];
 	submitInfo.pWaitDstStageMask = pipelineStageFlags;
 	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = &semaphore[SEMAPHORE_INDEX_RENDER_FINISHED];
+	submitInfo.pSignalSemaphores = &semaphore[currentFrame][SEMAPHORE_INDEX_RENDER_FINISHED];
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &pcommandBuffers[imageIndex];
-	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,0) != VK_SUCCESS)
+	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,fence[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to submit a queue.");
 	
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = &semaphore[SEMAPHORE_INDEX_RENDER_FINISHED];
+	presentInfo.pWaitSemaphores = &semaphore[currentFrame][SEMAPHORE_INDEX_RENDER_FINISHED];
 	presentInfo.swapchainCount = 1;
 	presentInfo.pSwapchains = &swapChain;
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = 0;
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
+
+	currentFrame = (currentFrame+1)%2;
 
 	//vkDeviceWaitIdle(logicalDev);
 }

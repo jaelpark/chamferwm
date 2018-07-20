@@ -12,17 +12,6 @@ class X11Backend;
 
 namespace Compositor{
 
-//class FrameObjectDesc
-
-/*class FrameObject{
-public:
-	//single frame object consists of window and the frame/decorations
-	FrameObject(class CompositorInterface *);
-	~FrameObject();
-	//SetTranslation
-	class CompositorInterface *pcomp;
-};*/
-
 class CompositorPipeline{
 public:
 	CompositorPipeline(class CompositorInterface *);
@@ -101,12 +90,14 @@ protected:
 		SEMAPHORE_INDEX_RENDER_FINISHED,
 		SEMAPHORE_INDEX_COUNT
 	};
-	VkSemaphore semaphore[SEMAPHORE_INDEX_COUNT];
+	VkSemaphore semaphore[2][SEMAPHORE_INDEX_COUNT];
+	VkFence fence[2];
 	VkCommandPool commandPool;
 	VkCommandBuffer *pcommandBuffers;
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
 	uint swapChainImageCount;
+	uint currentFrame;
 
 	//placeholder variables
 	CompositorPipeline *pdefaultPipeline; //temp?
