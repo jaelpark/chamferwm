@@ -25,8 +25,9 @@ public:
 	virtual sint GetEventFileDescriptor() = 0;
 	virtual bool HandleEvent() = 0;
 protected:
-	//Functions called by the implementing backends.
+	//Functions defined by the implementing backends.
 	virtual void DefineBindings() = 0;
+	virtual void ClientNotify(const WManager::Client *) = 0;
 };
 
 class X11Client : public WManager::Client{

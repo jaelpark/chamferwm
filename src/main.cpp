@@ -43,16 +43,30 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 
 	va_list args;
 	va_start(args,pfmt);
+	//pf = fopen("/tmp/log1","a+");
 	if(pf == stderr)
 		fprintf(pf,"Error: ");
 	vfprintf(pf,pfmt,args);
+	//fclose(pf);
 	va_end(args);
 }
 
 class RunBackend{
 public:
-	RunBackend(){}
+	RunBackend() : pcomp(0){}
 	virtual ~RunBackend(){}
+	void SetCompositor(class RunCompositor *pcomp){
+		this->pcomp = pcomp;
+	}
+protected:
+	class RunCompositor *pcomp;
+};
+
+class RunCompositor{
+public:
+	RunCompositor(){}
+	virtual ~RunCompositor(){}
+	virtual void Present() = 0;
 };
 
 class DefaultBackend : public Backend::Default, public RunBackend{
@@ -66,6 +80,14 @@ public:
 
 	void DefineBindings(){
 		DebugPrintf(stdout,"DefineKeybindings()\n");
+	}
+
+	void ClientNotify(const WManager::Client *pclient){
+		//tell compositor about the new client
+		if(!pcomp)
+			return;
+		dynamic_cast<Compositor::X11Compositor *>(pcomp)->SetupClient(pclient);
+		DebugPrintf(stdout,"Client notification()\n");
 	}
 };
 
@@ -81,13 +103,10 @@ public:
 	void DefineBindings(){
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
-};
 
-class RunCompositor{
-public:
-	RunCompositor(){}
-	virtual ~RunCompositor(){}
-	virtual void Present() = 0;
+	void ClientNotify(const WManager::Client *){
+		DebugPrintf(stdout,"Client notification()\n");
+	}
 };
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
@@ -98,7 +117,9 @@ public:
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
 
-	~DefaultCompositor(){}
+	~DefaultCompositor(){
+		Stop();
+	}
 
 	void Present(){
 		Compositor::X11Compositor::Present();
@@ -126,7 +147,8 @@ int main(sint argc, const char **pargv){
 	args::Group group_backend(parser,"Backend",args::Group::Validators::DontCare);
 	args::Flag debugBackend(group_backend,"debugBackend","Create a test environment for the compositor engine without redirection.",{'d',"debug-backend"});
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
-	args::ValueFlag<uint> gpuIndex(group_comp,"id","GPU to use by its index. By default the first enumerated GPU will be used.",{"gpu-index"},0);
+	args::ValueFlag<uint> gpuIndex(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"gpu-index","device-index"},0);
+	//args::ValueFlag<std::string> shaderPath(group_comp,"path","Path to SPIR-V shader binary blobs",{"shader-path"},".");
 
 	try{
 		parser.ParseCLI(argc,pargv);
@@ -195,29 +217,31 @@ int main(sint argc, const char **pargv){
 		if(debugBackend.Get())
 			pcomp = new DebugCompositor(gpuIndex.Get(),proot,pbackend11);
 		else pcomp = new DefaultCompositor(gpuIndex.Get(),proot,pbackend11);
-		pcomp->Present();
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		delete pbackend;
 		return 1;
 	}
 
+	pbackend->SetCompositor(pcomp);
+
 	for(bool r = true; r;){
-		for(sint n = epoll_wait(efd,events,MAX_EVENTS,-1), i = 0; i < n; ++i){
+		//for(sint n = epoll_wait(efd,events,MAX_EVENTS,-1), i = 0; i < n; ++i){
+		for(sint n = epoll_wait(efd,events,MAX_EVENTS,0), i = 0; i < n; ++i){
 			if(events[i].data.ptr == &fd){
 				r = pbackend11->HandleEvent();
 				if(!r)
 					break;
-				try{
-					pcomp->Present();
-
-				}catch(Exception e){
-					DebugPrintf(stderr,"%s\n",e.what());
-					break;
-				}
 			}
 		}
-		//xcb_flush(pcon);
+
+		try{
+			pcomp->Present();
+
+		}catch(Exception e){
+			DebugPrintf(stderr,"%s\n",e.what());
+			break;
+		}
 	}
 
 	DebugPrintf(stdout,"Exit\n");

@@ -66,10 +66,13 @@ public:
 	CompositorInterface(uint);
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
+	virtual void Stop() = 0;
+	virtual void SetupClient(const WManager::Client *) = 0;
 protected:
 	void InitializeRenderEngine();
 	VkShaderModule CreateShaderModule(const char *, size_t) const;
 	VkShaderModule CreateShaderModuleFromFile(const char *) const;
+	//void SetShaderLoadPath(const char *);
 	void CreateRenderQueue(const WManager::Container *);
 	void GenerateCommandBuffers(const WManager::Container *);
 	void Present();
@@ -107,6 +110,7 @@ protected:
 
 	//placeholder variables
 	CompositorPipeline *pdefaultPipeline; //temp?
+	//const char *pshaderPath;
 
 	std::vector<RenderObject *> renderQueue;
 	std::vector<FrameObject> frameObjectPool;
@@ -120,6 +124,8 @@ public:
 	X11Compositor(uint, const Backend::X11Backend *);
 	~X11Compositor();
 	virtual void Start();
+	virtual void Stop();
+	void SetupClient(const WManager::Client *);
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
 	VkExtent2D GetExtent() const;
@@ -133,6 +139,7 @@ public:
 	X11DebugCompositor(uint, const Backend::X11Backend *);
 	~X11DebugCompositor();
 	void Start();
+	void Stop();
 };
 
 }

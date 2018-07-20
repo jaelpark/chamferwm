@@ -84,18 +84,13 @@ BackendInterface::~BackendInterface(){
 
 X11Client::X11Client(xcb_window_t _window, const X11Backend *_pbackend) : window(_window), pbackend(_pbackend){
 
-	/*uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW};
+	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW};
 	xcb_change_window_attributes_checked(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 	xcb_map_window(pbackend->pcon,window);
 
-	xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL); //before map?
-
-	windowPixmap = xcb_generate_id(pbackend->pcon);
-	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);*/
-	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
-
 	//uint data[] = {XCB_ICCCM_WM_STATE_NORMAL,XCB_NONE};
 	//xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pev->window,atomWmState,atomWmState,32,2,data);
+
 }
 
 X11Client::~X11Client(){
@@ -196,6 +191,8 @@ bool Default::HandleEvent(){
 			DebugPrintf(stderr,"X server connection lost\n");
 			return false;
 		}
+
+		return true;
 	}
 
 	//switch(pevent->response_type & ~0x80){
@@ -232,9 +229,17 @@ bool Default::HandleEvent(){
 		
 		//TODO: check if window already exists
 		X11Client *pclient = new X11Client(pev->window,this);
+		ClientNotify(pclient);
 
 		xcb_flush(pcon);
 		DebugPrintf(stdout,"map request\n");
+		}
+		break;
+	case XCB_CLIENT_MESSAGE:{
+		//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
+		//if(pev->data.data32[0] == wmD
+		//_NET_WM_STATE
+		//_NET_WM_STATE_FULLSCREEN, _NET_WM_STATE_DEMANDS_ATTENTION
 		}
 		break;
 	case XCB_KEY_PRESS:{
@@ -353,6 +358,7 @@ bool Fake::HandleEvent(){
 			DebugPrintf(stderr,"X server connection lost\n");
 			return false;
 		}
+
 		return true;
 	}
 
@@ -375,6 +381,9 @@ bool Fake::HandleEvent(){
 		}
 		break;
 	}
+
+	free(pevent);
+	xcb_flush(pcon);
 
 	return true;
 }

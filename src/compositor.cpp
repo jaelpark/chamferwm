@@ -45,26 +45,28 @@ CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcom
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[3];
 
-	VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("frame_vertex.spv");
+	VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("/mnt/data/Asiakirjat/projects/super-xwm/build/frame_vertex.spv");
 	shaderStageCreateInfo[0] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 	shaderStageCreateInfo[0].module = vertexShader;
 	shaderStageCreateInfo[0].pName = "main";
 
-	VkShaderModule geometryShader = pcomp->CreateShaderModuleFromFile("frame_geometry.spv");
+	VkShaderModule geometryShader = pcomp->CreateShaderModuleFromFile("/mnt/data/Asiakirjat/projects/super-xwm/build/frame_geometry.spv");
 	shaderStageCreateInfo[1] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_GEOMETRY_BIT;
 	shaderStageCreateInfo[1].module = geometryShader;
 	shaderStageCreateInfo[1].pName = "main";
 
-	VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("frame_fragment.spv");
+	VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("/mnt/data/Asiakirjat/projects/super-xwm/build/frame_fragment.spv");
 	shaderStageCreateInfo[2] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[2].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	shaderStageCreateInfo[2].module = fragmentShader;
 	shaderStageCreateInfo[2].pName = "main";
+	if(!vertexShader || !geometryShader || !fragmentShader)
+		throw Exception("Unable to load required shaders.\n");
 
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
@@ -518,7 +520,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	swapchainCreateInfo.surface = surface;
-	swapchainCreateInfo.minImageCount = 3;
+	swapchainCreateInfo.minImageCount = 2;
 	swapchainCreateInfo.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
 	swapchainCreateInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 	swapchainCreateInfo.imageExtent = imageExtent;
@@ -540,8 +542,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	if(vkCreateSwapchainKHR(logicalDev,&swapchainCreateInfo,0,&swapChain) != VK_SUCCESS)
 		throw Exception("Failed to create swap chain.");
 
-	DebugPrintf(stdout,"Swap chain image extent %ux%u\n",swapchainCreateInfo.imageExtent.width,swapchainCreateInfo.imageExtent.height);
-
+	DebugPrintf(stdout,"Swap chain image extent %ux%u\n",swapchainCreateInfo.imageExtent.width,swapchainCreateInfo.imageExtent.height); 
 	vkGetSwapchainImagesKHR(logicalDev,swapChain,&swapChainImageCount,0);
 	pswapChainImages = new VkImage[swapChainImageCount];
 	vkGetSwapchainImagesKHR(logicalDev,swapChain,&swapChainImageCount,pswapChainImages);
@@ -620,7 +621,18 @@ VkShaderModule CompositorInterface::CreateShaderModule(const char *pbin, size_t 
 }
 
 VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc) const{
-	FILE *pf = fopen(psrc,"rb");
+	const char *pshaderPath = getenv("XWM_SHADER_PATH");
+
+	std::string appendSrc = psrc;
+	/*if(pshaderPath)
+		appendSrc = pshaderPath+'/'+appendSrc;
+	printf("%s\n",appendSrc.c_str());*/
+
+	FILE *pf = fopen(appendSrc.c_str(),"rb");
+	if(!pf){
+		DebugPrintf(stderr,"Shader module not found: %s\n",psrc);
+		return 0;
+	}
 	fseek(pf,0,SEEK_END);
 	size_t len = ftell(pf);
 	fseek(pf,0,SEEK_SET);
@@ -635,10 +647,15 @@ VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc)
 	return shaderModule;
 }
 
+/*void CompositorInterface::SetShaderLoadPath(const char *pshaderPath){
+	this->pshaderPath = pshaderPath;
+}*/
+
 void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer){
 	for(const WManager::Container *pcont = pcontainer; pcont; pcont = pcont->pnext){
 		if(!pcont->pclient)
 			continue;
+		//dynamic_cast pclient to X11Client
 		WManager::Rectangle r = pcont->pclient->GetRect();
 		VkRect2D frame;
 		frame.offset = {r.x,r.y};
@@ -752,11 +769,6 @@ X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *p
 
 X11Compositor::~X11Compositor(){
 	//
-	/*xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
-	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_INPUT,0,0,XCB_XFIXES_REGION_NONE);
-
-	xcb_composite_release_overlay_window(pbackend->pcon,overlay);*/
-
 }
 
 void X11Compositor::Start(){
@@ -800,6 +812,31 @@ void X11Compositor::Start(){
 	xcb_flush(pbackend->pcon);
 
 	InitializeRenderEngine();
+}
+
+void X11Compositor::Stop(){
+	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
+	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_INPUT,0,0,XCB_XFIXES_REGION_NONE);
+
+	xcb_composite_release_overlay_window(pbackend->pcon,overlay);
+
+	xcb_flush(pbackend->pcon);
+}
+
+void X11Compositor::SetupClient(const WManager::Client *pclient){
+	//
+	//backend should have a map of clients[xcb_window_t],
+	//compositor a map of pixmaps and textures
+	DebugPrintf(stdout,"SetupClient()\n");
+
+	const Backend::X11Client *pclient11 = dynamic_cast<const Backend::X11Client *>(pclient);
+	xcb_composite_redirect_subwindows(pbackend->pcon,pclient11->window,XCB_COMPOSITE_REDIRECT_MANUAL); //before map?
+
+	xcb_pixmap_t windowPixmap = xcb_generate_id(pbackend->pcon);
+	xcb_composite_name_window_pixmap(pbackend->pcon,pclient11->window,windowPixmap);
+	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
+
+	//The contents of the pixmap are retrieved in GenerateCommandBuffers
 }
 
 bool X11Compositor::CheckPresentQueueCompatibility(VkPhysicalDevice physicalDev, uint queueFamilyIndex) const{
@@ -854,6 +891,11 @@ void X11DebugCompositor::Start(){
 	xcb_flush(pbackend->pcon);
 
 	InitializeRenderEngine();
+}
+
+void X11DebugCompositor::Stop(){
+	xcb_destroy_window(pbackend->pcon,overlay);
+	xcb_flush(pbackend->pcon);
 }
 
 }
