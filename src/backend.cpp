@@ -108,6 +108,10 @@ X11Client::X11Client(xcb_window_t _window, const X11Backend *_pbackend) : window
 
 }
 
+X11Client::X11Client(const CreateInfo *pcreateInfo){
+	X11Client(pcreateInfo->window,pcreateInfo->pbackend);
+}
+
 X11Client::~X11Client(){
 	//
 }
@@ -252,9 +256,16 @@ bool Default::HandleEvent(){
 	case XCB_MAP_REQUEST:{
 		xcb_map_request_event_t *pev = (xcb_map_request_event_t*)pevent;
 		
-		//TODO: check if window already exists
-		X11Client *pclient = new X11Client(pev->window,this);
-		ClientNotify(pclient);
+		//check if window already exists
+		if(std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
+			return pclient->window == pev->window;
+		}) != clients.end())
+			break;
+
+		X11Client::CreateInfo createInfo;
+		createInfo.window = pev->window;
+		X11Client *pclient = dynamic_cast<X11Client *>(SetupClient(&createInfo));
+		clients.push_back(pclient);
 
 		xcb_flush(pcon);
 		DebugPrintf(stdout,"map request\n");
@@ -302,7 +313,16 @@ bool Default::HandleEvent(){
 		break;
 	case XCB_DESTROY_NOTIFY:{
 		xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
-		//destroy client
+
+		auto m = std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
+			return pclient->window == pev->window;
+		});
+		if(m == clients.end())
+			break; //shouldn't happen
+		delete *m;
+		
+		std::iter_swap(m,clients.end()-1);
+		clients.pop_back();
 		}
 		break;
 	default:

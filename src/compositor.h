@@ -3,7 +3,6 @@
 
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_xcb.h>
-//#include <glm/glm.hpp>
 #include <vector> //render queue
 
 namespace Backend{
@@ -56,7 +55,7 @@ public:
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
 	virtual void Stop() = 0;
-	virtual void SetupClient(const WManager::Client *) = 0;
+	//virtual void SetupClient(const WManager::Client *) = 0;
 protected:
 	void InitializeRenderEngine();
 	VkShaderModule CreateShaderModule(const char *, size_t) const;
@@ -109,14 +108,21 @@ protected:
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };
 
+class X11ClientFrame : public Backend::X11Client{
+public:
+	X11ClientFrame(const Backend::X11Client::CreateInfo *);
+	~X11ClientFrame();
+	xcb_pixmap_t *pwindowPixmap;
+};
+
 //Default compositor assumes XCB for its surface
-class X11Compositor: public CompositorInterface{
+class X11Compositor : public CompositorInterface{
 public:
 	X11Compositor(uint, const Backend::X11Backend *);
 	~X11Compositor();
 	virtual void Start();
 	virtual void Stop();
-	void SetupClient(const WManager::Client *);
+	//void SetupClient(const WManager::Client *);
 	bool FilterEvent(const Backend::X11Event *);
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
@@ -138,6 +144,17 @@ public:
 	~X11DebugCompositor();
 	void Start();
 	void Stop();
+};
+
+class NullCompositor : public CompositorInterface{
+public:
+	NullCompositor();
+	~NullCompositor();
+	void Start();
+	void Stop();
+	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
+	void CreateSurfaceKHR(VkSurfaceKHR *) const;
+	VkExtent2D GetExtent() const;
 };
 
 }

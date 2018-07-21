@@ -725,9 +725,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			//
 			prenderObject->Draw(&pcommandBuffers[i]);
 		}*/
-		//renderQueue[1]->Draw(&pcommandBuffers[i]);
-		//frameObjectPool[0].Draw(&pcommandBuffers[i]);
-		//frameObjectPool[1].Draw(&pcommandBuffers[i]);
 		for(uint j = 0, n = frameObjectPool.size(); j < n; ++j)
 			frameObjectPool[j].Draw(&pcommandBuffers[i]);
 
@@ -780,6 +777,21 @@ void CompositorInterface::Present(){
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){
 	DebugPrintf(stdout,"validation layer: %s\n",pmsg);
 	return VK_FALSE;
+}
+
+X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInfo) : X11Client(_pcreateInfo){
+	//
+	xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
+
+	xcb_pixmap_t windowPixmap = xcb_generate_id(pbackend->pcon);
+	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
+	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
+
+	//The contents of the pixmap are retrieved in GenerateCommandBuffers
+}
+
+X11ClientFrame::~X11ClientFrame(){
+	//
 }
 
 X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : CompositorInterface(physicalDevIndex){
@@ -854,22 +866,6 @@ void X11Compositor::Stop(){
 	xcb_flush(pbackend->pcon);
 }
 
-void X11Compositor::SetupClient(const WManager::Client *pclient){
-	//
-	//backend should have a map of clients[xcb_window_t],
-	//compositor a map of pixmaps and textures
-	DebugPrintf(stdout,"SetupClient()\n");
-
-	const Backend::X11Client *pclient11 = dynamic_cast<const Backend::X11Client *>(pclient);
-	xcb_composite_redirect_subwindows(pbackend->pcon,pclient11->window,XCB_COMPOSITE_REDIRECT_MANUAL); //before map?
-
-	xcb_pixmap_t windowPixmap = xcb_generate_id(pbackend->pcon);
-	xcb_composite_name_window_pixmap(pbackend->pcon,pclient11->window,windowPixmap);
-	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
-
-	//The contents of the pixmap are retrieved in GenerateCommandBuffers
-}
-
 bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 	if(pevent->pevent->response_type == XCB_DAMAGE_NOTIFY+damageEventOffset){
 		DebugPrintf(stdout,"DAMAGE_EVENT\n");
@@ -936,6 +932,34 @@ void X11DebugCompositor::Start(){
 void X11DebugCompositor::Stop(){
 	xcb_destroy_window(pbackend->pcon,overlay);
 	xcb_flush(pbackend->pcon);
+}
+
+NullCompositor::NullCompositor() : CompositorInterface(0){
+	//
+}
+
+NullCompositor::~NullCompositor(){
+	//
+}
+
+void NullCompositor::Start(){
+	//
+}
+
+void NullCompositor::Stop(){
+	//
+}
+
+bool NullCompositor::CheckPresentQueueCompatibility(VkPhysicalDevice physicalDev, uint queueFamilyIndex) const{
+	return true;
+}
+
+void NullCompositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
+	//
+}
+
+VkExtent2D NullCompositor::GetExtent() const{
+	return (VkExtent2D){0,0};
 }
 
 }

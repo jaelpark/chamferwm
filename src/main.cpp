@@ -82,16 +82,14 @@ public:
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
-	void ClientNotify(const WManager::Client *pclient){
-		//tell compositor about the new client
+	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
 		if(!pcomp)
-			return;
-		dynamic_cast<Compositor::X11Compositor *>(pcomp)->SetupClient(pclient);
-		DebugPrintf(stdout,"Client notification()\n");
+			return new Backend::X11Client(pcreateInfo);
+		Compositor::X11ClientFrame *pclientFrame = new Compositor::X11ClientFrame(pcreateInfo);
+		return pclientFrame;
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
-		//forward the event for the compositor
 		if(!pcomp)
 			return;
 		const Backend::X11Event *pevent11 = dynamic_cast<const Backend::X11Event *>(pevent);
@@ -108,12 +106,12 @@ public:
 
 	~FakeBackend(){}
 
-	void DefineBindings(){
-		DebugPrintf(stdout,"DefineKeybindings()\n");
+	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
+		return 0;
 	}
 
-	void ClientNotify(const WManager::Client *pclient){
-		DebugPrintf(stdout,"Client notification()\n");
+	void DefineBindings(){
+		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
@@ -153,13 +151,31 @@ public:
 	}
 };
 
+class NullCompositor : public Compositor::NullCompositor, public RunCompositor{
+public:
+	NullCompositor() : Compositor::NullCompositor(), RunCompositor(){
+		//
+	}
+
+	~NullCompositor(){
+		//
+	}
+
+	void Present(){
+		//
+	}
+};
+
 int main(sint argc, const char **pargv){	
 	args::ArgumentParser parser("xwm - A compositing window manager","");
 	args::HelpFlag help(parser,"help","Display this help menu",{'h',"help"});
+
 	args::Group group_backend(parser,"Backend",args::Group::Validators::DontCare);
-	args::Flag debugBackend(group_backend,"debugBackend","Create a test environment for the compositor engine without redirection.",{'d',"debug-backend"});
+	args::Flag debugBackend(group_backend,"debugBackend","Create a test environment for the compositor engine without redirection. The application will not as a window manager.",{'d',"debug-backend"});
+
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
-	args::ValueFlag<uint> gpuIndex(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"gpu-index","device-index"},0);
+	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
+	args::ValueFlag<uint> gpuIndex(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"},0);
 	//args::ValueFlag<std::string> shaderPath(group_comp,"path","Path to SPIR-V shader binary blobs",{"shader-path"},".");
 
 	try{
@@ -226,9 +242,14 @@ int main(sint argc, const char **pargv){
 
 	RunCompositor *pcomp;
 	try{
+		if(noComp.Get())
+			pcomp = new NullCompositor();
+		else
 		if(debugBackend.Get())
 			pcomp = new DebugCompositor(gpuIndex.Get(),proot,pbackend11);
 		else pcomp = new DefaultCompositor(gpuIndex.Get(),proot,pbackend11);
+		//null compositor
+		//compositor=[vulkan|vkdebug|null]
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		delete pbackend;
