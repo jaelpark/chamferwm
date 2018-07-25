@@ -239,37 +239,7 @@ CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIn
 }
 
 CompositorInterface::~CompositorInterface(){
-	DebugPrintf(stdout,"Compositor cleanup");
-	vkDeviceWaitIdle(logicalDev);
-
-	delete []pcommandBuffers;
-
-	vkDestroyCommandPool(logicalDev,commandPool,0);
-
-	delete pdefaultPipeline;
-
-	for(uint i = 0; i < 2; ++i){
-		vkDestroyFence(logicalDev,fence[i],0);
-		for(uint j = 0; j < SEMAPHORE_INDEX_COUNT; ++j)
-			vkDestroySemaphore(logicalDev,semaphore[i][j],0);
-	}
-
-	for(uint i = 0; i < swapChainImageCount; ++i){
-		vkDestroyFramebuffer(logicalDev,pframebuffers[i],0);
-		vkDestroyImageView(logicalDev,pswapChainImageViews[i],0);
-	}
-	delete []pswapChainImageViews;
-	delete []pswapChainImages;
-	vkDestroySwapchainKHR(logicalDev,swapChain,0);
-
-	vkDestroyRenderPass(logicalDev,renderPass,0);
-
-	vkDestroyDevice(logicalDev,0);
-
-	((PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance,"vkDestroyDebugReportCallbackEXT"))(instance,debugReportCb,0);
-
-	vkDestroySurfaceKHR(instance,surface,0);
-	vkDestroyInstance(instance,0);
+	//
 }
 
 void CompositorInterface::InitializeRenderEngine(){
@@ -620,6 +590,40 @@ void CompositorInterface::InitializeRenderEngine(){
 
 }
 
+void CompositorInterface::DestroyRenderEngine(){
+	DebugPrintf(stdout,"Compositor cleanup");
+	vkDeviceWaitIdle(logicalDev);
+
+	delete []pcommandBuffers;
+
+	vkDestroyCommandPool(logicalDev,commandPool,0);
+
+	delete pdefaultPipeline;
+
+	for(uint i = 0; i < 2; ++i){
+		vkDestroyFence(logicalDev,fence[i],0);
+		for(uint j = 0; j < SEMAPHORE_INDEX_COUNT; ++j)
+			vkDestroySemaphore(logicalDev,semaphore[i][j],0);
+	}
+
+	for(uint i = 0; i < swapChainImageCount; ++i){
+		vkDestroyFramebuffer(logicalDev,pframebuffers[i],0);
+		vkDestroyImageView(logicalDev,pswapChainImageViews[i],0);
+	}
+	delete []pswapChainImageViews;
+	delete []pswapChainImages;
+	vkDestroySwapchainKHR(logicalDev,swapChain,0);
+
+	vkDestroyRenderPass(logicalDev,renderPass,0);
+
+	vkDestroyDevice(logicalDev,0);
+
+	((PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance,"vkDestroyDebugReportCallbackEXT"))(instance,debugReportCb,0);
+
+	vkDestroySurfaceKHR(instance,surface,0);
+	vkDestroyInstance(instance,0);
+}
+
 VkShaderModule CompositorInterface::CreateShaderModule(const char *pbin, size_t binlen) const{
 	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -858,6 +862,8 @@ void X11Compositor::Start(){
 }
 
 void X11Compositor::Stop(){
+	DestroyRenderEngine();
+
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_INPUT,0,0,XCB_XFIXES_REGION_NONE);
 
@@ -910,7 +916,6 @@ X11DebugCompositor::~X11DebugCompositor(){
 }
 
 void X11DebugCompositor::Start(){
-	
 	overlay = xcb_generate_id(pbackend->pcon);
 
 	uint mask = XCB_CW_EVENT_MASK;
@@ -921,7 +926,6 @@ void X11DebugCompositor::Start(){
 	xcb_create_window(pbackend->pcon,XCB_COPY_FROM_PARENT,overlay,pbackend->pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pbackend->pscr->root_visual,mask,values);
 	const char title[] = "xwm compositor debug mode";
 	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,overlay,XCB_ATOM_WM_NAME,XCB_ATOM_STRING,8,strlen(title),title);
-	
 	xcb_map_window(pbackend->pcon,overlay);
 
 	xcb_flush(pbackend->pcon);
@@ -930,6 +934,8 @@ void X11DebugCompositor::Start(){
 }
 
 void X11DebugCompositor::Stop(){
+	DestroyRenderEngine();
+
 	xcb_destroy_window(pbackend->pcon,overlay);
 	xcb_flush(pbackend->pcon);
 }

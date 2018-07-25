@@ -58,6 +58,7 @@ public:
 	//virtual void SetupClient(const WManager::Client *) = 0;
 protected:
 	void InitializeRenderEngine();
+	void DestroyRenderEngine();
 	VkShaderModule CreateShaderModule(const char *, size_t) const;
 	VkShaderModule CreateShaderModuleFromFile(const char *) const;
 	//void SetShaderLoadPath(const char *);

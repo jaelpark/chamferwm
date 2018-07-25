@@ -99,7 +99,7 @@ X11Event::~X11Event(){
 
 X11Client::X11Client(xcb_window_t _window, const X11Backend *_pbackend) : window(_window), pbackend(_pbackend){
 
-	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW};
+	uint values[2] = {XCB_EVENT_MASK_ENTER_WINDOW,0};
 	xcb_change_window_attributes_checked(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 	xcb_map_window(pbackend->pcon,window);
 
@@ -264,6 +264,7 @@ bool Default::HandleEvent(){
 
 		X11Client::CreateInfo createInfo;
 		createInfo.window = pev->window;
+		createInfo.pbackend = this;
 		X11Client *pclient = dynamic_cast<X11Client *>(SetupClient(&createInfo));
 		clients.push_back(pclient);
 

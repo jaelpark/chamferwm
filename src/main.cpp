@@ -83,17 +83,19 @@ public:
 	}
 
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
-		if(!pcomp)
+		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
+		if(!pcomp11)
 			return new Backend::X11Client(pcreateInfo);
 		Compositor::X11ClientFrame *pclientFrame = new Compositor::X11ClientFrame(pcreateInfo);
 		return pclientFrame;
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
-		if(!pcomp)
+		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
+		if(!pcomp11)
 			return;
 		const Backend::X11Event *pevent11 = dynamic_cast<const Backend::X11Event *>(pevent);
-		dynamic_cast<Compositor::X11Compositor *>(pcomp)->FilterEvent(pevent11);
+		pcomp11->FilterEvent(pevent11);
 	}
 };
 
@@ -144,7 +146,9 @@ public:
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
 
-	~DebugCompositor(){}
+	~DebugCompositor(){
+		Compositor::X11DebugCompositor::Stop();
+	}
 
 	void Present(){
 		Compositor::X11DebugCompositor::Present();
@@ -154,11 +158,11 @@ public:
 class NullCompositor : public Compositor::NullCompositor, public RunCompositor{
 public:
 	NullCompositor() : Compositor::NullCompositor(), RunCompositor(){
-		//
+		Start();
 	}
 
 	~NullCompositor(){
-		//
+		Stop();
 	}
 
 	void Present(){
