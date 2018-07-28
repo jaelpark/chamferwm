@@ -3,7 +3,10 @@
 
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_xcb.h>
-#include <vector> //render queue
+#include <vector>
+
+#include <xcb/composite.h>
+#include <xcb/damage.h>
 
 namespace Backend{
 class X11Backend;
@@ -11,11 +14,32 @@ class X11Backend;
 
 namespace Compositor{
 
+class Texture{
+public:
+	Texture(uint, uint, VkFormat, const class CompositorInterface *pcomp);
+	~Texture();
+	const void * Map() const;
+	void Unmap(const VkCommandBuffer *);
+	const class CompositorInterface *pcomp;
+	VkImage image;
+	VkImageLayout imageLayout;
+	VkImageView imageView;
+	VkDeviceMemory deviceMemory;
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingMemory;
+
+	uint stagingMemorySize;
+	uint w, h;
+
+	static const std::vector<std::pair<VkFormat, uint>> formatSizeMap;
+};
+
 class CompositorPipeline{
 public:
-	CompositorPipeline(class CompositorInterface *);
+	CompositorPipeline(const class CompositorInterface *);
 	~CompositorPipeline();
-	class CompositorInterface *pcomp;
+	const class CompositorInterface *pcomp;
 	VkShaderModule vertexShader;
 	VkShaderModule geometryShader;
 	VkShaderModule fragmentShader;
@@ -23,7 +47,7 @@ public:
 	//renderPass default
 	VkPipeline pipeline;
 
-	static CompositorPipeline * CreateDefault(CompositorInterface *pcomp);
+	static CompositorPipeline * CreateDefault(const CompositorInterface *pcomp);
 };
 
 //Render queue object: can be a frame, text etc.
@@ -45,8 +69,16 @@ public:
 	VkRect2D frame;
 };
 
+class ClientFrame{
+public:
+	ClientFrame();
+	virtual ~ClientFrame();
+	virtual void UpdateContents(const VkCommandBuffer *) = 0;
+	Texture *ptexture;
+};
+
 class CompositorInterface{
-//friend class FrameObject;
+friend class Texture;
 friend class CompositorPipeline;
 friend class RenderObject;
 friend class FrameObject;
@@ -109,11 +141,13 @@ protected:
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };
 
-class X11ClientFrame : public Backend::X11Client{
+class X11ClientFrame : public ClientFrame, public Backend::X11Client{
 public:
 	X11ClientFrame(const Backend::X11Client::CreateInfo *);
 	~X11ClientFrame();
-	xcb_pixmap_t *pwindowPixmap;
+	void UpdateContents(const VkCommandBuffer *);
+	xcb_pixmap_t windowPixmap;
+	xcb_damage_damage_t damage;
 };
 
 //Default compositor assumes XCB for its surface
@@ -137,6 +171,13 @@ protected:
 	sint xfixesErrorOffset;
 	sint damageEventOffset;
 	sint damageErrorOffset;
+};
+
+class X11DebugClientFrame : public ClientFrame, public Backend::FakeClient{
+public:
+	X11DebugClientFrame();
+	~X11DebugClientFrame();
+	void UpdateContents(const VkCommandBuffer *);
 };
 
 class X11DebugCompositor : public X11Compositor{

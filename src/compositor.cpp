@@ -3,19 +3,144 @@
 #include "backend.h"
 #include "compositor.h"
 
-#include <xcb/composite.h>
-#include <xcb/damage.h>
-
 #define GLMF_SWIZZLE
 #include <glm/glm.hpp>
 //#include <glm/gtx/vec_swizzle.hpp>
 #include <set>
+#include <algorithm>
 #include <cstdlib>
 #include <limits>
 
 namespace Compositor{
 
-CompositorPipeline::CompositorPipeline(CompositorInterface *_pcomp) : pcomp(_pcomp){
+Texture::Texture(uint _w, uint _h, VkFormat format, const CompositorInterface *_pcomp) : imageLayout(VK_IMAGE_LAYOUT_UNDEFINED), w(_w), h(_h), pcomp(_pcomp){
+	//staging buffer
+	VkBufferCreateInfo bufferCreateInfo = {};
+	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferCreateInfo.size = (*std::find_if(formatSizeMap.begin(),formatSizeMap.end(),[&](auto &r)->bool{
+		return r.first == format;
+	})).second*w*h;
+	bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	if(vkCreateBuffer(pcomp->logicalDev,&bufferCreateInfo,0,&stagingBuffer) != VK_SUCCESS)
+		throw Exception("Failed to create a staging buffer.");
+	
+	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProps;
+	vkGetPhysicalDeviceMemoryProperties(pcomp->physicalDev,&physicalDeviceMemoryProps);
+
+	VkMemoryRequirements memoryRequirements;
+	vkGetBufferMemoryRequirements(pcomp->logicalDev,stagingBuffer,&memoryRequirements);
+
+	VkMemoryAllocateInfo memoryAllocateInfo = {};
+	memoryAllocateInfo.allocationSize = memoryRequirements.size;
+	for(memoryAllocateInfo.memoryTypeIndex = 0; memoryAllocateInfo.memoryTypeIndex < physicalDeviceMemoryProps.memoryTypeCount; memoryAllocateInfo.memoryTypeIndex++){
+		if(memoryRequirements.memoryTypeBits & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+			break;
+	}
+	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&stagingMemory) != VK_SUCCESS)
+		throw Exception("Failed to allocate staging buffer memory.");
+	vkBindBufferMemory(pcomp->logicalDev,stagingBuffer,stagingMemory,0);
+
+	stagingMemorySize = memoryRequirements.size;
+
+	//image
+	VkImageCreateInfo imageCreateInfo = {};
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.extent.width = w;
+	imageCreateInfo.extent.height = h;
+	imageCreateInfo.extent.depth = 1;
+	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.arrayLayers = 1;
+	imageCreateInfo.format = format;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageCreateInfo.flags = 0;
+	if(vkCreateImage(pcomp->logicalDev,&imageCreateInfo,0,&image) != VK_SUCCESS)
+		throw Exception("Failed to create an image.");
+	
+	vkGetImageMemoryRequirements(pcomp->logicalDev,image,&memoryRequirements);
+	
+	memoryAllocateInfo.allocationSize = memoryRequirements.size;
+	for(memoryAllocateInfo.memoryTypeIndex = 0; memoryAllocateInfo.memoryTypeIndex < physicalDeviceMemoryProps.memoryTypeCount; memoryAllocateInfo.memoryTypeIndex++){
+		if(memoryRequirements.memoryTypeBits & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+			break;
+	}
+
+	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&deviceMemory) != VK_SUCCESS)
+		throw Exception("Failed to allocate image memory.");
+	vkBindImageMemory(pcomp->logicalDev,image,deviceMemory,0);
+}
+
+Texture::~Texture(){
+	vkFreeMemory(pcomp->logicalDev,deviceMemory,0);
+	vkDestroyImage(pcomp->logicalDev,image,0);
+	
+	vkFreeMemory(pcomp->logicalDev,stagingMemory,0);
+	vkDestroyBuffer(pcomp->logicalDev,stagingBuffer,0);
+}
+
+const void * Texture::Map() const{
+	void *pdata;
+	if(vkMapMemory(pcomp->logicalDev,stagingMemory,0,stagingMemorySize,0,&pdata) != VK_SUCCESS)
+		return 0;
+	return pdata;
+}
+
+void Texture::Unmap(const VkCommandBuffer *pcommandBuffer){
+	vkUnmapMemory(pcomp->logicalDev,stagingMemory);
+
+	VkImageSubresourceRange imageSubresourceRange = {};
+	imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageSubresourceRange.baseMipLevel = 0;
+	imageSubresourceRange.levelCount = 1;
+	imageSubresourceRange.layerCount = 1;
+
+	//create in host stage (map), use in transfer stage
+	VkImageMemoryBarrier imageMemoryBarrier = {};
+	imageMemoryBarrier.image = image;
+	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
+	imageMemoryBarrier.srcAccessMask =
+		imageLayout == VK_IMAGE_LAYOUT_UNDEFINED?0:
+		imageLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL?VK_ACCESS_SHADER_READ_BIT:0;
+	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
+		0,0,0,0,1,&imageMemoryBarrier);
+
+	//transfer "stage"
+	VkBufferImageCopy bufferImageCopy = {};
+	bufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	bufferImageCopy.imageSubresource.mipLevel = 0;
+	bufferImageCopy.imageSubresource.baseArrayLayer = 0;
+	bufferImageCopy.imageSubresource.layerCount = 1;
+	bufferImageCopy.imageExtent.width = w;
+	bufferImageCopy.imageExtent.height = h;
+	bufferImageCopy.imageExtent.depth = 1;
+	bufferImageCopy.imageOffset = (VkOffset3D){0,0,0};
+	bufferImageCopy.bufferOffset = 0;
+	vkCmdCopyBufferToImage(*pcommandBuffer,stagingBuffer,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&bufferImageCopy);
+
+	//create in transfer stage, use in fragment shader stage
+	imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,0,
+		0,0,0,0,1,&imageMemoryBarrier);
+	
+	imageLayout = imageMemoryBarrier.newLayout;
+}
+
+const std::vector<std::pair<VkFormat, uint>> Texture::formatSizeMap = {
+	{VK_FORMAT_R8G8B8A8_UNORM,4}
+};
+
+CompositorPipeline::CompositorPipeline(const CompositorInterface *_pcomp) : pcomp(_pcomp){
 	//
 }
 
@@ -27,7 +152,7 @@ CompositorPipeline::~CompositorPipeline(){
 	vkDestroyPipelineLayout(pcomp->logicalDev,pipelineLayout,0);
 }
 
-CompositorPipeline * CompositorPipeline::CreateDefault(CompositorInterface *pcomp){
+CompositorPipeline * CompositorPipeline::CreateDefault(const CompositorInterface *pcomp){
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
 	//
@@ -199,23 +324,6 @@ FrameObject::~FrameObject(){
 }
 
 void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
-	/*glm::mat4 tr = glm::mat4(
-		2.0f,0.0f,0.0f,0.0f,
-		0.0f,1.0f,0.0f,0.0f,
-		0.0f,0.0f,2.0f,0.0f,
-		0.0f,0.0f,0.0f,1.0f);*/
-	/*glm::mat4 tr = glm::mat4(
-		1.0f,0.0f,0.0f,0.0f,
-		0.0f,0.5f,0.0f,0.0f,
-		0.0f,0.0f,1.0f,0.0f,
-		0.0f,0.0f,0.0f,1.0f);*/
-		//0.5f,0.0f,0.0f,1.0f);*/
-	/*glm::mat4 tr = glm::mat4(
-		0.7f,0.0f,0.0f,0.0f,
-		0.0f,0.7f*0.5f,0.0f,0.0f,
-		0.0f,0.0f,0.7f,0.0f,
-		0.0f,0.0f,0.0f,1.0f);*/
-	//TODO: need accurate coordinates, also add +0.5 for pixel centers
 	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
 	frameVec += 0.5f;
 	frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
@@ -232,6 +340,14 @@ void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
 	//vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT,0,64,&tr);
 	vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
+}
+
+ClientFrame::ClientFrame(){
+	//
+}
+
+ClientFrame::~ClientFrame(){
+	//
 }
 
 CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0){
@@ -257,8 +373,6 @@ void CompositorInterface::InitializeRenderEngine(){
 			if(strcmp(playerProps[i].layerName,players[j]) == 0){
 				printf("%s\n",players[j]);
 				++layersFound;
-				//vkEnumerateInstanceExtensionProperties(players[j],&extCount,0);
-				//VkExtensionProperties extProps;
 			}
 	if(layersFound < sizeof(players)/sizeof(players[0]))
 		throw Exception("Could not find all required layers.");
@@ -638,7 +752,7 @@ VkShaderModule CompositorInterface::CreateShaderModule(const char *pbin, size_t 
 }
 
 VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc) const{
-	const char *pshaderPath = getenv("XWM_SHADER_PATH");
+	//const char *pshaderPath = getenv("XWM_SHADER_PATH");
 
 	std::string appendSrc = psrc;
 	/*if(pshaderPath)
@@ -672,7 +786,12 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 	for(const WManager::Container *pcont = pcontainer; pcont; pcont = pcont->pnext){
 		if(!pcont->pclient)
 			continue;
-		//dynamic_cast pclient to X11Client
+		/*ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
+		if(!pclientFrame)
+			continue;
+		//virtual call to function to update the window texture
+		pclientFrame->UpdateContents();*/
+		//
 		WManager::Rectangle r = pcont->pclient->GetRect();
 		VkRect2D frame;
 		frame.offset = {r.x,r.y};
@@ -690,10 +809,6 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot){
 	//TODO: improved mechanism to generate only the command buffer for the next frame.
 	//This function checks wether the command buffer has to be rerecorded
-	//constants:
-	//-aspect ratio
-	//-transformation 3x3 matrix
-	//-time since creation of the object
 	if(!proot)
 		return;
 
@@ -783,19 +898,32 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInfo) : X11Client(_pcreateInfo){
+X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInfo) : ClientFrame(), X11Client(_pcreateInfo){
 	//
-	xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
+	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
+	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 
-	xcb_pixmap_t windowPixmap = xcb_generate_id(pbackend->pcon);
+	windowPixmap = xcb_generate_id(pbackend->pcon);
 	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
-	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
+
+	damage = xcb_generate_id(pbackend->pcon);
+	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
 
 	//The contents of the pixmap are retrieved in GenerateCommandBuffers
+	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
 }
 
 X11ClientFrame::~X11ClientFrame(){
 	//
+	xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
+
+	xcb_damage_destroy(pbackend->pcon,damage);
+}
+
+void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
+	//https://stackoverflow.com/questions/40574668/how-to-update-texture-for-every-frame-in-vulkan
+	//dynamic size: if the window geometry changes, transfer contents to a max-size texture until it's been sufficient time without changes
+	//-see if this is necessary, monitor the rate of window configurations with relative to the frame rate
 }
 
 X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : CompositorInterface(physicalDevIndex){
@@ -905,6 +1033,18 @@ VkExtent2D X11Compositor::GetExtent() const{
 	VkExtent2D e = (VkExtent2D){pgeometryReply->width,pgeometryReply->height};
 	free(pgeometryReply);
 	return e;
+}
+
+X11DebugClientFrame::X11DebugClientFrame() : ClientFrame(), Backend::FakeClient(0,0,0,0){
+	//
+}
+
+X11DebugClientFrame::~X11DebugClientFrame(){
+	//
+}
+
+void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
+	//
 }
 
 X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,pbackend){

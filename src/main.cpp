@@ -252,8 +252,6 @@ int main(sint argc, const char **pargv){
 		if(debugBackend.Get())
 			pcomp = new DebugCompositor(gpuIndex.Get(),proot,pbackend11);
 		else pcomp = new DefaultCompositor(gpuIndex.Get(),proot,pbackend11);
-		//null compositor
-		//compositor=[vulkan|vkdebug|null]
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		delete pbackend;

@@ -86,6 +86,9 @@ private:
 
 class FakeClient : public WManager::Client{
 public:
+	/*struct CreateInfo{
+		const class Fake *pbackend;
+	};*/
 	FakeClient(sint, sint, sint, sint);
 	~FakeClient();
 	WManager::Rectangle GetRect() const;
