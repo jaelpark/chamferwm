@@ -130,6 +130,7 @@ protected:
 	uint physicalDevIndex;
 	uint swapChainImageCount;
 	uint currentFrame;
+	uint imageIndex; //!!?
 
 	//placeholder variables
 	CompositorPipeline *pdefaultPipeline; //temp?
@@ -175,7 +176,7 @@ protected:
 
 class X11DebugClientFrame : public ClientFrame, public Backend::DebugClient{
 public:
-	X11DebugClientFrame();
+	X11DebugClientFrame(const Backend::DebugClient::CreateInfo *);
 	~X11DebugClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 };

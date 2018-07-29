@@ -50,7 +50,7 @@ public:
 		const class X11Backend *pbackend;
 	};
 	X11Client(xcb_window_t, const class X11Backend *);
-	X11Client(const struct CreateInfo *);
+	X11Client(const CreateInfo *);
 	~X11Client();
 	WManager::Rectangle GetRect() const;
 	xcb_window_t window;
@@ -69,7 +69,6 @@ public:
 protected:
 	xcb_connection_t *pcon;
 	xcb_screen_t *pscr;
-	std::vector<X11Client *> clients;
 };
 
 class Default : public X11Backend{
@@ -80,17 +79,20 @@ public:
 	sint GetEventFileDescriptor();
 	bool HandleEvent();
 protected:
-	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0; //TODO: move one class up!!
+	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
 private:	
 	xcb_keycode_t exitKeycode;
+	std::vector<X11Client *> clients;
 };
 
 class DebugClient : public WManager::Client{
 public:
 	struct CreateInfo{
+		WManager::Rectangle rect;
 		const class Debug *pbackend;
 	};
-	DebugClient(sint, sint, sint, sint);
+	DebugClient(WManager::Rectangle);
+	DebugClient(const CreateInfo *);
 	~DebugClient();
 	WManager::Rectangle GetRect() const;
 	sint x, y, w, h;
@@ -104,9 +106,11 @@ public:
 	sint GetEventFileDescriptor();
 	bool HandleEvent();
 protected:
-	virtual DebugClient * SetupClient(const DebugClient::CreateInfo *) = 0; //TODO: move one class up!!
+	virtual DebugClient * SetupClient(const DebugClient::CreateInfo *) = 0;
 private:
 	xcb_keycode_t exitKeycode;
+	xcb_keycode_t spaceKeycode;
+	std::vector<DebugClient *> clients;
 };
 
 }

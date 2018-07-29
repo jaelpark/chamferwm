@@ -53,25 +53,28 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 
 class RunBackend{
 public:
-	RunBackend() : pcomp(0){}
+	RunBackend(WManager::Container *_proot) : proot(_proot), pcomp(0){}
 	virtual ~RunBackend(){}
 	void SetCompositor(class RunCompositor *pcomp){
 		this->pcomp = pcomp;
 	}
 protected:
+	WManager::Container *proot;
 	class RunCompositor *pcomp;
 };
 
 class RunCompositor{
 public:
-	RunCompositor(){}
+	RunCompositor(WManager::Container *_proot) : proot(_proot){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
+protected:
+	WManager::Container *proot;
 };
 
 class DefaultBackend : public Backend::Default, public RunBackend{
 public:
-	DefaultBackend() : Default(), RunBackend(){
+	DefaultBackend(WManager::Container *_proot) : Default(), RunBackend(_proot){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -83,10 +86,15 @@ public:
 	}
 
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
+		WManager::Container *pcontainer = new WManager::Container(proot);
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
-		if(!pcomp11)
-			return new Backend::X11Client(pcreateInfo);
+		if(!pcomp11){
+			Backend::X11Client *pclient11 = new Backend::X11Client(pcreateInfo);
+			pcontainer->pclient = pclient11;
+			return pclient11;
+		}
 		Compositor::X11ClientFrame *pclientFrame = new Compositor::X11ClientFrame(pcreateInfo);
+		pcontainer->pclient = pclientFrame;
 		return pclientFrame;
 	}
 
@@ -101,7 +109,7 @@ public:
 
 class DebugBackend : public Backend::Debug, public RunBackend{
 public:
-	DebugBackend() : Debug(), RunBackend(){
+	DebugBackend(WManager::Container *_proot) : Debug(), RunBackend(_proot){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -109,7 +117,16 @@ public:
 	~DebugBackend(){}
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
-		return 0;
+		WManager::Container *pcontainer = new WManager::Container(proot);
+		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
+		if(!pcomp11){
+			Backend::DebugClient *pclient = new Backend::DebugClient(pcreateInfo);
+			pcontainer->pclient = pclient;
+			return pclient;
+		}
+		Compositor::X11DebugClientFrame *pclientFrame = new Compositor::X11DebugClientFrame(pcreateInfo);
+		pcontainer->pclient = pclientFrame;
+		return pclientFrame;
 	}
 
 	void DefineBindings(){
@@ -123,9 +140,8 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(uint gpuIndex, WManager::Container *proot, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend), RunCompositor(){
+	DefaultCompositor(uint gpuIndex, WManager::Container *_proot, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend), RunCompositor(_proot){
 		Start();
-		GenerateCommandBuffers(proot); //TODO: move to present
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
 
@@ -134,15 +150,15 @@ public:
 	}
 
 	void Present(){
+		GenerateCommandBuffers(proot); //TODO: move to present
 		Compositor::X11Compositor::Present();
 	}
 };
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(uint gpuIndex, WManager::Container *proot, Backend::X11Backend *pbackend) : X11DebugCompositor(gpuIndex,pbackend), RunCompositor(){
+	DebugCompositor(uint gpuIndex, WManager::Container *_proot, Backend::X11Backend *pbackend) : X11DebugCompositor(gpuIndex,pbackend), RunCompositor(_proot){
 		Compositor::X11DebugCompositor::Start();
-		GenerateCommandBuffers(proot);
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
 
@@ -151,13 +167,14 @@ public:
 	}
 
 	void Present(){
+		GenerateCommandBuffers(proot);
 		Compositor::X11DebugCompositor::Present();
 	}
 };
 
 class NullCompositor : public Compositor::NullCompositor, public RunCompositor{
 public:
-	NullCompositor() : Compositor::NullCompositor(), RunCompositor(){
+	NullCompositor() : Compositor::NullCompositor(), RunCompositor(0){
 		Start();
 	}
 
@@ -220,15 +237,15 @@ int main(sint argc, const char **pargv){
 
 	WManager::Container *proot = new WManager::Container();
 	WManager::Container *pna = new WManager::Container(proot); //temp: testing
-	pna->pclient = new Backend::DebugClient(400,10,400,200);
+	pna->pclient = new Backend::DebugClient((WManager::Rectangle){400,10,400,200});
 	WManager::Container *pnb = new WManager::Container(proot); //temp: testing
-	pnb->pclient = new Backend::DebugClient(10,10,400,800);
+	pnb->pclient = new Backend::DebugClient((WManager::Rectangle){10,10,400,800});
 
 	RunBackend *pbackend;
 	try{
 		if(debugBackend.Get())
-			pbackend = new DebugBackend();
-		else pbackend = new DefaultBackend();
+			pbackend = new DebugBackend(proot);
+		else pbackend = new DefaultBackend(proot);
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		return 1;

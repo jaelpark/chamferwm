@@ -265,7 +265,7 @@ bool Default::HandleEvent(){
 		X11Client::CreateInfo createInfo;
 		createInfo.window = pev->window;
 		createInfo.pbackend = this;
-		X11Client *pclient = dynamic_cast<X11Client *>(SetupClient(&createInfo));
+		X11Client *pclient = SetupClient(&createInfo);
 		clients.push_back(pclient);
 
 		xcb_flush(pcon);
@@ -347,7 +347,11 @@ bool Default::HandleEvent(){
 	return true;
 }
 
-DebugClient::DebugClient(sint _x, sint _y, sint _w, sint _h) : WManager::Client(), x(_x), y(_y), w(_w), h(_h){
+DebugClient::DebugClient(const DebugClient::CreateInfo *pcreateInfo) : DebugClient(pcreateInfo->rect){
+	//
+}
+
+DebugClient::DebugClient(WManager::Rectangle rect) : WManager::Client(), x(rect.x), y(rect.y), w(rect.w), h(rect.h){
 	//
 }
 
@@ -356,7 +360,6 @@ DebugClient::~DebugClient(){
 }
 
 WManager::Rectangle DebugClient::GetRect() const{
-	//return (WManager::Rectangle){912-452,1,452,200};
 	return (WManager::Rectangle){x,y,w,h};
 }
 
@@ -394,6 +397,9 @@ void Debug::Start(){
 		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
+		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+	spaceKeycode = SymbolToKeycode(XK_space,psymbols);
+	xcb_grab_key(pcon,1,pscr->root,0,spaceKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	DefineBindings();
 
@@ -433,7 +439,16 @@ bool Debug::HandleEvent(){
 
 		if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode)
 			return false;
-		//
+		else
+		if(pev->detail == spaceKeycode){
+			//create test client
+			DebugClient::CreateInfo createInfo = {};
+			createInfo.rect = (WManager::Rectangle){10,10,400,400};
+			createInfo.pbackend = this;
+			DebugClient *pclient = SetupClient(&createInfo);
+			clients.push_back(pclient);
+			DebugPrintf(stdout,"client created.\n");
+		}
 		}
 		break;
 	default:{

@@ -688,7 +688,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex[QUEUE_INDEX_GRAPHICS];
-	commandPoolCreateInfo.flags = 0; //TODO: flags
+	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	if(vkCreateCommandPool(logicalDev,&commandPoolCreateInfo,0,&commandPool) != VK_SUCCESS)
 		throw Exception("Failed to create a command pool.");
 	
@@ -809,9 +809,12 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot){
 	//TODO: improved mechanism to generate only the command buffer for the next frame.
 	//This function checks wether the command buffer has to be rerecorded
+	printf("------ %u\n",currentFrame);
+	if(currentFrame > 0)
+		return;
 	if(!proot)
 		return;
-
+	
 	//Create a render list elements arranged from back to front
 	renderQueue.clear();
 	frameObjectPool.clear();
@@ -874,7 +877,7 @@ void CompositorInterface::Present(){
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = &semaphore[currentFrame][SEMAPHORE_INDEX_RENDER_FINISHED];
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &pcommandBuffers[imageIndex];
+	submitInfo.pCommandBuffers = &pcommandBuffers[imageIndex]; //TODO: need command buffers equal to amount of frames in flight
 	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,fence[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to submit a queue.");
 	
@@ -1035,7 +1038,7 @@ VkExtent2D X11Compositor::GetExtent() const{
 	return e;
 }
 
-X11DebugClientFrame::X11DebugClientFrame() : ClientFrame(), Backend::DebugClient(0,0,0,0){
+X11DebugClientFrame::X11DebugClientFrame(const Backend::DebugClient::CreateInfo *_pcreateInfo) : ClientFrame(), DebugClient(_pcreateInfo){
 	//
 }
 
