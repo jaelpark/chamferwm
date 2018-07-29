@@ -173,7 +173,7 @@ protected:
 	sint damageErrorOffset;
 };
 
-class X11DebugClientFrame : public ClientFrame, public Backend::FakeClient{
+class X11DebugClientFrame : public ClientFrame, public Backend::DebugClient{
 public:
 	X11DebugClientFrame();
 	~X11DebugClientFrame();

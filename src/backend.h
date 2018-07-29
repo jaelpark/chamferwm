@@ -67,7 +67,6 @@ public:
 	virtual ~X11Backend();
 	bool QueryExtension(const char *, sint *, sint *) const;
 protected:
-	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
 	xcb_connection_t *pcon;
 	xcb_screen_t *pscr;
 	std::vector<X11Client *> clients;
@@ -80,28 +79,32 @@ public:
 	void Start();
 	sint GetEventFileDescriptor();
 	bool HandleEvent();
+protected:
+	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0; //TODO: move one class up!!
 private:	
 	xcb_keycode_t exitKeycode;
 };
 
-class FakeClient : public WManager::Client{
+class DebugClient : public WManager::Client{
 public:
-	/*struct CreateInfo{
-		const class Fake *pbackend;
-	};*/
-	FakeClient(sint, sint, sint, sint);
-	~FakeClient();
+	struct CreateInfo{
+		const class Debug *pbackend;
+	};
+	DebugClient(sint, sint, sint, sint);
+	~DebugClient();
 	WManager::Rectangle GetRect() const;
 	sint x, y, w, h;
 };
 
-class Fake : public X11Backend{
+class Debug : public X11Backend{
 public:
-	Fake();
-	virtual ~Fake();
+	Debug();
+	virtual ~Debug();
 	void Start();
 	sint GetEventFileDescriptor();
 	bool HandleEvent();
+protected:
+	virtual DebugClient * SetupClient(const DebugClient::CreateInfo *) = 0; //TODO: move one class up!!
 private:
 	xcb_keycode_t exitKeycode;
 };

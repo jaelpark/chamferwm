@@ -347,28 +347,28 @@ bool Default::HandleEvent(){
 	return true;
 }
 
-FakeClient::FakeClient(sint _x, sint _y, sint _w, sint _h) : WManager::Client(), x(_x), y(_y), w(_w), h(_h){
+DebugClient::DebugClient(sint _x, sint _y, sint _w, sint _h) : WManager::Client(), x(_x), y(_y), w(_w), h(_h){
 	//
 }
 
-FakeClient::~FakeClient(){
+DebugClient::~DebugClient(){
 	//
 }
 
-WManager::Rectangle FakeClient::GetRect() const{
+WManager::Rectangle DebugClient::GetRect() const{
 	//return (WManager::Rectangle){912-452,1,452,200};
 	return (WManager::Rectangle){x,y,w,h};
 }
 
-Fake::Fake() : X11Backend(){
+Debug::Debug() : X11Backend(){
 	//
 }
 
-Fake::~Fake(){
+Debug::~Debug(){
 	//
 }
 
-void Fake::Start(){
+void Debug::Start(){
 	sint scount;
 	pcon = xcb_connect(0,&scount);
 	if(xcb_connection_has_error(pcon))
@@ -402,12 +402,12 @@ void Fake::Start(){
 	xcb_key_symbols_free(psymbols);
 }
 
-sint Fake::GetEventFileDescriptor(){
+sint Debug::GetEventFileDescriptor(){
 	sint fd = xcb_get_file_descriptor(pcon);
 	return fd;
 }
 
-bool Fake::HandleEvent(){
+bool Debug::HandleEvent(){
 	xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
 	if(!pevent){
 		if(xcb_connection_has_error(pcon)){

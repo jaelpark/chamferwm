@@ -1035,7 +1035,7 @@ VkExtent2D X11Compositor::GetExtent() const{
 	return e;
 }
 
-X11DebugClientFrame::X11DebugClientFrame() : ClientFrame(), Backend::FakeClient(0,0,0,0){
+X11DebugClientFrame::X11DebugClientFrame() : ClientFrame(), Backend::DebugClient(0,0,0,0){
 	//
 }
 

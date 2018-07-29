@@ -99,16 +99,16 @@ public:
 	}
 };
 
-class FakeBackend : public Backend::Fake, public RunBackend{
+class DebugBackend : public Backend::Debug, public RunBackend{
 public:
-	FakeBackend() : Fake(), RunBackend(){
+	DebugBackend() : Debug(), RunBackend(){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
 
-	~FakeBackend(){}
+	~DebugBackend(){}
 
-	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
+	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
 		return 0;
 	}
 
@@ -220,14 +220,14 @@ int main(sint argc, const char **pargv){
 
 	WManager::Container *proot = new WManager::Container();
 	WManager::Container *pna = new WManager::Container(proot); //temp: testing
-	pna->pclient = new Backend::FakeClient(400,10,400,200);
+	pna->pclient = new Backend::DebugClient(400,10,400,200);
 	WManager::Container *pnb = new WManager::Container(proot); //temp: testing
-	pnb->pclient = new Backend::FakeClient(10,10,400,800);
+	pnb->pclient = new Backend::DebugClient(10,10,400,800);
 
 	RunBackend *pbackend;
 	try{
 		if(debugBackend.Get())
-			pbackend = new FakeBackend();
+			pbackend = new DebugBackend();
 		else pbackend = new DefaultBackend();
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
