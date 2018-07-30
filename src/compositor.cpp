@@ -74,9 +74,28 @@ Texture::Texture(uint _w, uint _h, VkFormat format, const CompositorInterface *_
 	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&deviceMemory) != VK_SUCCESS)
 		throw Exception("Failed to allocate image memory.");
 	vkBindImageMemory(pcomp->logicalDev,image,deviceMemory,0);
+
+	VkImageViewCreateInfo imageViewCreateInfo = {};
+	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageViewCreateInfo.image = image;
+	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	imageViewCreateInfo.format = format;
+	imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	imageViewCreateInfo.subresourceRange.levelCount = 1;
+	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	imageViewCreateInfo.subresourceRange.layerCount = 1;
+	if(vkCreateImageView(pcomp->logicalDev,&imageViewCreateInfo,0,&imageView) != VK_SUCCESS)
+		throw Exception("Failed to create texture image view.");
 }
 
 Texture::~Texture(){
+	vkDestroyImageView(pcomp->logicalDev,imageView,0);
+
 	vkFreeMemory(pcomp->logicalDev,deviceMemory,0);
 	vkDestroyImage(pcomp->logicalDev,image,0);
 	
@@ -105,9 +124,10 @@ void Texture::Unmap(const VkCommandBuffer *pcommandBuffer){
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	imageMemoryBarrier.image = image;
 	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
-	imageMemoryBarrier.srcAccessMask =
+	/*imageMemoryBarrier.srcAccessMask =
 		imageLayout == VK_IMAGE_LAYOUT_UNDEFINED?0:
-		imageLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL?VK_ACCESS_SHADER_READ_BIT:0;
+		imageLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL?VK_ACCESS_SHADER_READ_BIT:0;*/
+	imageMemoryBarrier.srcAccessMask = 0;
 	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
 	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -712,6 +732,26 @@ void CompositorInterface::InitializeRenderEngine(){
 
 	if(!(pdefaultPipeline = CompositorPipeline::CreateDefault(this)))
 		throw Exception("Failed to create the default compositor pipeline.");
+
+	VkSamplerCreateInfo samplerCreateInfo = {};
+	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+	samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	samplerCreateInfo.anisotropyEnable = VK_FALSE;
+	samplerCreateInfo.maxAnisotropy = 1;
+	samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerCreateInfo.compareEnable = VK_FALSE;
+	samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerCreateInfo.mipLodBias = 0.0f;
+	samplerCreateInfo.minLod = 0.0f;
+	samplerCreateInfo.maxLod = 0.0f;
+	if(vkCreateSampler(logicalDev,&samplerCreateInfo,0,&pointSampler) != VK_SUCCESS)
+		throw Exception("Failed to create a sampler.");
 	
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -721,6 +761,7 @@ void CompositorInterface::InitializeRenderEngine(){
 		throw Exception("Failed to create a command pool.");
 	
 	pcommandBuffers = new VkCommandBuffer[swapChainImageCount];
+	pcopyCommandBuffers = new VkCommandBuffer[swapChainImageCount];
 
 	VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
 	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -729,6 +770,9 @@ void CompositorInterface::InitializeRenderEngine(){
 	commandBufferAllocateInfo.commandBufferCount = swapChainImageCount;
 	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcommandBuffers) != VK_SUCCESS)
 		throw Exception("Failed to allocate command buffers.");
+	
+	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcopyCommandBuffers) != VK_SUCCESS)
+		throw Exception("Failed to allocate copy command buffer.");
 
 }
 
@@ -737,7 +781,9 @@ void CompositorInterface::DestroyRenderEngine(){
 	vkDeviceWaitIdle(logicalDev);
 
 	delete []pcommandBuffers;
+	delete []pcopyCommandBuffers;
 
+	vkDestroySampler(logicalDev,pointSampler,0);
 	vkDestroyCommandPool(logicalDev,commandPool,0);
 
 	delete pdefaultPipeline;
@@ -851,8 +897,19 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	commandBufferBeginInfo.flags = 0;
+	if(vkBeginCommandBuffer(pcopyCommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
+		throw Exception("Failed to begin command buffer recording.");
+
+	//TODO: damage extension is used to check which clients should update their texture contents
+	for(ClientFrame *pclientFrame : updateQueue)
+		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
+	updateQueue.clear();
+
+	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
+		throw Exception("Failed to end command buffer recording.");
+
 	commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-	commandBufferBeginInfo.pInheritanceInfo = 0;
 	if(vkBeginCommandBuffer(pcommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
 
@@ -868,13 +925,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	vkCmdBeginRenderPass(pcommandBuffers[currentFrame],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
 	vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pdefaultPipeline->pipeline);
-
-	//TODO: damage extension is used to check which clients should update their texture contents
-	for(ClientFrame *pclientFrame : updateQueue)
-		pclientFrame->UpdateContents(&pcommandBuffers[currentFrame]);
-	updateQueue.clear();
-	//vkCmdDraw(pcommandBuffers[i],3,1,0,0);
-	//vkCmdDraw(pcommandBuffers[i],1,1,0,0);
 	/*for(RenderObject *prenderObject : renderQueue){
 		//
 		prenderObject->Draw(&pcommandBuffers[currentFrame]);
@@ -898,6 +948,11 @@ void CompositorInterface::Present(){
 	
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &pcopyCommandBuffers[currentFrame];
+	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,0) != VK_SUCCESS)
+		throw Exception("Failed to submit a queue.");
+
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = &psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE];
 	submitInfo.pWaitDstStageMask = pipelineStageFlags;
@@ -1075,8 +1130,9 @@ X11DebugClientFrame::~X11DebugClientFrame(){
 
 void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//
-	DebugPrintf(stdout,"UpdateContents()\n");
 	const void *pdata = ptexture->Map();
+	for(uint i = 0, n = 4*x*y; i < n; ++i)
+		((char*)pdata)[i] = 255;
 	ptexture->Unmap(pcommandBuffer);
 }
 

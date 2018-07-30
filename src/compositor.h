@@ -145,6 +145,7 @@ protected:
 	VkFence *pfence;
 	VkCommandPool commandPool;
 	VkCommandBuffer *pcommandBuffers;
+	VkCommandBuffer *pcopyCommandBuffers;
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
 	uint swapChainImageCount;
@@ -152,6 +153,7 @@ protected:
 
 	//placeholder variables
 	CompositorPipeline *pdefaultPipeline; //temp?
+	VkSampler pointSampler;
 	//const char *pshaderPath;
 
 	std::vector<RenderObject *> renderQueue;
