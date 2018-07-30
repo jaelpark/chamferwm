@@ -58,7 +58,7 @@ public:
 	virtual void Draw(const VkCommandBuffer *) = 0;
 	//If the pipeline changes, the renderer binds a new one
 	const CompositorPipeline *pPipeline;
-	const CompositorInterface *pcomp;
+	const class CompositorInterface *pcomp;
 };
 
 class FrameObject : public RenderObject{
@@ -71,10 +71,11 @@ public:
 
 class ClientFrame{
 public:
-	ClientFrame();
+	ClientFrame(const class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	Texture *ptexture;
+	const class CompositorInterface *pcomp;
 };
 
 class CompositorInterface{
@@ -82,6 +83,7 @@ friend class Texture;
 friend class CompositorPipeline;
 friend class RenderObject;
 friend class FrameObject;
+friend class ClientFrame;
 public:
 	CompositorInterface(uint);
 	virtual ~CompositorInterface();
@@ -142,7 +144,7 @@ protected:
 
 class X11ClientFrame : public ClientFrame, public Backend::X11Client{
 public:
-	X11ClientFrame(const Backend::X11Client::CreateInfo *);
+	X11ClientFrame(const Backend::X11Client::CreateInfo *, const CompositorInterface *);
 	~X11ClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	xcb_pixmap_t windowPixmap;
@@ -174,7 +176,7 @@ protected:
 
 class X11DebugClientFrame : public ClientFrame, public Backend::DebugClient{
 public:
-	X11DebugClientFrame(const Backend::DebugClient::CreateInfo *);
+	X11DebugClientFrame(const Backend::DebugClient::CreateInfo *, const CompositorInterface *);
 	~X11DebugClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 };

@@ -55,9 +55,31 @@ class RunBackend{
 public:
 	RunBackend(WManager::Container *_proot) : proot(_proot), pcomp(0){}
 	virtual ~RunBackend(){}
+
 	void SetCompositor(class RunCompositor *pcomp){
 		this->pcomp = pcomp;
 	}
+
+	void ReleaseContainersRecursive(const WManager::Container *pcontainer){
+		for(const WManager::Container *pcont = pcontainer; pcont;){
+			if(pcont->pclient)
+				delete pcont->pclient;
+			if(pcont->pch){
+				ReleaseContainersRecursive(pcont->pch);
+				delete pcont->pch;
+			}
+			
+			const WManager::Container *pdiscard = pcont;
+			pcont = pcont->pnext;
+			delete pdiscard;
+		}
+	}
+
+	void ReleaseContainers(){
+		if(proot->pch)
+			ReleaseContainersRecursive(proot->pch);
+	}
+	
 protected:
 	WManager::Container *proot;
 	class RunCompositor *pcomp;
@@ -78,8 +100,10 @@ public:
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
-	
-	~DefaultBackend(){}
+
+	~DefaultBackend(){
+		//
+	}
 
 	void DefineBindings(){
 		DebugPrintf(stdout,"DefineKeybindings()\n");
@@ -93,7 +117,8 @@ public:
 			pcontainer->pclient = pclient11;
 			return pclient11;
 		}
-		Compositor::X11ClientFrame *pclientFrame = new Compositor::X11ClientFrame(pcreateInfo);
+		Compositor::CompositorInterface *pcompInterface = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
+		Compositor::X11ClientFrame *pclientFrame = new Compositor::X11ClientFrame(pcreateInfo,pcompInterface);
 		pcontainer->pclient = pclientFrame;
 		return pclientFrame;
 	}
@@ -124,7 +149,8 @@ public:
 			pcontainer->pclient = pclient;
 			return pclient;
 		}
-		Compositor::X11DebugClientFrame *pclientFrame = new Compositor::X11DebugClientFrame(pcreateInfo);
+		Compositor::CompositorInterface *pcompInterface = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
+		Compositor::X11DebugClientFrame *pclientFrame = new Compositor::X11DebugClientFrame(pcreateInfo,pcompInterface);
 		pcontainer->pclient = pclientFrame;
 		return pclientFrame;
 	}
@@ -240,10 +266,6 @@ int main(sint argc, const char **pargv){
 	epoll_ctl(sfd,EPOLL_CTL_ADD,sfd,&event1);*/
 
 	WManager::Container *proot = new WManager::Container();
-	WManager::Container *pna = new WManager::Container(proot); //temp: testing
-	pna->pclient = new Backend::DebugClient((WManager::Rectangle){400,10,400,200});
-	WManager::Container *pnb = new WManager::Container(proot); //temp: testing
-	pnb->pclient = new Backend::DebugClient((WManager::Rectangle){10,10,400,800});
 
 	RunBackend *pbackend;
 	try{
@@ -292,15 +314,6 @@ int main(sint argc, const char **pargv){
 				if(!r)
 					break;
 			}
-			/*if(!q){
-			q = true;
-			try{
-				pcomp->Present();
-
-			}catch(Exception e){
-				DebugPrintf(stderr,"%s\n",e.what());
-				break;
-			}}*/
 		}
 		try{
 			pcomp->Present();
@@ -312,6 +325,8 @@ int main(sint argc, const char **pargv){
 	}
 
 	DebugPrintf(stdout,"Exit\n");
+
+	pbackend->ReleaseContainers();
 
 	delete pcomp;
 	delete pbackend;

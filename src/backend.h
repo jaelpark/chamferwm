@@ -89,12 +89,13 @@ class DebugClient : public WManager::Client{
 public:
 	struct CreateInfo{
 		WManager::Rectangle rect;
-		const class Debug *pbackend;
+		const class X11Backend *pbackend;
 	};
-	DebugClient(WManager::Rectangle);
+	DebugClient(WManager::Rectangle, const class X11Backend *);
 	DebugClient(const CreateInfo *);
 	~DebugClient();
 	WManager::Rectangle GetRect() const;
+	const X11Backend *pbackend;
 	sint x, y, w, h;
 };
 

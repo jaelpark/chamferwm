@@ -347,11 +347,11 @@ bool Default::HandleEvent(){
 	return true;
 }
 
-DebugClient::DebugClient(const DebugClient::CreateInfo *pcreateInfo) : DebugClient(pcreateInfo->rect){
+DebugClient::DebugClient(const DebugClient::CreateInfo *pcreateInfo) : DebugClient(pcreateInfo->rect,pcreateInfo->pbackend){
 	//
 }
 
-DebugClient::DebugClient(WManager::Rectangle rect) : WManager::Client(), x(rect.x), y(rect.y), w(rect.w), h(rect.h){
+DebugClient::DebugClient(WManager::Rectangle rect, const X11Backend *_pbackend) : WManager::Client(), x(rect.x), y(rect.y), w(rect.w), h(rect.h), pbackend(_pbackend){
 	//
 }
 
@@ -426,7 +426,10 @@ bool Debug::HandleEvent(){
 
 	//switch(pevent->response_type & ~0x80){
 	switch(pevent->response_type & 0x7F){
-	//case XCB_CONFIGURE_REQUEST:{
+	case XCB_EXPOSE:{
+		printf("expose\n");
+		}
+		break;
 	case XCB_CLIENT_MESSAGE:{
 		//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
 		//if(pev->data.data32[0] == wmD
@@ -443,7 +446,7 @@ bool Debug::HandleEvent(){
 		if(pev->detail == spaceKeycode){
 			//create test client
 			DebugClient::CreateInfo createInfo = {};
-			createInfo.rect = (WManager::Rectangle){10,10,400,400};
+			createInfo.rect = (WManager::Rectangle){10,800,400,400};
 			createInfo.pbackend = this;
 			DebugClient *pclient = SetupClient(&createInfo);
 			clients.push_back(pclient);

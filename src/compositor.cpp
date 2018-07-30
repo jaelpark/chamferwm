@@ -32,6 +32,7 @@ Texture::Texture(uint _w, uint _h, VkFormat format, const CompositorInterface *_
 	vkGetBufferMemoryRequirements(pcomp->logicalDev,stagingBuffer,&memoryRequirements);
 
 	VkMemoryAllocateInfo memoryAllocateInfo = {};
+	memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	memoryAllocateInfo.allocationSize = memoryRequirements.size;
 	for(memoryAllocateInfo.memoryTypeIndex = 0; memoryAllocateInfo.memoryTypeIndex < physicalDeviceMemoryProps.memoryTypeCount; memoryAllocateInfo.memoryTypeIndex++){
 		if(memoryRequirements.memoryTypeBits & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
@@ -342,7 +343,7 @@ void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 }
 
-ClientFrame::ClientFrame(){
+ClientFrame::ClientFrame(const CompositorInterface *_pcomp) : pcomp(_pcomp){
 	//
 }
 
@@ -901,7 +902,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInfo) : ClientFrame(), X11Client(_pcreateInfo){
+X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInfo, const CompositorInterface *_pcomp) : ClientFrame(_pcomp), X11Client(_pcreateInfo){
 	//
 	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
@@ -1038,12 +1039,12 @@ VkExtent2D X11Compositor::GetExtent() const{
 	return e;
 }
 
-X11DebugClientFrame::X11DebugClientFrame(const Backend::DebugClient::CreateInfo *_pcreateInfo) : ClientFrame(), DebugClient(_pcreateInfo){
-	//
+X11DebugClientFrame::X11DebugClientFrame(const Backend::DebugClient::CreateInfo *_pcreateInfo, const CompositorInterface *_pcomp) : ClientFrame(_pcomp), DebugClient(_pcreateInfo){
+	ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
 }
 
 X11DebugClientFrame::~X11DebugClientFrame(){
-	//
+	delete ptexture;
 }
 
 void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
