@@ -102,6 +102,7 @@ void Texture::Unmap(const VkCommandBuffer *pcommandBuffer){
 
 	//create in host stage (map), use in transfer stage
 	VkImageMemoryBarrier imageMemoryBarrier = {};
+	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	imageMemoryBarrier.image = image;
 	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
 	imageMemoryBarrier.srcAccessMask =
@@ -316,7 +317,30 @@ RenderObject::~RenderObject(){
 	//
 }
 
-FrameObject::FrameObject(const CompositorPipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RenderObject(_pPipeline,_pcomp), frame(_frame){
+RectangleObject::RectangleObject(const CompositorPipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RenderObject(_pPipeline,_pcomp), frame(_frame){
+	//
+}
+
+void RectangleObject::PushConstants(const VkCommandBuffer *pcommandBuffer){
+	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
+	frameVec += 0.5f;
+	frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
+	frameVec *= 2.0f;
+	frameVec -= 1.0f;
+
+	const float pushConstants[] = {
+		frameVec.x,frameVec.y,
+		frameVec.z,frameVec.w,
+		0,1,0,1
+	};
+	vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
+}
+
+RectangleObject::~RectangleObject(){
+	//
+}
+
+FrameObject::FrameObject(const CompositorPipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pPipeline,_pcomp,_frame){
 	//
 }
 
@@ -325,26 +349,26 @@ FrameObject::~FrameObject(){
 }
 
 void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
-	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
-	frameVec += 0.5f;
-	frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
-	frameVec *= 2.0f;
-	frameVec -= 1.0f;
-
-	float pushConstants[] = {
-		frameVec.x,frameVec.y,
-		frameVec.z,frameVec.w,
-		0,1,0,1
-		//(float)pcomp->imageExtent.height/(float)pcomp->imageExtent.width,0.0f,0.0f,0.0f //TODO: should be in separate constant
-	};
-	//aspectRatio, time, 0, 0
-	//vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT,0,64,&tr);
-	vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
+	PushConstants(pcommandBuffer);
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 }
 
-ClientFrame::ClientFrame(const CompositorInterface *_pcomp) : pcomp(_pcomp){
+TextureObject::TextureObject(const CompositorPipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pPipeline,_pcomp,_frame){
 	//
+}
+
+TextureObject::~TextureObject(){
+	//
+}
+
+void TextureObject::Draw(const VkCommandBuffer *pcommandBuffer){
+	PushConstants(pcommandBuffer);
+	vkCmdDraw(*pcommandBuffer,1,1,0,0);
+}
+
+ClientFrame::ClientFrame(CompositorInterface *_pcomp) : pcomp(_pcomp){
+	//
+	pcomp->updateQueue.push_back(this);
 }
 
 ClientFrame::~ClientFrame(){
@@ -790,11 +814,9 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 	for(const WManager::Container *pcont = pcontainer; pcont; pcont = pcont->pnext){
 		if(!pcont->pclient)
 			continue;
-		/*ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
+		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
 		if(!pclientFrame)
 			continue;
-		//virtual call to function to update the window texture
-		pclientFrame->UpdateContents();*/
 		//
 		WManager::Rectangle r = pcont->pclient->GetRect();
 		VkRect2D frame;
@@ -813,7 +835,7 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 bool CompositorInterface::PollFrameFence(){
 	if(vkWaitForFences(logicalDev,1,&pfence[currentFrame],VK_TRUE,0) == VK_TIMEOUT)
 		return false;
-	//vkWaitForFences(logicalDev,1,&pfence[currentFrame],VK_TRUE,std::numeric_limits<uint64_t>::max()); //TODO: nonblocking (handle GenerateCommandBuffers)
+	//vkWaitForFences(logicalDev,1,&pfence[currentFrame],VK_TRUE,std::numeric_limits<uint64_t>::max());
 	vkResetFences(logicalDev,1,&pfence[currentFrame]);
 	return true;
 }
@@ -846,7 +868,11 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	vkCmdBeginRenderPass(pcommandBuffers[currentFrame],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
 	vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pdefaultPipeline->pipeline);
-	
+
+	//TODO: damage extension is used to check which clients should update their texture contents
+	for(ClientFrame *pclientFrame : updateQueue)
+		pclientFrame->UpdateContents(&pcommandBuffers[currentFrame]);
+	updateQueue.clear();
 	//vkCmdDraw(pcommandBuffers[i],3,1,0,0);
 	//vkCmdDraw(pcommandBuffers[i],1,1,0,0);
 	/*for(RenderObject *prenderObject : renderQueue){
@@ -902,7 +928,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInfo, const CompositorInterface *_pcomp) : ClientFrame(_pcomp), X11Client(_pcreateInfo){
+X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : ClientFrame(_pcomp), X11Client(_pcreateInfo){
 	//
 	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
@@ -1039,7 +1065,7 @@ VkExtent2D X11Compositor::GetExtent() const{
 	return e;
 }
 
-X11DebugClientFrame::X11DebugClientFrame(const Backend::DebugClient::CreateInfo *_pcreateInfo, const CompositorInterface *_pcomp) : ClientFrame(_pcomp), DebugClient(_pcreateInfo){
+X11DebugClientFrame::X11DebugClientFrame(const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : ClientFrame(_pcomp), DebugClient(_pcreateInfo){
 	ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
 }
 
@@ -1049,6 +1075,9 @@ X11DebugClientFrame::~X11DebugClientFrame(){
 
 void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//
+	DebugPrintf(stdout,"UpdateContents()\n");
+	const void *pdata = ptexture->Map();
+	ptexture->Unmap(pcommandBuffer);
 }
 
 X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,pbackend){

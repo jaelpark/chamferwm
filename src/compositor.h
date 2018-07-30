@@ -50,39 +50,57 @@ public:
 	static CompositorPipeline * CreateDefault(const CompositorInterface *pcomp);
 };
 
-//Render queue object: can be a frame, text etc.
+//Render queue objects: can be frames, text etc.
+//TODO: should the render objects define what shaders to load etc?
 class RenderObject{
 public:
 	RenderObject(const CompositorPipeline *, const class CompositorInterface *);
 	virtual ~RenderObject();
 	virtual void Draw(const VkCommandBuffer *) = 0;
 	//If the pipeline changes, the renderer binds a new one
+protected:
 	const CompositorPipeline *pPipeline;
 	const class CompositorInterface *pcomp;
 };
 
-class FrameObject : public RenderObject{
+class RectangleObject : public RenderObject{
+public:
+	RectangleObject(const CompositorPipeline *, const class CompositorInterface *, VkRect2D);
+	virtual ~RectangleObject();
+protected:
+	void PushConstants(const VkCommandBuffer *);
+	VkRect2D frame;
+};
+
+class FrameObject : public RectangleObject{
 public:
 	FrameObject(const CompositorPipeline *, const class CompositorInterface *, VkRect2D);
 	~FrameObject();
 	void Draw(const VkCommandBuffer *);
-	VkRect2D frame;
+};
+
+class TextureObject : public RectangleObject{
+public:
+	TextureObject(const CompositorPipeline *, const class CompositorInterface *, VkRect2D);
+	~TextureObject();
+	void Draw(const VkCommandBuffer *);
+	const Texture *ptexture;
 };
 
 class ClientFrame{
 public:
-	ClientFrame(const class CompositorInterface *);
+	ClientFrame(class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	Texture *ptexture;
-	const class CompositorInterface *pcomp;
+	class CompositorInterface *pcomp;
 };
 
 class CompositorInterface{
 friend class Texture;
 friend class CompositorPipeline;
 friend class RenderObject;
-friend class FrameObject;
+friend class RectangleObject;
 friend class ClientFrame;
 public:
 	CompositorInterface(uint);
@@ -138,13 +156,15 @@ protected:
 
 	std::vector<RenderObject *> renderQueue;
 	std::vector<FrameObject> frameObjectPool;
+
+	std::vector<ClientFrame *> updateQueue;
 	
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };
 
 class X11ClientFrame : public ClientFrame, public Backend::X11Client{
 public:
-	X11ClientFrame(const Backend::X11Client::CreateInfo *, const CompositorInterface *);
+	X11ClientFrame(const Backend::X11Client::CreateInfo *, CompositorInterface *);
 	~X11ClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	xcb_pixmap_t windowPixmap;
@@ -176,7 +196,7 @@ protected:
 
 class X11DebugClientFrame : public ClientFrame, public Backend::DebugClient{
 public:
-	X11DebugClientFrame(const Backend::DebugClient::CreateInfo *, const CompositorInterface *);
+	X11DebugClientFrame(const Backend::DebugClient::CreateInfo *, CompositorInterface *);
 	~X11DebugClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 };
