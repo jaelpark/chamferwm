@@ -150,7 +150,9 @@ public:
 	}
 
 	void Present(){
-		GenerateCommandBuffers(proot); //TODO: move to present
+		if(!PollFrameFence())
+			return;
+		GenerateCommandBuffers(proot);
 		Compositor::X11Compositor::Present();
 	}
 };
@@ -167,6 +169,8 @@ public:
 	}
 
 	void Present(){
+		if(!PollFrameFence())
+			return;
 		GenerateCommandBuffers(proot);
 		Compositor::X11DebugCompositor::Present();
 	}

@@ -87,14 +87,13 @@ public:
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
 	virtual void Stop() = 0;
-	//virtual void SetupClient(const WManager::Client *) = 0;
 protected:
 	void InitializeRenderEngine();
 	void DestroyRenderEngine();
 	VkShaderModule CreateShaderModule(const char *, size_t) const;
 	VkShaderModule CreateShaderModuleFromFile(const char *) const;
-	//void SetShaderLoadPath(const char *);
 	void CreateRenderQueue(const WManager::Container *);
+	bool PollFrameFence();
 	void GenerateCommandBuffers(const WManager::Container *);
 	void Present();
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
@@ -122,15 +121,14 @@ protected:
 		SEMAPHORE_INDEX_RENDER_FINISHED,
 		SEMAPHORE_INDEX_COUNT
 	};
-	VkSemaphore semaphore[2][SEMAPHORE_INDEX_COUNT];
-	VkFence fence[2];
+	VkSemaphore (*psemaphore)[SEMAPHORE_INDEX_COUNT];
+	VkFence *pfence;
 	VkCommandPool commandPool;
 	VkCommandBuffer *pcommandBuffers;
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
 	uint swapChainImageCount;
 	uint currentFrame;
-	uint imageIndex; //!!?
 
 	//placeholder variables
 	CompositorPipeline *pdefaultPipeline; //temp?

@@ -674,11 +674,14 @@ void CompositorInterface::InitializeRenderEngine(){
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-	for(uint i = 0; i < 2; ++i){
-		if(vkCreateFence(logicalDev,&fenceCreateInfo,0,&fence[i]) != VK_SUCCESS)
+	psemaphore = new VkSemaphore[swapChainImageCount][SEMAPHORE_INDEX_COUNT];
+	pfence = new VkFence[swapChainImageCount];
+
+	for(uint i = 0; i < swapChainImageCount; ++i){
+		if(vkCreateFence(logicalDev,&fenceCreateInfo,0,&pfence[i]) != VK_SUCCESS)
 			throw Exception("Failed to create a fence.");
 		for(uint j = 0; j < SEMAPHORE_INDEX_COUNT; ++j)
-			if(vkCreateSemaphore(logicalDev,&semaphoreCreateInfo,0,&semaphore[i][j]) != VK_SUCCESS)
+			if(vkCreateSemaphore(logicalDev,&semaphoreCreateInfo,0,&psemaphore[i][j]) != VK_SUCCESS)
 				throw Exception("Failed to create a semaphore.");
 	}
 
@@ -714,16 +717,16 @@ void CompositorInterface::DestroyRenderEngine(){
 
 	delete pdefaultPipeline;
 
-	for(uint i = 0; i < 2; ++i){
-		vkDestroyFence(logicalDev,fence[i],0);
-		for(uint j = 0; j < SEMAPHORE_INDEX_COUNT; ++j)
-			vkDestroySemaphore(logicalDev,semaphore[i][j],0);
-	}
-
 	for(uint i = 0; i < swapChainImageCount; ++i){
+		vkDestroyFence(logicalDev,pfence[i],0);
+		for(uint j = 0; j < SEMAPHORE_INDEX_COUNT; ++j)
+			vkDestroySemaphore(logicalDev,psemaphore[i][j],0);
+
 		vkDestroyFramebuffer(logicalDev,pframebuffers[i],0);
 		vkDestroyImageView(logicalDev,pswapChainImageViews[i],0);
 	}
+	delete []psemaphore;
+	delete []pfence;
 	delete []pswapChainImageViews;
 	delete []pswapChainImages;
 	vkDestroySwapchainKHR(logicalDev,swapChain,0);
@@ -806,12 +809,15 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 	}
 }
 
+bool CompositorInterface::PollFrameFence(){
+	if(vkWaitForFences(logicalDev,1,&pfence[currentFrame],VK_TRUE,0) == VK_TIMEOUT)
+		return false;
+	//vkWaitForFences(logicalDev,1,&pfence[currentFrame],VK_TRUE,std::numeric_limits<uint64_t>::max()); //TODO: nonblocking (handle GenerateCommandBuffers)
+	vkResetFences(logicalDev,1,&pfence[currentFrame]);
+	return true;
+}
+
 void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot){
-	//TODO: improved mechanism to generate only the command buffer for the next frame.
-	//This function checks wether the command buffer has to be rerecorded
-	printf("------ %u\n",currentFrame);
-	if(currentFrame > 0)
-		return;
 	if(!proot)
 		return;
 	
@@ -819,51 +825,45 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	renderQueue.clear();
 	frameObjectPool.clear();
 	CreateRenderQueue(proot->pch);
-	//
-	for(uint i = 0; i < swapChainImageCount; ++i){
-		VkCommandBufferBeginInfo commandBufferBeginInfo = {};
-		commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-		commandBufferBeginInfo.pInheritanceInfo = 0;
-		if(vkBeginCommandBuffer(pcommandBuffers[i],&commandBufferBeginInfo) != VK_SUCCESS)
-			throw Exception("Failed to begin command buffer recording.");
 
-		static const VkClearValue clearValue = {0.0f,0.0f,0.0f,1.0};
-		VkRenderPassBeginInfo renderPassBeginInfo = {};
-		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassBeginInfo.renderPass = renderPass;
-		renderPassBeginInfo.framebuffer = pframebuffers[i];
-		renderPassBeginInfo.renderArea.offset = {0,0};
-		renderPassBeginInfo.renderArea.extent = imageExtent;
-		renderPassBeginInfo.clearValueCount = 1;
-		renderPassBeginInfo.pClearValues = &clearValue;
-		vkCmdBeginRenderPass(pcommandBuffers[i],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
+	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
+	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+	commandBufferBeginInfo.pInheritanceInfo = 0;
+	if(vkBeginCommandBuffer(pcommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
+		throw Exception("Failed to begin command buffer recording.");
 
-		vkCmdBindPipeline(pcommandBuffers[i],VK_PIPELINE_BIND_POINT_GRAPHICS,pdefaultPipeline->pipeline);
-		
-		//vkCmdDraw(pcommandBuffers[i],3,1,0,0);
-		//vkCmdDraw(pcommandBuffers[i],1,1,0,0);
-		/*for(RenderObject *prenderObject : renderQueue){
-			//
-			prenderObject->Draw(&pcommandBuffers[i]);
-		}*/
-		for(uint j = 0, n = frameObjectPool.size(); j < n; ++j)
-			frameObjectPool[j].Draw(&pcommandBuffers[i]);
+	static const VkClearValue clearValue = {0.0f,0.0f,0.0f,1.0};
+	VkRenderPassBeginInfo renderPassBeginInfo = {};
+	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassBeginInfo.renderPass = renderPass;
+	renderPassBeginInfo.framebuffer = pframebuffers[currentFrame];
+	renderPassBeginInfo.renderArea.offset = {0,0};
+	renderPassBeginInfo.renderArea.extent = imageExtent;
+	renderPassBeginInfo.clearValueCount = 1;
+	renderPassBeginInfo.pClearValues = &clearValue;
+	vkCmdBeginRenderPass(pcommandBuffers[currentFrame],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
-		vkCmdEndRenderPass(pcommandBuffers[i]);
+	vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pdefaultPipeline->pipeline);
+	
+	//vkCmdDraw(pcommandBuffers[i],3,1,0,0);
+	//vkCmdDraw(pcommandBuffers[i],1,1,0,0);
+	/*for(RenderObject *prenderObject : renderQueue){
+		//
+		prenderObject->Draw(&pcommandBuffers[currentFrame]);
+	}*/
+	for(uint j = 0, n = frameObjectPool.size(); j < n; ++j)
+		frameObjectPool[j].Draw(&pcommandBuffers[currentFrame]);
 
-		if(vkEndCommandBuffer(pcommandBuffers[i]) != VK_SUCCESS)
-			throw Exception("Failed to end command buffer recording.");
-	}
+	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);
+
+	if(vkEndCommandBuffer(pcommandBuffers[currentFrame]) != VK_SUCCESS)
+		throw Exception("Failed to end command buffer recording.");
 }
 
 void CompositorInterface::Present(){
-	if(vkWaitForFences(logicalDev,1,&fence[currentFrame],VK_TRUE,0) == VK_TIMEOUT)
-		return;
-	vkResetFences(logicalDev,1,&fence[currentFrame]);
-
 	uint imageIndex;
-	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),semaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS)
+	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS)
 		throw Exception("Failed to acquire a swap chain image.\n");
 	//
 	VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -872,26 +872,26 @@ void CompositorInterface::Present(){
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.waitSemaphoreCount = 1;
-	submitInfo.pWaitSemaphores = &semaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE];
+	submitInfo.pWaitSemaphores = &psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE];
 	submitInfo.pWaitDstStageMask = pipelineStageFlags;
 	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = &semaphore[currentFrame][SEMAPHORE_INDEX_RENDER_FINISHED];
+	submitInfo.pSignalSemaphores = &psemaphore[currentFrame][SEMAPHORE_INDEX_RENDER_FINISHED];
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &pcommandBuffers[imageIndex]; //TODO: need command buffers equal to amount of frames in flight
-	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,fence[currentFrame]) != VK_SUCCESS)
+	submitInfo.pCommandBuffers = &pcommandBuffers[currentFrame];
+	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,pfence[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to submit a queue.");
 	
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = &semaphore[currentFrame][SEMAPHORE_INDEX_RENDER_FINISHED];
+	presentInfo.pWaitSemaphores = &psemaphore[currentFrame][SEMAPHORE_INDEX_RENDER_FINISHED];
 	presentInfo.swapchainCount = 1;
 	presentInfo.pSwapchains = &swapChain;
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = 0;
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
 
-	currentFrame = (currentFrame+1)%2;
+	currentFrame = (currentFrame+1)%swapChainImageCount; //TODO: needs to be higher or equal to image count?
 
 	//vkDeviceWaitIdle(logicalDev);
 }
