@@ -1,10 +1,12 @@
-project('xwm','cpp')
+project('xwm',['c','cpp'])
 
 src = [
 	'src/main.cpp',
 	'src/container.cpp',
 	'src/backend.cpp',
-	'src/compositor.cpp'
+	'src/compositor.cpp',
+	'src/CompositorResource.cpp',
+	'src/spirv_reflect.c'
 ]
 	
 xcb = [

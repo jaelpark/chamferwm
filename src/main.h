@@ -20,4 +20,15 @@ private:
 	const char *pmsg;
 };
 
+class Blob{
+public:
+	Blob(const char *);
+	~Blob();
+	const char * GetBufferPointer();
+	size_t GetBufferLength();
+private:
+	char *pbuffer;
+	size_t buflen;
+};
+
 #endif

@@ -1,6 +1,7 @@
 #include "main.h"
 #include "container.h"
 #include "backend.h"
+#include "CompositorResource.h"
 #include "compositor.h"
 
 #include <cstdlib>
@@ -31,6 +32,34 @@ const char * Exception::what(){
 }
 
 char Exception::buffer[4096];
+
+Blob::Blob(const char *pfileName){
+	FILE *pf = fopen(pfileName,"rb");
+	if(!pf){
+		snprintf(Exception::buffer,sizeof(Exception::buffer),"Unable to open file: %s\n",pfileName);
+		throw Exception();
+	}
+
+	fseek(pf,0,SEEK_END);
+	buflen = ftell(pf);
+	fseek(pf,0,SEEK_SET);
+	
+	pbuffer = new char[buflen];
+	fread(pbuffer,1,buflen,pf);
+	fclose(pf);
+}
+
+Blob::~Blob(){
+	delete []pbuffer;
+}
+
+const char * Blob::GetBufferPointer(){
+	return pbuffer;
+}
+
+size_t Blob::GetBufferLength(){
+	return buflen;
+}
 
 void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	time_t rt;

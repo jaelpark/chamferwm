@@ -14,43 +14,6 @@ class X11Backend;
 
 namespace Compositor{
 
-//texture class for shader reads
-class Texture{
-public:
-	Texture(uint, uint, VkFormat, const class CompositorInterface *pcomp);
-	~Texture();
-	const void * Map() const;
-	void Unmap(const VkCommandBuffer *);
-	const class CompositorInterface *pcomp;
-	VkImage image;
-	VkImageLayout imageLayout;
-	VkImageView imageView;
-	VkDeviceMemory deviceMemory;
-
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingMemory;
-
-	uint stagingMemorySize;
-	uint w, h;
-
-	static const std::vector<std::pair<VkFormat, uint>> formatSizeMap;
-};
-
-class CompositorPipeline{
-public:
-	CompositorPipeline(const class CompositorInterface *);
-	~CompositorPipeline();
-	const class CompositorInterface *pcomp;
-	VkShaderModule vertexShader;
-	VkShaderModule geometryShader;
-	VkShaderModule fragmentShader;
-	VkPipelineLayout pipelineLayout;
-	//renderPass default
-	VkPipeline pipeline;
-
-	static CompositorPipeline * CreateDefault(const CompositorInterface *pcomp);
-};
-
 //Render queue objects: can be frames, text etc.
 //TODO: should the render objects define what shaders to load etc?
 class RenderObject{
@@ -99,6 +62,7 @@ public:
 
 class CompositorInterface{
 friend class Texture;
+friend class ShaderModule;
 friend class CompositorPipeline;
 friend class RenderObject;
 friend class RectangleObject;
@@ -137,6 +101,7 @@ protected:
 	VkImage *pswapChainImages;
 	VkImageView *pswapChainImageViews;
 	VkFramebuffer *pframebuffers;
+
 	enum SEMAPHORE_INDEX{
 		SEMAPHORE_INDEX_IMAGE_AVAILABLE,
 		SEMAPHORE_INDEX_RENDER_FINISHED,
@@ -167,7 +132,7 @@ protected:
 	std::vector<TextureObject> textureObjectPool;
 
 	std::vector<ClientFrame *> updateQueue;
-	
+
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };
 
