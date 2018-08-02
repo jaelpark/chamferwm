@@ -733,6 +733,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	if(!(pdefaultPipeline = CompositorPipeline::CreateDefault(this)))
 		throw Exception("Failed to create the default compositor pipeline.");
 
+	//sampler
 	VkSamplerCreateInfo samplerCreateInfo = {};
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 	samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
@@ -752,7 +753,60 @@ void CompositorInterface::InitializeRenderEngine(){
 	samplerCreateInfo.maxLod = 0.0f;
 	if(vkCreateSampler(logicalDev,&samplerCreateInfo,0,&pointSampler) != VK_SUCCESS)
 		throw Exception("Failed to create a sampler.");
+
+	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+	samplerLayoutBinding.binding = 0;
+	samplerLayoutBinding.descriptorCount = 1;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerLayoutBinding.pImmutableSamplers = &pointSampler;
+ 	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = {};
+	descSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	descSetLayoutCreateInfo.bindingCount = 1;
+	descSetLayoutCreateInfo.pBindings = &samplerLayoutBinding;
+	if(vkCreateDescriptorSetLayout(logicalDev,&descSetLayoutCreateInfo,0,&descSetLayout) != VK_SUCCESS)
+		throw Exception("Failed to create a descriptor set layout.");
+	//bind the above to pipeline layout
+
+	//descriptor pool and descriptors
+	//descriptors of this pool
+	VkDescriptorPoolSize descPoolSizes[1];
+	descPoolSizes[0] = (VkDescriptorPoolSize){};
+	descPoolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descPoolSizes[0].descriptorCount = swapChainImageCount;
 	
+	VkDescriptorPoolCreateInfo descPoolCreateInfo = {};
+	descPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descPoolCreateInfo.poolSizeCount = sizeof(descPoolSizes)/sizeof(descPoolSizes[0]);
+	descPoolCreateInfo.pPoolSizes = descPoolSizes;
+	descPoolCreateInfo.maxSets = swapChainImageCount;
+	if(vkCreateDescriptorPool(logicalDev,&descPoolCreateInfo,0,&descPool) != VK_SUCCESS)
+		throw Exception("Failed to create a descriptor pool.");
+	
+	pdescSets = new VkDescriptorSet[swapChainImageCount];
+
+	VkDescriptorSetLayout *pdescSetLayoutCopy = new VkDescriptorSetLayout[swapChainImageCount];
+	std::fill(pdescSetLayoutCopy,pdescSetLayoutCopy+swapChainImageCount,descSetLayout);
+
+	//allocate the descriptor sets
+	VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
+	descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	descSetAllocateInfo.descriptorPool = descPool;
+	descSetAllocateInfo.pSetLayouts = pdescSetLayoutCopy;
+	descSetAllocateInfo.descriptorSetCount = swapChainImageCount;
+	if(vkAllocateDescriptorSets(logicalDev,&descSetAllocateInfo,pdescSets) != VK_SUCCESS)
+		throw Exception("Failed to allocate descriptor sets.");
+	
+	delete []pdescSetLayoutCopy;
+
+	for(uint i = 0; i < swapChainImageCount; ++i){
+		VkDescriptorImageInfo descImageInfo = {};
+		descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		//descImageInfo.imageView = 
+	}
+	
+	//command pool and buffers
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex[QUEUE_INDEX_GRAPHICS];
@@ -782,9 +836,13 @@ void CompositorInterface::DestroyRenderEngine(){
 
 	delete []pcommandBuffers;
 	delete []pcopyCommandBuffers;
+	vkDestroyCommandPool(logicalDev,commandPool,0);
+
+	delete []pdescSets;
+	vkDestroyDescriptorPool(logicalDev,descPool,0);
+	vkDestroyDescriptorSetLayout(logicalDev,descSetLayout,0);
 
 	vkDestroySampler(logicalDev,pointSampler,0);
-	vkDestroyCommandPool(logicalDev,commandPool,0);
 
 	delete pdefaultPipeline;
 
@@ -852,10 +910,6 @@ VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc)
 	return shaderModule;
 }
 
-/*void CompositorInterface::SetShaderLoadPath(const char *pshaderPath){
-	this->pshaderPath = pshaderPath;
-}*/
-
 void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer){
 	for(const WManager::Container *pcont = pcontainer; pcont; pcont = pcont->pnext){
 		if(!pcont->pclient)
@@ -871,6 +925,10 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 
 		FrameObject &frameObject = frameObjectPool.emplace_back(pdefaultPipeline,this,frame);
 		renderQueue.push_back(&frameObject);
+
+		//TextureObject &textureObject = textureObjectPool.emplace_back(pdefaultPipeline,this,frame);
+		//renderQueue.push_back(&textureObject);
+
 		if(pcont->pch)
 			CreateRenderQueue(pcont->pch);
 		//worry about stacks later
@@ -925,12 +983,11 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	vkCmdBeginRenderPass(pcommandBuffers[currentFrame],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
 	vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pdefaultPipeline->pipeline);
-	/*for(RenderObject *prenderObject : renderQueue){
-		//
-		prenderObject->Draw(&pcommandBuffers[currentFrame]);
-	}*/
-	for(uint j = 0, n = frameObjectPool.size(); j < n; ++j)
-		frameObjectPool[j].Draw(&pcommandBuffers[currentFrame]);
+	//for(RenderObject *prenderObject : renderQueue)
+		//prenderObject->Draw(&pcommandBuffers[currentFrame]);
+	
+	for(FrameObject &pframeObject : frameObjectPool)
+		pframeObject.Draw(&pcommandBuffers[currentFrame]);
 
 	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);
 

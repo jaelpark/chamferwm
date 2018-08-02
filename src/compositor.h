@@ -14,6 +14,7 @@ class X11Backend;
 
 namespace Compositor{
 
+//texture class for shader reads
 class Texture{
 public:
 	Texture(uint, uint, VkFormat, const class CompositorInterface *pcomp);
@@ -146,6 +147,11 @@ protected:
 	VkCommandPool commandPool;
 	VkCommandBuffer *pcommandBuffers;
 	VkCommandBuffer *pcopyCommandBuffers;
+
+	VkDescriptorSetLayout descSetLayout;
+	VkDescriptorPool descPool;
+	VkDescriptorSet *pdescSets;
+
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
 	uint swapChainImageCount;
@@ -158,6 +164,7 @@ protected:
 
 	std::vector<RenderObject *> renderQueue;
 	std::vector<FrameObject> frameObjectPool;
+	std::vector<TextureObject> textureObjectPool;
 
 	std::vector<ClientFrame *> updateQueue;
 	
