@@ -11,11 +11,10 @@
 
 #define GLMF_SWIZZLE
 #include <glm/glm.hpp>
-//#include <glm/gtx/vec_swizzle.hpp>
 
 namespace Compositor{
 
-RenderObject::RenderObject(const CompositorPipeline *_pPipeline, const CompositorInterface *_pcomp) : pPipeline(_pPipeline), pcomp(_pcomp){
+RenderObject::RenderObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp) : pPipeline(_pPipeline), pcomp(_pcomp){
 	//
 }
 
@@ -23,7 +22,7 @@ RenderObject::~RenderObject(){
 	//
 }
 
-RectangleObject::RectangleObject(const CompositorPipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RenderObject(_pPipeline,_pcomp), frame(_frame){
+RectangleObject::RectangleObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RenderObject(_pPipeline,_pcomp), frame(_frame){
 	//
 }
 
@@ -46,7 +45,7 @@ RectangleObject::~RectangleObject(){
 	//
 }
 
-FrameObject::FrameObject(const CompositorPipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pPipeline,_pcomp,_frame){
+FrameObject::FrameObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pPipeline,_pcomp,_frame){
 	//
 }
 
@@ -59,7 +58,7 @@ void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 }
 
-TextureObject::TextureObject(const CompositorPipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pPipeline,_pcomp,_frame){
+TextureObject::TextureObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pPipeline,_pcomp,_frame){
 	//
 }
 
@@ -90,7 +89,6 @@ CompositorInterface::~CompositorInterface(){
 }
 
 void CompositorInterface::InitializeRenderEngine(){
-	//https://gist.github.com/graphitemaster/e162a24e57379af840d4
 	uint layerCount;
 	vkEnumerateInstanceLayerProperties(&layerCount,0);
 	VkLayerProperties *playerProps = new VkLayerProperties[layerCount];
@@ -189,7 +187,6 @@ void CompositorInterface::InitializeRenderEngine(){
 
 	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDev,surface,&surfaceCapabilities);
-	//TODO
 
 	uint formatCount;
 	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDev,surface,&formatCount,0);
@@ -416,7 +413,7 @@ void CompositorInterface::InitializeRenderEngine(){
 				throw Exception("Failed to create a semaphore.");
 	}
 
-	if(!(pdefaultPipeline = CompositorPipeline::CreateDefault(this)))
+	if(!(pdefaultPipeline = Pipeline::CreateDefault(this)))
 		throw Exception("Failed to create the default compositor pipeline.");
 
 	//sampler
@@ -440,7 +437,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	if(vkCreateSampler(logicalDev,&samplerCreateInfo,0,&pointSampler) != VK_SUCCESS)
 		throw Exception("Failed to create a sampler.");
 
-	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+	/*VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
 	samplerLayoutBinding.binding = 0;
 	samplerLayoutBinding.descriptorCount = 1;
 	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -452,7 +449,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	descSetLayoutCreateInfo.bindingCount = 1;
 	descSetLayoutCreateInfo.pBindings = &samplerLayoutBinding;
 	if(vkCreateDescriptorSetLayout(logicalDev,&descSetLayoutCreateInfo,0,&descSetLayout) != VK_SUCCESS)
-		throw Exception("Failed to create a descriptor set layout.");
+		throw Exception("Failed to create a descriptor set layout.");*/
 	//bind the above to pipeline layout
 
 	//descriptor pool and descriptors
@@ -466,11 +463,11 @@ void CompositorInterface::InitializeRenderEngine(){
 	descPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descPoolCreateInfo.poolSizeCount = sizeof(descPoolSizes)/sizeof(descPoolSizes[0]);
 	descPoolCreateInfo.pPoolSizes = descPoolSizes;
-	descPoolCreateInfo.maxSets = swapChainImageCount;
+	descPoolCreateInfo.maxSets = 16;//swapChainImageCount;
 	if(vkCreateDescriptorPool(logicalDev,&descPoolCreateInfo,0,&descPool) != VK_SUCCESS)
 		throw Exception("Failed to create a descriptor pool.");
 	
-	pdescSets = new VkDescriptorSet[swapChainImageCount];
+	/*pdescSets = new VkDescriptorSet[swapChainImageCount];
 
 	VkDescriptorSetLayout *pdescSetLayoutCopy = new VkDescriptorSetLayout[swapChainImageCount];
 	std::fill(pdescSetLayoutCopy,pdescSetLayoutCopy+swapChainImageCount,descSetLayout);
@@ -490,7 +487,7 @@ void CompositorInterface::InitializeRenderEngine(){
 		VkDescriptorImageInfo descImageInfo = {};
 		descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		//descImageInfo.imageView = 
-	}
+	}*/
 	
 	//command pool and buffers
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
@@ -524,9 +521,9 @@ void CompositorInterface::DestroyRenderEngine(){
 	delete []pcopyCommandBuffers;
 	vkDestroyCommandPool(logicalDev,commandPool,0);
 
-	delete []pdescSets;
+	//delete []pdescSets;
 	vkDestroyDescriptorPool(logicalDev,descPool,0);
-	vkDestroyDescriptorSetLayout(logicalDev,descSetLayout,0);
+	//vkDestroyDescriptorSetLayout(logicalDev,descSetLayout,0);
 
 	vkDestroySampler(logicalDev,pointSampler,0);
 
@@ -554,46 +551,6 @@ void CompositorInterface::DestroyRenderEngine(){
 
 	vkDestroySurfaceKHR(instance,surface,0);
 	vkDestroyInstance(instance,0);
-}
-
-VkShaderModule CompositorInterface::CreateShaderModule(const char *pbin, size_t binlen) const{
-	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
-	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	shaderModuleCreateInfo.codeSize = binlen;
-	shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(pbin);
-
-	VkShaderModule shaderModule;
-	if(vkCreateShaderModule(logicalDev,&shaderModuleCreateInfo,0,&shaderModule) != VK_SUCCESS)
-		return 0;
-	
-	return shaderModule;
-}
-
-VkShaderModule CompositorInterface::CreateShaderModuleFromFile(const char *psrc) const{
-	//const char *pshaderPath = getenv("XWM_SHADER_PATH");
-
-	std::string appendSrc = psrc;
-	/*if(pshaderPath)
-		appendSrc = pshaderPath+'/'+appendSrc;
-	printf("%s\n",appendSrc.c_str());*/
-
-	FILE *pf = fopen(appendSrc.c_str(),"rb");
-	if(!pf){
-		DebugPrintf(stderr,"Shader module not found: %s\n",psrc);
-		return 0;
-	}
-	fseek(pf,0,SEEK_END);
-	size_t len = ftell(pf);
-	fseek(pf,0,SEEK_SET);
-	
-	char *pbuf = new char[len];
-	fread(pbuf,1,len,pf);
-	fclose(pf);
-
-	VkShaderModule shaderModule = CreateShaderModule(pbuf,len);
-	delete []pbuf;
-
-	return shaderModule;
 }
 
 void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer){

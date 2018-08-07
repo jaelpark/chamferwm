@@ -53,11 +53,11 @@ Blob::~Blob(){
 	delete []pbuffer;
 }
 
-const char * Blob::GetBufferPointer(){
+const char * Blob::GetBufferPointer() const{
 	return pbuffer;
 }
 
-size_t Blob::GetBufferLength(){
+size_t Blob::GetBufferLength() const{
 	return buflen;
 }
 

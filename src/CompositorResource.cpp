@@ -10,7 +10,7 @@
 
 namespace Compositor{
 
-Texture::Texture(uint _w, uint _h, VkFormat format, const CompositorInterface *_pcomp) : imageLayout(VK_IMAGE_LAYOUT_UNDEFINED), w(_w), h(_h), pcomp(_pcomp){
+Texture::Texture(uint _w, uint _h, VkFormat format, const CompositorInterface *_pcomp) : pcomp(_pcomp), imageLayout(VK_IMAGE_LAYOUT_UNDEFINED), w(_w), h(_h){
 	//staging buffer
 	VkBufferCreateInfo bufferCreateInfo = {};
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -155,7 +155,7 @@ void Texture::Unmap(const VkCommandBuffer *pcommandBuffer){
 	imageLayout = imageMemoryBarrier.newLayout;
 }
 
-ShaderModule::ShaderModule(Blob *pblob, const CompositorInterface *_pcomp) : pcomp(_pcomp){
+ShaderModule::ShaderModule(const Blob *pblob, const CompositorInterface *_pcomp) : pcomp(_pcomp){
 	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(pblob->GetBufferPointer());
@@ -168,7 +168,6 @@ ShaderModule::ShaderModule(Blob *pblob, const CompositorInterface *_pcomp) : pco
 	if(spvReflectCreateShaderModule(shaderModuleCreateInfo.codeSize,shaderModuleCreateInfo.pCode,&reflectShaderModule) != SPV_REFLECT_RESULT_SUCCESS)
 		throw Exception("Failed to reflect shader module.");
 	
-	uint setCount;
 	if(spvReflectEnumerateDescriptorSets(&reflectShaderModule,&setCount,0) != SPV_REFLECT_RESULT_SUCCESS)
 		throw Exception("Failed to enumerate descriptor sets.");
 	
@@ -176,6 +175,7 @@ ShaderModule::ShaderModule(Blob *pblob, const CompositorInterface *_pcomp) : pco
 	spvReflectEnumerateDescriptorSets(&reflectShaderModule,&setCount,preflectDescSets);
 
 	pdescSetLayouts = new VkDescriptorSetLayout[setCount];
+	pdescSets = new VkDescriptorSet[setCount];
 	for(uint i = 0; i < setCount; ++i){
 		VkDescriptorSetLayoutBinding *pbindings = new VkDescriptorSetLayoutBinding[preflectDescSets[i]->binding_count];
 		for(uint j = 0; j < preflectDescSets[i]->binding_count; ++j){
@@ -197,6 +197,16 @@ ShaderModule::ShaderModule(Blob *pblob, const CompositorInterface *_pcomp) : pco
 			throw Exception("Failed to create a descriptor set layout.");
 
 		delete []pbindings;
+
+		VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
+		descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		descSetAllocateInfo.descriptorPool = pcomp->descPool;
+		descSetAllocateInfo.pSetLayouts = &pdescSetLayouts[i];
+		descSetAllocateInfo.descriptorSetCount = 1;
+		if(vkAllocateDescriptorSets(pcomp->logicalDev,&descSetAllocateInfo,&pdescSets[i]) != VK_SUCCESS)
+			throw Exception("Failed to allocate descriptor sets.");
+		//TODO: desc set allocation may have to be done on per-object (material) basis
+		//--updateDescriptorSets can be called once before the pipeline begins
 	}
 
 	delete []preflectDescSets;
@@ -204,7 +214,8 @@ ShaderModule::ShaderModule(Blob *pblob, const CompositorInterface *_pcomp) : pco
 }
 
 ShaderModule::~ShaderModule(){
-	//
+	//TODO: destroy sets!!!
+	delete []pdescSets;
 	delete []pdescSetLayouts;
 	vkDestroyShaderModule(pcomp->logicalDev,shaderModule,0);
 }
@@ -213,19 +224,19 @@ const std::vector<std::pair<VkFormat, uint>> Texture::formatSizeMap = {
 	{VK_FORMAT_R8G8B8A8_UNORM,4}
 };
 
-CompositorPipeline::CompositorPipeline(const CompositorInterface *_pcomp) : pcomp(_pcomp){
+Pipeline::Pipeline(const CompositorInterface *_pcomp) : pcomp(_pcomp){
 	//
 }
 
-CompositorPipeline::~CompositorPipeline(){
-	vkDestroyShaderModule(pcomp->logicalDev,vertexShader,0);
-	vkDestroyShaderModule(pcomp->logicalDev,geometryShader,0);
-	vkDestroyShaderModule(pcomp->logicalDev,fragmentShader,0);
+Pipeline::~Pipeline(){
+	delete pvertexShader;
+	delete pgeometryShader;
+	delete pfragmentShader;
 	vkDestroyPipeline(pcomp->logicalDev,pipeline,0);
 	vkDestroyPipelineLayout(pcomp->logicalDev,pipelineLayout,0);
 }
 
-CompositorPipeline * CompositorPipeline::CreateDefault(const CompositorInterface *pcomp){
+Pipeline * Pipeline::CreateDefault(const CompositorInterface *pcomp){
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
 	//
@@ -244,28 +255,31 @@ CompositorPipeline * CompositorPipeline::CreateDefault(const CompositorInterface
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[3];
 
-	VkShaderModule vertexShader = pcomp->CreateShaderModuleFromFile("/mnt/data/Asiakirjat/projects/super-xwm/build/frame_vertex.spv");
+	Blob blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_vertex.spv");
+	ShaderModule *pvertexShader = new ShaderModule(&blob,pcomp);
 	shaderStageCreateInfo[0] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-	shaderStageCreateInfo[0].module = vertexShader;
+	shaderStageCreateInfo[0].module = pvertexShader->shaderModule;
 	shaderStageCreateInfo[0].pName = "main";
 
-	VkShaderModule geometryShader = pcomp->CreateShaderModuleFromFile("/mnt/data/Asiakirjat/projects/super-xwm/build/frame_geometry.spv");
+	blob.~Blob();
+	new(&blob) Blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_geometry.spv");
+	ShaderModule *pgeometryShader = new ShaderModule(&blob,pcomp);
 	shaderStageCreateInfo[1] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_GEOMETRY_BIT;
-	shaderStageCreateInfo[1].module = geometryShader;
+	shaderStageCreateInfo[1].module = pgeometryShader->shaderModule;
 	shaderStageCreateInfo[1].pName = "main";
 
-	VkShaderModule fragmentShader = pcomp->CreateShaderModuleFromFile("/mnt/data/Asiakirjat/projects/super-xwm/build/frame_fragment.spv");
+	blob.~Blob();
+	new(&blob) Blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_fragment.spv");
+	ShaderModule *pfragmentShader = new ShaderModule(&blob,pcomp);
 	shaderStageCreateInfo[2] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[2].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shaderStageCreateInfo[2].module = fragmentShader;
+	shaderStageCreateInfo[2].module = pfragmentShader->shaderModule;
 	shaderStageCreateInfo[2].pName = "main";
-	if(!vertexShader || !geometryShader || !fragmentShader)
-		throw Exception("Unable to load required shaders.\n");
 
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
@@ -328,14 +342,25 @@ CompositorPipeline * CompositorPipeline::CreateDefault(const CompositorInterface
 	pushConstantRange.offset = 0;
 	pushConstantRange.size = 32;
 
+	uint setCount = pvertexShader->setCount+pgeometryShader->setCount+pfragmentShader->setCount;
+	VkDescriptorSetLayout *pcombinedSets = new VkDescriptorSetLayout[setCount];
+
+	uint descPointer = 0;
+	for(ShaderModule *pshaderModule : {pvertexShader,pgeometryShader,pfragmentShader}){
+		std::copy(pshaderModule->pdescSetLayouts,pshaderModule->pdescSetLayouts+pshaderModule->setCount,pcombinedSets+descPointer);
+		descPointer += pshaderModule->setCount;
+	}
+
 	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
 	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	layoutCreateInfo.setLayoutCount = 0;
-	layoutCreateInfo.pSetLayouts = 0;
+	layoutCreateInfo.setLayoutCount = setCount;
+	layoutCreateInfo.pSetLayouts = pcombinedSets;
 	layoutCreateInfo.pushConstantRangeCount = 1;
 	layoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 	if(vkCreatePipelineLayout(pcomp->logicalDev,&layoutCreateInfo,0,&pipelineLayout) != VK_SUCCESS)
 		return 0;
+	
+	delete []pcombinedSets;
 
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -358,10 +383,10 @@ CompositorPipeline * CompositorPipeline::CreateDefault(const CompositorInterface
 	if(vkCreateGraphicsPipelines(pcomp->logicalDev,0,1,&graphicsPipelineCreateInfo,0,&pipeline) != VK_SUCCESS)
 		return 0;
 
-	CompositorPipeline *pcompPipeline = new CompositorPipeline(pcomp);
-	pcompPipeline->vertexShader = vertexShader;
-	pcompPipeline->geometryShader = geometryShader;
-	pcompPipeline->fragmentShader = fragmentShader;
+	Pipeline *pcompPipeline = new Pipeline(pcomp);
+	pcompPipeline->pvertexShader = pvertexShader;
+	pcompPipeline->pgeometryShader = pgeometryShader;
+	pcompPipeline->pfragmentShader = pfragmentShader;
 	pcompPipeline->pipelineLayout = pipelineLayout;
 	pcompPipeline->pipeline = pipeline;
 

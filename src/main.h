@@ -24,8 +24,8 @@ class Blob{
 public:
 	Blob(const char *);
 	~Blob();
-	const char * GetBufferPointer();
-	size_t GetBufferLength();
+	const char * GetBufferPointer() const;
+	size_t GetBufferLength() const;
 private:
 	char *pbuffer;
 	size_t buflen;

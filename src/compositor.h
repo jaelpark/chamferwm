@@ -18,18 +18,18 @@ namespace Compositor{
 //TODO: should the render objects define what shaders to load etc?
 class RenderObject{
 public:
-	RenderObject(const CompositorPipeline *, const class CompositorInterface *);
+	RenderObject(const Pipeline *, const class CompositorInterface *);
 	virtual ~RenderObject();
 	virtual void Draw(const VkCommandBuffer *) = 0;
 	//If the pipeline changes, the renderer binds a new one
 protected:
-	const CompositorPipeline *pPipeline;
+	const Pipeline *pPipeline;
 	const class CompositorInterface *pcomp;
 };
 
 class RectangleObject : public RenderObject{
 public:
-	RectangleObject(const CompositorPipeline *, const class CompositorInterface *, VkRect2D);
+	RectangleObject(const Pipeline *, const class CompositorInterface *, VkRect2D);
 	virtual ~RectangleObject();
 protected:
 	void PushConstants(const VkCommandBuffer *);
@@ -38,18 +38,20 @@ protected:
 
 class FrameObject : public RectangleObject{
 public:
-	FrameObject(const CompositorPipeline *, const class CompositorInterface *, VkRect2D);
+	FrameObject(const Pipeline *, const class CompositorInterface *, VkRect2D);
 	~FrameObject();
 	void Draw(const VkCommandBuffer *);
 };
 
 class TextureObject : public RectangleObject{
 public:
-	TextureObject(const CompositorPipeline *, const class CompositorInterface *, VkRect2D);
+	TextureObject(const Pipeline *, const class CompositorInterface *, VkRect2D);
 	~TextureObject();
 	void Draw(const VkCommandBuffer *);
 	const Texture *ptexture;
 };
+
+//Object: desc sets
 
 class ClientFrame{
 public:
@@ -57,13 +59,14 @@ public:
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	Texture *ptexture;
+	//descriptor sets
 	class CompositorInterface *pcomp;
 };
 
 class CompositorInterface{
 friend class Texture;
 friend class ShaderModule;
-friend class CompositorPipeline;
+friend class Pipeline;
 friend class RenderObject;
 friend class RectangleObject;
 friend class ClientFrame;
@@ -75,8 +78,6 @@ public:
 protected:
 	void InitializeRenderEngine();
 	void DestroyRenderEngine();
-	VkShaderModule CreateShaderModule(const char *, size_t) const;
-	VkShaderModule CreateShaderModuleFromFile(const char *) const;
 	void CreateRenderQueue(const WManager::Container *);
 	bool PollFrameFence();
 	void GenerateCommandBuffers(const WManager::Container *);
@@ -113,9 +114,9 @@ protected:
 	VkCommandBuffer *pcommandBuffers;
 	VkCommandBuffer *pcopyCommandBuffers;
 
-	VkDescriptorSetLayout descSetLayout;
+	//VkDescriptorSetLayout descSetLayout;
 	VkDescriptorPool descPool;
-	VkDescriptorSet *pdescSets;
+	//VkDescriptorSet *pdescSets;
 
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
@@ -123,7 +124,7 @@ protected:
 	uint currentFrame;
 
 	//placeholder variables
-	CompositorPipeline *pdefaultPipeline; //temp?
+	Pipeline *pdefaultPipeline; //temp?
 	VkSampler pointSampler;
 	//const char *pshaderPath;
 

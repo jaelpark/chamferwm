@@ -32,28 +32,29 @@ public:
 
 class ShaderModule{
 public:
-	ShaderModule(Blob *, const class CompositorInterface *);
+	ShaderModule(const Blob *, const class CompositorInterface *);
 	~ShaderModule();
 
 	const class CompositorInterface *pcomp;
 	VkShaderModule shaderModule;
 	VkDescriptorSetLayout *pdescSetLayouts;
+	VkDescriptorSet *pdescSets;
+	uint setCount;
 };
 
-class CompositorPipeline{
+class Pipeline{
 public:
-	CompositorPipeline(const class CompositorInterface *);
-	~CompositorPipeline();
+	Pipeline(const class CompositorInterface *);
+	~Pipeline();
 
 	const class CompositorInterface *pcomp;
-	VkShaderModule vertexShader;
-	VkShaderModule geometryShader;
-	VkShaderModule fragmentShader;
+	ShaderModule *pvertexShader;
+	ShaderModule *pgeometryShader;
+	ShaderModule *pfragmentShader;
 	VkPipelineLayout pipelineLayout;
-	//renderPass default
 	VkPipeline pipeline;
 
-	static CompositorPipeline * CreateDefault(const CompositorInterface *pcomp);
+	static Pipeline * CreateDefault(const CompositorInterface *pcomp);
 };
 
 }
