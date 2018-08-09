@@ -44,17 +44,15 @@ public:
 
 class Pipeline{
 public:
-	Pipeline(const class CompositorInterface *);
+	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const class CompositorInterface *);
 	~Pipeline();
 
-	const class CompositorInterface *pcomp;
 	ShaderModule *pvertexShader;
 	ShaderModule *pgeometryShader;
 	ShaderModule *pfragmentShader;
+	const class CompositorInterface *pcomp;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
-
-	static Pipeline * CreateDefault(const CompositorInterface *pcomp);
 };
 
 }

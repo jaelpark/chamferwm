@@ -102,7 +102,6 @@ protected:
 	VkImage *pswapChainImages;
 	VkImageView *pswapChainImageViews;
 	VkFramebuffer *pframebuffers;
-
 	enum SEMAPHORE_INDEX{
 		SEMAPHORE_INDEX_IMAGE_AVAILABLE,
 		SEMAPHORE_INDEX_RENDER_FINISHED,
@@ -122,6 +121,15 @@ protected:
 	uint physicalDevIndex;
 	uint swapChainImageCount;
 	uint currentFrame;
+
+	//all the resources are preloaded for now
+	std::vector<ShaderModule> shaders;
+	std::vector<Pipeline> pipelines;
+	/*ShaderModule **ppshaders;
+	uint shaderCount;
+
+	Pipeline *pPipelines;
+	uint pipelineCount;*/
 
 	//placeholder variables
 	Pipeline *pdefaultPipeline; //temp?

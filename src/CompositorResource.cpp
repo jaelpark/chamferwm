@@ -214,7 +214,6 @@ ShaderModule::ShaderModule(const Blob *pblob, const CompositorInterface *_pcomp)
 }
 
 ShaderModule::~ShaderModule(){
-	//TODO: destroy sets!!!
 	delete []pdescSets;
 	delete []pdescSetLayouts;
 	vkDestroyShaderModule(pcomp->logicalDev,shaderModule,0);
@@ -224,21 +223,7 @@ const std::vector<std::pair<VkFormat, uint>> Texture::formatSizeMap = {
 	{VK_FORMAT_R8G8B8A8_UNORM,4}
 };
 
-Pipeline::Pipeline(const CompositorInterface *_pcomp) : pcomp(_pcomp){
-	//
-}
-
-Pipeline::~Pipeline(){
-	delete pvertexShader;
-	delete pgeometryShader;
-	delete pfragmentShader;
-	vkDestroyPipeline(pcomp->logicalDev,pipeline,0);
-	vkDestroyPipelineLayout(pcomp->logicalDev,pipelineLayout,0);
-}
-
-Pipeline * Pipeline::CreateDefault(const CompositorInterface *pcomp){
-	VkPipelineLayout pipelineLayout;
-	VkPipeline pipeline;
+Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const CompositorInterface *_pcomp) : pvertexShader(_pvertexShader), pgeometryShader(_pgeometryShader), pfragmentShader(_pfragmentShader), pcomp(_pcomp){
 	//
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
 	vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -255,26 +240,18 @@ Pipeline * Pipeline::CreateDefault(const CompositorInterface *pcomp){
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[3];
 
-	Blob blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_vertex.spv");
-	ShaderModule *pvertexShader = new ShaderModule(&blob,pcomp);
 	shaderStageCreateInfo[0] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 	shaderStageCreateInfo[0].module = pvertexShader->shaderModule;
 	shaderStageCreateInfo[0].pName = "main";
 
-	blob.~Blob();
-	new(&blob) Blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_geometry.spv");
-	ShaderModule *pgeometryShader = new ShaderModule(&blob,pcomp);
 	shaderStageCreateInfo[1] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_GEOMETRY_BIT;
 	shaderStageCreateInfo[1].module = pgeometryShader->shaderModule;
 	shaderStageCreateInfo[1].pName = "main";
 
-	blob.~Blob();
-	new(&blob) Blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_fragment.spv");
-	ShaderModule *pfragmentShader = new ShaderModule(&blob,pcomp);
 	shaderStageCreateInfo[2] = (VkPipelineShaderStageCreateInfo){};
 	shaderStageCreateInfo[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageCreateInfo[2].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -358,7 +335,7 @@ Pipeline * Pipeline::CreateDefault(const CompositorInterface *pcomp){
 	layoutCreateInfo.pushConstantRangeCount = 1;
 	layoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 	if(vkCreatePipelineLayout(pcomp->logicalDev,&layoutCreateInfo,0,&pipelineLayout) != VK_SUCCESS)
-		return 0;
+		throw Exception("Failed to crate a pipeline layout.");
 	
 	delete []pcombinedSets;
 
@@ -381,16 +358,12 @@ Pipeline * Pipeline::CreateDefault(const CompositorInterface *pcomp){
 	graphicsPipelineCreateInfo.basePipelineIndex = -1;
 
 	if(vkCreateGraphicsPipelines(pcomp->logicalDev,0,1,&graphicsPipelineCreateInfo,0,&pipeline) != VK_SUCCESS)
-		return 0;
+		throw Exception("Failed to create a graphics pipeline.");
+}
 
-	Pipeline *pcompPipeline = new Pipeline(pcomp);
-	pcompPipeline->pvertexShader = pvertexShader;
-	pcompPipeline->pgeometryShader = pgeometryShader;
-	pcompPipeline->pfragmentShader = pfragmentShader;
-	pcompPipeline->pipelineLayout = pipelineLayout;
-	pcompPipeline->pipeline = pipeline;
-
-	return pcompPipeline;
+Pipeline::~Pipeline(){
+	vkDestroyPipeline(pcomp->logicalDev,pipeline,0);
+	vkDestroyPipelineLayout(pcomp->logicalDev,pipelineLayout,0);
 }
 
 }

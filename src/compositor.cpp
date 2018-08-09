@@ -413,8 +413,8 @@ void CompositorInterface::InitializeRenderEngine(){
 				throw Exception("Failed to create a semaphore.");
 	}
 
-	if(!(pdefaultPipeline = Pipeline::CreateDefault(this)))
-		throw Exception("Failed to create the default compositor pipeline.");
+	//if(!(pdefaultPipeline = Pipeline::CreateDefault(this)))
+		//throw Exception("Failed to create the default compositor pipeline.");
 
 	//sampler
 	VkSamplerCreateInfo samplerCreateInfo = {};
@@ -511,11 +511,32 @@ void CompositorInterface::InitializeRenderEngine(){
 	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcopyCommandBuffers) != VK_SUCCESS)
 		throw Exception("Failed to allocate copy command buffer.");
 
+	shaders.reserve(3);
+
+	//load compositor resources
+	Blob blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_vertex.spv");
+	ShaderModule &pvertexShader = shaders.emplace_back(&blob,this);
+
+	blob.~Blob();
+	new(&blob) Blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_geometry.spv");
+	ShaderModule &pgeometryShader = shaders.emplace_back(&blob,this);
+
+	blob.~Blob();
+	new(&blob) Blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_fragment.spv");
+	ShaderModule &pfragmentShader = shaders.emplace_back(&blob,this);
+
+	pipelines.reserve(1);
+	
+	pdefaultPipeline = &pipelines.emplace_back(&pvertexShader,&pgeometryShader,&pfragmentShader,this);
+
 }
 
 void CompositorInterface::DestroyRenderEngine(){
 	DebugPrintf(stdout,"Compositor cleanup");
 	vkDeviceWaitIdle(logicalDev);
+
+	pipelines.clear();
+	shaders.clear();
 
 	delete []pcommandBuffers;
 	delete []pcopyCommandBuffers;
@@ -526,8 +547,6 @@ void CompositorInterface::DestroyRenderEngine(){
 	//vkDestroyDescriptorSetLayout(logicalDev,descSetLayout,0);
 
 	vkDestroySampler(logicalDev,pointSampler,0);
-
-	delete pdefaultPipeline;
 
 	for(uint i = 0; i < swapChainImageCount; ++i){
 		vkDestroyFence(logicalDev,pfence[i],0);
