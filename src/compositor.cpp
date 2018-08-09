@@ -71,13 +71,50 @@ void TextureObject::Draw(const VkCommandBuffer *pcommandBuffer){
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 }
 
-ClientFrame::ClientFrame(CompositorInterface *_pcomp) : pcomp(_pcomp){
+ClientFrame::ClientFrame(CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
 	//
+	AssignPipeline(pcomp->pdefaultPipeline); //temp!!
 	pcomp->updateQueue.push_back(this);
 }
 
 ClientFrame::~ClientFrame(){
-	//
+	for(PipelineDescriptorSet &pipelineDescSet : descSets)
+		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+			if(pipelineDescSet.pdescSets[i])
+				delete []pipelineDescSet.pdescSets[i];
+}
+
+bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
+	auto m = std::find_if(descSets.begin(),descSets.end(),[&](auto &r)->bool{
+		return r.p == prenderPipeline;
+	});
+	if(m != descSets.end()){
+		passignedSet = &(*m);
+		return true;
+	}
+
+	PipelineDescriptorSet pipelineDescSet;
+	pipelineDescSet.p = prenderPipeline;
+	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		if(!prenderPipeline->pshaderModule[i]){
+			pipelineDescSet.pdescSets[i] = 0;
+			continue;
+		}
+		pipelineDescSet.pdescSets[i] = new VkDescriptorSet[prenderPipeline->pshaderModule[i]->setCount];
+		for(uint j = 0; j < prenderPipeline->pshaderModule[i]->setCount; ++j){
+			VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
+			descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			descSetAllocateInfo.descriptorPool = pcomp->descPool;
+			descSetAllocateInfo.pSetLayouts = &prenderPipeline->pshaderModule[i]->pdescSetLayouts[j];
+			descSetAllocateInfo.descriptorSetCount = 1;
+			if(vkAllocateDescriptorSets(pcomp->logicalDev,&descSetAllocateInfo,&pipelineDescSet.pdescSets[i][j]) != VK_SUCCESS)
+				return false;
+		}
+	}
+	descSets.push_back(pipelineDescSet);
+	passignedSet = &descSets.back();
+
+	return true;
 }
 
 CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0){

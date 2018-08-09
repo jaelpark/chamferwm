@@ -175,7 +175,6 @@ ShaderModule::ShaderModule(const Blob *pblob, const CompositorInterface *_pcomp)
 	spvReflectEnumerateDescriptorSets(&reflectShaderModule,&setCount,preflectDescSets);
 
 	pdescSetLayouts = new VkDescriptorSetLayout[setCount];
-	pdescSets = new VkDescriptorSet[setCount];
 	for(uint i = 0; i < setCount; ++i){
 		VkDescriptorSetLayoutBinding *pbindings = new VkDescriptorSetLayoutBinding[preflectDescSets[i]->binding_count];
 		for(uint j = 0; j < preflectDescSets[i]->binding_count; ++j){
@@ -197,16 +196,6 @@ ShaderModule::ShaderModule(const Blob *pblob, const CompositorInterface *_pcomp)
 			throw Exception("Failed to create a descriptor set layout.");
 
 		delete []pbindings;
-
-		VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
-		descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		descSetAllocateInfo.descriptorPool = pcomp->descPool;
-		descSetAllocateInfo.pSetLayouts = &pdescSetLayouts[i];
-		descSetAllocateInfo.descriptorSetCount = 1;
-		if(vkAllocateDescriptorSets(pcomp->logicalDev,&descSetAllocateInfo,&pdescSets[i]) != VK_SUCCESS)
-			throw Exception("Failed to allocate descriptor sets.");
-		//TODO: desc set allocation may have to be done on per-object (material) basis
-		//--updateDescriptorSets can be called once before the pipeline begins
 	}
 
 	delete []preflectDescSets;
@@ -214,7 +203,8 @@ ShaderModule::ShaderModule(const Blob *pblob, const CompositorInterface *_pcomp)
 }
 
 ShaderModule::~ShaderModule(){
-	delete []pdescSets;
+	for(uint i = 0; i < setCount; ++i)
+		vkDestroyDescriptorSetLayout(pcomp->logicalDev,pdescSetLayouts[i],0);
 	delete []pdescSetLayouts;
 	vkDestroyShaderModule(pcomp->logicalDev,shaderModule,0);
 }
@@ -223,7 +213,7 @@ const std::vector<std::pair<VkFormat, uint>> Texture::formatSizeMap = {
 	{VK_FORMAT_R8G8B8A8_UNORM,4}
 };
 
-Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const CompositorInterface *_pcomp) : pvertexShader(_pvertexShader), pgeometryShader(_pgeometryShader), pfragmentShader(_pfragmentShader), pcomp(_pcomp){
+Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp){
 	//
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
 	vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -240,23 +230,13 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[3];
 
-	shaderStageCreateInfo[0] = (VkPipelineShaderStageCreateInfo){};
-	shaderStageCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-	shaderStageCreateInfo[0].module = pvertexShader->shaderModule;
-	shaderStageCreateInfo[0].pName = "main";
-
-	shaderStageCreateInfo[1] = (VkPipelineShaderStageCreateInfo){};
-	shaderStageCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStageCreateInfo[1].stage = VK_SHADER_STAGE_GEOMETRY_BIT;
-	shaderStageCreateInfo[1].module = pgeometryShader->shaderModule;
-	shaderStageCreateInfo[1].pName = "main";
-
-	shaderStageCreateInfo[2] = (VkPipelineShaderStageCreateInfo){};
-	shaderStageCreateInfo[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStageCreateInfo[2].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shaderStageCreateInfo[2].module = pfragmentShader->shaderModule;
-	shaderStageCreateInfo[2].pName = "main";
+	for(uint i = 0, stageBit[] = {VK_SHADER_STAGE_VERTEX_BIT,VK_SHADER_STAGE_GEOMETRY_BIT,VK_SHADER_STAGE_FRAGMENT_BIT}; i < SHADER_MODULE_COUNT; ++i){
+		shaderStageCreateInfo[i] = (VkPipelineShaderStageCreateInfo){};
+		shaderStageCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shaderStageCreateInfo[i].stage = (VkShaderStageFlagBits)stageBit[i];
+		shaderStageCreateInfo[i].module = pshaderModule[i]->shaderModule;
+		shaderStageCreateInfo[i].pName = "main";
+	}
 
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
@@ -319,13 +299,13 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	pushConstantRange.offset = 0;
 	pushConstantRange.size = 32;
 
-	uint setCount = pvertexShader->setCount+pgeometryShader->setCount+pfragmentShader->setCount;
+	uint setCount = 0;
+	for(uint i = 0; i < SHADER_MODULE_COUNT; setCount += pshaderModule[i]->setCount, ++i);
 	VkDescriptorSetLayout *pcombinedSets = new VkDescriptorSetLayout[setCount];
 
-	uint descPointer = 0;
-	for(ShaderModule *pshaderModule : {pvertexShader,pgeometryShader,pfragmentShader}){
-		std::copy(pshaderModule->pdescSetLayouts,pshaderModule->pdescSetLayouts+pshaderModule->setCount,pcombinedSets+descPointer);
-		descPointer += pshaderModule->setCount;
+	for(uint i = 0, descPointer = 0; i < SHADER_MODULE_COUNT; ++i){
+		std::copy(pshaderModule[i]->pdescSetLayouts,pshaderModule[i]->pdescSetLayouts+pshaderModule[i]->setCount,pcombinedSets+descPointer);
+		descPointer += pshaderModule[i]->setCount;
 	}
 
 	VkPipelineLayoutCreateInfo layoutCreateInfo = {};

@@ -58,9 +58,16 @@ public:
 	ClientFrame(class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
+	bool AssignPipeline(const Pipeline *);
+protected:
 	Texture *ptexture;
-	//descriptor sets
 	class CompositorInterface *pcomp;
+	struct PipelineDescriptorSet{
+		const Pipeline *p;
+		VkDescriptorSet *pdescSets[Pipeline::SHADER_MODULE_COUNT];
+	};
+	std::vector<PipelineDescriptorSet> descSets;
+	PipelineDescriptorSet *passignedSet;
 };
 
 class CompositorInterface{
@@ -125,11 +132,6 @@ protected:
 	//all the resources are preloaded for now
 	std::vector<ShaderModule> shaders;
 	std::vector<Pipeline> pipelines;
-	/*ShaderModule **ppshaders;
-	uint shaderCount;
-
-	Pipeline *pPipelines;
-	uint pipelineCount;*/
 
 	//placeholder variables
 	Pipeline *pdefaultPipeline; //temp?

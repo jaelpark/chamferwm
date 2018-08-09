@@ -38,7 +38,7 @@ public:
 	const class CompositorInterface *pcomp;
 	VkShaderModule shaderModule;
 	VkDescriptorSetLayout *pdescSetLayouts;
-	VkDescriptorSet *pdescSets;
+	//VkDescriptorSet *pdescSets;
 	uint setCount;
 };
 
@@ -47,9 +47,13 @@ public:
 	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const class CompositorInterface *);
 	~Pipeline();
 
-	ShaderModule *pvertexShader;
-	ShaderModule *pgeometryShader;
-	ShaderModule *pfragmentShader;
+	enum SHADER_MODULE{
+		SHADER_MODULE_VERTEX,
+		SHADER_MODULE_GEOMETRY,
+		SHADER_MODULE_FRAGMENT,
+		SHADER_MODULE_COUNT
+	}; //note: code in Pipeline() relies on this order
+	ShaderModule *pshaderModule[SHADER_MODULE_COUNT];
 	const class CompositorInterface *pcomp;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
