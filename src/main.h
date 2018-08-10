@@ -9,6 +9,9 @@ typedef int sint;
 
 void DebugPrintf(FILE *, const char *, ...);
 
+#define mstrdup(s) strcpy(new char[strlen(s+1)],s)
+#define mstrfree(s) delete []s
+
 class Exception{
 public:
 	Exception();

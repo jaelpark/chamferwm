@@ -38,8 +38,15 @@ public:
 	const class CompositorInterface *pcomp;
 	VkShaderModule shaderModule;
 	VkDescriptorSetLayout *pdescSetLayouts;
-	//VkDescriptorSet *pdescSets;
 	uint setCount;
+
+	struct Binding{
+		const char *pname;
+		VkDescriptorType type;
+		uint setIndex;
+		uint binding;
+	};
+	std::vector<Binding> bindings;
 };
 
 class Pipeline{

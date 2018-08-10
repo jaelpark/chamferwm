@@ -45,7 +45,7 @@ RectangleObject::~RectangleObject(){
 	//
 }
 
-FrameObject::FrameObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pPipeline,_pcomp,_frame){
+FrameObject::FrameObject(ClientFrame *_pclientFrame, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pclientFrame->passignedSet->p,_pcomp,_frame), pclientFrame(_pclientFrame){
 	//
 }
 
@@ -54,34 +54,26 @@ FrameObject::~FrameObject(){
 }
 
 void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
-	PushConstants(pcommandBuffer);
-	vkCmdDraw(*pcommandBuffer,1,1,0,0);
-}
-
-TextureObject::TextureObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pPipeline,_pcomp,_frame){
-	//
-}
-
-TextureObject::~TextureObject(){
-	//
-}
-
-void TextureObject::Draw(const VkCommandBuffer *pcommandBuffer){
+	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+		if(pPipeline->pshaderModule[i]->setCount > 0){
+			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,pPipeline->pipelineLayout,descPointer,pPipeline->pshaderModule[i]->setCount,pclientFrame->passignedSet->pdescSets[i],0,0);
+			descPointer += pPipeline->pshaderModule[i]->setCount;
+		}
 	PushConstants(pcommandBuffer);
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 }
 
 ClientFrame::ClientFrame(CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
-	//
-	AssignPipeline(pcomp->pdefaultPipeline); //temp!!
 	pcomp->updateQueue.push_back(this);
 }
 
 ClientFrame::~ClientFrame(){
 	for(PipelineDescriptorSet &pipelineDescSet : descSets)
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-			if(pipelineDescSet.pdescSets[i])
+			if(pipelineDescSet.pdescSets[i]){
+				vkFreeDescriptorSets(pcomp->logicalDev,pcomp->descPool,pipelineDescSet.p->pshaderModule[i]->setCount,pipelineDescSet.pdescSets[i]);
 				delete []pipelineDescSet.pdescSets[i];
+			}
 }
 
 bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
@@ -93,26 +85,67 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 		return true;
 	}
 
+	uint totalSetCount = 0;
+
 	PipelineDescriptorSet pipelineDescSet;
 	pipelineDescSet.p = prenderPipeline;
 	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
-		if(!prenderPipeline->pshaderModule[i]){
+		if(!prenderPipeline->pshaderModule[i] || prenderPipeline->pshaderModule[i]->setCount == 0){
 			pipelineDescSet.pdescSets[i] = 0;
 			continue;
 		}
 		pipelineDescSet.pdescSets[i] = new VkDescriptorSet[prenderPipeline->pshaderModule[i]->setCount];
-		for(uint j = 0; j < prenderPipeline->pshaderModule[i]->setCount; ++j){
-			VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
-			descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			descSetAllocateInfo.descriptorPool = pcomp->descPool;
-			descSetAllocateInfo.pSetLayouts = &prenderPipeline->pshaderModule[i]->pdescSetLayouts[j];
-			descSetAllocateInfo.descriptorSetCount = 1;
-			if(vkAllocateDescriptorSets(pcomp->logicalDev,&descSetAllocateInfo,&pipelineDescSet.pdescSets[i][j]) != VK_SUCCESS)
-				return false;
-		}
+		VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
+		descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		descSetAllocateInfo.descriptorPool = pcomp->descPool;
+		descSetAllocateInfo.pSetLayouts = prenderPipeline->pshaderModule[i]->pdescSetLayouts;
+		descSetAllocateInfo.descriptorSetCount = prenderPipeline->pshaderModule[i]->setCount;
+		if(vkAllocateDescriptorSets(pcomp->logicalDev,&descSetAllocateInfo,pipelineDescSet.pdescSets[i]) != VK_SUCCESS)
+			return false;
+
+		totalSetCount += prenderPipeline->pshaderModule[i]->setCount;
 	}
 	descSets.push_back(pipelineDescSet);
 	passignedSet = &descSets.back();
+
+	VkDescriptorImageInfo descImageInfo = {};
+	descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	descImageInfo.imageView = ptexture->imageView;
+	descImageInfo.sampler = pcomp->pointSampler;
+
+	std::vector<VkWriteDescriptorSet> writeDescSets;
+	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		auto m1 = std::find_if(prenderPipeline->pshaderModule[i]->bindings.begin(),prenderPipeline->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
+			return r.type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE && strcmp(r.pname,"content") == 0;
+		});
+		if(m1 != prenderPipeline->pshaderModule[i]->bindings.end()){
+			VkWriteDescriptorSet &writeDescSet = writeDescSets.emplace_back();
+			writeDescSet = (VkWriteDescriptorSet){};
+			writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescSet.dstSet = pipelineDescSet.pdescSets[i][(*m1).setIndex];
+			writeDescSet.dstBinding = (*m1).binding;
+			writeDescSet.dstArrayElement = 0;
+			writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+			writeDescSet.descriptorCount = 1;
+			writeDescSet.pImageInfo = &descImageInfo;
+		}
+
+		auto m2 = std::find_if(prenderPipeline->pshaderModule[i]->bindings.begin(),prenderPipeline->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
+			return r.type == VK_DESCRIPTOR_TYPE_SAMPLER;
+		});
+		if(m2 != prenderPipeline->pshaderModule[i]->bindings.end()){
+			VkWriteDescriptorSet &writeDescSet = writeDescSets.emplace_back();
+			writeDescSet = (VkWriteDescriptorSet){};
+			writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescSet.dstSet = pipelineDescSet.pdescSets[i][(*m2).setIndex];
+			writeDescSet.dstBinding = (*m2).binding;
+			writeDescSet.dstArrayElement = 0;
+			writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+			writeDescSet.descriptorCount = 1;
+			writeDescSet.pImageInfo = &descImageInfo;
+		}
+	}
+	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 
 	return true;
 }
@@ -210,7 +243,7 @@ void CompositorInterface::InitializeRenderEngine(){
 		printf("%c %u: %s\n\t.deviceID: %u\n\t.vendorID: %u\n\t.deviceType: %u\n",
 			i == physicalDevIndex?'*':' ',
 			i,devProps.deviceName,devProps.deviceID,devProps.vendorID,devProps.deviceType);
-		printf("max push constant size: %u\n",devProps.limits.maxPushConstantsSize);
+		printf("  max push constant size: %u\n  max bound desc sets: %u\n",devProps.limits.maxPushConstantsSize,devProps.limits.maxBoundDescriptorSets);
 	}
 
 	if(physicalDevIndex >= devCount){
@@ -450,9 +483,6 @@ void CompositorInterface::InitializeRenderEngine(){
 				throw Exception("Failed to create a semaphore.");
 	}
 
-	//if(!(pdefaultPipeline = Pipeline::CreateDefault(this)))
-		//throw Exception("Failed to create the default compositor pipeline.");
-
 	//sampler
 	VkSamplerCreateInfo samplerCreateInfo = {};
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -474,33 +504,25 @@ void CompositorInterface::InitializeRenderEngine(){
 	if(vkCreateSampler(logicalDev,&samplerCreateInfo,0,&pointSampler) != VK_SUCCESS)
 		throw Exception("Failed to create a sampler.");
 
-	/*VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-	samplerLayoutBinding.binding = 0;
-	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerLayoutBinding.pImmutableSamplers = &pointSampler;
- 	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-	VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = {};
-	descSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	descSetLayoutCreateInfo.bindingCount = 1;
-	descSetLayoutCreateInfo.pBindings = &samplerLayoutBinding;
-	if(vkCreateDescriptorSetLayout(logicalDev,&descSetLayoutCreateInfo,0,&descSetLayout) != VK_SUCCESS)
-		throw Exception("Failed to create a descriptor set layout.");*/
-	//bind the above to pipeline layout
-
-	//descriptor pool and descriptors
+	//descriptor pool
 	//descriptors of this pool
-	VkDescriptorPoolSize descPoolSizes[1];
+	VkDescriptorPoolSize descPoolSizes[2];
 	descPoolSizes[0] = (VkDescriptorPoolSize){};
-	descPoolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descPoolSizes[0].descriptorCount = swapChainImageCount;
-	
+	descPoolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLER;//VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descPoolSizes[0].descriptorCount = 16;
+
+	descPoolSizes[1] = (VkDescriptorPoolSize){};
+	descPoolSizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	descPoolSizes[1].descriptorCount = 16;
+
+	//TODO: pool memory management, probably a vector a pools
+	//- find_if, find the pool which still has sets available
 	VkDescriptorPoolCreateInfo descPoolCreateInfo = {};
 	descPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descPoolCreateInfo.poolSizeCount = sizeof(descPoolSizes)/sizeof(descPoolSizes[0]);
 	descPoolCreateInfo.pPoolSizes = descPoolSizes;
 	descPoolCreateInfo.maxSets = 16;//swapChainImageCount;
+	descPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	if(vkCreateDescriptorPool(logicalDev,&descPoolCreateInfo,0,&descPool) != VK_SUCCESS)
 		throw Exception("Failed to create a descriptor pool.");
 	
@@ -622,7 +644,8 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 		frame.offset = {r.x,r.y};
 		frame.extent = {r.w,r.h};
 
-		FrameObject &frameObject = frameObjectPool.emplace_back(pdefaultPipeline,this,frame);
+		//FrameObject &frameObject = frameObjectPool.emplace_back(pdefaultPipeline,this,frame);
+		FrameObject &frameObject = frameObjectPool.emplace_back(pclientFrame,this,frame);
 		renderQueue.push_back(&frameObject);
 
 		//TextureObject &textureObject = textureObjectPool.emplace_back(pdefaultPipeline,this,frame);
@@ -685,8 +708,9 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	//for(RenderObject *prenderObject : renderQueue)
 		//prenderObject->Draw(&pcommandBuffers[currentFrame]);
 	
-	for(FrameObject &pframeObject : frameObjectPool)
+	for(FrameObject &pframeObject : frameObjectPool){
 		pframeObject.Draw(&pcommandBuffers[currentFrame]);
+	}
 
 	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);
 
@@ -878,6 +902,9 @@ VkExtent2D X11Compositor::GetExtent() const{
 
 X11DebugClientFrame::X11DebugClientFrame(const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : ClientFrame(_pcomp), DebugClient(_pcreateInfo){
 	ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+	
+	if(!AssignPipeline(pcomp->pdefaultPipeline))
+		throw Exception("Failed to assign a pipeline.");
 }
 
 X11DebugClientFrame::~X11DebugClientFrame(){

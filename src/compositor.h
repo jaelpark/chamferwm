@@ -38,20 +38,11 @@ protected:
 
 class FrameObject : public RectangleObject{
 public:
-	FrameObject(const Pipeline *, const class CompositorInterface *, VkRect2D);
+	FrameObject(class ClientFrame *, const class CompositorInterface *, VkRect2D);
 	~FrameObject();
 	void Draw(const VkCommandBuffer *);
+	class ClientFrame *pclientFrame;
 };
-
-class TextureObject : public RectangleObject{
-public:
-	TextureObject(const Pipeline *, const class CompositorInterface *, VkRect2D);
-	~TextureObject();
-	void Draw(const VkCommandBuffer *);
-	const Texture *ptexture;
-};
-
-//Object: desc sets
 
 class ClientFrame{
 public:
@@ -67,6 +58,7 @@ protected:
 		VkDescriptorSet *pdescSets[Pipeline::SHADER_MODULE_COUNT];
 	};
 	std::vector<PipelineDescriptorSet> descSets;
+public: //!!
 	PipelineDescriptorSet *passignedSet;
 };
 
@@ -134,13 +126,16 @@ protected:
 	std::vector<Pipeline> pipelines;
 
 	//placeholder variables
+public:
 	Pipeline *pdefaultPipeline; //temp?
+private:
+
 	VkSampler pointSampler;
 	//const char *pshaderPath;
 
 	std::vector<RenderObject *> renderQueue;
 	std::vector<FrameObject> frameObjectPool;
-	std::vector<TextureObject> textureObjectPool;
+	//std::vector<TextureObject> textureObjectPool;
 
 	std::vector<ClientFrame *> updateQueue;
 

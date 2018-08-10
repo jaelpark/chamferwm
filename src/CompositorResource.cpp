@@ -170,7 +170,7 @@ ShaderModule::ShaderModule(const Blob *pblob, const CompositorInterface *_pcomp)
 	
 	if(spvReflectEnumerateDescriptorSets(&reflectShaderModule,&setCount,0) != SPV_REFLECT_RESULT_SUCCESS)
 		throw Exception("Failed to enumerate descriptor sets.");
-	
+
 	SpvReflectDescriptorSet **preflectDescSets = new SpvReflectDescriptorSet*[setCount];
 	spvReflectEnumerateDescriptorSets(&reflectShaderModule,&setCount,preflectDescSets);
 
@@ -181,11 +181,17 @@ ShaderModule::ShaderModule(const Blob *pblob, const CompositorInterface *_pcomp)
 			pbindings[j] = (VkDescriptorSetLayoutBinding){};
 			pbindings[j].binding = preflectDescSets[i]->bindings[j]->binding;
 			pbindings[j].descriptorType = (VkDescriptorType)preflectDescSets[i]->bindings[j]->descriptor_type;
-			pbindings[j].descriptorCount = 1;
+			pbindings[j].descriptorCount = 1; //one binding can have multiple descriptors (combined image samplers)
 			for(uint k = 0; k < preflectDescSets[i]->bindings[j]->array.dims_count; ++k)
 				pbindings[j].descriptorCount *= preflectDescSets[i]->bindings[j]->array.dims[k];
 			pbindings[j].stageFlags = (VkShaderStageFlagBits)reflectShaderModule.shader_stage;
 			pbindings[j].pImmutableSamplers = &pcomp->pointSampler;
+
+			Binding &b = bindings.emplace_back();
+			b.pname = mstrdup(preflectDescSets[i]->bindings[j]->name);
+			b.type = pbindings[j].descriptorType;
+			b.setIndex = i;
+			b.binding = pbindings[j].binding;
 		}
 
 		VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = {};
@@ -203,6 +209,8 @@ ShaderModule::ShaderModule(const Blob *pblob, const CompositorInterface *_pcomp)
 }
 
 ShaderModule::~ShaderModule(){
+	for(Binding &b : bindings)
+		mstrfree(b.pname);
 	for(uint i = 0; i < setCount; ++i)
 		vkDestroyDescriptorSetLayout(pcomp->logicalDev,pdescSetLayouts[i],0);
 	delete []pdescSetLayouts;
