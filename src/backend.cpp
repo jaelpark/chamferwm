@@ -109,7 +109,7 @@ X11Client::X11Client(xcb_window_t _window, const X11Backend *_pbackend) : window
 }
 
 X11Client::X11Client(const CreateInfo *pcreateInfo){
-	X11Client(pcreateInfo->window,pcreateInfo->pbackend);
+	new(this) X11Client(pcreateInfo->window,pcreateInfo->pbackend);
 }
 
 X11Client::~X11Client(){
@@ -185,6 +185,9 @@ void Default::Start(){
 		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
+		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+	spaceKeycode = SymbolToKeycode(XK_space,psymbols);
+	xcb_grab_key(pcon,1,pscr->root,0,spaceKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	DefineBindings();
 
@@ -269,7 +272,7 @@ bool Default::HandleEvent(){
 		clients.push_back(pclient);
 
 		xcb_flush(pcon);
-		DebugPrintf(stdout,"map request\n");
+		DebugPrintf(stdout,"map request, %u\n",pev->window);
 		}
 		break;
 	case XCB_CLIENT_MESSAGE:{
@@ -287,6 +290,11 @@ bool Default::HandleEvent(){
 		if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode)
 			return false;
 		//
+		else
+		if(pev->detail == spaceKeycode){
+			//create test client
+			system("termite &");
+		}
 		}
 		break;
 	case XCB_KEY_RELEASE:{
@@ -309,10 +317,12 @@ bool Default::HandleEvent(){
 	case XCB_MAPPING_NOTIFY:
 		DebugPrintf(stdout,"mapping\n");
 		break;
-	case XCB_UNMAP_NOTIFY:
-		DebugPrintf(stdout,"unmapping\n");
+	case XCB_UNMAP_NOTIFY:{
+		//
+		}
 		break;
 	case XCB_DESTROY_NOTIFY:{
+		DebugPrintf(stdout,"destroy notify (%lu)\n",clients.size());
 		xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
 
 		auto m = std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{

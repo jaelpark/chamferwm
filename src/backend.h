@@ -82,6 +82,7 @@ protected:
 	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
 private:	
 	xcb_keycode_t exitKeycode;
+	xcb_keycode_t spaceKeycode;
 	std::vector<X11Client *> clients;
 };
 
