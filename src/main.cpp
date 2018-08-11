@@ -33,6 +33,24 @@ const char * Exception::what(){
 
 char Exception::buffer[4096];
 
+Clock::Clock(){
+	clock_gettime(CLOCK_MONOTONIC,&step0);
+	step1 = step0;
+}
+
+Clock::~Clock(){
+	//
+}
+
+void Clock::Step(){
+	step0 = step1;
+	clock_gettime(CLOCK_MONOTONIC,&step1);
+}
+
+float Clock::GetTimeDelta() const{
+	return (float)(step1.tv_sec-step0.tv_sec)+(float)((step1.tv_nsec-step0.tv_nsec)/1e9);
+}
+
 Blob::Blob(const char *pfileName){
 	FILE *pf = fopen(pfileName,"rb");
 	if(!pf){
@@ -119,8 +137,10 @@ public:
 	RunCompositor(WManager::Container *_proot) : proot(_proot){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
+	virtual void WaitIdle() = 0;
 protected:
 	WManager::Container *proot;
+	//Clock clock;
 };
 
 class DefaultBackend : public Backend::Default, public RunBackend{
@@ -210,6 +230,10 @@ public:
 		GenerateCommandBuffers(proot);
 		Compositor::X11Compositor::Present();
 	}
+
+	void WaitIdle(){
+		Compositor::X11Compositor::WaitIdle();
+	}
 };
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
@@ -229,6 +253,10 @@ public:
 		GenerateCommandBuffers(proot);
 		Compositor::X11DebugCompositor::Present();
 	}
+
+	void WaitIdle(){
+		Compositor::X11DebugCompositor::WaitIdle();
+	}
 };
 
 class NullCompositor : public Compositor::NullCompositor, public RunCompositor{
@@ -242,6 +270,10 @@ public:
 	}
 
 	void Present(){
+		//
+	}
+
+	void WaitIdle(){
 		//
 	}
 };
@@ -355,6 +387,7 @@ int main(sint argc, const char **pargv){
 
 	DebugPrintf(stdout,"Exit\n");
 
+	pcomp->WaitIdle();
 	pbackend->ReleaseContainers();
 
 	delete pcomp;

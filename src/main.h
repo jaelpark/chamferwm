@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 typedef unsigned int uint;
 typedef int sint;
@@ -21,6 +22,16 @@ public:
 	static char buffer[4096];
 private:
 	const char *pmsg;
+};
+
+class Clock{
+public:
+	Clock();
+	~Clock();
+	void Step();
+	float GetTimeDelta() const;
+private:
+	struct timespec step1, step0;
 };
 
 class Blob{

@@ -77,6 +77,7 @@ public:
 protected:
 	void InitializeRenderEngine();
 	void DestroyRenderEngine();
+	void WaitIdle();
 	void CreateRenderQueue(const WManager::Container *);
 	bool PollFrameFence();
 	void GenerateCommandBuffers(const WManager::Container *);

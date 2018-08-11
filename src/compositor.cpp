@@ -592,7 +592,6 @@ void CompositorInterface::InitializeRenderEngine(){
 
 void CompositorInterface::DestroyRenderEngine(){
 	DebugPrintf(stdout,"Compositor cleanup");
-	vkDeviceWaitIdle(logicalDev);
 
 	pipelines.clear();
 	shaders.clear();
@@ -629,6 +628,10 @@ void CompositorInterface::DestroyRenderEngine(){
 
 	vkDestroySurfaceKHR(instance,surface,0);
 	vkDestroyInstance(instance,0);
+}
+
+void CompositorInterface::WaitIdle(){
+	vkDeviceWaitIdle(logicalDev);
 }
 
 void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer){
@@ -776,9 +779,15 @@ X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInf
 
 	//The contents of the pixmap are retrieved in GenerateCommandBuffers
 	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
+
+	/*ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+	
+	if(!AssignPipeline(pcomp->pdefaultPipeline))
+		throw Exception("Failed to assign a pipeline.");*/
 }
 
 X11ClientFrame::~X11ClientFrame(){
+	//delete ptexture;
 	//
 	xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 
@@ -789,6 +798,15 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//https://stackoverflow.com/questions/40574668/how-to-update-texture-for-every-frame-in-vulkan
 	//dynamic size: if the window geometry changes, transfer contents to a max-size texture until it's been sufficient time without changes
 	//-see if this is necessary, monitor the rate of window configurations with relative to the frame rate
+	/*const void *pdata = ptexture->Map();
+	for(uint i = 0, n = w*h; i < n; ++i){
+		char t = (float)(i/w)/(float)h*255;
+		((char*)pdata)[4*i+0] = t;
+		((char*)pdata)[4*i+1] = t;
+		((char*)pdata)[4*i+2] = t;//100;
+		((char*)pdata)[4*i+3] = 255;
+	}
+	ptexture->Unmap(pcommandBuffer);*/
 }
 
 X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : CompositorInterface(physicalDevIndex){
@@ -914,8 +932,13 @@ X11DebugClientFrame::~X11DebugClientFrame(){
 void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//
 	const void *pdata = ptexture->Map();
-	for(uint i = 0, n = 4*x*y; i < n; ++i)
-		((char*)pdata)[i] = 255;
+	for(uint i = 0, n = w*h; i < n; ++i){
+		char t = (float)(i/w)/(float)h*255;
+		((char*)pdata)[4*i+0] = t;
+		((char*)pdata)[4*i+1] = t;
+		((char*)pdata)[4*i+2] = t;//100;
+		((char*)pdata)[4*i+3] = 255;
+	}
 	ptexture->Unmap(pcommandBuffer);
 }
 
