@@ -52,7 +52,7 @@ public:
 	X11Client(xcb_window_t, const class X11Backend *);
 	X11Client(const CreateInfo *);
 	~X11Client();
-	WManager::Rectangle GetRect() const;
+	//WManager::Rectangle GetRect() const;
 	xcb_window_t window;
 	const X11Backend *pbackend;
 };
@@ -95,9 +95,8 @@ public:
 	DebugClient(WManager::Rectangle, const class X11Backend *);
 	DebugClient(const CreateInfo *);
 	~DebugClient();
-	WManager::Rectangle GetRect() const;
+	//WManager::Rectangle GetRect() const;
 	const X11Backend *pbackend;
-	sint x, y, w, h;
 };
 
 class Debug : public X11Backend{

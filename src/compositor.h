@@ -15,7 +15,6 @@ class X11Backend;
 namespace Compositor{
 
 //Render queue objects: can be frames, text etc.
-//TODO: should the render objects define what shaders to load etc?
 class RenderObject{
 public:
 	RenderObject(const Pipeline *, const class CompositorInterface *);
@@ -25,6 +24,7 @@ public:
 protected:
 	const Pipeline *pPipeline;
 	const class CompositorInterface *pcomp;
+	float time;
 };
 
 class RectangleObject : public RenderObject{
@@ -45,8 +45,10 @@ public:
 };
 
 class ClientFrame{
+friend class CompositorInterface;
+friend class FrameObject;
 public:
-	ClientFrame(class CompositorInterface *);
+	ClientFrame(uint, uint, class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	bool AssignPipeline(const Pipeline *);
@@ -58,8 +60,8 @@ protected:
 		VkDescriptorSet *pdescSets[Pipeline::SHADER_MODULE_COUNT];
 	};
 	std::vector<PipelineDescriptorSet> descSets;
-public: //!!
 	PipelineDescriptorSet *passignedSet;
+	struct timespec creationTime;
 };
 
 class CompositorInterface{
@@ -68,6 +70,7 @@ friend class ShaderModule;
 friend class Pipeline;
 friend class RenderObject;
 friend class RectangleObject;
+friend class FrameObject;
 friend class ClientFrame;
 public:
 	CompositorInterface(uint);
@@ -134,6 +137,8 @@ private:
 	VkSampler pointSampler;
 	//const char *pshaderPath;
 
+	struct timespec frameTime;
+
 	std::vector<RenderObject *> renderQueue;
 	std::vector<FrameObject> frameObjectPool;
 	//std::vector<TextureObject> textureObjectPool;
@@ -143,7 +148,7 @@ private:
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };
 
-class X11ClientFrame : public ClientFrame, public Backend::X11Client{
+class X11ClientFrame : public Backend::X11Client, public ClientFrame{
 public:
 	X11ClientFrame(const Backend::X11Client::CreateInfo *, CompositorInterface *);
 	~X11ClientFrame();
@@ -175,7 +180,7 @@ protected:
 	sint damageErrorOffset;
 };
 
-class X11DebugClientFrame : public ClientFrame, public Backend::DebugClient{
+class X11DebugClientFrame : public Backend::DebugClient, public ClientFrame{
 public:
 	X11DebugClientFrame(const Backend::DebugClient::CreateInfo *, CompositorInterface *);
 	~X11DebugClientFrame();

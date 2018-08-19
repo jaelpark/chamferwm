@@ -99,6 +99,13 @@ X11Event::~X11Event(){
 
 X11Client::X11Client(xcb_window_t _window, const X11Backend *_pbackend) : window(_window), pbackend(_pbackend){
 
+	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,window);
+	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
+	if(!pgeometryReply)
+		throw Exception("Failed to get window geometry.");
+	rect = (WManager::Rectangle){pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
+	free(pgeometryReply);
+
 	uint values[2] = {XCB_EVENT_MASK_ENTER_WINDOW,0};
 	xcb_change_window_attributes_checked(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 	xcb_map_window(pbackend->pcon,window);
@@ -116,7 +123,7 @@ X11Client::~X11Client(){
 	//
 }
 
-WManager::Rectangle X11Client::GetRect() const{
+/*WManager::Rectangle X11Client::GetRect() const{
 	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,window);
 	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 	if(!pgeometryReply)
@@ -124,7 +131,7 @@ WManager::Rectangle X11Client::GetRect() const{
 	WManager::Rectangle r = (WManager::Rectangle){pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
 	free(pgeometryReply);
 	return r;
-}
+}*/
 
 X11Backend::X11Backend(){
 	//
@@ -155,8 +162,8 @@ Default::~Default(){
 
 	//cleanup
 	xcb_set_input_focus(pcon,XCB_NONE,XCB_INPUT_FOCUS_POINTER_ROOT,XCB_CURRENT_TIME);
-	xcb_flush(pcon);
 	xcb_disconnect(pcon);
+	xcb_flush(pcon);
 }
 
 void Default::Start(){
@@ -217,7 +224,8 @@ sint Default::GetEventFileDescriptor(){
 }
 
 bool Default::HandleEvent(){
-	xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
+	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
+	for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
 	if(!pevent){
 		if(xcb_connection_has_error(pcon)){
 			DebugPrintf(stderr,"X server connection lost\n");
@@ -228,7 +236,7 @@ bool Default::HandleEvent(){
 	}
 
 	//switch(pevent->response_type & ~0x80){
-	switch(pevent->response_type & 0x7F){
+	switch(pevent->response_type & 0x7f){
 	case XCB_CONFIGURE_REQUEST:{
 		xcb_configure_request_event_t *pev = (xcb_configure_request_event_t*)pevent;
 		struct{
@@ -252,7 +260,6 @@ bool Default::HandleEvent(){
 			}
 
 		xcb_configure_window(pcon,pev->window,mask,values);
-		xcb_flush(pcon);
 		DebugPrintf(stdout,"configure request: %u, %u, %u, %u\n",pev->x,pev->y,pev->width,pev->height);
 		}
 		break;
@@ -271,7 +278,6 @@ bool Default::HandleEvent(){
 		X11Client *pclient = SetupClient(&createInfo);
 		clients.push_back(pclient);
 
-		xcb_flush(pcon);
 		DebugPrintf(stdout,"map request, %u\n",pev->window);
 		}
 		break;
@@ -284,23 +290,23 @@ bool Default::HandleEvent(){
 		break;
 	case XCB_KEY_PRESS:{
 		xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
-		xcb_flush(pcon);
 		DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
 
-		if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode)
+		if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
+			free(pevent);
 			return false;
 		//
-		else
+		}else
 		if(pev->detail == spaceKeycode){
 			//create test client
-			system("termite &");
+			DebugPrintf(stdout,"Spawning test client...\n");
+			system("termite & >/tmp/chamferwm-test");
 		}
 		}
 		break;
 	case XCB_KEY_RELEASE:{
 		xcb_key_release_event_t *pev = (xcb_key_release_event_t*)pevent;
 		//xcb_send_event(pcon,false,XCB_SEND_EVENT_DEST_ITEM_FOCUS,XCB_EVENT_MASK_NO_EVENT,(const char*)pev);
-		xcb_flush(pcon);
 		DebugPrintf(stdout,"release\n");
 		}
 		break;
@@ -337,7 +343,7 @@ bool Default::HandleEvent(){
 		}
 		break;
 	default:
-		DebugPrintf(stdout,"default event\n");
+		DebugPrintf(stdout,"default event: %u\n",pevent->response_type & 0x7f);
 		X11Event event11(pevent);
 		EventNotify(&event11);
 		break;
@@ -353,25 +359,26 @@ bool Default::HandleEvent(){
 
 	free(pevent);
 	xcb_flush(pcon);
+	}
 
 	return true;
 }
 
-DebugClient::DebugClient(const DebugClient::CreateInfo *pcreateInfo) : DebugClient(pcreateInfo->rect,pcreateInfo->pbackend){
-	//
+DebugClient::DebugClient(WManager::Rectangle _rect, const X11Backend *_pbackend) : pbackend(_pbackend){
+	rect = _rect;
 }
 
-DebugClient::DebugClient(WManager::Rectangle rect, const X11Backend *_pbackend) : WManager::Client(), x(rect.x), y(rect.y), w(rect.w), h(rect.h), pbackend(_pbackend){
-	//
+DebugClient::DebugClient(const DebugClient::CreateInfo *pcreateInfo){
+	new(this) DebugClient(pcreateInfo->rect,pcreateInfo->pbackend);
 }
 
 DebugClient::~DebugClient(){
 	//
 }
 
-WManager::Rectangle DebugClient::GetRect() const{
+/*WManager::Rectangle DebugClient::GetRect() const{
 	return (WManager::Rectangle){x,y,w,h};
-}
+}*/
 
 Debug::Debug() : X11Backend(){
 	//
@@ -424,7 +431,8 @@ sint Debug::GetEventFileDescriptor(){
 }
 
 bool Debug::HandleEvent(){
-	xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
+	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
+	for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
 	if(!pevent){
 		if(xcb_connection_has_error(pcon)){
 			DebugPrintf(stderr,"X server connection lost\n");
@@ -435,24 +443,25 @@ bool Debug::HandleEvent(){
 	}
 
 	//switch(pevent->response_type & ~0x80){
-	switch(pevent->response_type & 0x7F){
-	case XCB_EXPOSE:{
+	switch(pevent->response_type & 0x7f){
+	/*case XCB_EXPOSE:{
 		printf("expose\n");
 		}
-		break;
+		break;*/
 	case XCB_CLIENT_MESSAGE:{
+		DebugPrintf(stdout,"message\n");
 		//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
 		//if(pev->data.data32[0] == wmD
 		}
 		break;
 	case XCB_KEY_PRESS:{
 		xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
-		xcb_flush(pcon);
 		DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
 
-		if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode)
+		if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
+			free(pevent);
 			return false;
-		else
+		}else
 		if(pev->detail == spaceKeycode){
 			//create test client
 			DebugClient::CreateInfo createInfo = {};
@@ -465,7 +474,7 @@ bool Debug::HandleEvent(){
 		}
 		break;
 	default:{
-		DebugPrintf(stdout,"default event\n");
+		DebugPrintf(stdout,"default event: %u\n",pevent->response_type & 0x7f);
 		X11Event event11(pevent);
 		EventNotify(&event11);
 		}
@@ -474,6 +483,7 @@ bool Debug::HandleEvent(){
 
 	free(pevent);
 	xcb_flush(pcon);
+	}
 
 	return true;
 }

@@ -24,7 +24,7 @@ private:
 	const char *pmsg;
 };
 
-class Clock{
+/*class Clock{
 public:
 	Clock();
 	~Clock();
@@ -32,7 +32,7 @@ public:
 	float GetTimeDelta() const;
 private:
 	struct timespec step1, step0;
-};
+};*/
 
 class Blob{
 public:

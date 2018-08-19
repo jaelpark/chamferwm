@@ -11,9 +11,9 @@
 #include <args.hxx>
 #include <iostream>
 
-#include <sys/epoll.h>
-#include <signal.h>
-#include <sys/signalfd.h>
+//#include <sys/epoll.h>
+//#include <signal.h>
+//#include <sys/signalfd.h>
 
 Exception::Exception(){
 	this->pmsg = buffer;
@@ -33,7 +33,7 @@ const char * Exception::what(){
 
 char Exception::buffer[4096];
 
-Clock::Clock(){
+/*Clock::Clock(){
 	clock_gettime(CLOCK_MONOTONIC,&step0);
 	step1 = step0;
 }
@@ -49,7 +49,7 @@ void Clock::Step(){
 
 float Clock::GetTimeDelta() const{
 	return (float)(step1.tv_sec-step0.tv_sec)+(float)((step1.tv_nsec-step0.tv_nsec)/1e9);
-}
+}*/
 
 Blob::Blob(const char *pfileName){
 	FILE *pf = fopen(pfileName,"rb");
@@ -303,28 +303,12 @@ int main(sint argc, const char **pargv){
 	}
 
 #define MAX_EVENTS 1024
-	struct epoll_event event1, events[MAX_EVENTS];
+	/*struct epoll_event event1, events[MAX_EVENTS];
 	sint efd = epoll_create1(0);
 	if(efd == -1){
 		DebugPrintf(stderr,"epoll efd\n");
 		return 1;
-	}
-
-	//https://stackoverflow.com/questions/43212106/handle-signals-with-epoll-wait
-	/*signal(SIGINT,SIG_IGN);
-
-	sigset_t signals;
-	sigemptyset(&signals);
-	sigaddset(&signals,SIGINT);
-	sint sfd = signalfd(-1,&signals,SFD_NONBLOCK);
-	if(sfd == -1){
-		DebugPrintf(stderr,"signal fd\n");
-		return 1;
-	}
-	sigprocmask(SIG_BLOCK,&signals,0);
-	event1.data.ptr = &sfd;
-	event1.events = EPOLLIN;
-	epoll_ctl(sfd,EPOLL_CTL_ADD,sfd,&event1);*/
+	}*/
 
 	WManager::Container *proot = new WManager::Container();
 
@@ -344,9 +328,9 @@ int main(sint argc, const char **pargv){
 		DebugPrintf(stderr,"XCB fd\n");
 		return 1;
 	}
-	event1.data.ptr = &fd;
+	/*event1.data.ptr = &fd;
 	event1.events = EPOLLIN;
-	epoll_ctl(efd,EPOLL_CTL_ADD,fd,&event1);
+	epoll_ctl(efd,EPOLL_CTL_ADD,fd,&event1);*/
 
 	RunCompositor *pcomp;
 	try{
@@ -364,18 +348,13 @@ int main(sint argc, const char **pargv){
 
 	pbackend->SetCompositor(pcomp);
 
-	//https://github.com/karulont/i3lock-blur/blob/master/xcb.c
-	for(bool r = true; r;){
-		//for(sint n = epoll_wait(efd,events,MAX_EVENTS,-1), i = 0; i < n; ++i){
-		//for(sint n = epoll_wait(efd,events,MAX_EVENTS,0), i = 0; i < n; ++i){
-		sint n = epoll_wait(efd,events,MAX_EVENTS,0);
-		for(sint i = 0; i < n; ++i){
-			if(events[i].data.ptr == &fd){
-				r = pbackend11->HandleEvent();
-				if(!r)
-					break;
-			}
-		}
+	/*struct timespec ta;
+	clock_gettime(CLOCK_MONOTONIC,&ta);*/
+
+	for(;;){
+		if(!pbackend11->HandleEvent())
+			break;
+
 		try{
 			pcomp->Present();
 
@@ -383,6 +362,14 @@ int main(sint argc, const char **pargv){
 			DebugPrintf(stderr,"%s\n",e.what());
 			break;
 		}
+
+		/*struct timespec t1;
+		clock_gettime(CLOCK_MONOTONIC,&t1);
+		float time = (float)(t1.tv_sec-ta.tv_sec)+(float)((t1.tv_nsec-ta.tv_nsec)/1e9);
+		if(time > 1.0f){
+			ta = t1;
+			DebugPrintf(stdout,"tik\n"); //loop freeze test
+		}*/
 	}
 
 	DebugPrintf(stdout,"Exit\n");

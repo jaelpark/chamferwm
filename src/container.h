@@ -19,7 +19,8 @@ public:
 	//virtual functions for the backend implementation
 	//SetTranslation
 	//SetLayer
-	virtual Rectangle GetRect() const = 0;
+	//virtual Rectangle GetRect() const = 0;
+	Rectangle rect;
 };
 
 class Container{

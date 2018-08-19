@@ -14,7 +14,7 @@
 
 namespace Compositor{
 
-RenderObject::RenderObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp) : pPipeline(_pPipeline), pcomp(_pcomp){
+RenderObject::RenderObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp) : pPipeline(_pPipeline), pcomp(_pcomp), time(0.0f){
 	//
 }
 
@@ -36,7 +36,7 @@ void RectangleObject::PushConstants(const VkCommandBuffer *pcommandBuffer){
 	const float pushConstants[] = {
 		frameVec.x,frameVec.y,
 		frameVec.z,frameVec.w,
-		0,1,0,1
+		time,1,0,1
 	};
 	vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
 }
@@ -54,6 +54,9 @@ FrameObject::~FrameObject(){
 }
 
 void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
+	time = (float)(pclientFrame->pcomp->frameTime.tv_sec-pclientFrame->creationTime.tv_sec)+(float)((pclientFrame->pcomp->frameTime.tv_nsec-pclientFrame->creationTime.tv_nsec)/1e9);
+	//TODO: max time, configurable
+
 	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
 		if(pPipeline->pshaderModule[i]->setCount > 0){
 			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,pPipeline->pipelineLayout,descPointer,pPipeline->pshaderModule[i]->setCount,pclientFrame->passignedSet->pdescSets[i],0,0);
@@ -61,13 +64,24 @@ void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
 		}
 	PushConstants(pcommandBuffer);
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
+
+	//pclientFrame->updateTime = pclientFrame->pcomp->frameTime;
 }
 
-ClientFrame::ClientFrame(CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
+ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
 	pcomp->updateQueue.push_back(this);
+
+	ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+	if(!AssignPipeline(pcomp->pdefaultPipeline))
+		throw Exception("Failed to assign a pipeline.");
+	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
+
+	clock_gettime(CLOCK_MONOTONIC,&creationTime);
 }
 
 ClientFrame::~ClientFrame(){
+	delete ptexture;
+
 	for(PipelineDescriptorSet &pipelineDescSet : descSets)
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
 			if(pipelineDescSet.pdescSets[i]){
@@ -591,7 +605,7 @@ void CompositorInterface::InitializeRenderEngine(){
 }
 
 void CompositorInterface::DestroyRenderEngine(){
-	DebugPrintf(stdout,"Compositor cleanup");
+	DebugPrintf(stdout,"Compositor cleanup\n");
 
 	pipelines.clear();
 	shaders.clear();
@@ -642,10 +656,10 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 		if(!pclientFrame)
 			continue;
 		//
-		WManager::Rectangle r = pcont->pclient->GetRect();
+		//WManager::Rectangle r = pcont->pclient->GetRect();
 		VkRect2D frame;
-		frame.offset = {r.x,r.y};
-		frame.extent = {r.w,r.h};
+		frame.offset = {pcont->pclient->rect.x,pcont->pclient->rect.y};
+		frame.extent = {pcont->pclient->rect.w,pcont->pclient->rect.h};
 
 		//FrameObject &frameObject = frameObjectPool.emplace_back(pdefaultPipeline,this,frame);
 		FrameObject &frameObject = frameObjectPool.emplace_back(pclientFrame,this,frame);
@@ -678,6 +692,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	frameObjectPool.clear();
 	CreateRenderQueue(proot->pch);
 
+	//TODO: adjust texture map sizes and assign pipelines if needed here
+
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	commandBufferBeginInfo.flags = 0;
@@ -708,9 +724,12 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	vkCmdBeginRenderPass(pcommandBuffers[currentFrame],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
 	vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pdefaultPipeline->pipeline);
+
+	clock_gettime(CLOCK_MONOTONIC,&frameTime);
+
 	//for(RenderObject *prenderObject : renderQueue)
 		//prenderObject->Draw(&pcommandBuffers[currentFrame]);
-	
+
 	for(FrameObject &pframeObject : frameObjectPool){
 		pframeObject.Draw(&pcommandBuffers[currentFrame]);
 	}
@@ -762,11 +781,11 @@ void CompositorInterface::Present(){
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){
-	DebugPrintf(stdout,"validation layer: %s\n",pmsg);
+	DebugPrintf(stderr,"validation layer: %s\n",pmsg);
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : ClientFrame(_pcomp), X11Client(_pcreateInfo){
+X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : X11Client(_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){// : ClientFrame(_pcomp), X11Client(_pcreateInfo){
 	//
 	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
@@ -777,6 +796,9 @@ X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInf
 	damage = xcb_generate_id(pbackend->pcon);
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
 
+	/*ptexture = new Texture(rect.w,rect.h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+	if(!AssignPipeline(pcomp->pdefaultPipeline))
+		throw Exception("Failed to assign a pipeline.");*/
 	//The contents of the pixmap are retrieved in GenerateCommandBuffers
 	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
 
@@ -798,15 +820,15 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//https://stackoverflow.com/questions/40574668/how-to-update-texture-for-every-frame-in-vulkan
 	//dynamic size: if the window geometry changes, transfer contents to a max-size texture until it's been sufficient time without changes
 	//-see if this is necessary, monitor the rate of window configurations with relative to the frame rate
-	/*const void *pdata = ptexture->Map();
-	for(uint i = 0, n = w*h; i < n; ++i){
-		char t = (float)(i/w)/(float)h*255;
+	const void *pdata = ptexture->Map();
+	for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
+		char t = (float)(i/rect.w)/(float)rect.h*255;
 		((char*)pdata)[4*i+0] = t;
 		((char*)pdata)[4*i+1] = t;
 		((char*)pdata)[4*i+2] = t;//100;
 		((char*)pdata)[4*i+3] = 255;
 	}
-	ptexture->Unmap(pcommandBuffer);*/
+	ptexture->Unmap(pcommandBuffer);
 }
 
 X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : CompositorInterface(physicalDevIndex){
@@ -884,6 +906,7 @@ void X11Compositor::Stop(){
 }
 
 bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
+	printf("%u\n",damageEventOffset);
 	if(pevent->pevent->response_type == XCB_DAMAGE_NOTIFY+damageEventOffset){
 		DebugPrintf(stdout,"DAMAGE_EVENT\n");
 		return true;
@@ -918,22 +941,21 @@ VkExtent2D X11Compositor::GetExtent() const{
 	return e;
 }
 
-X11DebugClientFrame::X11DebugClientFrame(const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : ClientFrame(_pcomp), DebugClient(_pcreateInfo){
-	ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
-	
+X11DebugClientFrame::X11DebugClientFrame(const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : DebugClient(_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){
+	/*ptexture = new Texture(rect.w,rect.h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
 	if(!AssignPipeline(pcomp->pdefaultPipeline))
-		throw Exception("Failed to assign a pipeline.");
+		throw Exception("Failed to assign a pipeline.");*/
 }
 
 X11DebugClientFrame::~X11DebugClientFrame(){
-	delete ptexture;
+	//delete ptexture;
 }
 
 void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//
 	const void *pdata = ptexture->Map();
-	for(uint i = 0, n = w*h; i < n; ++i){
-		char t = (float)(i/w)/(float)h*255;
+	for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
+		char t = (float)(i/rect.w)/(float)rect.h*255;
 		((char*)pdata)[4*i+0] = t;
 		((char*)pdata)[4*i+1] = t;
 		((char*)pdata)[4*i+2] = t;//100;
