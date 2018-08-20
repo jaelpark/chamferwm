@@ -193,8 +193,8 @@ void Default::Start(){
 	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-	spaceKeycode = SymbolToKeycode(XK_space,psymbols);
-	xcb_grab_key(pcon,1,pscr->root,0,spaceKeycode,
+	launchKeycode = SymbolToKeycode(XK_space,psymbols);
+	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,launchKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	DefineBindings();
 
@@ -297,7 +297,7 @@ bool Default::HandleEvent(){
 			return false;
 		//
 		}else
-		if(pev->detail == spaceKeycode){
+		if(pev->state & XCB_MOD_MASK_1 && pev->detail == launchKeycode){
 			//create test client
 			DebugPrintf(stdout,"Spawning test client...\n");
 			system("termite & >/tmp/chamferwm-test");
@@ -415,8 +415,8 @@ void Debug::Start(){
 	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-	spaceKeycode = SymbolToKeycode(XK_space,psymbols);
-	xcb_grab_key(pcon,1,pscr->root,0,spaceKeycode,
+	launchKeycode = SymbolToKeycode(XK_space,psymbols);
+	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,launchKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	DefineBindings();
 
@@ -462,7 +462,7 @@ bool Debug::HandleEvent(){
 			free(pevent);
 			return false;
 		}else
-		if(pev->detail == spaceKeycode){
+		if(pev->state & XCB_MOD_MASK_1 && pev->detail == launchKeycode){
 			//create test client
 			DebugClient::CreateInfo createInfo = {};
 			createInfo.rect = (WManager::Rectangle){10,800,400,400};

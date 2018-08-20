@@ -348,9 +348,6 @@ int main(sint argc, const char **pargv){
 
 	pbackend->SetCompositor(pcomp);
 
-	/*struct timespec ta;
-	clock_gettime(CLOCK_MONOTONIC,&ta);*/
-
 	for(;;){
 		if(!pbackend11->HandleEvent())
 			break;
@@ -362,14 +359,6 @@ int main(sint argc, const char **pargv){
 			DebugPrintf(stderr,"%s\n",e.what());
 			break;
 		}
-
-		/*struct timespec t1;
-		clock_gettime(CLOCK_MONOTONIC,&t1);
-		float time = (float)(t1.tv_sec-ta.tv_sec)+(float)((t1.tv_nsec-ta.tv_nsec)/1e9);
-		if(time > 1.0f){
-			ta = t1;
-			DebugPrintf(stdout,"tik\n"); //loop freeze test
-		}*/
 	}
 
 	DebugPrintf(stdout,"Exit\n");

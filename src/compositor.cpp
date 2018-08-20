@@ -703,7 +703,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	//TODO: damage extension is used to check which clients should update their texture contents
 	for(ClientFrame *pclientFrame : updateQueue)
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
-	updateQueue.clear();
+	//updateQueue.clear(); !!
 
 	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to end command buffer recording.");
@@ -796,16 +796,8 @@ X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInf
 	damage = xcb_generate_id(pbackend->pcon);
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
 
-	/*ptexture = new Texture(rect.w,rect.h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
-	if(!AssignPipeline(pcomp->pdefaultPipeline))
-		throw Exception("Failed to assign a pipeline.");*/
 	//The contents of the pixmap are retrieved in GenerateCommandBuffers
 	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
-
-	/*ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
-	
-	if(!AssignPipeline(pcomp->pdefaultPipeline))
-		throw Exception("Failed to assign a pipeline.");*/
 }
 
 X11ClientFrame::~X11ClientFrame(){
@@ -817,18 +809,33 @@ X11ClientFrame::~X11ClientFrame(){
 }
 
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
-	//https://stackoverflow.com/questions/40574668/how-to-update-texture-for-every-frame-in-vulkan
-	//dynamic size: if the window geometry changes, transfer contents to a max-size texture until it's been sufficient time without changes
-	//-see if this is necessary, monitor the rate of window configurations with relative to the frame rate
-	const void *pdata = ptexture->Map();
-	for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
-		char t = (float)(i/rect.w)/(float)rect.h*255;
-		((char*)pdata)[4*i+0] = t;
-		((char*)pdata)[4*i+1] = t;
-		((char*)pdata)[4*i+2] = t;//100;
-		((char*)pdata)[4*i+3] = 255;
+	xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,windowPixmap,0,0,rect.w,rect.h,~0);
+	xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pbackend->pcon,imageCookie,0);
+	if(!pimageReply){
+		DebugPrintf(stderr,"Failed to receive image reply.\n");
+		return;
 	}
+	//DebugPrintf(stdout,"format: %u\n",pimageReply->depth);
+
+	//http://doc.qt.io/qt-5/qimage.html
+	//argb can be swizzled (image view)
+
+	//--
+	unsigned char *pdata = (unsigned char *)ptexture->Map();
+
+	unsigned char *pchpixels = xcb_get_image_data(pimageReply);
+	memcpy(pdata,pchpixels,rect.w*rect.h*4);
+	/*for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
+		unsigned char t = (float)(i/rect.w)/(float)rect.h*255;
+		((unsigned char*)pdata)[4*i+0] = t;
+		((unsigned char*)pdata)[4*i+1] = t;
+		((unsigned char*)pdata)[4*i+2] = t;//100;
+		((unsigned char*)pdata)[4*i+3] = 255;
+	}*/
+
 	ptexture->Unmap(pcommandBuffer);
+
+	free(pimageReply);
 }
 
 X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : CompositorInterface(physicalDevIndex){
@@ -867,6 +874,7 @@ void X11Compositor::Start(){
 	if(!pfixesReply)
 		throw Exception("XFixes unavailable.\n");
 	DebugPrintf(stdout,"XFixes %u.%u\n",pfixesReply->major_version,pfixesReply->minor_version);
+	free(pfixesReply);
 
 	//allow overlay input passthrough
 	xcb_xfixes_region_t region = xcb_generate_id(pbackend->pcon);
@@ -887,6 +895,7 @@ void X11Compositor::Start(){
 
 	xcb_damage_query_version_cookie_t damageCookie = xcb_damage_query_version(pbackend->pcon,XCB_DAMAGE_MAJOR_VERSION,XCB_DAMAGE_MINOR_VERSION);
 	xcb_damage_query_version_reply_t *pdamageReply = xcb_damage_query_version_reply(pbackend->pcon,damageCookie,0);
+	DebugPrintf(stdout,"Damage %u.%u\n",pdamageReply->major_version,pdamageReply->minor_version);
 	free(pdamageReply);
 
 	xcb_flush(pbackend->pcon);
@@ -942,9 +951,7 @@ VkExtent2D X11Compositor::GetExtent() const{
 }
 
 X11DebugClientFrame::X11DebugClientFrame(const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : DebugClient(_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){
-	/*ptexture = new Texture(rect.w,rect.h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
-	if(!AssignPipeline(pcomp->pdefaultPipeline))
-		throw Exception("Failed to assign a pipeline.");*/
+	//
 }
 
 X11DebugClientFrame::~X11DebugClientFrame(){
@@ -955,11 +962,11 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//
 	const void *pdata = ptexture->Map();
 	for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
-		char t = (float)(i/rect.w)/(float)rect.h*255;
-		((char*)pdata)[4*i+0] = t;
-		((char*)pdata)[4*i+1] = t;
-		((char*)pdata)[4*i+2] = t;//100;
-		((char*)pdata)[4*i+3] = 255;
+		unsigned char t = (float)(i/rect.w)/(float)rect.h*255;
+		((unsigned char*)pdata)[4*i+0] = t;
+		((unsigned char*)pdata)[4*i+1] = t;
+		((unsigned char*)pdata)[4*i+2] = t;//100;
+		((unsigned char*)pdata)[4*i+3] = 255;
 	}
 	ptexture->Unmap(pcommandBuffer);
 }
