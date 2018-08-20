@@ -129,6 +129,8 @@ protected:
 	std::vector<ShaderModule> shaders;
 	std::vector<Pipeline> pipelines;
 
+	std::vector<ClientFrame *> updateQueue;
+
 	//placeholder variables
 public:
 	Pipeline *pdefaultPipeline; //temp?
@@ -142,8 +144,6 @@ private:
 	std::vector<RenderObject *> renderQueue;
 	std::vector<FrameObject> frameObjectPool;
 	//std::vector<TextureObject> textureObjectPool;
-
-	std::vector<ClientFrame *> updateQueue;
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };
@@ -160,6 +160,7 @@ public:
 //Default compositor assumes XCB for its surface
 class X11Compositor : public CompositorInterface{
 public:
+	//Derivatives of compositor classes should not point to their default corresponding backend classes (Backend::Default in this case). This is to allow the compositor to be independent of the backend implementation, as long as it's based on X11 here.
 	X11Compositor(uint, const Backend::X11Backend *);
 	~X11Compositor();
 	virtual void Start();

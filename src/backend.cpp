@@ -89,7 +89,7 @@ BackendInterface::~BackendInterface(){
 	//
 }
 
-X11Event::X11Event(xcb_generic_event_t *_pevent) : BackendEvent(), pevent(_pevent){
+X11Event::X11Event(xcb_generic_event_t *_pevent, const X11Backend *_pbackend) : BackendEvent(), pevent(_pevent), pbackend(_pbackend){
 	//
 }
 
@@ -226,142 +226,144 @@ sint Default::GetEventFileDescriptor(){
 bool Default::HandleEvent(){
 	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
 	for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
-	if(!pevent){
-		if(xcb_connection_has_error(pcon)){
-			DebugPrintf(stderr,"X server connection lost\n");
-			return false;
-		}
-
-		return true;
-	}
-
-	//switch(pevent->response_type & ~0x80){
-	switch(pevent->response_type & 0x7f){
-	case XCB_CONFIGURE_REQUEST:{
-		xcb_configure_request_event_t *pev = (xcb_configure_request_event_t*)pevent;
-		struct{
-			uint16_t m;
-			uint32_t v;
-		} maskm[] = {
-			{XCB_CONFIG_WINDOW_X,pev->x},
-			{XCB_CONFIG_WINDOW_Y,pev->y},
-			{XCB_CONFIG_WINDOW_WIDTH,pev->width},
-			{XCB_CONFIG_WINDOW_HEIGHT,pev->height},
-			{XCB_CONFIG_WINDOW_BORDER_WIDTH,pev->border_width},
-			{XCB_CONFIG_WINDOW_SIBLING,pev->sibling},
-			{XCB_CONFIG_WINDOW_STACK_MODE,pev->stack_mode}
-		};
-		uint values[7];
-		uint mask = 0;
-		for(uint j = 0, mi = 0; j < 7; ++j)
-			if(maskm[j].m & pev->value_mask){
-				mask |= maskm[j].m;
-				values[mi++] = maskm[j].v;
+		if(!pevent){
+			if(xcb_connection_has_error(pcon)){
+				DebugPrintf(stderr,"X server connection lost\n");
+				return false;
 			}
 
-		xcb_configure_window(pcon,pev->window,mask,values);
-		DebugPrintf(stdout,"configure request: %u, %u, %u, %u\n",pev->x,pev->y,pev->width,pev->height);
+			return true;
 		}
-		break;
-	case XCB_MAP_REQUEST:{
-		xcb_map_request_event_t *pev = (xcb_map_request_event_t*)pevent;
-		
-		//check if window already exists
-		if(std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
-			return pclient->window == pev->window;
-		}) != clients.end())
+
+		//switch(pevent->response_type & ~0x80){
+		switch(pevent->response_type & 0x7f){
+		case XCB_CONFIGURE_REQUEST:{
+			xcb_configure_request_event_t *pev = (xcb_configure_request_event_t*)pevent;
+			struct{
+				uint16_t m;
+				uint32_t v;
+			} maskm[] = {
+				{XCB_CONFIG_WINDOW_X,pev->x},
+				{XCB_CONFIG_WINDOW_Y,pev->y},
+				{XCB_CONFIG_WINDOW_WIDTH,pev->width},
+				{XCB_CONFIG_WINDOW_HEIGHT,pev->height},
+				{XCB_CONFIG_WINDOW_BORDER_WIDTH,pev->border_width},
+				{XCB_CONFIG_WINDOW_SIBLING,pev->sibling},
+				{XCB_CONFIG_WINDOW_STACK_MODE,pev->stack_mode}
+			};
+			uint values[7];
+			uint mask = 0;
+			for(uint j = 0, mi = 0; j < 7; ++j)
+				if(maskm[j].m & pev->value_mask){
+					mask |= maskm[j].m;
+					values[mi++] = maskm[j].v;
+				}
+
+			xcb_configure_window(pcon,pev->window,mask,values);
+			DebugPrintf(stdout,"configure request: %u, %u, %u, %u\n",pev->x,pev->y,pev->width,pev->height);
+			}
 			break;
+		case XCB_MAP_REQUEST:{
+			xcb_map_request_event_t *pev = (xcb_map_request_event_t*)pevent;
+			
+			//check if window already exists
+			if(std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
+				return pclient->window == pev->window;
+			}) != clients.end())
+				break;
 
-		X11Client::CreateInfo createInfo;
-		createInfo.window = pev->window;
-		createInfo.pbackend = this;
-		X11Client *pclient = SetupClient(&createInfo);
-		clients.push_back(pclient);
+			X11Client::CreateInfo createInfo;
+			createInfo.window = pev->window;
+			createInfo.pbackend = this;
+			X11Client *pclient = SetupClient(&createInfo);
+			clients.push_back(pclient);
 
-		DebugPrintf(stdout,"map request, %u\n",pev->window);
-		}
-		break;
-	case XCB_CLIENT_MESSAGE:{
-		//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
-		//if(pev->data.data32[0] == wmD
-		//_NET_WM_STATE
-		//_NET_WM_STATE_FULLSCREEN, _NET_WM_STATE_DEMANDS_ATTENTION
-		}
-		break;
-	case XCB_KEY_PRESS:{
-		xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
-		DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
-
-		if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
-			free(pevent);
-			return false;
-		//
-		}else
-		if(pev->state & XCB_MOD_MASK_1 && pev->detail == launchKeycode){
-			//create test client
-			DebugPrintf(stdout,"Spawning test client...\n");
-			system("termite & >/tmp/chamferwm-test");
-		}
-		}
-		break;
-	case XCB_KEY_RELEASE:{
-		xcb_key_release_event_t *pev = (xcb_key_release_event_t*)pevent;
-		//xcb_send_event(pcon,false,XCB_SEND_EVENT_DEST_ITEM_FOCUS,XCB_EVENT_MASK_NO_EVENT,(const char*)pev);
-		DebugPrintf(stdout,"release\n");
-		}
-		break;
-	case XCB_CONFIGURE_NOTIFY:{
-		xcb_configure_notify_event_t *pev = (xcb_configure_notify_event_t*)pevent;
-		if(pev->window != pscr->root)
+			DebugPrintf(stdout,"map request, %u\n",pev->window);
+			}
 			break;
+		case XCB_CLIENT_MESSAGE:{
+			//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
+			//if(pev->data.data32[0] == wmD
+			//_NET_WM_STATE
+			//_NET_WM_STATE_FULLSCREEN, _NET_WM_STATE_DEMANDS_ATTENTION
+			}
+			break;
+		case XCB_KEY_PRESS:{
+			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
+			DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
 
-		pscr->width_in_pixels = pev->width;
-		pscr->height_in_pixels = pev->height;
-		DebugPrintf(stdout,"configure\n");
-		}
-		break;
-	case XCB_MAPPING_NOTIFY:
-		DebugPrintf(stdout,"mapping\n");
-		break;
-	case XCB_UNMAP_NOTIFY:{
-		//
-		}
-		break;
-	case XCB_DESTROY_NOTIFY:{
-		DebugPrintf(stdout,"destroy notify (%lu)\n",clients.size());
-		xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
+			if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
+				free(pevent);
+				return false;
+			//
+			}else
+			if(pev->state & XCB_MOD_MASK_1 && pev->detail == launchKeycode){
+				//create test client
+				DebugPrintf(stdout,"Spawning test client...\n");
+				system("termite & >/tmp/chamferwm-test");
+			}
+			}
+			break;
+		case XCB_KEY_RELEASE:{
+			xcb_key_release_event_t *pev = (xcb_key_release_event_t*)pevent;
+			//xcb_send_event(pcon,false,XCB_SEND_EVENT_DEST_ITEM_FOCUS,XCB_EVENT_MASK_NO_EVENT,(const char*)pev);
+			DebugPrintf(stdout,"release\n");
+			}
+			break;
+		case XCB_CONFIGURE_NOTIFY:{
+			xcb_configure_notify_event_t *pev = (xcb_configure_notify_event_t*)pevent;
+			if(pev->window != pscr->root)
+				break;
 
-		auto m = std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
-			return pclient->window == pev->window;
-		});
-		if(m == clients.end())
-			break; //shouldn't happen
-		delete *m;
+			pscr->width_in_pixels = pev->width;
+			pscr->height_in_pixels = pev->height;
+			DebugPrintf(stdout,"configure\n");
+			}
+			break;
+		case XCB_MAPPING_NOTIFY:
+			DebugPrintf(stdout,"mapping\n");
+			break;
+		case XCB_UNMAP_NOTIFY:{
+			//
+			}
+			break;
+		case XCB_DESTROY_NOTIFY:{
+			DebugPrintf(stdout,"destroy notify (%lu)\n",clients.size());
+			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
+
+			auto m = std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
+				return pclient->window == pev->window;
+			});
+			if(m == clients.end())
+				break; //shouldn't happen
+			delete *m;
+			
+			std::iter_swap(m,clients.end()-1);
+			clients.pop_back();
+			}
+			break;
+		default:
+			DebugPrintf(stdout,"default event: %u\n",pevent->response_type & 0x7f);
+
+			X11Event event11(pevent,this);
+			EventNotify(&event11);
+			break;
+		}
 		
-		std::iter_swap(m,clients.end()-1);
-		clients.pop_back();
-		}
-		break;
-	default:
-		DebugPrintf(stdout,"default event: %u\n",pevent->response_type & 0x7f);
-		X11Event event11(pevent);
-		EventNotify(&event11);
-		break;
-	}
-	
-	//extension notifications
-	/*case XCB_DAMAGE_NOTIFY+damageEventOffset:{
-		xcb_damage_notify_event_t *pev = (xcb_damage_notify_event_t*)pevent;
-		//
-		DebugPrintf(stdout,"Damage");
-		}
-		break;*/
-
-	free(pevent);
-	xcb_flush(pcon);
+		free(pevent);
+		xcb_flush(pcon);
 	}
 
 	return true;
+}
+
+X11Client * Default::FindClient(xcb_window_t window) const{
+	auto m = std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
+		return pclient->window == window;
+	});
+	if(m == clients.end())
+		return 0;
+	return *m;
 }
 
 DebugClient::DebugClient(WManager::Rectangle _rect, const X11Backend *_pbackend) : pbackend(_pbackend){
@@ -407,16 +409,11 @@ void Debug::Start(){
 
 	xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
 
-	//xcb_keycode_t kk = SymbolToKeycode(XK_Return,psymbols);
-	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,kk,
-		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_SHIFT|XCB_MOD_MASK_1,kk,
-		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	launchKeycode = SymbolToKeycode(XK_space,psymbols);
-	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,launchKeycode,
+	xcb_grab_key(pcon,1,pscr->root,0,launchKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	DefineBindings();
 
@@ -433,59 +430,64 @@ sint Debug::GetEventFileDescriptor(){
 bool Debug::HandleEvent(){
 	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
 	for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
-	if(!pevent){
-		if(xcb_connection_has_error(pcon)){
-			DebugPrintf(stderr,"X server connection lost\n");
-			return false;
+		if(!pevent){
+			if(xcb_connection_has_error(pcon)){
+				DebugPrintf(stderr,"X server connection lost\n");
+				return false;
+			}
+
+			return true;
 		}
 
-		return true;
-	}
+		//switch(pevent->response_type & ~0x80){
+		switch(pevent->response_type & 0x7f){
+		/*case XCB_EXPOSE:{
+			printf("expose\n");
+			}
+			break;*/
+		case XCB_CLIENT_MESSAGE:{
+			DebugPrintf(stdout,"message\n");
+			//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
+			//if(pev->data.data32[0] == wmD
+			}
+			break;
+		case XCB_KEY_PRESS:{
+			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
+			DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
 
-	//switch(pevent->response_type & ~0x80){
-	switch(pevent->response_type & 0x7f){
-	/*case XCB_EXPOSE:{
-		printf("expose\n");
+			if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
+				free(pevent);
+				return false;
+			}else
+			if(pev->detail == launchKeycode){
+				//create test client
+				DebugClient::CreateInfo createInfo = {};
+				createInfo.rect = (WManager::Rectangle){10,800,400,400};
+				createInfo.pbackend = this;
+				DebugClient *pclient = SetupClient(&createInfo);
+				clients.push_back(pclient);
+				DebugPrintf(stdout,"client created.\n");
+			}
+			}
+			break;
+		default:{
+			DebugPrintf(stdout,"default event: %u\n",pevent->response_type & 0x7f);
+			//TODO: find client here
+			//X11Event event11(pevent); //DebugEvent
+			//EventNotify(&event11);
+			}
+			break;
 		}
-		break;*/
-	case XCB_CLIENT_MESSAGE:{
-		DebugPrintf(stdout,"message\n");
-		//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
-		//if(pev->data.data32[0] == wmD
-		}
-		break;
-	case XCB_KEY_PRESS:{
-		xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
-		DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
 
-		if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
-			free(pevent);
-			return false;
-		}else
-		if(pev->state & XCB_MOD_MASK_1 && pev->detail == launchKeycode){
-			//create test client
-			DebugClient::CreateInfo createInfo = {};
-			createInfo.rect = (WManager::Rectangle){10,800,400,400};
-			createInfo.pbackend = this;
-			DebugClient *pclient = SetupClient(&createInfo);
-			clients.push_back(pclient);
-			DebugPrintf(stdout,"client created.\n");
-		}
-		}
-		break;
-	default:{
-		DebugPrintf(stdout,"default event: %u\n",pevent->response_type & 0x7f);
-		X11Event event11(pevent);
-		EventNotify(&event11);
-		}
-		break;
-	}
-
-	free(pevent);
-	xcb_flush(pcon);
+		free(pevent);
+		xcb_flush(pcon);
 	}
 
 	return true;
+}
+
+X11Client * Debug::FindClient(xcb_window_t window) const{
+	return 0;
 }
 
 };

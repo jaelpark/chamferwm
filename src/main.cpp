@@ -209,7 +209,7 @@ public:
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
-		//
+		//nothing to process
 	}
 };
 

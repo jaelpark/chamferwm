@@ -36,7 +36,8 @@ void RectangleObject::PushConstants(const VkCommandBuffer *pcommandBuffer){
 	const float pushConstants[] = {
 		frameVec.x,frameVec.y,
 		frameVec.z,frameVec.w,
-		time,1,0,1
+		pcomp->imageExtent.width,pcomp->imageExtent.height,
+		time,0.0f,
 	};
 	vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
 }
@@ -915,9 +916,17 @@ void X11Compositor::Stop(){
 }
 
 bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
-	printf("%u\n",damageEventOffset);
 	if(pevent->pevent->response_type == XCB_DAMAGE_NOTIFY+damageEventOffset){
 		DebugPrintf(stdout,"DAMAGE_EVENT\n");
+
+		xcb_damage_notify_event_t *pev = (xcb_damage_notify_event_t*)pevent;
+		Backend::X11Client *pclient = pevent->pbackend->FindClient(pev->drawable);
+
+		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pclient);
+		updateQueue.push_back(pclientFrame);
+
+		//TODO: area
+
 		return true;
 	}
 
@@ -962,10 +971,10 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//
 	const void *pdata = ptexture->Map();
 	for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
-		unsigned char t = (float)(i/rect.w)/(float)rect.h*255;
-		((unsigned char*)pdata)[4*i+0] = t;
-		((unsigned char*)pdata)[4*i+1] = t;
-		((unsigned char*)pdata)[4*i+2] = t;//100;
+		//unsigned char t = (float)(i/rect.w)/(float)rect.h*255;
+		((unsigned char*)pdata)[4*i+0] = 255;
+		((unsigned char*)pdata)[4*i+1] = 255;
+		((unsigned char*)pdata)[4*i+2] = 255;//100;
 		((unsigned char*)pdata)[4*i+3] = 255;
 	}
 	ptexture->Unmap(pcommandBuffer);

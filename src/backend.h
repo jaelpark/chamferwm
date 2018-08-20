@@ -38,9 +38,10 @@ protected:
 
 class X11Event : public BackendEvent{
 public:
-	X11Event(xcb_generic_event_t *);
+	X11Event(xcb_generic_event_t *, const class X11Backend *);
 	~X11Event();
 	xcb_generic_event_t *pevent;
+	const X11Backend *pbackend;
 };
 
 class X11Client : public WManager::Client{
@@ -52,7 +53,6 @@ public:
 	X11Client(xcb_window_t, const class X11Backend *);
 	X11Client(const CreateInfo *);
 	~X11Client();
-	//WManager::Rectangle GetRect() const;
 	xcb_window_t window;
 	const X11Backend *pbackend;
 };
@@ -66,6 +66,7 @@ public:
 	X11Backend();
 	virtual ~X11Backend();
 	bool QueryExtension(const char *, sint *, sint *) const;
+	virtual X11Client * FindClient(xcb_window_t) const = 0;
 protected:
 	xcb_connection_t *pcon;
 	xcb_screen_t *pscr;
@@ -78,9 +79,10 @@ public:
 	void Start();
 	sint GetEventFileDescriptor();
 	bool HandleEvent();
+	X11Client * FindClient(xcb_window_t) const;
 protected:
 	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
-private:	
+private:
 	xcb_keycode_t exitKeycode;
 	xcb_keycode_t launchKeycode;
 	std::vector<X11Client *> clients;
@@ -95,7 +97,6 @@ public:
 	DebugClient(WManager::Rectangle, const class X11Backend *);
 	DebugClient(const CreateInfo *);
 	~DebugClient();
-	//WManager::Rectangle GetRect() const;
 	const X11Backend *pbackend;
 };
 
@@ -106,6 +107,7 @@ public:
 	void Start();
 	sint GetEventFileDescriptor();
 	bool HandleEvent();
+	X11Client * FindClient(xcb_window_t) const;
 protected:
 	virtual DebugClient * SetupClient(const DebugClient::CreateInfo *) = 0;
 private:

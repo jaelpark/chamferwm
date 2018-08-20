@@ -6,7 +6,11 @@ src = [
 	'src/backend.cpp',
 	'src/compositor.cpp',
 	'src/CompositorResource.cpp',
-	'src/spirv_reflect.c'
+	'third/spirv_reflect.c'
+]
+
+inc = [
+	include_directories('third')
 ]
 	
 xcb = [
@@ -30,5 +34,5 @@ custom_target('frame_vertex',output:'frame_vertex.spv',input:'shaders/frame.hlsl
 custom_target('frame_geometry',output:'frame_geometry.spv',input:'shaders/frame.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
 custom_target('frame_fragment',output:'frame_fragment.spv',input:'shaders/frame.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
 
-executable('xwm',sources:src,dependencies:[xcb,vk],cpp_args:['-std=c++17'])
+executable('xwm',sources:src,include_directories:inc,dependencies:[xcb,vk],cpp_args:['-std=c++17'])
 
