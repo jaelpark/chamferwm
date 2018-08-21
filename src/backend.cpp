@@ -106,13 +106,13 @@ X11Client::X11Client(xcb_window_t _window, const X11Backend *_pbackend) : window
 	rect = (WManager::Rectangle){pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
 	free(pgeometryReply);
 
-	uint values[2] = {XCB_EVENT_MASK_ENTER_WINDOW,0};
-	xcb_change_window_attributes_checked(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
+	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE};
+	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
+
 	xcb_map_window(pbackend->pcon,window);
 
 	//uint data[] = {XCB_ICCCM_WM_STATE_NORMAL,XCB_NONE};
 	//xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pev->window,atomWmState,atomWmState,32,2,data);
-
 }
 
 X11Client::X11Client(const CreateInfo *pcreateInfo){
@@ -122,16 +122,6 @@ X11Client::X11Client(const CreateInfo *pcreateInfo){
 X11Client::~X11Client(){
 	//
 }
-
-/*WManager::Rectangle X11Client::GetRect() const{
-	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,window);
-	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
-	if(!pgeometryReply)
-		return (WManager::Rectangle){0,0,0,0};
-	WManager::Rectangle r = (WManager::Rectangle){pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
-	free(pgeometryReply);
-	return r;
-}*/
 
 X11Backend::X11Backend(){
 	//
@@ -205,7 +195,8 @@ void Default::Start(){
 	uint mask = XCB_CW_EVENT_MASK;
 	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
-		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
+		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
+		|XCB_EVENT_MASK_EXPOSURE};
 
 	xcb_void_cookie_t cookie = xcb_change_window_attributes_checked(pcon,pscr->root,mask,values);
 	xcb_generic_error_t *perr = xcb_request_check(pcon,cookie);
@@ -342,6 +333,9 @@ bool Default::HandleEvent(){
 			clients.pop_back();
 			}
 			break;
+		case 0:
+			DebugPrintf(stdout,"Invalid event\n");
+			break;
 		default:
 			DebugPrintf(stdout,"default event: %u\n",pevent->response_type & 0x7f);
 
@@ -359,6 +353,15 @@ bool Default::HandleEvent(){
 
 X11Client * Default::FindClient(xcb_window_t window) const{
 	auto m = std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
+		/*printf("%x, %x\n",pclient->window,window);
+		xcb_query_tree_cookie_t queryTreeCookie = xcb_query_tree(pcon,pclient->window);
+		xcb_query_tree_reply_t *pqueryTreeReply = xcb_query_tree_reply(pcon,queryTreeCookie,0);
+		if(!pqueryTreeReply)
+			DebugPrintf(stdout,"failed to query\n");
+		xcb_window_t *pchs = xcb_query_tree_children(pqueryTreeReply);
+		for(uint i = 0; i < pqueryTreeReply->children_len; ++i)
+			printf("-- %x (ch)\n",pchs[i]);
+		free(pqueryTreeReply);*/
 		return pclient->window == window;
 	});
 	if(m == clients.end())
@@ -377,10 +380,6 @@ DebugClient::DebugClient(const DebugClient::CreateInfo *pcreateInfo){
 DebugClient::~DebugClient(){
 	//
 }
-
-/*WManager::Rectangle DebugClient::GetRect() const{
-	return (WManager::Rectangle){x,y,w,h};
-}*/
 
 Debug::Debug() : X11Backend(){
 	//

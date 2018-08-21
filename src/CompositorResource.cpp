@@ -121,9 +121,6 @@ void Texture::Unmap(const VkCommandBuffer *pcommandBuffer){
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	imageMemoryBarrier.image = image;
 	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
-	/*imageMemoryBarrier.srcAccessMask =
-		imageLayout == VK_IMAGE_LAYOUT_UNDEFINED?0:
-		imageLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL?VK_ACCESS_SHADER_READ_BIT:0;*/
 	imageMemoryBarrier.srcAccessMask = 0;
 	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
@@ -137,11 +134,13 @@ void Texture::Unmap(const VkCommandBuffer *pcommandBuffer){
 	bufferImageCopy.imageSubresource.mipLevel = 0;
 	bufferImageCopy.imageSubresource.baseArrayLayer = 0;
 	bufferImageCopy.imageSubresource.layerCount = 1;
-	bufferImageCopy.imageExtent.width = w;
-	bufferImageCopy.imageExtent.height = h;
+	bufferImageCopy.imageExtent.width = w;//w/4; //w
+	bufferImageCopy.imageExtent.height = h;//h
 	bufferImageCopy.imageExtent.depth = 1;
-	bufferImageCopy.imageOffset = (VkOffset3D){0,0,0};
-	bufferImageCopy.bufferOffset = 0;
+	bufferImageCopy.imageOffset = (VkOffset3D){0,0,0};//(VkOffset3D){w/4,0,0}; //x,y
+	bufferImageCopy.bufferOffset = 0;//w/4*4; //(w*y+x)*format
+	bufferImageCopy.bufferRowLength = w;
+	bufferImageCopy.bufferImageHeight = h;
 	vkCmdCopyBufferToImage(*pcommandBuffer,stagingBuffer,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&bufferImageCopy);
 
 	//create in transfer stage, use in fragment shader stage

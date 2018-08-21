@@ -40,6 +40,8 @@ public:
 	// = 1.0f: default size, scale with the number of containers
 	// < 1.0f: smaller than default, leaving the unscaled parallel containers more space
 
+	//uint borderWidth; //0.5x the space allocated between two windows
+
 	//Stack order: pnext is always below the current one
 	
 	/*enum{
