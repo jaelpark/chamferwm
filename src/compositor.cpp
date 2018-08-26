@@ -783,7 +783,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(const Backend::X11Client::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : X11Client(_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){// : ClientFrame(_pcomp), X11Client(_pcreateInfo){
+X11ClientFrame::X11ClientFrame(glm::vec2 p, glm::vec2 e, const Backend::X11Client::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : X11Client(p,e,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){// : ClientFrame(_pcomp), X11Client(_pcreateInfo){
 	//
 	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	//xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
@@ -961,7 +961,7 @@ VkExtent2D X11Compositor::GetExtent() const{
 	return e;
 }
 
-X11DebugClientFrame::X11DebugClientFrame(const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : DebugClient(_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){
+X11DebugClientFrame::X11DebugClientFrame(glm::vec2 p, glm::vec2 e, const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : DebugClient(p,e,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){
 	//
 }
 
@@ -991,28 +991,13 @@ X11DebugCompositor::~X11DebugCompositor(){
 }
 
 void X11DebugCompositor::Start(){
-	overlay = xcb_generate_id(pbackend->pcon);
-
-	uint mask = XCB_CW_EVENT_MASK;
-	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
-		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
-		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
-	
-	xcb_create_window(pbackend->pcon,XCB_COPY_FROM_PARENT,overlay,pbackend->pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pbackend->pscr->root_visual,mask,values);
-	const char title[] = "xwm compositor debug mode";
-	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,overlay,XCB_ATOM_WM_NAME,XCB_ATOM_STRING,8,strlen(title),title);
-	xcb_map_window(pbackend->pcon,overlay);
-
-	xcb_flush(pbackend->pcon);
+	overlay = pbackend->window;
 
 	InitializeRenderEngine();
 }
 
 void X11DebugCompositor::Stop(){
 	DestroyRenderEngine();
-
-	xcb_destroy_window(pbackend->pcon,overlay);
-	xcb_flush(pbackend->pcon);
 }
 
 NullCompositor::NullCompositor() : CompositorInterface(0){

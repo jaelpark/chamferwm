@@ -150,7 +150,7 @@ private:
 
 class X11ClientFrame : public Backend::X11Client, public ClientFrame{
 public:
-	X11ClientFrame(const Backend::X11Client::CreateInfo *, CompositorInterface *);
+	X11ClientFrame(glm::vec2, glm::vec2, const Backend::X11Client::CreateInfo *, CompositorInterface *);
 	~X11ClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	xcb_pixmap_t windowPixmap;
@@ -183,7 +183,7 @@ protected:
 
 class X11DebugClientFrame : public Backend::DebugClient, public ClientFrame{
 public:
-	X11DebugClientFrame(const Backend::DebugClient::CreateInfo *, CompositorInterface *);
+	X11DebugClientFrame(glm::vec2, glm::vec2, const Backend::DebugClient::CreateInfo *, CompositorInterface *);
 	~X11DebugClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 };

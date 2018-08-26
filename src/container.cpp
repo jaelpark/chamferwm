@@ -88,10 +88,5 @@ void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
 		pclient->SetTranslation(p,e);
 }
 
-void Container::Assign(Client *pclient){
-	this->pclient = pclient;
-	pclient->SetTranslation(p,e);
-}
-
 }
 

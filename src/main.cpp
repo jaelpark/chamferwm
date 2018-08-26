@@ -162,12 +162,12 @@ public:
 		WManager::Container *pcontainer = new WManager::Container(proot);
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 		if(!pcomp11){
-			Backend::X11Client *pclient11 = new Backend::X11Client(pcreateInfo);
+			Backend::X11Client *pclient11 = new Backend::X11Client(pcontainer->p,pcontainer->e,pcreateInfo);
 			pcontainer->pclient = pclient11;
 			return pclient11;
 		}
 		Compositor::CompositorInterface *pcompInterface = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
-		Compositor::X11ClientFrame *pclientFrame = new Compositor::X11ClientFrame(pcreateInfo,pcompInterface);
+		Compositor::X11ClientFrame *pclientFrame = new Compositor::X11ClientFrame(pcontainer->p,pcontainer->e,pcreateInfo,pcompInterface);
 		pcontainer->pclient = pclientFrame;
 		return pclientFrame;
 	}
@@ -194,13 +194,13 @@ public:
 		WManager::Container *pcontainer = new WManager::Container(proot);
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		if(!pcomp11){
-			Backend::DebugClient *pclient = new Backend::DebugClient(pcreateInfo);
+			Backend::DebugClient *pclient = new Backend::DebugClient(pcontainer->p,pcontainer->e,pcreateInfo);
 			//pcontainer->Assign(pclient);
 			pcontainer->pclient = pclient;
 			return pclient;
 		}
 		Compositor::CompositorInterface *pcompInterface = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
-		Compositor::X11DebugClientFrame *pclientFrame = new Compositor::X11DebugClientFrame(pcreateInfo,pcompInterface);
+		Compositor::X11DebugClientFrame *pclientFrame = new Compositor::X11DebugClientFrame(pcontainer->p,pcontainer->e,pcreateInfo,pcompInterface);
 		//pcontainer->Assign(pclientFrame);
 		pcontainer->pclient = pclientFrame;
 		return pclientFrame;

@@ -37,7 +37,7 @@ public:
 	Container(Container *);
 	~Container();
 	void SetTranslation(glm::vec2, glm::vec2);
-	void Assign(Client *);
+	//void Assign(Client *);
 
 	Container *pParent;
 	Container *pch; //First children

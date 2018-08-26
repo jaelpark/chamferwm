@@ -50,8 +50,8 @@ public:
 		xcb_window_t window;
 		const class X11Backend *pbackend;
 	};
-	X11Client(xcb_window_t, const class X11Backend *);
-	X11Client(const CreateInfo *);
+	//X11Client(xcb_window_t, const class X11Backend *);
+	X11Client(glm::vec2, glm::vec2, const CreateInfo *);
 	~X11Client();
 	void SetTranslation(glm::vec2, glm::vec2);
 	xcb_window_t window;
@@ -73,6 +73,7 @@ public:
 protected:
 	xcb_connection_t *pcon;
 	xcb_screen_t *pscr;
+	xcb_window_t window;
 };
 
 class Default : public X11Backend{
@@ -94,11 +95,10 @@ private:
 class DebugClient : public WManager::Client{
 public:
 	struct CreateInfo{
-		WManager::Rectangle rect;
+		////WManager::Rectangle rect;
 		const class X11Backend *pbackend;
 	};
-	DebugClient(WManager::Rectangle, const class X11Backend *);
-	DebugClient(const CreateInfo *);
+	DebugClient(glm::vec2, glm::vec2, const CreateInfo *);
 	~DebugClient();
 	void SetTranslation(glm::vec2, glm::vec2);
 	const X11Backend *pbackend;

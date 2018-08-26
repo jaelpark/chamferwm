@@ -97,26 +97,20 @@ X11Event::~X11Event(){
 	//
 }
 
-X11Client::X11Client(xcb_window_t _window, const X11Backend *_pbackend) : window(_window), pbackend(_pbackend){
-
-	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,window);
+X11Client::X11Client(glm::vec2 p, glm::vec2 e, const CreateInfo *pcreateInfo) : window(pcreateInfo->window), pbackend(pcreateInfo->pbackend){
+	/*xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,window);
 	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 	if(!pgeometryReply)
 		throw Exception("Failed to get window geometry.");
 	rect = (WManager::Rectangle){pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
-	free(pgeometryReply);
+	free(pgeometryReply);*/
 
 	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
+	SetTranslation(p,e);
+
 	xcb_map_window(pbackend->pcon,window);
-
-	//uint data[] = {XCB_ICCCM_WM_STATE_NORMAL,XCB_NONE};
-	//xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pev->window,atomWmState,atomWmState,32,2,data);
-}
-
-X11Client::X11Client(const CreateInfo *pcreateInfo){
-	new(this) X11Client(pcreateInfo->window,pcreateInfo->pbackend);
 }
 
 X11Client::~X11Client(){
@@ -124,7 +118,12 @@ X11Client::~X11Client(){
 }
 
 void X11Client::SetTranslation(glm::vec2 p, glm::vec2 e){
-	//
+	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
+	glm::vec4 coord = glm::vec4(p,e)*screen;
+	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
+
+	uint values[4] = {rect.x,rect.y,rect.w,rect.h};
+	xcb_configure_window(pbackend->pcon,window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,values);
 }
 
 X11Backend::X11Backend(){
@@ -206,6 +205,8 @@ void Default::Start(){
 	xcb_generic_error_t *perr = xcb_request_check(pcon,cookie);
 
 	xcb_flush(pcon);
+
+	window = pscr->root;
 
 	if(perr != 0){
 		snprintf(Exception::buffer,sizeof(Exception::buffer),"Substructure redirection failed (%d). WM already present.\n",perr->error_code);
@@ -307,11 +308,11 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_CONFIGURE_NOTIFY:{
 			xcb_configure_notify_event_t *pev = (xcb_configure_notify_event_t*)pevent;
-			if(pev->window != pscr->root)
+			/*if(pev->window != pscr->root)
 				break;
 
 			pscr->width_in_pixels = pev->width;
-			pscr->height_in_pixels = pev->height;
+			pscr->height_in_pixels = pev->height;*/
 			DebugPrintf(stdout,"configure\n");
 			}
 			break;
@@ -373,12 +374,12 @@ X11Client * Default::FindClient(xcb_window_t window) const{
 	return *m;
 }
 
-DebugClient::DebugClient(WManager::Rectangle _rect, const X11Backend *_pbackend) : pbackend(_pbackend){
+/*DebugClient::DebugClient(WManager::Rectangle _rect, const X11Backend *_pbackend) : pbackend(_pbackend){
 	rect = _rect;
-}
+}*/
 
-DebugClient::DebugClient(const DebugClient::CreateInfo *pcreateInfo){
-	new(this) DebugClient(pcreateInfo->rect,pcreateInfo->pbackend);
+DebugClient::DebugClient(glm::vec2 p, glm::vec2 e, const DebugClient::CreateInfo *pcreateInfo) : pbackend(pcreateInfo->pbackend){
+	SetTranslation(p,e);
 }
 
 DebugClient::~DebugClient(){
@@ -386,11 +387,17 @@ DebugClient::~DebugClient(){
 }
 
 void DebugClient::SetTranslation(glm::vec2 p, glm::vec2 e){
-	//
-	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
+	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,pbackend->window);
+	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
+	if(!pgeometryReply)
+		throw("Invalid geometry size - unable to retrieve.");
+	glm::uvec2 se(pgeometryReply->width,pgeometryReply->height);
+	free(pgeometryReply);
+
+	//glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
+	glm::vec4 screen(se.x,se.y,se.x,se.y);
 	glm::vec4 coord = glm::vec4(p,e)*screen;
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
-	//DebugPrintf(stdout,"set translation: %f, %f, %f, %f\n",coord.x,coord.y,coord.z,coord.w);
 }
 
 Debug::Debug() : X11Backend(){
@@ -399,6 +406,8 @@ Debug::Debug() : X11Backend(){
 
 Debug::~Debug(){
 	//
+	xcb_destroy_window(pcon,window);
+	xcb_flush(pcon);
 }
 
 void Debug::Start(){
@@ -427,6 +436,20 @@ void Debug::Start(){
 	xcb_grab_key(pcon,1,pscr->root,0,launchKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	DefineBindings();
+
+	xcb_flush(pcon);
+
+	window = xcb_generate_id(pcon);
+
+	uint mask = XCB_CW_EVENT_MASK;
+	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
+		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
+		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
+	
+	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,window,pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pscr->root_visual,mask,values);
+	const char title[] = "xwm compositor debug mode";
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,window,XCB_ATOM_WM_NAME,XCB_ATOM_STRING,8,strlen(title),title);
+	xcb_map_window(pcon,window);
 
 	xcb_flush(pcon);
 
@@ -473,7 +496,7 @@ bool Debug::HandleEvent(){
 			if(pev->detail == launchKeycode){
 				//create test client
 				DebugClient::CreateInfo createInfo = {};
-				createInfo.rect = (WManager::Rectangle){10,800,400,400};
+				//createInfo.rect = (WManager::Rectangle){10,800,400,400};
 				createInfo.pbackend = this;
 				DebugClient *pclient = SetupClient(&createInfo);
 				clients.push_back(pclient);
