@@ -97,7 +97,7 @@ X11Event::~X11Event(){
 	//
 }
 
-X11Client::X11Client(glm::vec2 p, glm::vec2 e, WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend){
+X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend){
 	/*xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,window);
 	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 	if(!pgeometryReply)
@@ -108,7 +108,7 @@ X11Client::X11Client(glm::vec2 p, glm::vec2 e, WManager::Container *pcontainer, 
 	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
-	SetTranslation(p,e);
+	UpdateTranslation();
 
 	xcb_map_window(pbackend->pcon,window);
 }
@@ -117,9 +117,9 @@ X11Client::~X11Client(){
 	//
 }
 
-void X11Client::SetTranslation(glm::vec2 p, glm::vec2 e){
+void X11Client::UpdateTranslation(){
 	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
-	glm::vec4 coord = glm::vec4(p,e)*screen;
+	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
 
 	uint values[4] = {rect.x,rect.y,rect.w,rect.h};
@@ -379,15 +379,15 @@ X11Client * Default::FindClient(xcb_window_t window) const{
 	rect = _rect;
 }*/
 
-DebugClient::DebugClient(glm::vec2 p, glm::vec2 e, WManager::Container *pcontainer, const DebugClient::CreateInfo *pcreateInfo) : Client(pcontainer), pbackend(pcreateInfo->pbackend){
-	SetTranslation(p,e);
+DebugClient::DebugClient(WManager::Container *pcontainer, const DebugClient::CreateInfo *pcreateInfo) : Client(pcontainer), pbackend(pcreateInfo->pbackend){
+	UpdateTranslation();
 }
 
 DebugClient::~DebugClient(){
 	//
 }
 
-void DebugClient::SetTranslation(glm::vec2 p, glm::vec2 e){
+void DebugClient::UpdateTranslation(){
 	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,pbackend->window);
 	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 	if(!pgeometryReply)
@@ -397,7 +397,7 @@ void DebugClient::SetTranslation(glm::vec2 p, glm::vec2 e){
 
 	//glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
 	glm::vec4 screen(se.x,se.y,se.x,se.y);
-	glm::vec4 coord = glm::vec4(p,e)*screen;
+	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
 }
 

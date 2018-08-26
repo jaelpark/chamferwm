@@ -17,7 +17,7 @@ public:
 	virtual ~Client();
 	//
 	//virtual functions for the backend implementation
-	virtual void SetTranslation(glm::vec2, glm::vec2) = 0;
+	virtual void UpdateTranslation() = 0;
 	//Resize
 	//SetLayer
 	//virtual Rectangle GetRect() const = 0;
@@ -26,19 +26,13 @@ public:
 	class Container *pcontainer;
 };
 
-/*class RootClient{
-public:
-	RootClient(uint, uint);
-	~RootClient();
-};
-*/
 class Container{
 public:
 	Container(); //root container
 	Container(Container *);
 	~Container();
 	void SetTranslation(glm::vec2, glm::vec2);
-	//void Assign(Client *);
+	void Remove();
 
 	Container *pParent;
 	Container *pch; //First children

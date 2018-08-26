@@ -783,7 +783,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(glm::vec2 p, glm::vec2 e, WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : X11Client(p,e,pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){// : ClientFrame(_pcomp), X11Client(_pcreateInfo){
+X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){// : ClientFrame(_pcomp), X11Client(_pcreateInfo){
 	//
 	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	//xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
@@ -959,7 +959,7 @@ VkExtent2D X11Compositor::GetExtent() const{
 	return e;
 }
 
-X11DebugClientFrame::X11DebugClientFrame(glm::vec2 p, glm::vec2 e, WManager::Container *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : DebugClient(p,e,pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){
+X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : DebugClient(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){
 	//
 }
 

@@ -45,8 +45,7 @@ Container::Container(Container *pParent) : pch(0), pnext(0),
 	pParent->SetTranslation(pParent->p,pParent->e);
 }
 
-Container::~Container(){
-	//
+void Container::Remove(){
 	for(Container *pcontainer = pParent->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
 		if(pcontainer == this){
 			if(pPrev)
@@ -58,13 +57,17 @@ Container::~Container(){
 	pParent->SetTranslation(pParent->p,pParent->e);
 }
 
+Container::~Container(){
+	//
+}
+
 void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
 	glm::vec2 scaleSum(0.0f);
 	for(Container *pcontainer = pch; pcontainer; scaleSum += pcontainer->scale, pcontainer = pcontainer->pnext);
 
 	glm::vec2 position(0.0f);
 	for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
-		glm::vec2 e1 = e;//mode != MODE_STACKED?pcontainer->scale/scaleSum:e;
+		glm::vec2 e1 = e;
 		glm::vec2 p1 = position;
 		switch(mode){
 		case MODE_VSPLIT:
@@ -82,7 +85,7 @@ void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
 	this->p = p;
 	this->e = e;
 	if(pclient)
-		pclient->SetTranslation(p,e);
+		pclient->UpdateTranslation();
 }
 
 }
