@@ -97,7 +97,7 @@ X11Event::~X11Event(){
 	//
 }
 
-X11Client::X11Client(glm::vec2 p, glm::vec2 e, const CreateInfo *pcreateInfo) : window(pcreateInfo->window), pbackend(pcreateInfo->pbackend){
+X11Client::X11Client(glm::vec2 p, glm::vec2 e, WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend){
 	/*xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,window);
 	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 	if(!pgeometryReply)
@@ -331,8 +331,9 @@ bool Default::HandleEvent(){
 				return pclient->window == pev->window;
 			});
 			if(m == clients.end())
-				break; //shouldn't happen
-			delete *m;
+				break;
+			//delete *m;
+			DestroyClient(*m);
 			
 			std::iter_swap(m,clients.end()-1);
 			clients.pop_back();
@@ -378,7 +379,7 @@ X11Client * Default::FindClient(xcb_window_t window) const{
 	rect = _rect;
 }*/
 
-DebugClient::DebugClient(glm::vec2 p, glm::vec2 e, const DebugClient::CreateInfo *pcreateInfo) : pbackend(pcreateInfo->pbackend){
+DebugClient::DebugClient(glm::vec2 p, glm::vec2 e, WManager::Container *pcontainer, const DebugClient::CreateInfo *pcreateInfo) : Client(pcontainer), pbackend(pcreateInfo->pbackend){
 	SetTranslation(p,e);
 }
 

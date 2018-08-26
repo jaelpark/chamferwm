@@ -13,7 +13,7 @@ struct Rectangle{
 class Client{
 public:
 	//Client(class BackendInterface *);
-	Client();
+	Client(class Container *);
 	virtual ~Client();
 	//
 	//virtual functions for the backend implementation
@@ -23,6 +23,7 @@ public:
 	//virtual Rectangle GetRect() const = 0;
 	Rectangle rect;
 	//TODO: scale; //scaling of the client inside the container
+	class Container *pcontainer;
 };
 
 /*class RootClient{

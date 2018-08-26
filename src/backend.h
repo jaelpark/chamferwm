@@ -13,6 +13,7 @@ class X11DebugCompositor;
 
 namespace WManager{
 class Client;
+class Container;
 }
 
 namespace Backend{
@@ -51,7 +52,7 @@ public:
 		const class X11Backend *pbackend;
 	};
 	//X11Client(xcb_window_t, const class X11Backend *);
-	X11Client(glm::vec2, glm::vec2, const CreateInfo *);
+	X11Client(glm::vec2, glm::vec2, WManager::Container *, const CreateInfo *);
 	~X11Client();
 	void SetTranslation(glm::vec2, glm::vec2);
 	xcb_window_t window;
@@ -86,6 +87,7 @@ public:
 	X11Client * FindClient(xcb_window_t) const;
 protected:
 	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
+	virtual void DestroyClient(X11Client *) = 0;
 private:
 	xcb_keycode_t exitKeycode;
 	xcb_keycode_t launchKeycode;
@@ -98,7 +100,7 @@ public:
 		////WManager::Rectangle rect;
 		const class X11Backend *pbackend;
 	};
-	DebugClient(glm::vec2, glm::vec2, const CreateInfo *);
+	DebugClient(glm::vec2, glm::vec2, WManager::Container *, const CreateInfo *);
 	~DebugClient();
 	void SetTranslation(glm::vec2, glm::vec2);
 	const X11Backend *pbackend;
@@ -114,6 +116,7 @@ public:
 	X11Client * FindClient(xcb_window_t) const;
 protected:
 	virtual DebugClient * SetupClient(const DebugClient::CreateInfo *) = 0;
+	virtual void DestroyClient(DebugClient *) = 0;
 private:
 	xcb_keycode_t exitKeycode;
 	xcb_keycode_t launchKeycode;

@@ -783,7 +783,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(glm::vec2 p, glm::vec2 e, const Backend::X11Client::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : X11Client(p,e,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){// : ClientFrame(_pcomp), X11Client(_pcreateInfo){
+X11ClientFrame::X11ClientFrame(glm::vec2 p, glm::vec2 e, WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : X11Client(p,e,pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){// : ClientFrame(_pcomp), X11Client(_pcreateInfo){
 	//
 	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	//xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
@@ -861,8 +861,6 @@ void X11Compositor::Start(){
 	uint mask = XCB_CW_EVENT_MASK;
 	uint values[1] = {XCB_EVENT_MASK_EXPOSURE};
 	xcb_change_window_attributes(pbackend->pcon,overlay,mask,values);
-
-	DebugPrintf(stdout,"Root: %x, Overlay: %x\n",pbackend->pscr->root,overlay);
 
 	//xfixes
 	if(!pbackend->QueryExtension("XFIXES",&xfixesEventOffset,&xfixesErrorOffset))
@@ -961,7 +959,7 @@ VkExtent2D X11Compositor::GetExtent() const{
 	return e;
 }
 
-X11DebugClientFrame::X11DebugClientFrame(glm::vec2 p, glm::vec2 e, const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : DebugClient(p,e,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){
+X11DebugClientFrame::X11DebugClientFrame(glm::vec2 p, glm::vec2 e, WManager::Container *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : DebugClient(p,e,pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){
 	//
 }
 
