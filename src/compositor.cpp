@@ -1,421 +1,418 @@
-	#include "main.h"
-	#include "container.h"
-	#include "backend.h"
-	#include "CompositorResource.h"
-	#include "compositor.h"
+#include "main.h"
+#include "container.h"
+#include "backend.h"
+#include "CompositorResource.h"
+#include "compositor.h"
 
-	#include <set>
-	#include <algorithm>
-	#include <cstdlib>
-	#include <limits>
+#include <set>
+#include <algorithm>
+#include <cstdlib>
+#include <limits>
 
-	#define GLMF_SWIZZLE
-	#include <glm/glm.hpp>
+namespace Compositor{
 
-	namespace Compositor{
+RenderObject::RenderObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp) : pPipeline(_pPipeline), pcomp(_pcomp), time(0.0f){
+	//
+}
 
-	RenderObject::RenderObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp) : pPipeline(_pPipeline), pcomp(_pcomp), time(0.0f){
-		//
-	}
+RenderObject::~RenderObject(){
+	//
+}
 
-	RenderObject::~RenderObject(){
-		//
-	}
+RectangleObject::RectangleObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RenderObject(_pPipeline,_pcomp), frame(_frame){
+	//
+}
 
-	RectangleObject::RectangleObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RenderObject(_pPipeline,_pcomp), frame(_frame){
-		//
-	}
+void RectangleObject::PushConstants(const VkCommandBuffer *pcommandBuffer){
+	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
+	frameVec += 0.5f;
+	frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
+	frameVec *= 2.0f;
+	frameVec -= 1.0f;
 
-	void RectangleObject::PushConstants(const VkCommandBuffer *pcommandBuffer){
-		glm::vec4 frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
-		frameVec += 0.5f;
-		frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
-		frameVec *= 2.0f;
-		frameVec -= 1.0f;
+	const float pushConstants[] = {
+		frameVec.x,frameVec.y,
+		frameVec.z,frameVec.w,
+		pcomp->imageExtent.width,pcomp->imageExtent.height,
+		time,0.0f,
+	};
+	vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
+}
 
-		const float pushConstants[] = {
-			frameVec.x,frameVec.y,
-			frameVec.z,frameVec.w,
-			pcomp->imageExtent.width,pcomp->imageExtent.height,
-			time,0.0f,
-		};
-		vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
-	}
+RectangleObject::~RectangleObject(){
+	//
+}
 
-	RectangleObject::~RectangleObject(){
-		//
-	}
+FrameObject::FrameObject(ClientFrame *_pclientFrame, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pclientFrame->passignedSet->p,_pcomp,_frame), pclientFrame(_pclientFrame){
+	//
+}
 
-	FrameObject::FrameObject(ClientFrame *_pclientFrame, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pclientFrame->passignedSet->p,_pcomp,_frame), pclientFrame(_pclientFrame){
-		//
-	}
+FrameObject::~FrameObject(){
+	//
+}
 
-	FrameObject::~FrameObject(){
-		//
-	}
+void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
+	time = (float)(pclientFrame->pcomp->frameTime.tv_sec-pclientFrame->creationTime.tv_sec)+(float)((pclientFrame->pcomp->frameTime.tv_nsec-pclientFrame->creationTime.tv_nsec)/1e9);
+	//TODO: max time, configurable
 
-	void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
-		time = (float)(pclientFrame->pcomp->frameTime.tv_sec-pclientFrame->creationTime.tv_sec)+(float)((pclientFrame->pcomp->frameTime.tv_nsec-pclientFrame->creationTime.tv_nsec)/1e9);
-		//TODO: max time, configurable
-
-		for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-			if(pPipeline->pshaderModule[i]->setCount > 0){
-				vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,pPipeline->pipelineLayout,descPointer,pPipeline->pshaderModule[i]->setCount,pclientFrame->passignedSet->pdescSets[i],0,0);
-				descPointer += pPipeline->pshaderModule[i]->setCount;
-			}
-		PushConstants(pcommandBuffer);
-		vkCmdDraw(*pcommandBuffer,1,1,0,0);
-
-		//pclientFrame->updateTime = pclientFrame->pcomp->frameTime;
-	}
-
-	ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
-		pcomp->updateQueue.push_back(this);
-
-		ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
-		if(!AssignPipeline(pcomp->pdefaultPipeline))
-			throw Exception("Failed to assign a pipeline.");
-		DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
-
-		clock_gettime(CLOCK_MONOTONIC,&creationTime);
-	}
-
-	ClientFrame::~ClientFrame(){
-		delete ptexture;
-
-		for(PipelineDescriptorSet &pipelineDescSet : descSets)
-			for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-				if(pipelineDescSet.pdescSets[i]){
-					vkFreeDescriptorSets(pcomp->logicalDev,pcomp->descPool,pipelineDescSet.p->pshaderModule[i]->setCount,pipelineDescSet.pdescSets[i]);
-					delete []pipelineDescSet.pdescSets[i];
-				}
-	}
-
-	bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
-		auto m = std::find_if(descSets.begin(),descSets.end(),[&](auto &r)->bool{
-			return r.p == prenderPipeline;
-		});
-		if(m != descSets.end()){
-			passignedSet = &(*m);
-			return true;
+	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+		if(pPipeline->pshaderModule[i]->setCount > 0){
+			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,pPipeline->pipelineLayout,descPointer,pPipeline->pshaderModule[i]->setCount,pclientFrame->passignedSet->pdescSets[i],0,0);
+			descPointer += pPipeline->pshaderModule[i]->setCount;
 		}
+	PushConstants(pcommandBuffer);
+	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 
-		uint totalSetCount = 0;
+	//pclientFrame->updateTime = pclientFrame->pcomp->frameTime;
+}
 
-		PipelineDescriptorSet pipelineDescSet;
-		pipelineDescSet.p = prenderPipeline;
-		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
-			if(!prenderPipeline->pshaderModule[i] || prenderPipeline->pshaderModule[i]->setCount == 0){
-				pipelineDescSet.pdescSets[i] = 0;
-				continue;
+ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
+	pcomp->updateQueue.push_back(this);
+
+	ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+	if(!AssignPipeline(pcomp->pdefaultPipeline))
+		throw Exception("Failed to assign a pipeline.");
+	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
+
+	clock_gettime(CLOCK_MONOTONIC,&creationTime);
+}
+
+ClientFrame::~ClientFrame(){
+	delete ptexture;
+
+	for(PipelineDescriptorSet &pipelineDescSet : descSets)
+		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+			if(pipelineDescSet.pdescSets[i]){
+				vkFreeDescriptorSets(pcomp->logicalDev,pcomp->descPool,pipelineDescSet.p->pshaderModule[i]->setCount,pipelineDescSet.pdescSets[i]);
+				delete []pipelineDescSet.pdescSets[i];
 			}
-			pipelineDescSet.pdescSets[i] = new VkDescriptorSet[prenderPipeline->pshaderModule[i]->setCount];
-			VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
-			descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			descSetAllocateInfo.descriptorPool = pcomp->descPool;
-			descSetAllocateInfo.pSetLayouts = prenderPipeline->pshaderModule[i]->pdescSetLayouts;
-			descSetAllocateInfo.descriptorSetCount = prenderPipeline->pshaderModule[i]->setCount;
-			if(vkAllocateDescriptorSets(pcomp->logicalDev,&descSetAllocateInfo,pipelineDescSet.pdescSets[i]) != VK_SUCCESS)
-				return false;
+}
 
-			totalSetCount += prenderPipeline->pshaderModule[i]->setCount;
-		}
-		descSets.push_back(pipelineDescSet);
-		passignedSet = &descSets.back();
-
-		VkDescriptorImageInfo descImageInfo = {};
-		descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		descImageInfo.imageView = ptexture->imageView;
-		descImageInfo.sampler = pcomp->pointSampler;
-
-		std::vector<VkWriteDescriptorSet> writeDescSets;
-		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
-			auto m1 = std::find_if(prenderPipeline->pshaderModule[i]->bindings.begin(),prenderPipeline->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
-				return r.type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE && strcmp(r.pname,"content") == 0;
-			});
-			if(m1 != prenderPipeline->pshaderModule[i]->bindings.end()){
-				VkWriteDescriptorSet &writeDescSet = writeDescSets.emplace_back();
-				writeDescSet = (VkWriteDescriptorSet){};
-				writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				writeDescSet.dstSet = pipelineDescSet.pdescSets[i][(*m1).setIndex];
-				writeDescSet.dstBinding = (*m1).binding;
-				writeDescSet.dstArrayElement = 0;
-				writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-				writeDescSet.descriptorCount = 1;
-				writeDescSet.pImageInfo = &descImageInfo;
-			}
-
-			auto m2 = std::find_if(prenderPipeline->pshaderModule[i]->bindings.begin(),prenderPipeline->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
-				return r.type == VK_DESCRIPTOR_TYPE_SAMPLER;
-			});
-			if(m2 != prenderPipeline->pshaderModule[i]->bindings.end()){
-				VkWriteDescriptorSet &writeDescSet = writeDescSets.emplace_back();
-				writeDescSet = (VkWriteDescriptorSet){};
-				writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				writeDescSet.dstSet = pipelineDescSet.pdescSets[i][(*m2).setIndex];
-				writeDescSet.dstBinding = (*m2).binding;
-				writeDescSet.dstArrayElement = 0;
-				writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-				writeDescSet.descriptorCount = 1;
-				writeDescSet.pImageInfo = &descImageInfo;
-			}
-		}
-		vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
-
+bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
+	auto m = std::find_if(descSets.begin(),descSets.end(),[&](auto &r)->bool{
+		return r.p == prenderPipeline;
+	});
+	if(m != descSets.end()){
+		passignedSet = &(*m);
 		return true;
 	}
 
-	CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0){
-		//
+	uint totalSetCount = 0;
+
+	PipelineDescriptorSet pipelineDescSet;
+	pipelineDescSet.p = prenderPipeline;
+	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		if(!prenderPipeline->pshaderModule[i] || prenderPipeline->pshaderModule[i]->setCount == 0){
+			pipelineDescSet.pdescSets[i] = 0;
+			continue;
+		}
+		pipelineDescSet.pdescSets[i] = new VkDescriptorSet[prenderPipeline->pshaderModule[i]->setCount];
+		VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
+		descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		descSetAllocateInfo.descriptorPool = pcomp->descPool;
+		descSetAllocateInfo.pSetLayouts = prenderPipeline->pshaderModule[i]->pdescSetLayouts;
+		descSetAllocateInfo.descriptorSetCount = prenderPipeline->pshaderModule[i]->setCount;
+		if(vkAllocateDescriptorSets(pcomp->logicalDev,&descSetAllocateInfo,pipelineDescSet.pdescSets[i]) != VK_SUCCESS)
+			return false;
+
+		totalSetCount += prenderPipeline->pshaderModule[i]->setCount;
+	}
+	descSets.push_back(pipelineDescSet);
+	passignedSet = &descSets.back();
+
+	VkDescriptorImageInfo descImageInfo = {};
+	descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	descImageInfo.imageView = ptexture->imageView;
+	descImageInfo.sampler = pcomp->pointSampler;
+
+	std::vector<VkWriteDescriptorSet> writeDescSets;
+	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		auto m1 = std::find_if(prenderPipeline->pshaderModule[i]->bindings.begin(),prenderPipeline->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
+			return r.type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE && strcmp(r.pname,"content") == 0;
+		});
+		if(m1 != prenderPipeline->pshaderModule[i]->bindings.end()){
+			VkWriteDescriptorSet &writeDescSet = writeDescSets.emplace_back();
+			writeDescSet = (VkWriteDescriptorSet){};
+			writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescSet.dstSet = pipelineDescSet.pdescSets[i][(*m1).setIndex];
+			writeDescSet.dstBinding = (*m1).binding;
+			writeDescSet.dstArrayElement = 0;
+			writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+			writeDescSet.descriptorCount = 1;
+			writeDescSet.pImageInfo = &descImageInfo;
+		}
+
+		auto m2 = std::find_if(prenderPipeline->pshaderModule[i]->bindings.begin(),prenderPipeline->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
+			return r.type == VK_DESCRIPTOR_TYPE_SAMPLER;
+		});
+		if(m2 != prenderPipeline->pshaderModule[i]->bindings.end()){
+			VkWriteDescriptorSet &writeDescSet = writeDescSets.emplace_back();
+			writeDescSet = (VkWriteDescriptorSet){};
+			writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescSet.dstSet = pipelineDescSet.pdescSets[i][(*m2).setIndex];
+			writeDescSet.dstBinding = (*m2).binding;
+			writeDescSet.dstArrayElement = 0;
+			writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+			writeDescSet.descriptorCount = 1;
+			writeDescSet.pImageInfo = &descImageInfo;
+		}
+	}
+	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
+
+	return true;
+}
+
+CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0){
+	//
+}
+
+CompositorInterface::~CompositorInterface(){
+	//
+}
+
+void CompositorInterface::InitializeRenderEngine(){
+	uint layerCount;
+	vkEnumerateInstanceLayerProperties(&layerCount,0);
+	VkLayerProperties *playerProps = new VkLayerProperties[layerCount];
+	vkEnumerateInstanceLayerProperties(&layerCount,playerProps);
+
+	const char *players[] = {"VK_LAYER_LUNARG_standard_validation"};
+	DebugPrintf(stdout,"Enumerating required layers\n");
+	uint layersFound = 0;
+	for(uint i = 0; i < layerCount; ++i)
+		for(uint j = 0; j < sizeof(players)/sizeof(players[0]); ++j)
+			if(strcmp(playerProps[i].layerName,players[j]) == 0){
+				printf("%s\n",players[j]);
+				++layersFound;
+			}
+	if(layersFound < sizeof(players)/sizeof(players[0]))
+		throw Exception("Could not find all required layers.");
+
+	uint extCount;
+	vkEnumerateInstanceExtensionProperties(0,&extCount,0);
+	VkExtensionProperties *pextProps = new VkExtensionProperties[extCount];
+	vkEnumerateInstanceExtensionProperties(0,&extCount,pextProps);
+
+	const char *pextensions[] = {
+		VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+		"VK_KHR_surface",
+		"VK_KHR_xcb_surface"
+	};
+	DebugPrintf(stdout,"Enumerating required extensions\n");
+	uint extFound = 0;
+	for(uint i = 0; i < extCount; ++i)
+		for(uint j = 0; j < sizeof(pextensions)/sizeof(pextensions[0]); ++j)
+			if(strcmp(pextProps[i].extensionName,pextensions[j]) == 0){
+				printf("%s\n",pextensions[j]);
+				++extFound;
+			}
+	if(extFound < sizeof(pextensions)/sizeof(pextensions[0]))
+		throw Exception("Could not find all required extensions.");
+	
+	VkApplicationInfo appInfo = {};
+	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	appInfo.pApplicationName = "xwm";
+	appInfo.applicationVersion = VK_MAKE_VERSION(0,0,1);
+	appInfo.pEngineName = "xwm-engine";
+	appInfo.engineVersion = VK_MAKE_VERSION(0,0,1);
+	appInfo.apiVersion = VK_API_VERSION_1_0;
+
+	VkInstanceCreateInfo instanceCreateInfo = {};
+	instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	instanceCreateInfo.pApplicationInfo = &appInfo;
+	instanceCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]);
+	instanceCreateInfo.ppEnabledLayerNames = players;
+	instanceCreateInfo.enabledExtensionCount = sizeof(pextensions)/sizeof(pextensions[0]);
+	instanceCreateInfo.ppEnabledExtensionNames = pextensions;
+	if(vkCreateInstance(&instanceCreateInfo,0,&instance) != VK_SUCCESS)
+		throw Exception("Failed to create Vulkan instance.");
+	
+	delete []playerProps;
+	delete []pextProps;
+
+	CreateSurfaceKHR(&surface);
+	
+	VkDebugReportCallbackCreateInfoEXT debugcbCreateInfo = {};
+	debugcbCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+	debugcbCreateInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT|VK_DEBUG_REPORT_WARNING_BIT_EXT;
+	debugcbCreateInfo.pfnCallback = ValidationLayerDebugCallback;
+	((PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance,"vkCreateDebugReportCallbackEXT"))(instance,&debugcbCreateInfo,0,&debugReportCb);
+
+	DebugPrintf(stdout,"Enumerating physical devices\n");
+
+	//physical device
+	uint devCount;
+	vkEnumeratePhysicalDevices(instance,&devCount,0);
+	VkPhysicalDevice *pdevices = new VkPhysicalDevice[devCount];
+	vkEnumeratePhysicalDevices(instance,&devCount,pdevices);
+
+	for(uint i = 0; i < devCount; ++i){
+		VkPhysicalDeviceProperties devProps;
+		vkGetPhysicalDeviceProperties(pdevices[i],&devProps);
+		VkPhysicalDeviceFeatures devFeatures;
+		vkGetPhysicalDeviceFeatures(pdevices[i],&devFeatures);
+
+		printf("%c %u: %s\n\t.deviceID: %u\n\t.vendorID: %u\n\t.deviceType: %u\n",
+			i == physicalDevIndex?'*':' ',
+			i,devProps.deviceName,devProps.deviceID,devProps.vendorID,devProps.deviceType);
+		printf("  max push constant size: %u\n  max bound desc sets: %u\n",devProps.limits.maxPushConstantsSize,devProps.limits.maxBoundDescriptorSets);
 	}
 
-	CompositorInterface::~CompositorInterface(){
-		//
+	if(physicalDevIndex >= devCount){
+		snprintf(Exception::buffer,sizeof(Exception::buffer),"Invalid gpu-index (%u) exceeds the number of available devices (%u).",physicalDevIndex,devCount);
+		throw Exception();
 	}
 
-	void CompositorInterface::InitializeRenderEngine(){
-		uint layerCount;
-		vkEnumerateInstanceLayerProperties(&layerCount,0);
-		VkLayerProperties *playerProps = new VkLayerProperties[layerCount];
-		vkEnumerateInstanceLayerProperties(&layerCount,playerProps);
+	physicalDev = pdevices[physicalDevIndex];
 
-		const char *players[] = {"VK_LAYER_LUNARG_standard_validation"};
-		DebugPrintf(stdout,"Enumerating required layers\n");
-		uint layersFound = 0;
-		for(uint i = 0; i < layerCount; ++i)
-			for(uint j = 0; j < sizeof(players)/sizeof(players[0]); ++j)
-				if(strcmp(playerProps[i].layerName,players[j]) == 0){
-					printf("%s\n",players[j]);
-					++layersFound;
-				}
-		if(layersFound < sizeof(players)/sizeof(players[0]))
-			throw Exception("Could not find all required layers.");
+	delete []pdevices;
 
-		uint extCount;
-		vkEnumerateInstanceExtensionProperties(0,&extCount,0);
-		VkExtensionProperties *pextProps = new VkExtensionProperties[extCount];
-		vkEnumerateInstanceExtensionProperties(0,&extCount,pextProps);
+	VkSurfaceCapabilitiesKHR surfaceCapabilities;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDev,surface,&surfaceCapabilities);
 
-		const char *pextensions[] = {
-			VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-			"VK_KHR_surface",
-			"VK_KHR_xcb_surface"
-		};
-		DebugPrintf(stdout,"Enumerating required extensions\n");
-		uint extFound = 0;
-		for(uint i = 0; i < extCount; ++i)
-			for(uint j = 0; j < sizeof(pextensions)/sizeof(pextensions[0]); ++j)
-				if(strcmp(pextProps[i].extensionName,pextensions[j]) == 0){
-					printf("%s\n",pextensions[j]);
-					++extFound;
-				}
-		if(extFound < sizeof(pextensions)/sizeof(pextensions[0]))
-			throw Exception("Could not find all required extensions.");
-		
-		VkApplicationInfo appInfo = {};
-		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		appInfo.pApplicationName = "xwm";
-		appInfo.applicationVersion = VK_MAKE_VERSION(0,0,1);
-		appInfo.pEngineName = "xwm-engine";
-		appInfo.engineVersion = VK_MAKE_VERSION(0,0,1);
-		appInfo.apiVersion = VK_API_VERSION_1_0;
+	uint formatCount;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDev,surface,&formatCount,0);
+	VkSurfaceFormatKHR *pformats = new VkSurfaceFormatKHR[formatCount];
+	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDev,surface,&formatCount,pformats);
 
-		VkInstanceCreateInfo instanceCreateInfo = {};
-		instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-		instanceCreateInfo.pApplicationInfo = &appInfo;
-		instanceCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]);
-		instanceCreateInfo.ppEnabledLayerNames = players;
-		instanceCreateInfo.enabledExtensionCount = sizeof(pextensions)/sizeof(pextensions[0]);
-		instanceCreateInfo.ppEnabledExtensionNames = pextensions;
-		if(vkCreateInstance(&instanceCreateInfo,0,&instance) != VK_SUCCESS)
-			throw Exception("Failed to create Vulkan instance.");
-		
-		delete []playerProps;
-		delete []pextProps;
+	DebugPrintf(stdout,"Available surface formats: %u\n",formatCount);
+	for(uint i = 0; i < formatCount; ++i)
+		if(pformats[i].format == VK_FORMAT_B8G8R8A8_UNORM && pformats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+			printf("Surface format ok.\n");
 
-		CreateSurfaceKHR(&surface);
-		
-		VkDebugReportCallbackCreateInfoEXT debugcbCreateInfo = {};
-		debugcbCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-		debugcbCreateInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT|VK_DEBUG_REPORT_WARNING_BIT_EXT;
-		debugcbCreateInfo.pfnCallback = ValidationLayerDebugCallback;
-		((PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance,"vkCreateDebugReportCallbackEXT"))(instance,&debugcbCreateInfo,0,&debugReportCb);
+	uint presentModeCount;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDev,surface,&presentModeCount,0);
+	VkPresentModeKHR *ppresentModes = new VkPresentModeKHR[presentModeCount];
+	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDev,surface,&presentModeCount,ppresentModes);
 
-		DebugPrintf(stdout,"Enumerating physical devices\n");
+	uint queueFamilyCount;
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDev,&queueFamilyCount,0);
+	VkQueueFamilyProperties *pqueueFamilyProps = new VkQueueFamilyProperties[queueFamilyCount];
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDev,&queueFamilyCount,pqueueFamilyProps);
 
-		//physical device
-		uint devCount;
-		vkEnumeratePhysicalDevices(instance,&devCount,0);
-		VkPhysicalDevice *pdevices = new VkPhysicalDevice[devCount];
-		vkEnumeratePhysicalDevices(instance,&devCount,pdevices);
-
-		for(uint i = 0; i < devCount; ++i){
-			VkPhysicalDeviceProperties devProps;
-			vkGetPhysicalDeviceProperties(pdevices[i],&devProps);
-			VkPhysicalDeviceFeatures devFeatures;
-			vkGetPhysicalDeviceFeatures(pdevices[i],&devFeatures);
-
-			printf("%c %u: %s\n\t.deviceID: %u\n\t.vendorID: %u\n\t.deviceType: %u\n",
-				i == physicalDevIndex?'*':' ',
-				i,devProps.deviceName,devProps.deviceID,devProps.vendorID,devProps.deviceType);
-			printf("  max push constant size: %u\n  max bound desc sets: %u\n",devProps.limits.maxPushConstantsSize,devProps.limits.maxBoundDescriptorSets);
+	//find required queue families
+	for(uint i = 0; i < QUEUE_INDEX_COUNT; ++i)
+		queueFamilyIndex[i] = ~0;
+	for(uint i = 0; i < queueFamilyCount; ++i){
+		if(pqueueFamilyProps[i].queueCount > 0 && pqueueFamilyProps[i].queueFlags & VK_QUEUE_GRAPHICS_BIT){
+			queueFamilyIndex[QUEUE_INDEX_GRAPHICS] = i;
+			break;
 		}
+	}
+	for(uint i = 0; i < queueFamilyCount; ++i){
+		VkBool32 presentSupport;
+		vkGetPhysicalDeviceSurfaceSupportKHR(physicalDev,i,surface,&presentSupport);
 
-		if(physicalDevIndex >= devCount){
-			snprintf(Exception::buffer,sizeof(Exception::buffer),"Invalid gpu-index (%u) exceeds the number of available devices (%u).",physicalDevIndex,devCount);
-			throw Exception();
+		bool compatible = CheckPresentQueueCompatibility(physicalDev,i);
+		//printf("Device compatibility:\t%u\nPresent support:\t%u\n",compatible,presentSupport);
+		if(pqueueFamilyProps[i].queueCount > 0 && compatible && presentSupport){
+			queueFamilyIndex[QUEUE_INDEX_PRESENT] = i;
+			break;
 		}
+	}
+	std::set<uint> queueSet;
+	for(uint i = 0; i < QUEUE_INDEX_COUNT; ++i){
+		if(queueFamilyIndex[i] == ~0u)
+			throw Exception("No suitable queue family available.");
+		queueSet.insert(queueFamilyIndex[i]);
+	}
 
-		physicalDev = pdevices[physicalDevIndex];
+	delete []pqueueFamilyProps;
 
-		delete []pdevices;
+	//queue creation
+	VkDeviceQueueCreateInfo queueCreateInfo[QUEUE_INDEX_COUNT];
+	uint queueCount = 0;
+	for(uint queueFamilyIndex1 : queueSet){
+		//logical device
+		static const float queuePriorities[] = {1.0f};
+		queueCreateInfo[queueCount] = (VkDeviceQueueCreateInfo){};
+		queueCreateInfo[queueCount].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo[queueCount].queueFamilyIndex = queueFamilyIndex1;
+		queueCreateInfo[queueCount].queueCount = 1;
+		queueCreateInfo[queueCount].pQueuePriorities = queuePriorities;
+		++queueCount;
+	}
 
-		VkSurfaceCapabilitiesKHR surfaceCapabilities;
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDev,surface,&surfaceCapabilities);
+	VkPhysicalDeviceFeatures physicalDevFeatures = {};
+	physicalDevFeatures.geometryShader = VK_TRUE;
+	
+	uint devExtCount;
+	vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,0);
+	VkExtensionProperties *pdevExtProps = new VkExtensionProperties[devExtCount];
+	vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,pdevExtProps);
 
-		uint formatCount;
-		vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDev,surface,&formatCount,0);
-		VkSurfaceFormatKHR *pformats = new VkSurfaceFormatKHR[formatCount];
-		vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDev,surface,&formatCount,pformats);
-
-		DebugPrintf(stdout,"Available surface formats: %u\n",formatCount);
-		for(uint i = 0; i < formatCount; ++i)
-			if(pformats[i].format == VK_FORMAT_B8G8R8A8_UNORM && pformats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-				printf("Surface format ok.\n");
-
-		uint presentModeCount;
-		vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDev,surface,&presentModeCount,0);
-		VkPresentModeKHR *ppresentModes = new VkPresentModeKHR[presentModeCount];
-		vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDev,surface,&presentModeCount,ppresentModes);
-
-		uint queueFamilyCount;
-		vkGetPhysicalDeviceQueueFamilyProperties(physicalDev,&queueFamilyCount,0);
-		VkQueueFamilyProperties *pqueueFamilyProps = new VkQueueFamilyProperties[queueFamilyCount];
-		vkGetPhysicalDeviceQueueFamilyProperties(physicalDev,&queueFamilyCount,pqueueFamilyProps);
-
-		//find required queue families
-		for(uint i = 0; i < QUEUE_INDEX_COUNT; ++i)
-			queueFamilyIndex[i] = ~0;
-		for(uint i = 0; i < queueFamilyCount; ++i){
-			if(pqueueFamilyProps[i].queueCount > 0 && pqueueFamilyProps[i].queueFlags & VK_QUEUE_GRAPHICS_BIT){
-				queueFamilyIndex[QUEUE_INDEX_GRAPHICS] = i;
-				break;
+	//device extensions
+	const char *pdevExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+	DebugPrintf(stdout,"Enumerating required device extensions\n");
+	uint devExtFound = 0;
+	for(uint i = 0; i < devExtCount; ++i)
+		for(uint j = 0; j < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]); ++j)
+			if(strcmp(pdevExtProps[i].extensionName,pdevExtensions[j]) == 0){
+				printf("%s\n",pdevExtensions[j]);
+				++devExtFound;
 			}
-		}
-		for(uint i = 0; i < queueFamilyCount; ++i){
-			VkBool32 presentSupport;
-			vkGetPhysicalDeviceSurfaceSupportKHR(physicalDev,i,surface,&presentSupport);
+	if(devExtFound < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]))
+		throw Exception("Could not find all required device extensions.");
+	//
 
-			bool compatible = CheckPresentQueueCompatibility(physicalDev,i);
-			//printf("Device compatibility:\t%u\nPresent support:\t%u\n",compatible,presentSupport);
-			if(pqueueFamilyProps[i].queueCount > 0 && compatible && presentSupport){
-				queueFamilyIndex[QUEUE_INDEX_PRESENT] = i;
-				break;
-			}
-		}
-		std::set<uint> queueSet;
-		for(uint i = 0; i < QUEUE_INDEX_COUNT; ++i){
-			if(queueFamilyIndex[i] == ~0u)
-				throw Exception("No suitable queue family available.");
-			queueSet.insert(queueFamilyIndex[i]);
-		}
+	VkDeviceCreateInfo devCreateInfo = {};
+	devCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	devCreateInfo.pQueueCreateInfos = queueCreateInfo;
+	devCreateInfo.queueCreateInfoCount = queueCount;
+	devCreateInfo.pEnabledFeatures = &physicalDevFeatures;
+	devCreateInfo.ppEnabledExtensionNames = pdevExtensions;
+	devCreateInfo.enabledExtensionCount = sizeof(pdevExtensions)/sizeof(pdevExtensions[0]);
+	devCreateInfo.ppEnabledLayerNames = players;
+	devCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]);
+	if(vkCreateDevice(physicalDev,&devCreateInfo,0,&logicalDev) != VK_SUCCESS)
+		throw Exception("Failed to create a logical device.");
+	
+	delete []pdevExtProps;
 
-		delete []pqueueFamilyProps;
+	for(uint i = 0; i < QUEUE_INDEX_COUNT; ++i)
+		vkGetDeviceQueue(logicalDev,queueFamilyIndex[i],0,&queue[i]);
 
-		//queue creation
-		VkDeviceQueueCreateInfo queueCreateInfo[QUEUE_INDEX_COUNT];
-		uint queueCount = 0;
-		for(uint queueFamilyIndex1 : queueSet){
-			//logical device
-			static const float queuePriorities[] = {1.0f};
-			queueCreateInfo[queueCount] = (VkDeviceQueueCreateInfo){};
-			queueCreateInfo[queueCount].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-			queueCreateInfo[queueCount].queueFamilyIndex = queueFamilyIndex1;
-			queueCreateInfo[queueCount].queueCount = 1;
-			queueCreateInfo[queueCount].pQueuePriorities = queuePriorities;
-			++queueCount;
-		}
+	//render pass (later an array of these for different purposes)
+	VkAttachmentReference attachmentRef = {};
+	attachmentRef.attachment = 0;
+	attachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		VkPhysicalDeviceFeatures physicalDevFeatures = {};
-		physicalDevFeatures.geometryShader = VK_TRUE;
-		
-		uint devExtCount;
-		vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,0);
-		VkExtensionProperties *pdevExtProps = new VkExtensionProperties[devExtCount];
-		vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,pdevExtProps);
+	VkSubpassDescription subpassDesc = {};
+	subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpassDesc.colorAttachmentCount = 1;
+	subpassDesc.pColorAttachments = &attachmentRef;
 
-		//device extensions
-		const char *pdevExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-		DebugPrintf(stdout,"Enumerating required device extensions\n");
-		uint devExtFound = 0;
-		for(uint i = 0; i < devExtCount; ++i)
-			for(uint j = 0; j < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]); ++j)
-				if(strcmp(pdevExtProps[i].extensionName,pdevExtensions[j]) == 0){
-					printf("%s\n",pdevExtensions[j]);
-					++devExtFound;
-				}
-		if(devExtFound < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]))
-			throw Exception("Could not find all required device extensions.");
-		//
+	VkAttachmentDescription attachmentDesc = {};
+	attachmentDesc.format = VK_FORMAT_B8G8R8A8_UNORM;
+	attachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-		VkDeviceCreateInfo devCreateInfo = {};
-		devCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		devCreateInfo.pQueueCreateInfos = queueCreateInfo;
-		devCreateInfo.queueCreateInfoCount = queueCount;
-		devCreateInfo.pEnabledFeatures = &physicalDevFeatures;
-		devCreateInfo.ppEnabledExtensionNames = pdevExtensions;
-		devCreateInfo.enabledExtensionCount = sizeof(pdevExtensions)/sizeof(pdevExtensions[0]);
-		devCreateInfo.ppEnabledLayerNames = players;
-		devCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]);
-		if(vkCreateDevice(physicalDev,&devCreateInfo,0,&logicalDev) != VK_SUCCESS)
-			throw Exception("Failed to create a logical device.");
-		
-		delete []pdevExtProps;
+	VkSubpassDependency subpassDependency = {};
+	subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	subpassDependency.srcAccessMask = 0;
+	subpassDependency.dstSubpass = 0;
+	subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	//subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_MEMORY_READ_BIT;
 
-		for(uint i = 0; i < QUEUE_INDEX_COUNT; ++i)
-			vkGetDeviceQueue(logicalDev,queueFamilyIndex[i],0,&queue[i]);
-
-		//render pass (later an array of these for different purposes)
-		VkAttachmentReference attachmentRef = {};
-		attachmentRef.attachment = 0;
-		attachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		VkSubpassDescription subpassDesc = {};
-		subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpassDesc.colorAttachmentCount = 1;
-		subpassDesc.pColorAttachments = &attachmentRef;
-
-		VkAttachmentDescription attachmentDesc = {};
-		attachmentDesc.format = VK_FORMAT_B8G8R8A8_UNORM;
-		attachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-		attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		attachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		attachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		attachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		attachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		attachmentDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-		VkSubpassDependency subpassDependency = {};
-		subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-		subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		subpassDependency.srcAccessMask = 0;
-		subpassDependency.dstSubpass = 0;
-		subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		//subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_MEMORY_READ_BIT;
-
-		VkRenderPassCreateInfo renderPassCreateInfo = {};
-		renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		renderPassCreateInfo.attachmentCount = 1;
-		renderPassCreateInfo.pAttachments = &attachmentDesc;
-		renderPassCreateInfo.subpassCount = 1;
-		renderPassCreateInfo.pSubpasses = &subpassDesc;
-		renderPassCreateInfo.dependencyCount = 1;
-		renderPassCreateInfo.pDependencies = &subpassDependency;
-		if(vkCreateRenderPass(logicalDev,&renderPassCreateInfo,0,&renderPass) != VK_SUCCESS)
-			throw Exception("Failed to create a render pass.");
-		
-		imageExtent = GetExtent();
+	VkRenderPassCreateInfo renderPassCreateInfo = {};
+	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassCreateInfo.attachmentCount = 1;
+	renderPassCreateInfo.pAttachments = &attachmentDesc;
+	renderPassCreateInfo.subpassCount = 1;
+	renderPassCreateInfo.pSubpasses = &subpassDesc;
+	renderPassCreateInfo.dependencyCount = 1;
+	renderPassCreateInfo.pDependencies = &subpassDependency;
+	if(vkCreateRenderPass(logicalDev,&renderPassCreateInfo,0,&renderPass) != VK_SUCCESS)
+		throw Exception("Failed to create a render pass.");
+	
+	imageExtent = GetExtent();
 
 		//swap chain
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
@@ -978,7 +975,7 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
 		//unsigned char t = (float)(i/rect.w)/(float)rect.h*255;
 		((unsigned char*)pdata)[4*i+0] = 255;
-		((unsigned char*)pdata)[4*i+1] = 255;
+		((unsigned char*)pdata)[4*i+1] = 200;
 		((unsigned char*)pdata)[4*i+2] = 255;//100;
 		((unsigned char*)pdata)[4*i+3] = 255;
 	}

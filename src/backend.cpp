@@ -123,6 +123,10 @@ X11Client::~X11Client(){
 	//
 }
 
+void X11Client::SetTranslation(glm::vec2 p, glm::vec2 e){
+	//
+}
+
 X11Backend::X11Backend(){
 	//
 }
@@ -209,10 +213,10 @@ void Default::Start(){
 	}
 }
 
-sint Default::GetEventFileDescriptor(){
+/*sint Default::GetEventFileDescriptor(){
 	sint fd = xcb_get_file_descriptor(pcon);
 	return fd;
-}
+}*/
 
 bool Default::HandleEvent(){
 	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
@@ -381,6 +385,14 @@ DebugClient::~DebugClient(){
 	//
 }
 
+void DebugClient::SetTranslation(glm::vec2 p, glm::vec2 e){
+	//
+	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
+	glm::vec4 coord = glm::vec4(p,e)*screen;
+	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
+	//DebugPrintf(stdout,"set translation: %f, %f, %f, %f\n",coord.x,coord.y,coord.z,coord.w);
+}
+
 Debug::Debug() : X11Backend(){
 	//
 }
@@ -421,10 +433,10 @@ void Debug::Start(){
 	xcb_key_symbols_free(psymbols);
 }
 
-sint Debug::GetEventFileDescriptor(){
+/*sint Debug::GetEventFileDescriptor(){
 	sint fd = xcb_get_file_descriptor(pcon);
 	return fd;
-}
+}*/
 
 bool Debug::HandleEvent(){
 	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);

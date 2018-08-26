@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <glm/glm.hpp>
 
 typedef unsigned int uint;
 typedef int sint;

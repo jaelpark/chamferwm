@@ -195,11 +195,13 @@ public:
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		if(!pcomp11){
 			Backend::DebugClient *pclient = new Backend::DebugClient(pcreateInfo);
+			//pcontainer->Assign(pclient);
 			pcontainer->pclient = pclient;
 			return pclient;
 		}
 		Compositor::CompositorInterface *pcompInterface = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
 		Compositor::X11DebugClientFrame *pclientFrame = new Compositor::X11DebugClientFrame(pcreateInfo,pcompInterface);
+		//pcontainer->Assign(pclientFrame);
 		pcontainer->pclient = pclientFrame;
 		return pclientFrame;
 	}
@@ -323,11 +325,11 @@ int main(sint argc, const char **pargv){
 	}
 
 	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
-	sint fd = pbackend11->GetEventFileDescriptor();
+	/*sint fd = pbackend11->GetEventFileDescriptor();
 	if(fd == -1){
 		DebugPrintf(stderr,"XCB fd\n");
 		return 1;
-	}
+	}*/
 	/*event1.data.ptr = &fd;
 	event1.events = EPOLLIN;
 	epoll_ctl(efd,EPOLL_CTL_ADD,fd,&event1);*/

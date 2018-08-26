@@ -28,7 +28,7 @@ public:
 	BackendInterface();
 	virtual ~BackendInterface();
 	virtual void Start() = 0;
-	virtual sint GetEventFileDescriptor() = 0;
+	//virtual sint GetEventFileDescriptor() = 0;
 	virtual bool HandleEvent() = 0;
 protected:
 	//Functions defined by the implementing backends.
@@ -53,12 +53,15 @@ public:
 	X11Client(xcb_window_t, const class X11Backend *);
 	X11Client(const CreateInfo *);
 	~X11Client();
+	void SetTranslation(glm::vec2, glm::vec2);
 	xcb_window_t window;
 	const X11Backend *pbackend;
 };
 
 class X11Backend : public BackendInterface{
 friend class X11Client;
+friend class Default;
+friend class DebugClient;
 friend class Compositor::X11ClientFrame;
 friend class Compositor::X11Compositor;
 friend class Compositor::X11DebugCompositor;
@@ -77,7 +80,7 @@ public:
 	Default();
 	virtual ~Default();
 	void Start();
-	sint GetEventFileDescriptor();
+	//sint GetEventFileDescriptor();
 	bool HandleEvent();
 	X11Client * FindClient(xcb_window_t) const;
 protected:
@@ -97,6 +100,7 @@ public:
 	DebugClient(WManager::Rectangle, const class X11Backend *);
 	DebugClient(const CreateInfo *);
 	~DebugClient();
+	void SetTranslation(glm::vec2, glm::vec2);
 	const X11Backend *pbackend;
 };
 
@@ -105,7 +109,7 @@ public:
 	Debug();
 	virtual ~Debug();
 	void Start();
-	sint GetEventFileDescriptor();
+	//sint GetEventFileDescriptor();
 	bool HandleEvent();
 	X11Client * FindClient(xcb_window_t) const;
 protected:
