@@ -88,6 +88,19 @@ ClientFrame::~ClientFrame(){
 			}
 }
 
+void ClientFrame::AdjustSurface(uint w, uint h){
+	//TODO: call this every frame
+	//warning; cant release without semaphore
+	//store the unrealeased texture somewhere?
+	//TODO: texture manager, allocate/release textures?
+	if(w == ptexture->w && h == ptexture->h)
+		return;
+	ptexture->~Texture();
+	new(ptexture) Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+
+	UpdateDescSets();
+}
+
 bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 	auto m = std::find_if(descSets.begin(),descSets.end(),[&](auto &r)->bool{
 		return r.p == prenderPipeline;
@@ -120,6 +133,13 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 	descSets.push_back(pipelineDescSet);
 	passignedSet = &descSets.back();
 
+	UpdateDescSets();
+
+	return true;
+}
+
+void ClientFrame::UpdateDescSets(){
+	//
 	VkDescriptorImageInfo descImageInfo = {};
 	descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	descImageInfo.imageView = ptexture->imageView;
@@ -127,14 +147,14 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 
 	std::vector<VkWriteDescriptorSet> writeDescSets;
 	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
-		auto m1 = std::find_if(prenderPipeline->pshaderModule[i]->bindings.begin(),prenderPipeline->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
+		auto m1 = std::find_if(passignedSet->p->pshaderModule[i]->bindings.begin(),passignedSet->p->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
 			return r.type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE && strcmp(r.pname,"content") == 0;
 		});
-		if(m1 != prenderPipeline->pshaderModule[i]->bindings.end()){
+		if(m1 != passignedSet->p->pshaderModule[i]->bindings.end()){
 			VkWriteDescriptorSet &writeDescSet = writeDescSets.emplace_back();
 			writeDescSet = (VkWriteDescriptorSet){};
 			writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			writeDescSet.dstSet = pipelineDescSet.pdescSets[i][(*m1).setIndex];
+			writeDescSet.dstSet = passignedSet->pdescSets[i][(*m1).setIndex];
 			writeDescSet.dstBinding = (*m1).binding;
 			writeDescSet.dstArrayElement = 0;
 			writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -142,14 +162,14 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 			writeDescSet.pImageInfo = &descImageInfo;
 		}
 
-		auto m2 = std::find_if(prenderPipeline->pshaderModule[i]->bindings.begin(),prenderPipeline->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
+		auto m2 = std::find_if(passignedSet->p->pshaderModule[i]->bindings.begin(),passignedSet->p->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
 			return r.type == VK_DESCRIPTOR_TYPE_SAMPLER;
 		});
-		if(m2 != prenderPipeline->pshaderModule[i]->bindings.end()){
+		if(m2 != passignedSet->p->pshaderModule[i]->bindings.end()){
 			VkWriteDescriptorSet &writeDescSet = writeDescSets.emplace_back();
 			writeDescSet = (VkWriteDescriptorSet){};
 			writeDescSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			writeDescSet.dstSet = pipelineDescSet.pdescSets[i][(*m2).setIndex];
+			writeDescSet.dstSet = passignedSet->pdescSets[i][(*m2).setIndex];
 			writeDescSet.dstBinding = (*m2).binding;
 			writeDescSet.dstArrayElement = 0;
 			writeDescSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -158,8 +178,6 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 		}
 	}
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
-
-	return true;
 }
 
 CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0){
@@ -773,9 +791,7 @@ void CompositorInterface::Present(){
 	presentInfo.pResults = 0;
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
 
-	currentFrame = (currentFrame+1)%swapChainImageCount; //TODO: needs to be higher or equal to image count?
-
-	//vkDeviceWaitIdle(logicalDev);
+	currentFrame = (currentFrame+1)%swapChainImageCount;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){
@@ -966,6 +982,10 @@ X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const 
 X11DebugClientFrame::~X11DebugClientFrame(){
 	//delete ptexture;
 }
+
+/*void X11DebugClientFrame::AdjustSurface(){
+	//
+}*/
 
 void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//

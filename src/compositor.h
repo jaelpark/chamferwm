@@ -51,7 +51,10 @@ public:
 	ClientFrame(uint, uint, class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
+	void AdjustSurface(uint, uint);
 	bool AssignPipeline(const Pipeline *);
+private:
+	void UpdateDescSets();
 protected:
 	Texture *ptexture;
 	class CompositorInterface *pcomp;
@@ -185,6 +188,7 @@ class X11DebugClientFrame : public Backend::DebugClient, public ClientFrame{
 public:
 	X11DebugClientFrame(WManager::Container *, const Backend::DebugClient::CreateInfo *, CompositorInterface *);
 	~X11DebugClientFrame();
+	void AdjustSurface();
 	void UpdateContents(const VkCommandBuffer *);
 };
 

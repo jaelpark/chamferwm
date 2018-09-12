@@ -124,6 +124,8 @@ void X11Client::UpdateTranslation(){
 
 	uint values[4] = {rect.x,rect.y,rect.w,rect.h};
 	xcb_configure_window(pbackend->pcon,window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,values);
+
+	//TODO: virtual call to compositor implementation to adjust the texture?
 }
 
 X11Backend::X11Backend(){
@@ -388,6 +390,7 @@ DebugClient::~DebugClient(){
 }
 
 void DebugClient::UpdateTranslation(){
+	printf("UpdateTranslation()\n");
 	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,pbackend->window);
 	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 	if(!pgeometryReply)
