@@ -146,7 +146,22 @@ private:
 
 	std::vector<RenderObject *> renderQueue;
 	std::vector<FrameObject> frameObjectPool;
-	//std::vector<TextureObject> textureObjectPool;
+
+	//Used textures get stored for potential reuse before they get destroyed.
+	//Many of the allocated window textures will initially have some common reoccuring size.
+#define delete_TEXTURE(t,c){\
+	CompositorInterface::TexturePoolEntry texturePoolEntry;\
+	texturePoolEntry.ptexture = t;\
+	texturePoolEntry.fencePass = 0;\
+	clock_gettime(CLOCK_MONOTONIC,&texturePoolEntry.releaseTime);\
+	c->texturePool.push_back(texturePoolEntry);}
+
+	struct TexturePoolEntry{
+		Texture *ptexture;
+		uint fencePass; //release only after all the frame fences have been signaled at least once.
+		struct timespec releaseTime;
+	};
+	std::vector<TexturePoolEntry> texturePool;
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };
@@ -156,6 +171,7 @@ public:
 	X11ClientFrame(WManager::Container *, const Backend::X11Client::CreateInfo *, CompositorInterface *);
 	~X11ClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
+	void AdjustSurface1();
 	xcb_pixmap_t windowPixmap;
 	xcb_damage_damage_t damage;
 };
@@ -188,8 +204,8 @@ class X11DebugClientFrame : public Backend::DebugClient, public ClientFrame{
 public:
 	X11DebugClientFrame(WManager::Container *, const Backend::DebugClient::CreateInfo *, CompositorInterface *);
 	~X11DebugClientFrame();
-	void AdjustSurface();
 	void UpdateContents(const VkCommandBuffer *);
+	void AdjustSurface1();
 };
 
 class X11DebugCompositor : public X11Compositor{

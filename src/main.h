@@ -14,6 +14,8 @@ void DebugPrintf(FILE *, const char *, ...);
 #define mstrdup(s) strcpy(new char[strlen(s+1)],s)
 #define mstrfree(s) delete []s
 
+#define timespec_diff(b,a) (float)(b.tv_sec-a.tv_sec)+(float)((b.tv_nsec-a.tv_nsec)/1e9)
+
 class Exception{
 public:
 	Exception();

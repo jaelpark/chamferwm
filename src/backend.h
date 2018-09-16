@@ -54,7 +54,7 @@ public:
 	//X11Client(xcb_window_t, const class X11Backend *);
 	X11Client(WManager::Container *, const CreateInfo *);
 	~X11Client();
-	//virtual void AdjustSurface() = 0;
+	virtual void AdjustSurface1(){printf("empty adjust\n");};
 	void UpdateTranslation();
 	//virtual void UpdateCompositor();
 	xcb_window_t window;
@@ -104,7 +104,7 @@ public:
 	};
 	DebugClient(WManager::Container *, const CreateInfo *);
 	~DebugClient();
-	//virtual void AdjustSurface() = 0;
+	virtual void AdjustSurface1(){printf("empty adjust\n");};
 	void UpdateTranslation();
 	const X11Backend *pbackend;
 };

@@ -98,13 +98,6 @@ X11Event::~X11Event(){
 }
 
 X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend){
-	/*xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,window);
-	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
-	if(!pgeometryReply)
-		throw Exception("Failed to get window geometry.");
-	rect = (WManager::Rectangle){pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
-	free(pgeometryReply);*/
-
 	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
@@ -125,7 +118,7 @@ void X11Client::UpdateTranslation(){
 	uint values[4] = {rect.x,rect.y,rect.w,rect.h};
 	xcb_configure_window(pbackend->pcon,window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,values);
 
-	//TODO: virtual call to compositor implementation to adjust the texture?
+	AdjustSurface1();
 }
 
 X11Backend::X11Backend(){
@@ -402,6 +395,8 @@ void DebugClient::UpdateTranslation(){
 	glm::vec4 screen(se.x,se.y,se.x,se.y);
 	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
+
+	AdjustSurface1();
 }
 
 Debug::Debug() : X11Backend(){

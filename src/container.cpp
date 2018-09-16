@@ -84,8 +84,10 @@ void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
 
 	this->p = p;
 	this->e = e;
-	if(pclient)
+	if(pclient){
 		pclient->UpdateTranslation();
+		printf("pclient->UpdateTranslation()\n");
+	}
 }
 
 }

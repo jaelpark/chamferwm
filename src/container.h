@@ -21,7 +21,7 @@ public:
 	//Resize
 	//SetLayer
 	//virtual Rectangle GetRect() const = 0;
-	Rectangle rect;
+	Rectangle rect; //pixel coordinates of the client
 	//TODO: scale; //scaling of the client inside the container
 	class Container *pcontainer;
 };

@@ -52,7 +52,8 @@ FrameObject::~FrameObject(){
 }
 
 void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
-	time = (float)(pclientFrame->pcomp->frameTime.tv_sec-pclientFrame->creationTime.tv_sec)+(float)((pclientFrame->pcomp->frameTime.tv_nsec-pclientFrame->creationTime.tv_nsec)/1e9);
+	//time = (float)(pclientFrame->pcomp->frameTime.tv_sec-pclientFrame->creationTime.tv_sec)+(float)((pclientFrame->pcomp->frameTime.tv_nsec-pclientFrame->creationTime.tv_nsec)/1e9);
+	time = timespec_diff(pclientFrame->pcomp->frameTime,pclientFrame->creationTime);
 	//TODO: max time, configurable
 
 	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
@@ -78,7 +79,7 @@ ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_p
 }
 
 ClientFrame::~ClientFrame(){
-	delete ptexture;
+	delete_TEXTURE(ptexture,pcomp);
 
 	for(PipelineDescriptorSet &pipelineDescSet : descSets)
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
@@ -89,14 +90,21 @@ ClientFrame::~ClientFrame(){
 }
 
 void ClientFrame::AdjustSurface(uint w, uint h){
-	//TODO: call this every frame
-	//warning; cant release without semaphore
-	//store the unrealeased texture somewhere?
-	//TODO: texture manager, allocate/release textures?
-	if(w == ptexture->w && h == ptexture->h)
-		return;
-	ptexture->~Texture();
-	new(ptexture) Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+	delete_TEXTURE(ptexture,pcomp);
+
+	pcomp->updateQueue.push_back(this);
+
+	auto m = std::find_if(pcomp->texturePool.begin(),pcomp->texturePool.end(),[&](auto &r)->bool{
+		return r.ptexture->w == w && r.ptexture->h == h;
+	});
+	if(m != pcomp->texturePool.end()){
+		ptexture = (*m).ptexture;
+
+		std::iter_swap(m,pcomp->texturePool.end()-1);
+		pcomp->texturePool.pop_back();
+
+	}else ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
 
 	UpdateDescSets();
 }
@@ -139,6 +147,7 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 }
 
 void ClientFrame::UpdateDescSets(){
+	//wait idle?
 	//
 	VkDescriptorImageInfo descImageInfo = {};
 	descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -555,29 +564,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	descPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	if(vkCreateDescriptorPool(logicalDev,&descPoolCreateInfo,0,&descPool) != VK_SUCCESS)
 		throw Exception("Failed to create a descriptor pool.");
-	
-	/*pdescSets = new VkDescriptorSet[swapChainImageCount];
 
-	VkDescriptorSetLayout *pdescSetLayoutCopy = new VkDescriptorSetLayout[swapChainImageCount];
-	std::fill(pdescSetLayoutCopy,pdescSetLayoutCopy+swapChainImageCount,descSetLayout);
-
-	//allocate the descriptor sets
-	VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
-	descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	descSetAllocateInfo.descriptorPool = descPool;
-	descSetAllocateInfo.pSetLayouts = pdescSetLayoutCopy;
-	descSetAllocateInfo.descriptorSetCount = swapChainImageCount;
-	if(vkAllocateDescriptorSets(logicalDev,&descSetAllocateInfo,pdescSets) != VK_SUCCESS)
-		throw Exception("Failed to allocate descriptor sets.");
-	
-	delete []pdescSetLayoutCopy;
-
-	for(uint i = 0; i < swapChainImageCount; ++i){
-		VkDescriptorImageInfo descImageInfo = {};
-		descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		//descImageInfo.imageView = 
-	}*/
-	
 	//command pool and buffers
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -623,6 +610,9 @@ void CompositorInterface::InitializeRenderEngine(){
 void CompositorInterface::DestroyRenderEngine(){
 	DebugPrintf(stdout,"Compositor cleanup\n");
 
+	for(TexturePoolEntry &texturePoolEntry : texturePool)
+		delete texturePoolEntry.ptexture;
+
 	pipelines.clear();
 	shaders.clear();
 
@@ -630,9 +620,7 @@ void CompositorInterface::DestroyRenderEngine(){
 	delete []pcopyCommandBuffers;
 	vkDestroyCommandPool(logicalDev,commandPool,0);
 
-	//delete []pdescSets;
 	vkDestroyDescriptorPool(logicalDev,descPool,0);
-	//vkDestroyDescriptorSetLayout(logicalDev,descSetLayout,0);
 
 	vkDestroySampler(logicalDev,pointSampler,0);
 
@@ -694,8 +682,20 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 bool CompositorInterface::PollFrameFence(){
 	if(vkWaitForFences(logicalDev,1,&pfence[currentFrame],VK_TRUE,0) == VK_TIMEOUT)
 		return false;
-	//vkWaitForFences(logicalDev,1,&pfence[currentFrame],VK_TRUE,std::numeric_limits<uint64_t>::max());
 	vkResetFences(logicalDev,1,&pfence[currentFrame]);
+
+	//release the textures no longer in use
+	for(TexturePoolEntry &texturePoolEntry : texturePool){
+		texturePoolEntry.fencePass++;
+		if(texturePoolEntry.fencePass <= swapChainImageCount || timespec_diff(frameTime,texturePoolEntry.releaseTime) < 5.0f)
+			continue;
+		delete texturePoolEntry.ptexture;
+		texturePoolEntry.ptexture = 0;
+	}
+	std::remove_if(texturePool.begin(),texturePool.end(),[&](auto &texturePoolEntry)->bool{
+		return !texturePoolEntry.ptexture;
+	});
+
 	return true;
 }
 
@@ -707,8 +707,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	renderQueue.clear();
 	frameObjectPool.clear();
 	CreateRenderQueue(proot->pch);
-
-	//TODO: adjust texture map sizes and assign pipelines if needed here
 
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -844,6 +842,12 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	ptexture->Unmap(pcommandBuffer);
 
 	free(pimageReply);
+}
+
+void X11ClientFrame::AdjustSurface1(){
+	//
+	printf("client adjust\n");
+	AdjustSurface(rect.w,rect.h);
 }
 
 X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : CompositorInterface(physicalDevIndex){
@@ -983,10 +987,6 @@ X11DebugClientFrame::~X11DebugClientFrame(){
 	//delete ptexture;
 }
 
-/*void X11DebugClientFrame::AdjustSurface(){
-	//
-}*/
-
 void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//
 	const void *pdata = ptexture->Map();
@@ -998,6 +998,12 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		((unsigned char*)pdata)[4*i+3] = 255;
 	}
 	ptexture->Unmap(pcommandBuffer);
+}
+
+void X11DebugClientFrame::AdjustSurface1(){
+	//
+	printf("client adjust\n");
+	AdjustSurface(rect.w,rect.h);
 }
 
 X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,pbackend){
