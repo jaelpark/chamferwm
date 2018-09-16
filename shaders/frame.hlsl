@@ -65,8 +65,8 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 
 //TODO: create chamfer with ndc coords and sdf transformation
 float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0) : SV_Target{
-	if(any(texc < 0.005) || any(texc > 0.995))
-		return float4(0.5f+0.5f*sin(params.x),1,0,1);
+	//if(any(texc < 0.005) || any(texc > 0.995))
+		//return float4(0.5f+0.5f*sin(params.x),1,0,1);
 	//float4 c = content.Sample(sm,texc);
 	float2 p = screen*(0.5f*xy0+0.5f);
 	float4 c = content.Load(float3(posh.xy-p,0)); //p already has the 0.5f offset

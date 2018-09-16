@@ -9,6 +9,9 @@
 typedef unsigned int uint;
 typedef int sint;
 
+typedef unsigned long long int uint64;
+typedef long long int sint64;
+
 void DebugPrintf(FILE *, const char *, ...);
 
 #define mstrdup(s) strcpy(new char[strlen(s+1)],s)

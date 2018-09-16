@@ -59,6 +59,7 @@ protected:
 	Texture *ptexture;
 	class CompositorInterface *pcomp;
 	struct PipelineDescriptorSet{
+		uint64 fenceTag;
 		const Pipeline *p;
 		VkDescriptorSet *pdescSets[Pipeline::SHADER_MODULE_COUNT];
 	};
@@ -143,6 +144,7 @@ private:
 	//const char *pshaderPath;
 
 	struct timespec frameTime;
+	uint64 frameTag;
 
 	std::vector<RenderObject *> renderQueue;
 	std::vector<FrameObject> frameObjectPool;
@@ -152,13 +154,13 @@ private:
 #define delete_TEXTURE(t,c){\
 	CompositorInterface::TexturePoolEntry texturePoolEntry;\
 	texturePoolEntry.ptexture = t;\
-	texturePoolEntry.fencePass = 0;\
+	texturePoolEntry.releaseTag = c->frameTag;\
 	clock_gettime(CLOCK_MONOTONIC,&texturePoolEntry.releaseTime);\
 	c->texturePool.push_back(texturePoolEntry);}
 
 	struct TexturePoolEntry{
 		Texture *ptexture;
-		uint fencePass; //release only after all the frame fences have been signaled at least once.
+		uint64 releaseTag;
 		struct timespec releaseTime;
 	};
 	std::vector<TexturePoolEntry> texturePool;

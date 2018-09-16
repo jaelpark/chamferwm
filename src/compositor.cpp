@@ -64,16 +64,30 @@ void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
 	PushConstants(pcommandBuffer);
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 
+	pclientFrame->passignedSet->fenceTag = pclientFrame->pcomp->frameTag;
+
 	//pclientFrame->updateTime = pclientFrame->pcomp->frameTime;
 }
 
 ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
 	pcomp->updateQueue.push_back(this);
 
-	ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+	auto m = std::find_if(pcomp->texturePool.begin(),pcomp->texturePool.end(),[&](auto &r)->bool{
+		return r.ptexture->w == w && r.ptexture->h == h;
+	});
+	if(m != pcomp->texturePool.end()){
+		ptexture = (*m).ptexture;
+
+		std::iter_swap(m,pcomp->texturePool.end()-1);
+		pcomp->texturePool.pop_back();
+
+	}else ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+
 	if(!AssignPipeline(pcomp->pdefaultPipeline))
 		throw Exception("Failed to assign a pipeline.");
 	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
+
+	UpdateDescSets();
 
 	clock_gettime(CLOCK_MONOTONIC,&creationTime);
 }
@@ -104,6 +118,10 @@ void ClientFrame::AdjustSurface(uint w, uint h){
 		pcomp->texturePool.pop_back();
 
 	}else ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
+
+	//In this case updating the descriptor sets would be enough, but we can't do that because of them being used currently by frames in flight.
+	if(!AssignPipeline(passignedSet->p))
+		throw Exception("Failed to assign a pipeline.");
 	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
 
 	UpdateDescSets();
@@ -111,7 +129,7 @@ void ClientFrame::AdjustSurface(uint w, uint h){
 
 bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 	auto m = std::find_if(descSets.begin(),descSets.end(),[&](auto &r)->bool{
-		return r.p == prenderPipeline;
+		return r.p == prenderPipeline && pcomp->frameTag > r.fenceTag+pcomp->swapChainImageCount+1;
 	});
 	if(m != descSets.end()){
 		passignedSet = &(*m);
@@ -121,6 +139,7 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 	uint totalSetCount = 0;
 
 	PipelineDescriptorSet pipelineDescSet;
+	pipelineDescSet.fenceTag = pcomp->frameTag;
 	pipelineDescSet.p = prenderPipeline;
 	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
 		if(!prenderPipeline->pshaderModule[i] || prenderPipeline->pshaderModule[i]->setCount == 0){
@@ -140,8 +159,6 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 	}
 	descSets.push_back(pipelineDescSet);
 	passignedSet = &descSets.back();
-
-	UpdateDescSets();
 
 	return true;
 }
@@ -189,7 +206,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0){
+CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0){
 	//
 }
 
@@ -238,9 +255,9 @@ void CompositorInterface::InitializeRenderEngine(){
 	
 	VkApplicationInfo appInfo = {};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = "xwm";
+	appInfo.pApplicationName = "chamferwm";
 	appInfo.applicationVersion = VK_MAKE_VERSION(0,0,1);
-	appInfo.pEngineName = "xwm-engine";
+	appInfo.pEngineName = "chamferwm-engine";
 	appInfo.engineVersion = VK_MAKE_VERSION(0,0,1);
 	appInfo.apiVersion = VK_API_VERSION_1_0;
 
@@ -685,16 +702,12 @@ bool CompositorInterface::PollFrameFence(){
 	vkResetFences(logicalDev,1,&pfence[currentFrame]);
 
 	//release the textures no longer in use
-	for(TexturePoolEntry &texturePoolEntry : texturePool){
-		texturePoolEntry.fencePass++;
-		if(texturePoolEntry.fencePass <= swapChainImageCount || timespec_diff(frameTime,texturePoolEntry.releaseTime) < 5.0f)
-			continue;
+	texturePool.erase(std::remove_if(texturePool.begin(),texturePool.end(),[&](auto &texturePoolEntry)->bool{
+		if(frameTag < texturePoolEntry.releaseTag+swapChainImageCount+1 || timespec_diff(frameTime,texturePoolEntry.releaseTime) < 5.0f)
+			return false;
 		delete texturePoolEntry.ptexture;
-		texturePoolEntry.ptexture = 0;
-	}
-	std::remove_if(texturePool.begin(),texturePool.end(),[&](auto &texturePoolEntry)->bool{
-		return !texturePoolEntry.ptexture;
-	});
+		return true;
+	}),texturePool.end());
 
 	return true;
 }
@@ -790,6 +803,8 @@ void CompositorInterface::Present(){
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
 
 	currentFrame = (currentFrame+1)%swapChainImageCount;
+
+	frameTag++;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){
@@ -846,7 +861,6 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 
 void X11ClientFrame::AdjustSurface1(){
 	//
-	printf("client adjust\n");
 	AdjustSurface(rect.w,rect.h);
 }
 
@@ -989,12 +1003,15 @@ X11DebugClientFrame::~X11DebugClientFrame(){
 
 void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//
+	uint color[3];
+	for(uint &t : color)
+		t = rand()%255;
 	const void *pdata = ptexture->Map();
 	for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
 		//unsigned char t = (float)(i/rect.w)/(float)rect.h*255;
-		((unsigned char*)pdata)[4*i+0] = 255;
-		((unsigned char*)pdata)[4*i+1] = 200;
-		((unsigned char*)pdata)[4*i+2] = 255;//100;
+		((unsigned char*)pdata)[4*i+0] = color[0];
+		((unsigned char*)pdata)[4*i+1] = color[1];
+		((unsigned char*)pdata)[4*i+2] = color[2];
 		((unsigned char*)pdata)[4*i+3] = 255;
 	}
 	ptexture->Unmap(pcommandBuffer);
@@ -1002,7 +1019,6 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 
 void X11DebugClientFrame::AdjustSurface1(){
 	//
-	printf("client adjust\n");
 	AdjustSurface(rect.w,rect.h);
 }
 
