@@ -151,19 +151,26 @@ private:
 
 	//Used textures get stored for potential reuse before they get destroyed.
 	//Many of the allocated window textures will initially have some common reoccuring size.
-#define delete_TEXTURE(t,c){\
-	CompositorInterface::TexturePoolEntry texturePoolEntry;\
-	texturePoolEntry.ptexture = t;\
-	texturePoolEntry.releaseTag = c->frameTag;\
-	clock_gettime(CLOCK_MONOTONIC,&texturePoolEntry.releaseTime);\
-	c->texturePool.push_back(texturePoolEntry);}
+	//The purpose of caching is also to avoid attempts to destroy resources that are currently used by the pipeline.
+	Texture * CreateTexture(uint, uint);
+	void ReleaseTexture(Texture *);
 
-	struct TexturePoolEntry{
+	struct TextureCacheEntry{
 		Texture *ptexture;
 		uint64 releaseTag;
 		struct timespec releaseTime;
 	};
-	std::vector<TexturePoolEntry> texturePool;
+	std::vector<TextureCacheEntry> textureCache;
+
+	VkDescriptorSet * CreateDescSets(const ShaderModule *);
+	void ReleaseDescSets(const ShaderModule *, VkDescriptorSet *);
+
+	struct DescSetCacheEntry{
+		VkDescriptorSet *pdescSets;
+		uint setCount;
+		uint64 releaseTag;
+	};
+	std::vector<DescSetCacheEntry> descSetCache;
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };

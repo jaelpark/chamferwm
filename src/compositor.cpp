@@ -72,17 +72,7 @@ void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
 ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
 	pcomp->updateQueue.push_back(this);
 
-	auto m = std::find_if(pcomp->texturePool.begin(),pcomp->texturePool.end(),[&](auto &r)->bool{
-		return r.ptexture->w == w && r.ptexture->h == h;
-	});
-	if(m != pcomp->texturePool.end()){
-		ptexture = (*m).ptexture;
-
-		std::iter_swap(m,pcomp->texturePool.end()-1);
-		pcomp->texturePool.pop_back();
-
-	}else ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
-
+	ptexture = pcomp->CreateTexture(w,h);
 	if(!AssignPipeline(pcomp->pdefaultPipeline))
 		throw Exception("Failed to assign a pipeline.");
 	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
@@ -93,32 +83,23 @@ ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_p
 }
 
 ClientFrame::~ClientFrame(){
-	delete_TEXTURE(ptexture,pcomp);
+	pcomp->ReleaseTexture(ptexture);
 
 	for(PipelineDescriptorSet &pipelineDescSet : descSets)
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
 			if(pipelineDescSet.pdescSets[i]){
-				vkFreeDescriptorSets(pcomp->logicalDev,pcomp->descPool,pipelineDescSet.p->pshaderModule[i]->setCount,pipelineDescSet.pdescSets[i]);
-				delete []pipelineDescSet.pdescSets[i];
+				/*vkFreeDescriptorSets(pcomp->logicalDev,pcomp->descPool,pipelineDescSet.p->pshaderModule[i]->setCount,pipelineDescSet.pdescSets[i]);
+				delete []pipelineDescSet.pdescSets[i];*/
+				pcomp->ReleaseDescSets(pipelineDescSet.p->pshaderModule[i],pipelineDescSet.pdescSets[i]);
 			}
 }
 
 void ClientFrame::AdjustSurface(uint w, uint h){
-	delete_TEXTURE(ptexture,pcomp);
+	pcomp->ReleaseTexture(ptexture);
 
 	pcomp->updateQueue.push_back(this);
 
-	auto m = std::find_if(pcomp->texturePool.begin(),pcomp->texturePool.end(),[&](auto &r)->bool{
-		return r.ptexture->w == w && r.ptexture->h == h;
-	});
-	if(m != pcomp->texturePool.end()){
-		ptexture = (*m).ptexture;
-
-		std::iter_swap(m,pcomp->texturePool.end()-1);
-		pcomp->texturePool.pop_back();
-
-	}else ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,pcomp);
-
+	ptexture = pcomp->CreateTexture(w,h);
 	//In this case updating the descriptor sets would be enough, but we can't do that because of them being used currently by frames in flight.
 	if(!AssignPipeline(passignedSet->p))
 		throw Exception("Failed to assign a pipeline.");
@@ -146,13 +127,16 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 			pipelineDescSet.pdescSets[i] = 0;
 			continue;
 		}
-		pipelineDescSet.pdescSets[i] = new VkDescriptorSet[prenderPipeline->pshaderModule[i]->setCount];
+		/*pipelineDescSet.pdescSets[i] = new VkDescriptorSet[prenderPipeline->pshaderModule[i]->setCount];
 		VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
 		descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		descSetAllocateInfo.descriptorPool = pcomp->descPool;
 		descSetAllocateInfo.pSetLayouts = prenderPipeline->pshaderModule[i]->pdescSetLayouts;
 		descSetAllocateInfo.descriptorSetCount = prenderPipeline->pshaderModule[i]->setCount;
 		if(vkAllocateDescriptorSets(pcomp->logicalDev,&descSetAllocateInfo,pipelineDescSet.pdescSets[i]) != VK_SUCCESS)
+			return false;*/
+		pipelineDescSet.pdescSets[i] = pcomp->CreateDescSets(prenderPipeline->pshaderModule[i]);
+		if(!pipelineDescSet.pdescSets[i])
 			return false;
 
 		totalSetCount += prenderPipeline->pshaderModule[i]->setCount;
@@ -164,7 +148,6 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 }
 
 void ClientFrame::UpdateDescSets(){
-	//wait idle?
 	//
 	VkDescriptorImageInfo descImageInfo = {};
 	descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -458,7 +441,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	
 	imageExtent = GetExtent();
 
-		//swap chain
+	//swap chain
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	swapchainCreateInfo.surface = surface;
@@ -627,8 +610,8 @@ void CompositorInterface::InitializeRenderEngine(){
 void CompositorInterface::DestroyRenderEngine(){
 	DebugPrintf(stdout,"Compositor cleanup\n");
 
-	for(TexturePoolEntry &texturePoolEntry : texturePool)
-		delete texturePoolEntry.ptexture;
+	for(TextureCacheEntry &textureCacheEntry : textureCache)
+		delete textureCacheEntry.ptexture;
 
 	pipelines.clear();
 	shaders.clear();
@@ -702,13 +685,20 @@ bool CompositorInterface::PollFrameFence(){
 	vkResetFences(logicalDev,1,&pfence[currentFrame]);
 
 	//release the textures no longer in use
-	texturePool.erase(std::remove_if(texturePool.begin(),texturePool.end(),[&](auto &texturePoolEntry)->bool{
-		if(frameTag < texturePoolEntry.releaseTag+swapChainImageCount+1 || timespec_diff(frameTime,texturePoolEntry.releaseTime) < 5.0f)
+	textureCache.erase(std::remove_if(textureCache.begin(),textureCache.end(),[&](auto &textureCacheEntry)->bool{
+		if(frameTag < textureCacheEntry.releaseTag+swapChainImageCount+1 || timespec_diff(frameTime,textureCacheEntry.releaseTime) < 5.0f)
 			return false;
-		delete texturePoolEntry.ptexture;
+		delete textureCacheEntry.ptexture;
 		return true;
-	}),texturePool.end());
+	}),textureCache.end());
 
+	descSetCache.erase(std::remove_if(descSetCache.begin(),descSetCache.end(),[&](auto &descSetCacheEntry)->bool{
+		if(frameTag < descSetCacheEntry.releaseTag+swapChainImageCount+1)
+			return false;
+		vkFreeDescriptorSets(logicalDev,descPool,descSetCacheEntry.setCount,descSetCacheEntry.pdescSets);
+		delete []descSetCacheEntry.pdescSets;
+		return true;
+	}),descSetCache.end());
 	return true;
 }
 
@@ -807,6 +797,58 @@ void CompositorInterface::Present(){
 	frameTag++;
 }
 
+Texture * CompositorInterface::CreateTexture(uint w, uint h){
+	Texture *ptexture;
+
+	auto m = std::find_if(textureCache.begin(),textureCache.end(),[&](auto &r)->bool{
+		return r.ptexture->w == w && r.ptexture->h == h;
+	});
+	if(m != textureCache.end()){
+		ptexture = (*m).ptexture;
+
+		std::iter_swap(m,textureCache.end()-1);
+		textureCache.pop_back();
+		printf("----------- found cached texture\n");
+
+	}else ptexture = new Texture(w,h,VK_FORMAT_R8G8B8A8_UNORM,this);
+
+	return ptexture;
+}
+
+void CompositorInterface::ReleaseTexture(Texture *ptexture){
+	TextureCacheEntry textureCacheEntry;
+	textureCacheEntry.ptexture = ptexture;
+	textureCacheEntry.releaseTag = frameTag;
+	clock_gettime(CLOCK_MONOTONIC,&textureCacheEntry.releaseTime);
+	
+	textureCache.push_back(textureCacheEntry); //->emplace_back
+}
+
+VkDescriptorSet * CompositorInterface::CreateDescSets(const ShaderModule *pshaderModule){
+	VkDescriptorSet *pdescSets = new VkDescriptorSet[pshaderModule->setCount];
+
+	VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
+	descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	descSetAllocateInfo.descriptorPool = descPool;
+	descSetAllocateInfo.pSetLayouts = pshaderModule->pdescSetLayouts;
+	descSetAllocateInfo.descriptorSetCount = pshaderModule->setCount;
+	if(vkAllocateDescriptorSets(logicalDev,&descSetAllocateInfo,pdescSets) != VK_SUCCESS){
+		delete []pdescSets;
+		return 0;
+	}
+	
+	return pdescSets;
+}
+
+void CompositorInterface::ReleaseDescSets(const ShaderModule *pshaderModule, VkDescriptorSet *pdescSets){
+	DescSetCacheEntry descSetCacheEntry;
+	descSetCacheEntry.pdescSets = pdescSets;
+	descSetCacheEntry.setCount = pshaderModule->setCount;
+	descSetCacheEntry.releaseTag = frameTag;
+
+	descSetCache.push_back(descSetCacheEntry);
+}
+
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){
 	DebugPrintf(stderr,"validation layer: %s\n",pmsg);
 	return VK_FALSE;
@@ -843,12 +885,12 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		DebugPrintf(stderr,"Failed to receive image reply.\n");
 		return;
 	}
-	//DebugPrintf(stdout,"format: %u\n",pimageReply->depth);
 
 	//http://doc.qt.io/qt-5/qimage.html
 	//argb can be swizzled (image view)
 
 	//--
+	//TODO: update only the regions given by the damage extension
 	unsigned char *pdata = (unsigned char *)ptexture->Map();
 
 	unsigned char *pchpixels = xcb_get_image_data(pimageReply);

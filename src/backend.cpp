@@ -434,6 +434,9 @@ void Debug::Start(){
 	launchKeycode = SymbolToKeycode(XK_space,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,0,launchKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+	closeKeycode = SymbolToKeycode(XK_X,psymbols);
+	xcb_grab_key(pcon,1,pscr->root,0,closeKeycode,
+		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	DefineBindings();
 
 	xcb_flush(pcon);
@@ -495,11 +498,18 @@ bool Debug::HandleEvent(){
 			if(pev->detail == launchKeycode){
 				//create test client
 				DebugClient::CreateInfo createInfo = {};
-				//createInfo.rect = (WManager::Rectangle){10,800,400,400};
 				createInfo.pbackend = this;
 				DebugClient *pclient = SetupClient(&createInfo);
 				clients.push_back(pclient);
 				DebugPrintf(stdout,"client created.\n");
+			}else
+			if(pev->detail == closeKeycode){
+				if(clients.size() == 0)
+					break;
+				DebugClient *pclient = clients.back();
+				DestroyClient(pclient);
+				
+				clients.pop_back();
 			}
 			}
 			break;

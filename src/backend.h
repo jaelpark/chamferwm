@@ -123,6 +123,7 @@ protected:
 private:
 	xcb_keycode_t exitKeycode;
 	xcb_keycode_t launchKeycode;
+	xcb_keycode_t closeKeycode;
 	std::vector<DebugClient *> clients;
 };
 
