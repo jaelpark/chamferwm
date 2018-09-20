@@ -878,14 +878,14 @@ X11ClientFrame::~X11ClientFrame(){
 }
 
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
-	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry_unchecked(pbackend->pcon,windowPixmap);
+	/*xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry_unchecked(pbackend->pcon,windowPixmap);
 	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 	if(!pgeometryReply){
 		DebugPrintf(stderr,"Failed to get pixmap geometry.\n");
 		return;
 	}
 	DebugPrintf(stdout,"---- rect: %ux%u, pixmap: %ux%u\n",rect.w,rect.h,pgeometryReply->width,pgeometryReply->height);
-	free(pgeometryReply);
+	free(pgeometryReply);*/
 
 	xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,windowPixmap,0,0,rect.w,rect.h,~0);
 	xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pbackend->pcon,imageCookie,0);
@@ -900,7 +900,13 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	unsigned char *pdata = (unsigned char *)ptexture->Map();
 
 	unsigned char *pchpixels = xcb_get_image_data(pimageReply);
-	memcpy(pdata,pchpixels,rect.w*rect.h*4);
+	//memcpy(pdata,pchpixels,rect.w*rect.h*4);
+	for(VkRect2D &rect1 : damageRegions){
+		for(uint y = rect1.offset.y, Y = y+rect1.extent.height; y < Y; ++y){
+			uint offset = 4*(rect.w*y+rect1.offset.x);
+			memcpy(pdata+offset,pchpixels+offset,4*rect1.extent.width);
+		}
+	}
 
 	ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
 	damageRegions.clear();

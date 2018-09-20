@@ -217,7 +217,8 @@ void Default::Start(){
 
 bool Default::HandleEvent(){
 	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
-	for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
+	//for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
+	for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
 		if(!pevent){
 			if(xcb_connection_has_error(pcon)){
 				DebugPrintf(stderr,"X server connection lost\n");
