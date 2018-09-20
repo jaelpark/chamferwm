@@ -65,8 +65,6 @@ void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 
 	pclientFrame->passignedSet->fenceTag = pclientFrame->pcomp->frameTag;
-
-	//pclientFrame->updateTime = pclientFrame->pcomp->frameTime;
 }
 
 ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
@@ -858,7 +856,7 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	//
 	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	//xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
-	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_AUTOMATIC);
+	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 
 	windowPixmap = xcb_generate_id(pbackend->pcon);
 	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
@@ -875,10 +873,20 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 X11ClientFrame::~X11ClientFrame(){
 	xcb_damage_destroy(pbackend->pcon,damage);
 	//
-	xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_AUTOMATIC);
+	xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
+	xcb_free_pixmap(pbackend->pcon,windowPixmap);
 }
 
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
+	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry_unchecked(pbackend->pcon,windowPixmap);
+	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
+	if(!pgeometryReply){
+		DebugPrintf(stderr,"Failed to get pixmap geometry.\n");
+		return;
+	}
+	DebugPrintf(stdout,"---- rect: %ux%u, pixmap: %ux%u\n",rect.w,rect.h,pgeometryReply->width,pgeometryReply->height);
+	free(pgeometryReply);
+
 	xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,windowPixmap,0,0,rect.w,rect.h,~0);
 	xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pbackend->pcon,imageCookie,0);
 	if(!pimageReply){
@@ -889,20 +897,22 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//http://doc.qt.io/qt-5/qimage.html
 	//argb can be swizzled (image view)
 
-	//--
-	//TODO: update only the regions given by the damage extension
 	unsigned char *pdata = (unsigned char *)ptexture->Map();
 
 	unsigned char *pchpixels = xcb_get_image_data(pimageReply);
 	memcpy(pdata,pchpixels,rect.w*rect.h*4);
 
-	ptexture->Unmap(pcommandBuffer);
+	ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
+	damageRegions.clear();
 
 	free(pimageReply);
 }
 
 void X11ClientFrame::AdjustSurface1(){
-	//
+	//TODO: should window be re-redirected?
+	xcb_free_pixmap(pbackend->pcon,windowPixmap);
+	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
+
 	AdjustSurface(rect.w,rect.h);
 }
 
@@ -996,12 +1006,16 @@ bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 			return true;
 		}
 
-		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pclient);
+		//ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pclient);
+		X11ClientFrame *pclientFrame = dynamic_cast<X11ClientFrame *>(pclient);
 		if(std::find(updateQueue.begin(),updateQueue.end(),pclientFrame) == updateQueue.end())
 			updateQueue.push_back(pclientFrame);
 
+		VkRect2D rect;
+		rect.offset = {pev->area.x,pev->area.y};
+		rect.extent = {pev->area.width,pev->area.height};
+		pclientFrame->damageRegions.push_back(rect);
 		DebugPrintf(stdout,"DAMAGE_EVENT, (%hd,%hd), (%hux%hu)\n",pev->area.x,pev->area.y,pev->area.width,pev->area.height);
-		//xcb_damage_subtract(pbackend->pcon,pev->damage,XCB_NONE,XCB_NONE);
 		
 		return true;
 	}
@@ -1056,7 +1070,10 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		((unsigned char*)pdata)[4*i+2] = color[2];
 		((unsigned char*)pdata)[4*i+3] = 255;
 	}
-	ptexture->Unmap(pcommandBuffer);
+	VkRect2D rect1;
+	rect1.offset = {0,0};
+	rect1.extent = {rect.w,rect.h};
+	ptexture->Unmap(pcommandBuffer,&rect1,1);
 }
 
 void X11DebugClientFrame::AdjustSurface1(){

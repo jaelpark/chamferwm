@@ -13,7 +13,7 @@ public:
 	Texture(uint, uint, VkFormat, const class CompositorInterface *pcomp);
 	~Texture();
 	const void * Map() const;
-	void Unmap(const VkCommandBuffer *);
+	void Unmap(const VkCommandBuffer *, const VkRect2D *, uint);
 
 	const class CompositorInterface *pcomp;
 	VkImage image;
@@ -26,6 +26,9 @@ public:
 
 	uint stagingMemorySize;
 	uint w, h;
+	uint formatIndex;
+
+	std::vector<VkBufferImageCopy> bufferImageCopyBuffer; //to avoid dynamic allocations each time texture is updated in multiple regions
 
 	static const std::vector<std::pair<VkFormat, uint>> formatSizeMap;
 };

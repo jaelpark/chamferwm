@@ -11,12 +11,16 @@
 namespace Compositor{
 
 Texture::Texture(uint _w, uint _h, VkFormat format, const CompositorInterface *_pcomp) : pcomp(_pcomp), imageLayout(VK_IMAGE_LAYOUT_UNDEFINED), w(_w), h(_h){
+	//
+	auto m = std::find_if(formatSizeMap.begin(),formatSizeMap.end(),[&](auto &r)->bool{
+		return r.first == format;
+	});
+	formatIndex = m-formatSizeMap.begin();
+
 	//staging buffer
 	VkBufferCreateInfo bufferCreateInfo = {};
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferCreateInfo.size = (*std::find_if(formatSizeMap.begin(),formatSizeMap.end(),[&](auto &r)->bool{
-		return r.first == format;
-	})).second*w*h;
+	bufferCreateInfo.size = (*m).second*w*h;
 	bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	if(vkCreateBuffer(pcomp->logicalDev,&bufferCreateInfo,0,&stagingBuffer) != VK_SUCCESS)
@@ -107,7 +111,7 @@ const void * Texture::Map() const{
 	return pdata;
 }
 
-void Texture::Unmap(const VkCommandBuffer *pcommandBuffer){
+void Texture::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prects, uint rectCount){
 	vkUnmapMemory(pcomp->logicalDev,stagingMemory);
 
 	VkImageSubresourceRange imageSubresourceRange = {};
@@ -129,7 +133,22 @@ void Texture::Unmap(const VkCommandBuffer *pcommandBuffer){
 		0,0,0,0,1,&imageMemoryBarrier);
 
 	//transfer "stage"
-	VkBufferImageCopy bufferImageCopy = {};
+	bufferImageCopyBuffer.reserve(rectCount);
+	for(uint i = 0; i < rectCount; ++i){
+		bufferImageCopyBuffer[i].imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		bufferImageCopyBuffer[i].imageSubresource.mipLevel = 0;
+		bufferImageCopyBuffer[i].imageSubresource.baseArrayLayer = 0;
+		bufferImageCopyBuffer[i].imageSubresource.layerCount = 1;
+		bufferImageCopyBuffer[i].imageExtent.width = prects[i].extent.width;//w/4; //w
+		bufferImageCopyBuffer[i].imageExtent.height = prects[i].extent.height;//h
+		bufferImageCopyBuffer[i].imageExtent.depth = 1;
+		bufferImageCopyBuffer[i].imageOffset = (VkOffset3D){prects[i].offset.x,prects[i].offset.y,0};//(VkOffset3D){w/4,0,0}; //x,y
+		bufferImageCopyBuffer[i].bufferOffset = (w*prects[i].offset.y+prects[i].offset.x)*formatSizeMap[formatIndex].second;//w/4*4; //(w*y+x)*format
+		bufferImageCopyBuffer[i].bufferRowLength = w;
+		bufferImageCopyBuffer[i].bufferImageHeight = h;
+	}
+	vkCmdCopyBufferToImage(*pcommandBuffer,stagingBuffer,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,rectCount,bufferImageCopyBuffer.data());
+	/*VkBufferImageCopy bufferImageCopy = {};
 	bufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	bufferImageCopy.imageSubresource.mipLevel = 0;
 	bufferImageCopy.imageSubresource.baseArrayLayer = 0;
@@ -141,7 +160,7 @@ void Texture::Unmap(const VkCommandBuffer *pcommandBuffer){
 	bufferImageCopy.bufferOffset = 0;//w/4*4; //(w*y+x)*format
 	bufferImageCopy.bufferRowLength = w;
 	bufferImageCopy.bufferImageHeight = h;
-	vkCmdCopyBufferToImage(*pcommandBuffer,stagingBuffer,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&bufferImageCopy);
+	vkCmdCopyBufferToImage(*pcommandBuffer,stagingBuffer,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&bufferImageCopy);*/
 
 	//create in transfer stage, use in fragment shader stage
 	imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;

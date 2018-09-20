@@ -63,8 +63,8 @@ protected:
 		const Pipeline *p;
 		VkDescriptorSet *pdescSets[Pipeline::SHADER_MODULE_COUNT];
 	};
-	std::vector<PipelineDescriptorSet> descSets;
 	PipelineDescriptorSet *passignedSet;
+	std::vector<PipelineDescriptorSet> descSets;
 	struct timespec creationTime;
 };
 
@@ -120,9 +120,7 @@ protected:
 	VkCommandBuffer *pcommandBuffers;
 	VkCommandBuffer *pcopyCommandBuffers;
 
-	//VkDescriptorSetLayout descSetLayout;
 	VkDescriptorPool descPool;
-	//VkDescriptorSet *pdescSets;
 
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;
@@ -183,6 +181,7 @@ public:
 	void AdjustSurface1();
 	xcb_pixmap_t windowPixmap;
 	xcb_damage_damage_t damage;
+	std::vector<VkRect2D> damageRegions;
 };
 
 //Default compositor assumes XCB for its surface

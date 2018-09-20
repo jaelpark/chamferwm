@@ -117,6 +117,7 @@ void X11Client::UpdateTranslation(){
 
 	uint values[4] = {rect.x,rect.y,rect.w,rect.h};
 	xcb_configure_window(pbackend->pcon,window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,values);
+	xcb_flush(pbackend->pcon);
 
 	AdjustSurface1(); //virtual function gets called only if the compositor client class has been initialized
 }
