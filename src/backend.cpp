@@ -81,6 +81,14 @@ BackendEvent::~BackendEvent(){
 	//
 }
 
+BackendKeyBinder::BackendKeyBinder(){
+	//
+}
+
+BackendKeyBinder::~BackendKeyBinder(){
+	//
+}
+
 BackendInterface::BackendInterface(){
 	//
 }
@@ -95,6 +103,25 @@ X11Event::X11Event(xcb_generic_event_t *_pevent, const X11Backend *_pbackend) : 
 
 X11Event::~X11Event(){
 	//
+}
+
+X11KeyBinder::X11KeyBinder(xcb_key_symbols_t *_psymbols, X11Backend *_pbackend) : BackendKeyBinder(), psymbols(_psymbols), pbackend(_pbackend){
+	//
+}
+
+X11KeyBinder::~X11KeyBinder(){
+	//
+}
+
+void X11KeyBinder::BindKey(uint symbol, uint mask, uint keyId){
+	xcb_keycode_t keycode = SymbolToKeycode(symbol,psymbols);
+	xcb_grab_key(pbackend->pcon,1,pbackend->pscr->root,mask,keycode,
+		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+	X11Backend::KeyBinding binding;
+	binding.keycode = keycode;
+	binding.mask = mask;
+	binding.keyId = keyId;
+	pbackend->keycodes.push_back(binding);
 }
 
 X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend){
@@ -117,6 +144,8 @@ void X11Client::UpdateTranslation(){
 
 	uint values[4] = {rect.x,rect.y,rect.w,rect.h};
 	xcb_configure_window(pbackend->pcon,window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,values);
+	xcb_set_input_focus(pbackend->pcon,XCB_INPUT_FOCUS_POINTER_ROOT,window,XCB_CURRENT_TIME);
+
 	xcb_flush(pbackend->pcon);
 
 	AdjustSurface1(); //virtual function gets called only if the compositor client class has been initialized
@@ -185,7 +214,9 @@ void Default::Start(){
 	launchKeycode = SymbolToKeycode(XK_space,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,launchKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-	DefineBindings();
+	
+	X11KeyBinder binder(psymbols,this);
+	DefineBindings(&binder); //TODO: an interface to define bindings? This is passed to config before calling SetupKeys
 
 	xcb_flush(pcon);
 
@@ -283,8 +314,6 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_KEY_PRESS:{
 			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
-			DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
-
 			if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
 				free(pevent);
 				return false;
@@ -294,13 +323,23 @@ bool Default::HandleEvent(){
 				//create test client
 				DebugPrintf(stdout,"Spawning test client...\n");
 				system("termite & >/tmp/chamferwm-test");
+			}else
+			for(KeyBinding &binding : keycodes){
+				if(pev->state == binding.mask && pev->detail == binding.keycode){
+					KeyPress(binding.keyId,true);
+					break;
+				}
 			}
 			}
 			break;
 		case XCB_KEY_RELEASE:{
 			xcb_key_release_event_t *pev = (xcb_key_release_event_t*)pevent;
-			//xcb_send_event(pcon,false,XCB_SEND_EVENT_DEST_ITEM_FOCUS,XCB_EVENT_MASK_NO_EVENT,(const char*)pev);
-			DebugPrintf(stdout,"release\n");
+			for(KeyBinding &binding : keycodes){
+				if(pev->state == binding.mask && pev->detail == binding.keycode){
+					KeyPress(binding.keyId,false);
+					break;
+				}
+			}
 			}
 			break;
 		case XCB_CONFIGURE_NOTIFY:{
@@ -310,7 +349,7 @@ bool Default::HandleEvent(){
 
 			pscr->width_in_pixels = pev->width;
 			pscr->height_in_pixels = pev->height;*/
-			DebugPrintf(stdout,"configure\n");
+			DebugPrintf(stdout,"configure to %ux%u\n",pev->width,pev->height);
 			}
 			break;
 		case XCB_MAPPING_NOTIFY:
@@ -439,7 +478,9 @@ void Debug::Start(){
 	closeKeycode = SymbolToKeycode(XK_X,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,0,closeKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-	DefineBindings();
+	
+	X11KeyBinder binder(psymbols,this);
+	DefineBindings(&binder);
 
 	xcb_flush(pcon);
 
@@ -491,8 +532,7 @@ bool Debug::HandleEvent(){
 			break;
 		case XCB_KEY_PRESS:{
 			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
-			DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
-
+			//DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
 			if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
 				free(pevent);
 				return false;
@@ -512,6 +552,22 @@ bool Debug::HandleEvent(){
 				DestroyClient(pclient);
 				
 				clients.pop_back();
+			}else
+			for(KeyBinding &binding : keycodes){
+				if(pev->state == binding.mask && pev->detail == binding.keycode){
+					KeyPress(binding.keyId,true);
+					break;
+				}
+			}
+			}
+			break;
+		case XCB_KEY_RELEASE:{
+			xcb_key_release_event_t *pev = (xcb_key_release_event_t*)pevent;
+			for(KeyBinding &binding : keycodes){
+				if(pev->state == binding.mask && pev->detail == binding.keycode){
+					KeyPress(binding.keyId,false);
+					break;
+				}
 			}
 			}
 			break;

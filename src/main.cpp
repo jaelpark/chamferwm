@@ -1,4 +1,5 @@
 #include "main.h"
+#include "config.h"
 #include "container.h"
 #include "backend.h"
 #include "CompositorResource.h"
@@ -154,7 +155,9 @@ public:
 		//
 	}
 
-	void DefineBindings(){
+	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
+		Config::KeyConfigInterface::pkeyConfigInt->SetKeyBinder(pkeyBinder);
+		Config::KeyConfigInterface::pkeyConfigInt->SetupKeys();
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
@@ -185,6 +188,12 @@ public:
 		const Backend::X11Event *pevent11 = dynamic_cast<const Backend::X11Event *>(pevent);
 		pcomp11->FilterEvent(pevent11);
 	}
+
+	void KeyPress(uint keyId, bool down){
+		if(down)
+			Config::KeyActionInterface::pkeyActionInt->OnKeyPress(keyId);
+		else Config::KeyActionInterface::pkeyActionInt->OnKeyRelease(keyId);
+	}
 };
 
 class DebugBackend : public Backend::Debug, public RunBackend{
@@ -201,13 +210,11 @@ public:
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		if(!pcomp11){
 			Backend::DebugClient *pclient = new Backend::DebugClient(pcontainer,pcreateInfo);
-			//pcontainer->Assign(pclient);
 			pcontainer->pclient = pclient;
 			return pclient;
 		}
 		Compositor::CompositorInterface *pcompInterface = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
 		Compositor::X11DebugClientFrame *pclientFrame = new Compositor::X11DebugClientFrame(pcontainer,pcreateInfo,pcompInterface);
-		//pcontainer->Assign(pclientFrame);
 		pcontainer->pclient = pclientFrame;
 		return pclientFrame;
 	}
@@ -218,12 +225,20 @@ public:
 		delete pclient;
 	}
 
-	void DefineBindings(){
+	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
+		Config::KeyConfigInterface::pkeyConfigInt->SetKeyBinder(pkeyBinder);
+		Config::KeyConfigInterface::pkeyConfigInt->SetupKeys();
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
 		//nothing to process
+	}
+
+	void KeyPress(uint keyId, bool down){
+		if(down)
+			Config::KeyActionInterface::pkeyActionInt->OnKeyPress(keyId);
+		else Config::KeyActionInterface::pkeyActionInt->OnKeyRelease(keyId);
 	}
 };
 
@@ -296,6 +311,8 @@ int main(sint argc, const char **pargv){
 	args::ArgumentParser parser("xwm - A compositing window manager","");
 	args::HelpFlag help(parser,"help","Display this help menu",{'h',"help"});
 
+	args::ValueFlag<std::string> configPath(parser,"path","Configuration Python script",{"config",'c'},"config.py");
+
 	args::Group group_backend(parser,"Backend",args::Group::Validators::DontCare);
 	args::Flag debugBackend(group_backend,"debugBackend","Create a test environment for the compositor engine without redirection. The application will not as a window manager.",{'d',"debug-backend"});
 
@@ -316,8 +333,11 @@ int main(sint argc, const char **pargv){
 		return 1;
 	}
 
-#define MAX_EVENTS 1024
-	/*struct epoll_event event1, events[MAX_EVENTS];
+	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
+	pconfigLoader->Run(configPath.Get().c_str(),"config.py");
+
+/*#define MAX_EVENTS 1024
+	struct epoll_event event1, events[MAX_EVENTS];
 	sint efd = epoll_create1(0);
 	if(efd == -1){
 		DebugPrintf(stderr,"epoll efd\n");
@@ -383,6 +403,7 @@ int main(sint argc, const char **pargv){
 	delete pcomp;
 	delete pbackend;
 	delete proot;
+	delete pconfigLoader;
 
 	return 0;
 }
