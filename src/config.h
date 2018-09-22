@@ -40,7 +40,7 @@ class BackendInterface{
 public:
 	BackendInterface();
 	~BackendInterface();
-	virtual void OnCreateClient();
+	virtual void OnCreateClient(WManager::Container *);
 	virtual void OnKeyPress(uint);
 	virtual void OnKeyRelease(uint);
 
@@ -54,7 +54,7 @@ public:
 	BackendProxy();
 	~BackendProxy();
 	//
-	void OnCreateClient();
+	void OnCreateClient(WManager::Container *);
 	void OnKeyPress(uint);
 	void OnKeyRelease(uint);
 };
@@ -74,12 +74,6 @@ public:
 	CompositorProxy();
 	~CompositorProxy();
 };
-
-/*class ContainerProxy : public WManager::Container{
-public:
-	ContainerProxy();
-	~ContainerProxy();
-};*/
 
 class Loader{
 public:

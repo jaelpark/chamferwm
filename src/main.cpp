@@ -163,18 +163,16 @@ public:
 
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
 		WManager::Container *pcontainer = new WManager::Container(proot);
-		Config::BackendInterface::pbackendInt->OnCreateClient();
-
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
-		if(!pcomp11){
-			Backend::X11Client *pclient11 = new Backend::X11Client(pcontainer,pcreateInfo);
-			pcontainer->pclient = pclient11;
-			return pclient11;
-		}
-		Compositor::CompositorInterface *pcompInterface = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
-		Compositor::X11ClientFrame *pclientFrame = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pcompInterface);
-		pcontainer->pclient = pclientFrame;
-		return pclientFrame;
+
+		Backend::X11Client *pclient11;
+		if(!pcomp11)
+			pclient11 = new Backend::X11Client(pcontainer,pcreateInfo);
+		else pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pcomp11);
+		pcontainer->pclient = pclient11;
+
+		Config::BackendInterface::pbackendInt->OnCreateClient(pcontainer);
+		return pclient11;
 	}
 
 	void DestroyClient(Backend::X11Client *pclient){
@@ -209,18 +207,15 @@ public:
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
 		WManager::Container *pcontainer = new WManager::Container(proot);
-		Config::BackendInterface::pbackendInt->OnCreateClient();
-
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
-		if(!pcomp11){
-			Backend::DebugClient *pclient = new Backend::DebugClient(pcontainer,pcreateInfo);
-			pcontainer->pclient = pclient;
-			return pclient;
-		}
-		Compositor::CompositorInterface *pcompInterface = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
-		Compositor::X11DebugClientFrame *pclientFrame = new Compositor::X11DebugClientFrame(pcontainer,pcreateInfo,pcompInterface);
-		pcontainer->pclient = pclientFrame;
-		return pclientFrame;
+		Backend::DebugClient *pclient;
+		if(!pcomp11)
+			pclient = new Backend::DebugClient(pcontainer,pcreateInfo);
+		else pclient = new Compositor::X11DebugClientFrame(pcontainer,pcreateInfo,pcomp11);
+		pcontainer->pclient = pclient;
+
+		Config::BackendInterface::pbackendInt->OnCreateClient(pcontainer);
+		return pclient;
 	}
 
 	void DestroyClient(Backend::DebugClient *pclient){

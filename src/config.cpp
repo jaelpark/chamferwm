@@ -58,7 +58,7 @@ BackendInterface::~BackendInterface(){
 	//
 }
 
-void BackendInterface::OnCreateClient(){
+void BackendInterface::OnCreateClient(WManager::Container *pcontainer){
 	//
 }
 
@@ -86,11 +86,11 @@ BackendProxy::~BackendProxy(){
 	//
 }
 
-void BackendProxy::OnCreateClient(){
+void BackendProxy::OnCreateClient(WManager::Container *pcontainer){
 	boost::python::override ovr = this->get_override("OnCreateClient");
 	if(ovr)
-		ovr();
-	else BackendInterface::OnCreateClient();
+		ovr(pcontainer);
+	else BackendInterface::OnCreateClient(pcontainer);
 }
 
 void BackendProxy::OnKeyPress(uint keyId){
@@ -161,13 +161,12 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::scope().attr("LAYOUT_STACKED") = uint(WManager::Container::LAYOUT_STACKED);
 	//boost::python::def("ShiftLayout",);
 
-	boost::python::scope().attr("FOCUS_RIGHT") = 0;
-	boost::python::scope().attr("FOCUS_LEFT") = 0;
-	boost::python::scope().attr("FOCUS_UP") = 0;
-	boost::python::scope().attr("FOCUS_DOWN") = 0;
-	boost::python::scope().attr("FOCUS_PARENT") = 0;
-	boost::python::scope().attr("FOCUS_CHILD") = 0;
-	//ShiftFocus
+	boost::python::class_<WManager::Container>("Container")
+		.def("GetNext",&WManager::Container::GetNext,boost::python::return_value_policy<boost::python::reference_existing_object>())
+		.def("GetPrev",&WManager::Container::GetPrev,boost::python::return_value_policy<boost::python::reference_existing_object>())
+		.def("GetParent",&WManager::Container::GetParent,boost::python::return_value_policy<boost::python::reference_existing_object>())
+		.def("GetFocus",&WManager::Container::GetFocus,boost::python::return_value_policy<boost::python::reference_existing_object>())
+		;
 }
 
 Loader::Loader(const char *pargv0){
