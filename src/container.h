@@ -33,12 +33,28 @@ public:
 	~Container();
 	void SetTranslation(glm::vec2, glm::vec2);
 	void Remove();
+	//Container * FindFocus();
+	Container * GetNext();
+	Container * GetPrev();
+	Container * GetParent();
+	Container * GetFocus();
+
+	//Stack order: pnext is always below the current one
+	enum LAYOUT{
+		LAYOUT_VSPLIT,
+		LAYOUT_HSPLIT,
+		//Title is rendered as tabs on the same row. Render titles inside a chamfered box.
+		//stack mode: render titles vertically to the left?
+		LAYOUT_STACKED,
+		LAYOUT_TABBED,
+	};
+	void SetLayout(LAYOUT);
 
 	Container *pParent;
 	Container *pch; //First children
 	Container *pnext; //Subsequent container in the parent container
 	Container *pfocus; //Focused child (or this in case no children)
-	Container *pPrevFocus; //Previously focused child (in case current focus is lost)
+	//Container *pPrevFocus; //Previously focused child (in case current focus is lost)
 	Client *pclient;
 
 	glm::vec2 scale;
@@ -50,17 +66,11 @@ public:
 	glm::vec2 e;
 
 	//uint borderWidth; //0.5x the space allocated between two windows
+	LAYOUT layout;
 
-	//Stack order: pnext is always below the current one
-	enum{
-		MODE_VSPLIT,
-		MODE_HSPLIT,
-		MODE_STACKED,
-	} mode;
 };
 
 }
-
 
 #endif
 

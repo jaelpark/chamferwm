@@ -13,6 +13,8 @@
 
 #include <X11/keysym.h>
 
+namespace Backend{
+
 /*inline uint GetModMask1(uint keysym, xcb_key_symbols_t *psymbols, xcb_get_modifier_mapping_reply_t *pmodmapReply){
 	xcb_keycode_t *pcodes = xcb_key_symbols_get_keycode(psymbols,keysym);
 	if(!pcodes)
@@ -59,19 +61,6 @@ static xcb_keycode_t SymbolToKeycode(xcb_keysym_t symbol, xcb_key_symbols_t *psy
 
 	return key;
 }
-
-/*static xcb_atom_t GetAtom(xcb_connection_t *pcon, const char *pname){
-	xcb_intern_atom_cookie_t atomCookie = xcb_intern_atom(pcon,0,strlen(pname),pname);
-	xcb_intern_atom_reply_t *patomReply = xcb_intern_atom_reply(pcon,atomCookie,0);
-	if(!patomReply)
-		return 0;
-	xcb_atom_t atom = patomReply->atom;
-	free(patomReply);
-
-	return atom;
-}*/
-
-namespace Backend{
 
 BackendEvent::BackendEvent(){
 	//
@@ -543,7 +532,6 @@ bool Debug::HandleEvent(){
 				createInfo.pbackend = this;
 				DebugClient *pclient = SetupClient(&createInfo);
 				clients.push_back(pclient);
-				DebugPrintf(stdout,"client created.\n");
 			}else
 			if(pev->detail == closeKeycode){
 				if(clients.size() == 0)

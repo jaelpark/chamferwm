@@ -50,50 +50,61 @@ void KeyConfigProxy::SetupKeys(){
 	else KeyConfigInterface::SetupKeys();
 }
 
-KeyActionInterface::KeyActionInterface(){
+BackendInterface::BackendInterface(){
 	//
 }
 
-KeyActionInterface::~KeyActionInterface(){
+BackendInterface::~BackendInterface(){
 	//
 }
 
-void KeyActionInterface::OnKeyPress(uint keyId){
+void BackendInterface::OnCreateClient(){
 	//
 }
 
-void KeyActionInterface::OnKeyRelease(uint keyId){
+void BackendInterface::OnKeyPress(uint keyId){
 	//
 }
 
-void KeyActionInterface::Bind(boost::python::object obj){
-	KeyActionInterface &keyActionInt1 = boost::python::extract<KeyActionInterface&>(obj)();
-	pkeyActionInt = &keyActionInt1;
-}
-
-KeyActionInterface KeyActionInterface::defaultInt;
-KeyActionInterface *KeyActionInterface::pkeyActionInt = &KeyActionInterface::defaultInt;
-
-KeyActionProxy::KeyActionProxy(){
+void BackendInterface::OnKeyRelease(uint keyId){
 	//
 }
 
-KeyActionProxy::~KeyActionProxy(){
+void BackendInterface::Bind(boost::python::object obj){
+	BackendInterface &backendInt1 = boost::python::extract<BackendInterface&>(obj)();
+	pbackendInt = &backendInt1;
+}
+
+BackendInterface BackendInterface::defaultInt;
+BackendInterface *BackendInterface::pbackendInt = &BackendInterface::defaultInt;
+
+BackendProxy::BackendProxy(){
 	//
 }
 
-void KeyActionProxy::OnKeyPress(uint keyId){
+BackendProxy::~BackendProxy(){
+	//
+}
+
+void BackendProxy::OnCreateClient(){
+	boost::python::override ovr = this->get_override("OnCreateClient");
+	if(ovr)
+		ovr();
+	else BackendInterface::OnCreateClient();
+}
+
+void BackendProxy::OnKeyPress(uint keyId){
 	boost::python::override ovr = this->get_override("OnKeyPress");
 	if(ovr)
 		ovr(keyId);
-	else KeyActionInterface::OnKeyPress(keyId);
+	else BackendInterface::OnKeyPress(keyId);
 }
 
-void KeyActionProxy::OnKeyRelease(uint keyId){
+void BackendProxy::OnKeyRelease(uint keyId){
 	boost::python::override ovr = this->get_override("OnKeyRelease");
 	if(ovr)
 		ovr(keyId);
-	else KeyActionInterface::OnKeyRelease(keyId);
+	else BackendInterface::OnKeyRelease(keyId);
 }
 
 CompositorInterface::CompositorInterface() : shaderPath("."){
@@ -134,15 +145,29 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("SetupKeys",&KeyConfigInterface::SetupKeys)
 		;
 	boost::python::def("bind_KeyConfig",KeyConfigInterface::Bind);
-	boost::python::class_<KeyActionProxy,boost::noncopyable>("KeyAction")
-		.def("OnKeyPress",&KeyActionInterface::OnKeyPress)
-		.def("OnKeyRelease",&KeyActionInterface::OnKeyRelease)
+	boost::python::class_<BackendProxy,boost::noncopyable>("Backend")
+		.def("OnCreateClient",&BackendInterface::OnCreateClient)
+		.def("OnKeyPress",&BackendInterface::OnKeyPress)
+		.def("OnKeyRelease",&BackendInterface::OnKeyRelease)
 		;
-	boost::python::def("bind_KeyAction",KeyActionInterface::Bind);
+	boost::python::def("bind_Backend",BackendInterface::Bind);
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")
 		.add_property("shaderPath",&CompositorInterface::shaderPath)
 		;
 	boost::python::def("bind_Compositor",CompositorInterface::Bind);
+
+	boost::python::scope().attr("LAYOUT_VSPLIT") = uint(WManager::Container::LAYOUT_VSPLIT);
+	boost::python::scope().attr("LAYOUT_HSPLIT") = uint(WManager::Container::LAYOUT_HSPLIT);
+	boost::python::scope().attr("LAYOUT_STACKED") = uint(WManager::Container::LAYOUT_STACKED);
+	//boost::python::def("ShiftLayout",);
+
+	boost::python::scope().attr("FOCUS_RIGHT") = 0;
+	boost::python::scope().attr("FOCUS_LEFT") = 0;
+	boost::python::scope().attr("FOCUS_UP") = 0;
+	boost::python::scope().attr("FOCUS_DOWN") = 0;
+	boost::python::scope().attr("FOCUS_PARENT") = 0;
+	boost::python::scope().attr("FOCUS_CHILD") = 0;
+	//ShiftFocus
 }
 
 Loader::Loader(const char *pargv0){
@@ -168,7 +193,6 @@ void Loader::Run(const char *pfilePath, const char *pfileLabel){
 		PyRun_SimpleFile(pf,pfileLabel);
 
 	}catch(boost::python::error_already_set &){
-		printf("failure\n");
 		boost::python::handle_exception();
 		PyErr_Clear();
 	}

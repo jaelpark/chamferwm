@@ -86,7 +86,7 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	const struct tm *pti = localtime(&rt);
 
 	char tbuf[256];
-	strftime(tbuf,sizeof(tbuf),"[xwm %F %T]",pti);
+	strftime(tbuf,sizeof(tbuf),"[chamferwm %F %T]",pti);
 	fprintf(pf,"%s ",tbuf);
 
 	va_list args;
@@ -163,6 +163,8 @@ public:
 
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
 		WManager::Container *pcontainer = new WManager::Container(proot);
+		Config::BackendInterface::pbackendInt->OnCreateClient();
+
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 		if(!pcomp11){
 			Backend::X11Client *pclient11 = new Backend::X11Client(pcontainer,pcreateInfo);
@@ -178,7 +180,7 @@ public:
 	void DestroyClient(Backend::X11Client *pclient){
 		pclient->pcontainer->Remove();
 		delete pclient->pcontainer;
-		delete pclient;
+
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
@@ -191,8 +193,8 @@ public:
 
 	void KeyPress(uint keyId, bool down){
 		if(down)
-			Config::KeyActionInterface::pkeyActionInt->OnKeyPress(keyId);
-		else Config::KeyActionInterface::pkeyActionInt->OnKeyRelease(keyId);
+			Config::BackendInterface::pbackendInt->OnKeyPress(keyId);
+		else Config::BackendInterface::pbackendInt->OnKeyRelease(keyId);
 	}
 };
 
@@ -207,6 +209,8 @@ public:
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
 		WManager::Container *pcontainer = new WManager::Container(proot);
+		Config::BackendInterface::pbackendInt->OnCreateClient();
+
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		if(!pcomp11){
 			Backend::DebugClient *pclient = new Backend::DebugClient(pcontainer,pcreateInfo);
@@ -237,8 +241,8 @@ public:
 
 	void KeyPress(uint keyId, bool down){
 		if(down)
-			Config::KeyActionInterface::pkeyActionInt->OnKeyPress(keyId);
-		else Config::KeyActionInterface::pkeyActionInt->OnKeyRelease(keyId);
+			Config::BackendInterface::pbackendInt->OnKeyPress(keyId);
+		else Config::BackendInterface::pbackendInt->OnKeyRelease(keyId);
 	}
 };
 
@@ -308,7 +312,7 @@ public:
 };
 
 int main(sint argc, const char **pargv){	
-	args::ArgumentParser parser("xwm - A compositing window manager","");
+	args::ArgumentParser parser("chamferwm - A compositing window manager","");
 	args::HelpFlag help(parser,"help","Display this help menu",{'h',"help"});
 
 	args::ValueFlag<std::string> configPath(parser,"path","Configuration Python script",{"config",'c'},"config.py");
@@ -345,6 +349,7 @@ int main(sint argc, const char **pargv){
 	}*/
 
 	WManager::Container *proot = new WManager::Container();
+	//WManager::Container *pfocus = proot;
 
 	RunBackend *pbackend;
 	try{
