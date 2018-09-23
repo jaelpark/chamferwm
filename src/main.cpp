@@ -177,8 +177,9 @@ public:
 
 	void DestroyClient(Backend::X11Client *pclient){
 		pclient->pcontainer->Remove();
+		//Config::BackendInterface::SetFocus(pclient->pcontainer->pPrevFocus);
 		delete pclient->pcontainer;
-
+		delete pclient;
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
@@ -214,12 +215,14 @@ public:
 		else pclient = new Compositor::X11DebugClientFrame(pcontainer,pcreateInfo,pcomp11);
 		pcontainer->pclient = pclient;
 
+		printf("create: %x\n",pcontainer);
 		Config::BackendInterface::pbackendInt->OnCreateClient(pcontainer);
 		return pclient;
 	}
 
 	void DestroyClient(Backend::DebugClient *pclient){
 		pclient->pcontainer->Remove();
+		//Config::BackendInterface::SetFocus(pclient->pcontainer->pPrevFocus);
 		delete pclient->pcontainer;
 		delete pclient;
 	}
@@ -332,9 +335,6 @@ int main(sint argc, const char **pargv){
 		return 1;
 	}
 
-	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
-	pconfigLoader->Run(configPath.Get().c_str(),"config.py");
-
 /*#define MAX_EVENTS 1024
 	struct epoll_event event1, events[MAX_EVENTS];
 	sint efd = epoll_create1(0);
@@ -344,7 +344,11 @@ int main(sint argc, const char **pargv){
 	}*/
 
 	WManager::Container *proot = new WManager::Container();
-	//WManager::Container *pfocus = proot;
+	printf("root: %x\n",proot);
+	Config::BackendInterface::pfocus = proot;
+
+	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
+	pconfigLoader->Run(configPath.Get().c_str(),"config.py");
 
 	RunBackend *pbackend;
 	try{

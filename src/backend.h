@@ -74,6 +74,7 @@ public:
 	~X11Client();
 	virtual void AdjustSurface1(){};
 	void UpdateTranslation();
+	void Focus();
 	//virtual void UpdateCompositor();
 	xcb_window_t window;
 	const X11Backend *pbackend;
@@ -131,6 +132,7 @@ public:
 	~DebugClient();
 	virtual void AdjustSurface1(){};
 	void UpdateTranslation();
+	void Focus();
 	const X11Backend *pbackend;
 };
 

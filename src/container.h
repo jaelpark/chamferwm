@@ -18,6 +18,7 @@ public:
 	//
 	//virtual functions for the backend implementation
 	virtual void UpdateTranslation() = 0;
+	virtual void Focus() = 0;
 	//Resize
 	//SetLayer
 	//virtual Rectangle GetRect() const = 0;
@@ -34,6 +35,7 @@ public:
 	void SetTranslation(glm::vec2, glm::vec2);
 	void Remove();
 	//Container * FindFocus();
+	void Focus();
 	Container * GetNext();
 	Container * GetPrev();
 	Container * GetParent();
@@ -54,7 +56,7 @@ public:
 	Container *pch; //First children
 	Container *pnext; //Subsequent container in the parent container
 	Container *pfocus; //Focused child (or this in case no children)
-	//Container *pPrevFocus; //Previously focused child (in case current focus is lost)
+	Container *pPrevFocus; //Previously focused child (in case current focus is lost, e.g container removed)
 	Client *pclient;
 
 	glm::vec2 scale;

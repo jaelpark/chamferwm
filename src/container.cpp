@@ -12,7 +12,7 @@ Client::~Client(){
 }
 
 Container::Container() : pParent(0), pch(0), pnext(0),
-	pfocus(this),// pPrevFocus(this),
+	pfocus(this), pPrevFocus(this),
 	pclient(0),
 	scale(1.0f), p(0.0f), e(1.0f),
 	layout(LAYOUT_VSPLIT){
@@ -20,7 +20,7 @@ Container::Container() : pParent(0), pch(0), pnext(0),
 }
 
 Container::Container(Container *pParent) : pch(0), pnext(0),
-	pfocus(0),// pPrevFocus(this),
+	pfocus(0), pPrevFocus(0),
 	pclient(0),
 	scale(1.0f),
 	layout(LAYOUT_VSPLIT){
@@ -30,7 +30,6 @@ Container::Container(Container *pParent) : pch(0), pnext(0),
 		pn = &(*pn)->pnext;
 	*pn = this;
 	this->pParent = pParent;
-	pParent->pfocus = this;
 
 	//If parent has a client, this container is a result of a new split.
 	//Move the client to this new container.
@@ -44,7 +43,13 @@ Container::Container(Container *pParent) : pch(0), pnext(0),
 	pParent->SetTranslation(pParent->p,pParent->e);
 }
 
+Container::~Container(){
+	//
+}
+
 void Container::Remove(){
+	if(pParent->pfocus == this)
+		pParent->pfocus = pPrevFocus;
 	for(Container *pcontainer = pParent->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
 		if(pcontainer == this){
 			if(pPrev)
@@ -52,23 +57,39 @@ void Container::Remove(){
 			else pParent->pch = pcontainer->pnext;
 			break;
 		}
+	for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
+		if(pcontainer->pPrevFocus == this)
+			pcontainer->pPrevFocus = pPrevFocus;
 	
 	pParent->SetTranslation(pParent->p,pParent->e);
 }
 
-/*Container * Container::FindFocus(){
-	if(!pfocus)
-		return this;
-	return pfocus->FindFocus();
-}*/
+void Container::Focus(){
+	if(!pParent)
+		return;
+	pPrevFocus = pParent->pfocus;
+	for(Container *pcontainer = pParent, *pchild = this; pcontainer != 0; pchild = pcontainer, pcontainer = pcontainer->pParent)
+		pcontainer->pfocus = pchild;
+	if(pclient)
+		pclient->Focus();
+}
 
 Container * Container::GetNext(){
+	if(!pParent)
+		return 0; //root container
+	if(!pnext)
+		return pParent->pch;
 	return pnext;
 }
 
 Container * Container::GetPrev(){
+	printf("getPrev: %x\n",this);
+	if(!pParent)
+		return 0; //root container
 	Container *pcontainer = pParent->pch;
-	for(; pcontainer->pnext != this; pcontainer = pcontainer->pnext);
+	if(pcontainer == this)
+		for(; pcontainer->pnext; pcontainer = pcontainer->pnext);
+	else for(; pcontainer->pnext != this; pcontainer = pcontainer->pnext);
 	return pcontainer;
 }
 
@@ -83,10 +104,6 @@ Container * Container::GetFocus(){
 void Container::SetLayout(LAYOUT layout){
 	this->layout = layout;
 	pParent->SetTranslation(pParent->p,pParent->e);
-}
-
-Container::~Container(){
-	//
 }
 
 void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
@@ -113,10 +130,8 @@ void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
 
 	this->p = p;
 	this->e = e;
-	if(pclient){
+	if(pclient)
 		pclient->UpdateTranslation();
-		printf("pclient->UpdateTranslation()\n");
-	}
 }
 
 }

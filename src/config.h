@@ -45,8 +45,13 @@ public:
 	virtual void OnKeyRelease(uint);
 
 	static void Bind(boost::python::object);
+	//static void SetFocus(boost::python::object);
+	static void SetFocus(WManager::Container *);
+	//static boost::python::object GetFocus();
+	static WManager::Container * GetFocus();
 	static BackendInterface defaultInt;
 	static BackendInterface *pbackendInt;
+	static WManager::Container *pfocus; //client focus, managed by Python
 };
 
 class BackendProxy : public BackendInterface, public boost::python::wrapper<BackendInterface>{

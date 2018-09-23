@@ -120,7 +120,6 @@ X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateI
 	UpdateTranslation();
 
 	xcb_map_window(pbackend->pcon,window);
-	xcb_set_input_focus(pbackend->pcon,XCB_INPUT_FOCUS_POINTER_ROOT,window,XCB_CURRENT_TIME);
 }
 
 X11Client::~X11Client(){
@@ -138,6 +137,12 @@ void X11Client::UpdateTranslation(){
 	xcb_flush(pbackend->pcon);
 
 	AdjustSurface1(); //virtual function gets called only if the compositor client class has been initialized
+}
+
+void X11Client::Focus(){
+	xcb_set_input_focus(pbackend->pcon,XCB_INPUT_FOCUS_POINTER_ROOT,window,XCB_CURRENT_TIME);
+
+	xcb_flush(pbackend->pcon);
 }
 
 X11Backend::X11Backend(){
@@ -413,7 +418,6 @@ DebugClient::~DebugClient(){
 }
 
 void DebugClient::UpdateTranslation(){
-	printf("UpdateTranslation()\n");
 	xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,pbackend->window);
 	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 	if(!pgeometryReply)
@@ -427,6 +431,11 @@ void DebugClient::UpdateTranslation(){
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
 
 	AdjustSurface1();
+}
+
+void DebugClient::Focus(){
+	//
+	printf("--- setting focus [%x]\n",this);
 }
 
 Debug::Debug() : X11Backend(){
@@ -462,10 +471,10 @@ void Debug::Start(){
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	launchKeycode = SymbolToKeycode(XK_space,psymbols);
-	xcb_grab_key(pcon,1,pscr->root,0,launchKeycode,
+	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_SHIFT,launchKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	closeKeycode = SymbolToKeycode(XK_X,psymbols);
-	xcb_grab_key(pcon,1,pscr->root,0,closeKeycode,
+	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_SHIFT,closeKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	
 	X11KeyBinder binder(psymbols,this);
