@@ -67,7 +67,8 @@ public:
 	glm::vec2 p;
 	glm::vec2 e;
 
-	//uint borderWidth; //0.5x the space allocated between two windows
+	glm::vec2 borderWidth;
+
 	LAYOUT layout;
 
 };

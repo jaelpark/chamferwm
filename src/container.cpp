@@ -14,24 +14,28 @@ Client::~Client(){
 }
 
 Container::Container() : pParent(0), pch(0), pnext(0),
-	//pfocus(this),// pPrevFocus(this),
 	pclient(0),
-	scale(1.0f), p(0.0f), e(1.0f),
+	scale(1.0f), p(0.0f), e(1.0f), borderWidth(0.0f),
 	layout(LAYOUT_VSPLIT){
 	//
 }
 
-Container::Container(Container *pParent) : pch(0), pnext(0),
-	//pfocus(0),// pPrevFocus(0),
+Container::Container(Container *_pParent) : pParent(_pParent), pch(0), pnext(0),
 	pclient(0),
-	scale(1.0f),
+	scale(1.0f), borderWidth(0.0f),
 	layout(LAYOUT_VSPLIT){
+	
+	if(pParent->focusQueue.size() > 0){
+		Container *pfocus = pParent->focusQueue.back();
+		pnext = pfocus->pnext;
+		pfocus->pnext = this;
 
-	Container **pn = &pParent->pch;
-	while(*pn)
-		pn = &(*pn)->pnext;
-	*pn = this;
-	this->pParent = pParent;
+	}else{
+		Container **pn = &pParent->pch;
+		while(*pn)
+			pn = &(*pn)->pnext;
+		*pn = this;
+	}
 
 	//If parent has a client, this container is a result of a new split.
 	//Move the client to this new container.
@@ -50,8 +54,6 @@ Container::~Container(){
 }
 
 void Container::Remove(){
-	//if(pParent->pfocus == this)
-	//	pParent->pfocus = 0;
 	if(pParent)
 		pParent->focusQueue.erase(std::remove(pParent->focusQueue.begin(),pParent->focusQueue.end(),this),pParent->focusQueue.end());
 	for(Container *pcontainer = pParent->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
@@ -66,8 +68,10 @@ void Container::Remove(){
 }
 
 void Container::Focus(){
-	if(pParent)
+	if(pParent){
+		pParent->focusQueue.erase(std::remove(pParent->focusQueue.begin(),pParent->focusQueue.end(),this),pParent->focusQueue.end());
 		pParent->focusQueue.push_back(this);
+	}
 	if(pclient)
 		pclient->Focus();
 }
@@ -95,7 +99,6 @@ Container * Container::GetParent(){
 }
 
 Container * Container::GetFocus(){
-	//return pfocus;
 	return focusQueue.size() > 0?focusQueue.back():0;
 }
 
@@ -110,6 +113,9 @@ void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
 
 	glm::vec2 position(0.0f);
 	for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
+		//TODO: +borderWidth. Aspect can be calculated by the user script
+		//dynamic border width according to container size?
+		//Border width is only added if a client is present.
 		glm::vec2 e1 = e;
 		glm::vec2 p1 = position;
 		switch(layout){
