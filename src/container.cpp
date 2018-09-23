@@ -101,7 +101,7 @@ Container * Container::GetFocus(){
 
 void Container::SetLayout(LAYOUT layout){
 	this->layout = layout;
-	pParent->SetTranslation(pParent->p,pParent->e);
+	SetTranslation(p,e);
 }
 
 void Container::SetTranslation(glm::vec2 p, glm::vec2 e){

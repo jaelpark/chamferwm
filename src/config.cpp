@@ -205,6 +205,8 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("GetPrev",&WManager::Container::GetPrev,boost::python::return_value_policy<boost::python::reference_existing_object>())
 		.def("GetParent",&WManager::Container::GetParent,boost::python::return_value_policy<boost::python::reference_existing_object>())
 		.def("GetFocus",&WManager::Container::GetFocus,boost::python::return_value_policy<boost::python::reference_existing_object>())
+
+		.def("ShiftLayout",&WManager::Container::SetLayout)
 		//.def("GetNext",&WManager::Container::GetNext,boost::python::return_internal_reference<>())
 		////.def("GetNext",&ClientProxy::GetNext,boost::python::return_internal_reference<>())
 		//.def("GetPrev",&WManager::Container::GetPrev,boost::python::return_internal_reference<>())
