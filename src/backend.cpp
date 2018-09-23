@@ -435,7 +435,7 @@ void DebugClient::UpdateTranslation(){
 
 void DebugClient::Focus(){
 	//
-	printf("--- setting focus [%x]\n",this);
+	DebugPrintf(stdout,"Setting focus [%x]\n",this);
 }
 
 Debug::Debug() : X11Backend(){

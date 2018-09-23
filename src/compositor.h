@@ -3,7 +3,6 @@
 
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_xcb.h>
-#include <vector>
 
 #include <xcb/composite.h>
 #include <xcb/damage.h>

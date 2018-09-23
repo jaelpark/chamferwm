@@ -179,7 +179,8 @@ public:
 
 	void DestroyClient(Backend::X11Client *pclient){
 		pclient->pcontainer->Remove();
-		//Config::BackendInterface::SetFocus(pclient->pcontainer->pPrevFocus);
+		if(pclient->pcontainer->pParent->focusQueue.size() > 0)
+			Config::BackendInterface::SetFocus(pclient->pcontainer->pParent->focusQueue.back());
 		delete pclient->pcontainer;
 		delete pclient;
 	}
@@ -225,7 +226,8 @@ public:
 
 	void DestroyClient(Backend::DebugClient *pclient){
 		pclient->pcontainer->Remove();
-		//Config::BackendInterface::SetFocus(pclient->pcontainer->pPrevFocus);
+		if(pclient->pcontainer->pParent->focusQueue.size() > 0)
+			Config::BackendInterface::SetFocus(pclient->pcontainer->pParent->focusQueue.back());
 		delete pclient->pcontainer;
 		delete pclient;
 	}

@@ -55,8 +55,8 @@ public:
 	Container *pParent;
 	Container *pch; //First children
 	Container *pnext; //Subsequent container in the parent container
-	Container *pfocus; //Focused child (or this in case no children)
-	Container *pPrevFocus; //Previously focused child (in case current focus is lost, e.g container removed)
+	std::deque<Container *> focusQueue;
+
 	Client *pclient;
 
 	glm::vec2 scale;

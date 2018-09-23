@@ -1,7 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include "main.h"
 #include <boost/python.hpp>
 
 namespace Backend{

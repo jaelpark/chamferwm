@@ -3,7 +3,6 @@
 
 #include <xcb/xproto.h>
 #include <xcb/xcb_keysyms.h>
-#include <vector> //client list
 
 namespace Compositor{
 //declarations for friend classes

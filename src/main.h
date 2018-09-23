@@ -6,6 +6,9 @@
 #include <time.h>
 #include <glm/glm.hpp>
 
+#include <vector>
+#include <deque>
+
 typedef unsigned int uint;
 typedef int sint;
 
