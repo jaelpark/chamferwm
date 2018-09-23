@@ -50,6 +50,22 @@ void KeyConfigProxy::SetupKeys(){
 	else KeyConfigInterface::SetupKeys();
 }
 
+ClientProxy::ClientProxy() : pcontainer(0){
+	//
+}
+
+ClientProxy::ClientProxy(WManager::Container *_pcontainer) : pcontainer(_pcontainer){
+	//
+}
+
+ClientProxy::~ClientProxy(){
+	//
+}
+
+WManager::Container * ClientProxy::GetContainer() const{
+	return pcontainer;
+}
+
 BackendInterface::BackendInterface(){
 	//
 }
@@ -58,7 +74,8 @@ BackendInterface::~BackendInterface(){
 	//
 }
 
-void BackendInterface::OnCreateClient(WManager::Container *pcontainer){
+//void BackendInterface::OnCreateClient(WManager::Container *pcontainer){
+void BackendInterface::OnCreateClient(const ClientProxy &client){
 	//
 }
 
@@ -75,10 +92,7 @@ void BackendInterface::Bind(boost::python::object obj){
 	pbackendInt = &backendInt1;
 }
 
-//void BackendInterface::SetFocus(boost::python::object obj){
 void BackendInterface::SetFocus(WManager::Container *pcontainer){
-	//WManager::Container *pcontainer = &boost::python::extract<WManager::Container&>(obj)();
-	printf("SetFocus: %x\n",pcontainer);
 	if(!pcontainer)
 		return;
 	pcontainer->Focus();
@@ -86,14 +100,7 @@ void BackendInterface::SetFocus(WManager::Container *pcontainer){
 }
 
 WManager::Container * BackendInterface::GetFocus(){
-	printf("GetFocus: %x\n",pfocus);
 	return pfocus;
-//boost::python::object BackendInterface::GetFocus(){
-	//printf("GetFocus: %x\n",pfocus);
-	//return boost::python::object(pfocus);
-	/*typename boost::python::reference_existing_object::apply<WManager::Container*>::type converter;
-	boost::python::handle handle(converter(pfocus));
-	return boost::python::object(handle);*/
 }
 
 BackendInterface BackendInterface::defaultInt;
@@ -108,16 +115,17 @@ BackendProxy::~BackendProxy(){
 	//
 }
 
-void BackendProxy::OnCreateClient(WManager::Container *pcontainer){
+void BackendProxy::OnCreateClient(const ClientProxy &client){
 	boost::python::override ovr = this->get_override("OnCreateClient");
 	if(ovr){
-		ovr(pcontainer);
+		ovr(client);
+		//ovr(pcontainer);
 		//ovr.operator()<boost::python::return_value_policy::reference>(pcontainer).cast<WManager::Container*>();
 		/*typename boost::python::reference_existing_object::apply<WManager::Container*>::type converter;
 		boost::python::handle handle(converter(pfocus));
 		ovr(boost::python::object(handle));*/
-	}
-	else BackendInterface::OnCreateClient(pcontainer);
+	}else BackendInterface::OnCreateClient(client);
+	//}else BackendInterface::OnCreateClient(pcontainer);
 }
 
 void BackendProxy::OnKeyPress(uint keyId){
@@ -188,22 +196,24 @@ BOOST_PYTHON_MODULE(chamfer){
 		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT)
 		.value("STACKED",WManager::Container::LAYOUT_STACKED)
 		.value("TABBED",WManager::Container::LAYOUT_TABBED);
+	
+	boost::python::class_<ClientProxy>("Client")
+		.def("GetContainer",&ClientProxy::GetContainer,boost::python::return_value_policy<boost::python::reference_existing_object>());
 
 	boost::python::class_<WManager::Container>("Container",boost::python::no_init)
-		//.def("GetNext",&WManager::Container::GetNext,boost::python::return_value_policy<boost::python::reference_existing_object>())
-		//.def("GetPrev",&WManager::Container::GetPrev,boost::python::return_value_policy<boost::python::reference_existing_object>())
-		//.def("GetParent",&WManager::Container::GetParent,boost::python::return_value_policy<boost::python::reference_existing_object>())
-		//.def("GetFocus",&WManager::Container::GetFocus,boost::python::return_value_policy<boost::python::reference_existing_object>())
-		.def("GetNext",&WManager::Container::GetNext,boost::python::return_internal_reference<>())
-		.def("GetPrev",&WManager::Container::GetPrev,boost::python::return_internal_reference<>())
-		.def("GetParent",&WManager::Container::GetParent,boost::python::return_internal_reference<>())
-		.def("GetFocus",&WManager::Container::GetFocus,boost::python::return_internal_reference<>())
+		.def("GetNext",&WManager::Container::GetNext,boost::python::return_value_policy<boost::python::reference_existing_object>())
+		.def("GetPrev",&WManager::Container::GetPrev,boost::python::return_value_policy<boost::python::reference_existing_object>())
+		.def("GetParent",&WManager::Container::GetParent,boost::python::return_value_policy<boost::python::reference_existing_object>())
+		.def("GetFocus",&WManager::Container::GetFocus,boost::python::return_value_policy<boost::python::reference_existing_object>())
+		//.def("GetNext",&WManager::Container::GetNext,boost::python::return_internal_reference<>())
+		////.def("GetNext",&ClientProxy::GetNext,boost::python::return_internal_reference<>())
+		//.def("GetPrev",&WManager::Container::GetPrev,boost::python::return_internal_reference<>())
+		//.def("GetParent",&WManager::Container::GetParent,boost::python::return_internal_reference<>())
+		//.def("GetFocus",&WManager::Container::GetFocus,boost::python::return_internal_reference<>())
 		.def_readonly("layout",&WManager::Container::layout)
 		;
 	
-	//boost::python::def("GetFocus",&BackendInterface::GetFocus,boost::python::return_value_policy<boost::python::reference_existing_object>());
-	boost::python::def("GetFocus",&BackendInterface::GetFocus,boost::python::return_internal_reference<>());
-	//boost::python::def("GetFocus",&BackendInterface::GetFocus);
+	boost::python::def("GetFocus",&BackendInterface::GetFocus,boost::python::return_value_policy<boost::python::reference_existing_object>());
 	boost::python::def("SetFocus",&BackendInterface::SetFocus);
 }
 

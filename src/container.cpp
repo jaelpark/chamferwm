@@ -48,8 +48,10 @@ Container::~Container(){
 }
 
 void Container::Remove(){
-	if(pParent->pfocus == this)
+	if(pParent->pfocus == this){
+		printf("switching focus to previous\n");
 		pParent->pfocus = pPrevFocus;
+	}
 	for(Container *pcontainer = pParent->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
 		if(pcontainer == this){
 			if(pPrev)
@@ -83,7 +85,6 @@ Container * Container::GetNext(){
 }
 
 Container * Container::GetPrev(){
-	printf("getPrev: %x\n",this);
 	if(!pParent)
 		return 0; //root container
 	Container *pcontainer = pParent->pch;

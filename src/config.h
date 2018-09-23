@@ -36,19 +36,27 @@ public:
 	void SetupKeys();
 };
 
+class ClientProxy{
+public:
+	ClientProxy();
+	ClientProxy(WManager::Container *);
+	~ClientProxy();
+	WManager::Container * GetContainer() const;
+	WManager::Container *pcontainer;
+};
+
 class BackendInterface{
 public:
 	BackendInterface();
 	~BackendInterface();
-	virtual void OnCreateClient(WManager::Container *);
+	virtual void OnCreateClient(const ClientProxy &);
 	virtual void OnKeyPress(uint);
 	virtual void OnKeyRelease(uint);
 
 	static void Bind(boost::python::object);
-	//static void SetFocus(boost::python::object);
 	static void SetFocus(WManager::Container *);
-	//static boost::python::object GetFocus();
 	static WManager::Container * GetFocus();
+
 	static BackendInterface defaultInt;
 	static BackendInterface *pbackendInt;
 	static WManager::Container *pfocus; //client focus, managed by Python
@@ -59,7 +67,8 @@ public:
 	BackendProxy();
 	~BackendProxy();
 	//
-	void OnCreateClient(WManager::Container *);
+	//void OnCreateClient(WManager::Container *);
+	void OnCreateClient(const ClientProxy &);
 	void OnKeyPress(uint);
 	void OnKeyRelease(uint);
 };
@@ -69,6 +78,8 @@ public:
 	CompositorInterface();
 	~CompositorInterface();
 	std::string shaderPath;
+	//virtual void SetupShaders();
+
 	static void Bind(boost::python::object);
 	static CompositorInterface defaultInt;
 	static CompositorInterface *pcompositorInt;

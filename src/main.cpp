@@ -171,7 +171,9 @@ public:
 		else pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pcomp11);
 		pcontainer->pclient = pclient11;
 
-		Config::BackendInterface::pbackendInt->OnCreateClient(pcontainer);
+		Config::ClientProxy client(pcontainer);
+		Config::BackendInterface::pbackendInt->OnCreateClient(client);
+
 		return pclient11;
 	}
 
@@ -215,8 +217,9 @@ public:
 		else pclient = new Compositor::X11DebugClientFrame(pcontainer,pcreateInfo,pcomp11);
 		pcontainer->pclient = pclient;
 
-		printf("create: %x\n",pcontainer);
-		Config::BackendInterface::pbackendInt->OnCreateClient(pcontainer);
+		Config::ClientProxy client(pcontainer);
+		Config::BackendInterface::pbackendInt->OnCreateClient(client);
+
 		return pclient;
 	}
 
