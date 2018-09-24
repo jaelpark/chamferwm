@@ -5,6 +5,7 @@
 
 namespace Backend{
 class BackendKeyBinder;
+class X11KeyBinder;
 }
 
 namespace WManager{
@@ -12,28 +13,6 @@ class Container;
 }
 
 namespace Config{
-
-class KeyConfigInterface{
-public:
-	KeyConfigInterface();
-	~KeyConfigInterface();
-	void SetKeyBinder(class Backend::BackendKeyBinder *);
-	virtual void SetupKeys();
-	Backend::BackendKeyBinder *pkeyBinder;
-
-	static void Bind(boost::python::object);
-	static KeyConfigInterface defaultInt;
-	static KeyConfigInterface *pkeyConfigInt;
-};
-
-class KeyConfigProxy : public KeyConfigInterface, public boost::python::wrapper<KeyConfigInterface>{
-public:
-	KeyConfigProxy();
-	~KeyConfigProxy();
-	void BindKey(uint, uint, uint);
-	//
-	void SetupKeys();
-};
 
 class ClientProxy{
 public:
@@ -48,6 +27,7 @@ class BackendInterface{
 public:
 	BackendInterface();
 	~BackendInterface();
+	virtual void SetupKeys(Backend::X11KeyBinder *);
 	virtual void OnCreateClient(const ClientProxy &);
 	virtual void OnKeyPress(uint);
 	virtual void OnKeyRelease(uint);
@@ -66,7 +46,7 @@ public:
 	BackendProxy();
 	~BackendProxy();
 	//
-	//void OnCreateClient(WManager::Container *);
+	void SetupKeys(Backend::X11KeyBinder *);
 	void OnCreateClient(const ClientProxy &);
 	void OnKeyPress(uint);
 	void OnKeyRelease(uint);

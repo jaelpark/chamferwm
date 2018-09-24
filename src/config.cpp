@@ -6,50 +6,6 @@
 
 namespace Config{
 
-KeyConfigInterface::KeyConfigInterface(){
-	//
-}
-
-KeyConfigInterface::~KeyConfigInterface(){
-	//
-}
-
-void KeyConfigInterface::SetKeyBinder(Backend::BackendKeyBinder *_pkeyBinder){
-	pkeyBinder = _pkeyBinder;
-}
-
-void KeyConfigInterface::SetupKeys(){
-	//
-	DebugPrintf(stdout,"No KeyConfig interface, skipping configuration.\n");
-}
-
-void KeyConfigInterface::Bind(boost::python::object obj){
-	KeyConfigInterface &keyConfigInt1 = boost::python::extract<KeyConfigInterface&>(obj)();
-	pkeyConfigInt = &keyConfigInt1;
-}
-
-KeyConfigInterface KeyConfigInterface::defaultInt;
-KeyConfigInterface *KeyConfigInterface::pkeyConfigInt = &KeyConfigInterface::defaultInt;
-
-KeyConfigProxy::KeyConfigProxy(){
-	//
-}
-
-KeyConfigProxy::~KeyConfigProxy(){
-	//
-}
-
-void KeyConfigProxy::BindKey(uint symbol, uint mask, uint keyId){
-	pkeyBinder->BindKey(symbol,mask,keyId);
-}
-
-void KeyConfigProxy::SetupKeys(){
-	boost::python::override ovr = this->get_override("SetupKeys");
-	if(ovr)
-		ovr();
-	else KeyConfigInterface::SetupKeys();
-}
-
 ClientProxy::ClientProxy() : pcontainer(0){
 	//
 }
@@ -74,7 +30,11 @@ BackendInterface::~BackendInterface(){
 	//
 }
 
-//void BackendInterface::OnCreateClient(WManager::Container *pcontainer){
+void BackendInterface::SetupKeys(Backend::X11KeyBinder *pkeyBinder){
+	//
+	DebugPrintf(stdout,"No KeyConfig interface, skipping configuration.\n");
+}
+
 void BackendInterface::OnCreateClient(const ClientProxy &client){
 	//
 }
@@ -117,15 +77,16 @@ BackendProxy::~BackendProxy(){
 
 void BackendProxy::OnCreateClient(const ClientProxy &client){
 	boost::python::override ovr = this->get_override("OnCreateClient");
-	if(ovr){
+	if(ovr)
 		ovr(client);
-		//ovr(pcontainer);
-		//ovr.operator()<boost::python::return_value_policy::reference>(pcontainer).cast<WManager::Container*>();
-		/*typename boost::python::reference_existing_object::apply<WManager::Container*>::type converter;
-		boost::python::handle handle(converter(pfocus));
-		ovr(boost::python::object(handle));*/
-	}else BackendInterface::OnCreateClient(client);
-	//}else BackendInterface::OnCreateClient(pcontainer);
+	else BackendInterface::OnCreateClient(client);
+}
+
+void BackendProxy::SetupKeys(Backend::X11KeyBinder *pkeyBinder){
+	boost::python::override ovr = this->get_override("SetupKeys");
+	if(ovr)
+		ovr(pkeyBinder);
+	else BackendInterface::SetupKeys(pkeyBinder);
 }
 
 void BackendProxy::OnKeyPress(uint keyId){
@@ -175,12 +136,12 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::scope().attr("MOD_MASK_SHIFT") = uint(XCB_MOD_MASK_SHIFT);
 	boost::python::scope().attr("MOD_MASK_CONTROL") = uint(XCB_MOD_MASK_CONTROL);
 
-	boost::python::class_<KeyConfigProxy,boost::noncopyable>("KeyConfig")
-		.def("BindKey",&KeyConfigProxy::BindKey)
-		.def("SetupKeys",&KeyConfigInterface::SetupKeys)
+	boost::python::class_<Backend::X11KeyBinder>("KeyBinder",boost::python::no_init)
+		.def("BindKey",&Backend::X11KeyBinder::BindKey)
 		;
-	boost::python::def("bind_KeyConfig",KeyConfigInterface::Bind);
+
 	boost::python::class_<BackendProxy,boost::noncopyable>("Backend")
+		.def("SetupKeys",&BackendInterface::SetupKeys)
 		.def("OnCreateClient",&BackendInterface::OnCreateClient)
 		.def("OnKeyPress",&BackendInterface::OnKeyPress)
 		.def("OnKeyRelease",&BackendInterface::OnKeyRelease)
@@ -207,11 +168,6 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("GetFocus",&WManager::Container::GetFocus,boost::python::return_value_policy<boost::python::reference_existing_object>())
 
 		.def("ShiftLayout",&WManager::Container::SetLayout)
-		//.def("GetNext",&WManager::Container::GetNext,boost::python::return_internal_reference<>())
-		////.def("GetNext",&ClientProxy::GetNext,boost::python::return_internal_reference<>())
-		//.def("GetPrev",&WManager::Container::GetPrev,boost::python::return_internal_reference<>())
-		//.def("GetParent",&WManager::Container::GetParent,boost::python::return_internal_reference<>())
-		//.def("GetFocus",&WManager::Container::GetFocus,boost::python::return_internal_reference<>())
 		.def_readonly("layout",&WManager::Container::layout)
 		;
 	

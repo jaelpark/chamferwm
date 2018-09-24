@@ -113,9 +113,6 @@ void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
 
 	glm::vec2 position(0.0f);
 	for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
-		//TODO: +borderWidth. Aspect can be calculated by the user script
-		//dynamic border width according to container size?
-		//Border width is only added if a client is present.
 		glm::vec2 e1 = e;
 		glm::vec2 p1 = position;
 		switch(layout){

@@ -34,24 +34,6 @@ const char * Exception::what(){
 
 char Exception::buffer[4096];
 
-/*Clock::Clock(){
-	clock_gettime(CLOCK_MONOTONIC,&step0);
-	step1 = step0;
-}
-
-Clock::~Clock(){
-	//
-}
-
-void Clock::Step(){
-	step0 = step1;
-	clock_gettime(CLOCK_MONOTONIC,&step1);
-}
-
-float Clock::GetTimeDelta() const{
-	return (float)(step1.tv_sec-step0.tv_sec)+(float)((step1.tv_nsec-step0.tv_nsec)/1e9);
-}*/
-
 Blob::Blob(const char *pfileName){
 	FILE *pf = fopen(pfileName,"rb");
 	if(!pf){
@@ -156,13 +138,14 @@ public:
 	}
 
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
-		Config::KeyConfigInterface::pkeyConfigInt->SetKeyBinder(pkeyBinder);
-		Config::KeyConfigInterface::pkeyConfigInt->SetupKeys();
+		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
+		Config::BackendInterface::pbackendInt->SetupKeys(pkeyBinder11);
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
 		WManager::Container *pcontainer = new WManager::Container(proot);
+		pcontainer->borderWidth = glm::vec2(0.02f);
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 
 		Backend::X11Client *pclient11;
@@ -211,6 +194,7 @@ public:
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
 		WManager::Container *pcontainer = new WManager::Container(proot);
+		pcontainer->borderWidth = glm::vec2(0.02f);
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		Backend::DebugClient *pclient;
 		if(!pcomp11)
@@ -233,8 +217,8 @@ public:
 	}
 
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
-		Config::KeyConfigInterface::pkeyConfigInt->SetKeyBinder(pkeyBinder);
-		Config::KeyConfigInterface::pkeyConfigInt->SetupKeys();
+		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
+		Config::BackendInterface::pbackendInt->SetupKeys(pkeyBinder11);
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
@@ -349,7 +333,6 @@ int main(sint argc, const char **pargv){
 	}*/
 
 	WManager::Container *proot = new WManager::Container();
-	printf("root: %x\n",proot);
 	Config::BackendInterface::pfocus = proot;
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);

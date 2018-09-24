@@ -12,29 +12,34 @@ class Key(Enum):
 
 	LAYOUT = auto()
 
-class KeyConfig(chamfer.KeyConfig):
-	def SetupKeys(self):
+class Backend(chamfer.Backend):
+	def SetupKeys(self, binder):
 		print("setting up keys...");
 
-		self.BindKey(ord('l'),chamfer.MOD_MASK_1,Key.FOCUS_RIGHT.value);
-		self.BindKey(ord('h'),chamfer.MOD_MASK_1,Key.FOCUS_LEFT.value);
-		self.BindKey(ord('k'),chamfer.MOD_MASK_1,Key.FOCUS_UP.value);
-		self.BindKey(ord('j'),chamfer.MOD_MASK_1,Key.FOCUS_DOWN.value);
-		self.BindKey(ord('a'),chamfer.MOD_MASK_1,Key.FOCUS_PARENT.value);
-		self.BindKey(ord('x'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
+		binder.BindKey(ord('l'),chamfer.MOD_MASK_1,Key.FOCUS_RIGHT.value);
+		binder.BindKey(ord('h'),chamfer.MOD_MASK_1,Key.FOCUS_LEFT.value);
+		binder.BindKey(ord('k'),chamfer.MOD_MASK_1,Key.FOCUS_UP.value);
+		binder.BindKey(ord('j'),chamfer.MOD_MASK_1,Key.FOCUS_DOWN.value);
+		binder.BindKey(ord('a'),chamfer.MOD_MASK_1,Key.FOCUS_PARENT.value);
+		binder.BindKey(ord('x'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
 
-		self.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
+		binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
+
+		#/ - search for a window
+		#n - next match
+		#N - previous match
 
 		#debug only
-		self.BindKey(ord('h'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_LEFT.value);
-		self.BindKey(ord('k'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_UP.value);
-		self.BindKey(ord('l'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_RIGHT.value);
-		self.BindKey(ord('j'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_DOWN.value);
+		binder.BindKey(ord('h'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_LEFT.value);
+		binder.BindKey(ord('k'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_UP.value);
+		binder.BindKey(ord('l'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_RIGHT.value);
+		binder.BindKey(ord('j'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_DOWN.value);
 
-		self.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
+		binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
 
-class Backend(chamfer.Backend):
 	def OnCreateClient(self, client):
+		#TODO: define minimum and maximum dimensions. Minimum size clients will start overlapping,
+		#while clients exceeding the maximum won't stretch any further.
 		container = client.GetContainer();
 		chamfer.SetFocus(container);
 
@@ -64,7 +69,7 @@ class Backend(chamfer.Backend):
 				chamfer.layout.VSPLIT:chamfer.layout.HSPLIT,
 				chamfer.layout.HSPLIT:chamfer.layout.VSPLIT
 			}[parent.layout];
-			parent.ShiftLayout(layout);
+			parent.ShiftLayout(layout); #TODO: layout = ..., use UpdateLayout() to update all changes?
 	
 	def OnKeyRelease(self, keyId):
 		print("key release: {}".format(keyId));
@@ -73,12 +78,12 @@ class Compositor(chamfer.Compositor):
 	def __init__(self):
 		#self.shaderPath = "../";
 		print(self.shaderPath);
+	
+	#def SetupGraphics(self):
+	#	shader = self.LoadShader("frame_vertex.spv");
 
 	def OnPropertyChange(self, prop):
 		pass;
-
-keyConfig = KeyConfig();
-chamfer.bind_KeyConfig(keyConfig);
 
 backend = Backend();
 chamfer.bind_Backend(backend);

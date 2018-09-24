@@ -128,7 +128,8 @@ X11Client::~X11Client(){
 
 void X11Client::UpdateTranslation(){
 	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
-	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
+	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y); //TODO: needs to be handled in container class
+	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
 
 	uint values[4] = {rect.x,rect.y,rect.w,rect.h};
@@ -405,10 +406,6 @@ X11Client * Default::FindClient(xcb_window_t window) const{
 	return *m;
 }
 
-/*DebugClient::DebugClient(WManager::Rectangle _rect, const X11Backend *_pbackend) : pbackend(_pbackend){
-	rect = _rect;
-}*/
-
 DebugClient::DebugClient(WManager::Container *pcontainer, const DebugClient::CreateInfo *pcreateInfo) : Client(pcontainer), pbackend(pcreateInfo->pbackend){
 	UpdateTranslation();
 }
@@ -427,7 +424,8 @@ void DebugClient::UpdateTranslation(){
 
 	//glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
 	glm::vec4 screen(se.x,se.y,se.x,se.y);
-	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
+	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
+	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
 
 	AdjustSurface1();
@@ -506,7 +504,8 @@ void Debug::Start(){
 
 bool Debug::HandleEvent(){
 	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
-	for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
+	//for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
+	for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
 		if(!pevent){
 			if(xcb_connection_has_error(pcon)){
 				DebugPrintf(stderr,"X server connection lost\n");
