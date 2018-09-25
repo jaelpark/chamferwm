@@ -30,6 +30,8 @@ struct GS_OUTPUT{
 	float2 xy0;
 	float2 xy1;
 	float2 screen;
+	float2 border;
+	float2 params;
 };
 
 const float2 vertices[4] = {
@@ -45,7 +47,7 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 	GS_OUTPUT output;
 	
 	float2 aspect = float2(1.0f,screen.x/screen.y);
-	float2 borderWidth = 0.03f*aspect;
+	float2 borderWidth = border*aspect;//0.03f*aspect;
 	//float2 borderWidth = 0.04f*aspect; //2.0*borderWidth
 
 	[unroll]
@@ -68,19 +70,18 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 #elif defined(SHADER_STAGE_PS)
 
 [[vk::binding(0)]] Texture2D<float4> content;
-[[vk::binding(1)]] SamplerState sm;
+//[[vk::binding(1)]] SamplerState sm;
 
 [[vk::push_constant]] cbuffer cb{
 	float2 xy0;
 	float2 xy1;
 	float2 screen;
+	float2 border;
 	float2 params;
 };
 
 //TODO: create chamfer with ndc coords and sdf transformation
 float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0) : SV_Target{
-	//if(any(texc < 0.005) || any(texc > 0.995))
-		//return float4(0.5f+0.5f*sin(params.x),1,0,1);
 	//float4 c = content.Sample(sm,texc);
 	float2 p = screen*(0.5f*xy0+0.5f);
 	float4 c = content.Load(float3(posh.xy-p,0)); //p already has the 0.5f offset

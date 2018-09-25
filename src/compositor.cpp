@@ -36,7 +36,7 @@ ClientFrame::~ClientFrame(){
 			}
 }
 
-void ClientFrame::Draw(VkRect2D &frame, const VkCommandBuffer *pcommandBuffer){
+void ClientFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, const VkCommandBuffer *pcommandBuffer){
 	time = timespec_diff(pcomp->frameTime,creationTime);
 
 	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
@@ -55,9 +55,10 @@ void ClientFrame::Draw(VkRect2D &frame, const VkCommandBuffer *pcommandBuffer){
 		frameVec.x,frameVec.y,
 		frameVec.z,frameVec.w,
 		pcomp->imageExtent.width,pcomp->imageExtent.height,
-		time,0.0f,
+		borderWidth.x,borderWidth.y,
+		time,0.0f
 	};
-	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
+	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,40,pushConstants); //size in CompositorResource VkPushConstantRange
 
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 
@@ -630,12 +631,8 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 		if(!pclientFrame)
 			continue;
 		
-		VkRect2D frame;
-		frame.offset = {pcont->pclient->rect.x,pcont->pclient->rect.y};
-		frame.extent = {pcont->pclient->rect.w,pcont->pclient->rect.h};
-
 		RenderObject renderObject;
-		renderObject.rect = frame;
+		renderObject.pclient = pcont->pclient;
 		renderObject.pclientFrame = pclientFrame;
 		renderQueue.push_back(renderObject);
 
@@ -710,8 +707,13 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 	clock_gettime(CLOCK_MONOTONIC,&frameTime);
 
-	for(RenderObject &renderObject : renderQueue)
-		renderObject.pclientFrame->Draw(renderObject.rect,&pcommandBuffers[currentFrame]);
+	for(RenderObject &renderObject : renderQueue){
+		VkRect2D frame;
+		frame.offset = {renderObject.pclient->rect.x,renderObject.pclient->rect.y};
+		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
+
+		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,&pcommandBuffers[currentFrame]);
+	}
 
 	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);
 
