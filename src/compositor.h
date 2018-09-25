@@ -13,43 +13,14 @@ class X11Backend;
 
 namespace Compositor{
 
-//Render queue objects: can be frames, text etc.
-class RenderObject{
-public:
-	RenderObject(const Pipeline *, const class CompositorInterface *);
-	virtual ~RenderObject();
-	virtual void Draw(const VkCommandBuffer *) = 0;
-	//If the pipeline changes, the renderer binds a new one
-protected:
-	const Pipeline *pPipeline;
-	const class CompositorInterface *pcomp;
-	float time;
-};
-
-class RectangleObject : public RenderObject{
-public:
-	RectangleObject(const Pipeline *, const class CompositorInterface *, VkRect2D);
-	virtual ~RectangleObject();
-protected:
-	void PushConstants(const VkCommandBuffer *);
-	VkRect2D frame;
-};
-
-class FrameObject : public RectangleObject{
-public:
-	FrameObject(class ClientFrame *, const class CompositorInterface *, VkRect2D);
-	~FrameObject();
-	void Draw(const VkCommandBuffer *);
-	class ClientFrame *pclientFrame;
-};
-
 class ClientFrame{
 friend class CompositorInterface;
-friend class FrameObject;
+//friend class FrameObject;
 public:
 	ClientFrame(uint, uint, class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
+	void Draw(VkRect2D &, const VkCommandBuffer *);
 	void AdjustSurface(uint, uint);
 	bool AssignPipeline(const Pipeline *);
 private:
@@ -65,15 +36,13 @@ protected:
 	PipelineDescriptorSet *passignedSet;
 	std::vector<PipelineDescriptorSet> descSets;
 	struct timespec creationTime;
+	float time;
 };
 
 class CompositorInterface{
 friend class Texture;
 friend class ShaderModule;
 friend class Pipeline;
-friend class RenderObject;
-friend class RectangleObject;
-friend class FrameObject;
 friend class ClientFrame;
 public:
 	CompositorInterface(uint);
@@ -143,8 +112,14 @@ private:
 	struct timespec frameTime;
 	uint64 frameTag;
 
-	std::vector<RenderObject *> renderQueue;
-	std::vector<FrameObject> frameObjectPool;
+	//std::vector<renderObject *> renderQueue;
+	//std::vector<FrameObject> frameObjectPool;
+	struct RenderObject{
+		VkRect2D rect;
+		ClientFrame *pclientFrame;
+	};
+	std::vector<RenderObject> renderQueue;
+	//std::vector<ClientFrame *> renderQueue;
 
 	//Used textures get stored for potential reuse before they get destroyed.
 	//Many of the allocated window textures will initially have some common reoccuring size.

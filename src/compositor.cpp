@@ -11,63 +11,7 @@
 
 namespace Compositor{
 
-RenderObject::RenderObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp) : pPipeline(_pPipeline), pcomp(_pcomp), time(0.0f){
-	//
-}
-
-RenderObject::~RenderObject(){
-	//
-}
-
-RectangleObject::RectangleObject(const Pipeline *_pPipeline, const CompositorInterface *_pcomp, VkRect2D _frame) : RenderObject(_pPipeline,_pcomp), frame(_frame){
-	//
-}
-
-void RectangleObject::PushConstants(const VkCommandBuffer *pcommandBuffer){
-	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
-	frameVec += 0.5f;
-	frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
-	frameVec *= 2.0f;
-	frameVec -= 1.0f;
-
-	const float pushConstants[] = {
-		frameVec.x,frameVec.y,
-		frameVec.z,frameVec.w,
-		pcomp->imageExtent.width,pcomp->imageExtent.height,
-		time,0.0f,
-	};
-	vkCmdPushConstants(*pcommandBuffer,pPipeline->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
-}
-
-RectangleObject::~RectangleObject(){
-	//
-}
-
-FrameObject::FrameObject(ClientFrame *_pclientFrame, const CompositorInterface *_pcomp, VkRect2D _frame) : RectangleObject(_pclientFrame->passignedSet->p,_pcomp,_frame), pclientFrame(_pclientFrame){
-	//
-}
-
-FrameObject::~FrameObject(){
-	//
-}
-
-void FrameObject::Draw(const VkCommandBuffer *pcommandBuffer){
-	//time = (float)(pclientFrame->pcomp->frameTime.tv_sec-pclientFrame->creationTime.tv_sec)+(float)((pclientFrame->pcomp->frameTime.tv_nsec-pclientFrame->creationTime.tv_nsec)/1e9);
-	time = timespec_diff(pclientFrame->pcomp->frameTime,pclientFrame->creationTime);
-	//TODO: max time, configurable
-
-	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-		if(pPipeline->pshaderModule[i]->setCount > 0){
-			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,pPipeline->pipelineLayout,descPointer,pPipeline->pshaderModule[i]->setCount,pclientFrame->passignedSet->pdescSets[i],0,0);
-			descPointer += pPipeline->pshaderModule[i]->setCount;
-		}
-	PushConstants(pcommandBuffer);
-	vkCmdDraw(*pcommandBuffer,1,1,0,0);
-
-	pclientFrame->passignedSet->fenceTag = pclientFrame->pcomp->frameTag;
-}
-
-ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
+ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f){
 	pcomp->updateQueue.push_back(this);
 
 	ptexture = pcomp->CreateTexture(w,h);
@@ -90,6 +34,34 @@ ClientFrame::~ClientFrame(){
 				delete []pipelineDescSet.pdescSets[i];*/
 				pcomp->ReleaseDescSets(pipelineDescSet.p->pshaderModule[i],pipelineDescSet.pdescSets[i]);
 			}
+}
+
+void ClientFrame::Draw(VkRect2D &frame, const VkCommandBuffer *pcommandBuffer){
+	time = timespec_diff(pcomp->frameTime,creationTime);
+
+	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+		if(passignedSet->p->pshaderModule[i]->setCount > 0){
+			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,passignedSet->p->pipelineLayout,descPointer,passignedSet->p->pshaderModule[i]->setCount,passignedSet->pdescSets[i],0,0);
+			descPointer += passignedSet->p->pshaderModule[i]->setCount;
+		}
+	
+	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
+	frameVec += 0.5f;
+	frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
+	frameVec *= 2.0f;
+	frameVec -= 1.0f;
+
+	const float pushConstants[] = {
+		frameVec.x,frameVec.y,
+		frameVec.z,frameVec.w,
+		pcomp->imageExtent.width,pcomp->imageExtent.height,
+		time,0.0f,
+	};
+	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,32,pushConstants);
+
+	vkCmdDraw(*pcommandBuffer,1,1,0,0);
+
+	passignedSet->fenceTag = pcomp->frameTag;
 }
 
 void ClientFrame::AdjustSurface(uint w, uint h){
@@ -657,18 +629,15 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
 		if(!pclientFrame)
 			continue;
-		//
-		//WManager::Rectangle r = pcont->pclient->GetRect();
+		
 		VkRect2D frame;
 		frame.offset = {pcont->pclient->rect.x,pcont->pclient->rect.y};
 		frame.extent = {pcont->pclient->rect.w,pcont->pclient->rect.h};
 
-		//FrameObject &frameObject = frameObjectPool.emplace_back(pdefaultPipeline,this,frame);
-		FrameObject &frameObject = frameObjectPool.emplace_back(pclientFrame,this,frame);
-		renderQueue.push_back(&frameObject);
-
-		//TextureObject &textureObject = textureObjectPool.emplace_back(pdefaultPipeline,this,frame);
-		//renderQueue.push_back(&textureObject);
+		RenderObject renderObject;
+		renderObject.rect = frame;
+		renderObject.pclientFrame = pclientFrame;
+		renderQueue.push_back(renderObject);
 
 		if(pcont->pch)
 			CreateRenderQueue(pcont->pch);
@@ -706,7 +675,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	
 	//Create a render list elements arranged from back to front
 	renderQueue.clear();
-	frameObjectPool.clear();
+	//frameObjectPool.clear();
 	CreateRenderQueue(proot->pch);
 
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
@@ -715,7 +684,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	if(vkBeginCommandBuffer(pcopyCommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
 
-	//TODO: damage extension is used to check which clients should update their texture contents
 	for(ClientFrame *pclientFrame : updateQueue)
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 	updateQueue.clear();
@@ -742,12 +710,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 	clock_gettime(CLOCK_MONOTONIC,&frameTime);
 
-	//for(RenderObject *prenderObject : renderQueue)
-		//prenderObject->Draw(&pcommandBuffers[currentFrame]);
-
-	for(FrameObject &pframeObject : frameObjectPool){
-		pframeObject.Draw(&pcommandBuffers[currentFrame]);
-	}
+	for(RenderObject &renderObject : renderQueue)
+		renderObject.pclientFrame->Draw(renderObject.rect,&pcommandBuffers[currentFrame]);
 
 	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);
 
@@ -865,9 +829,6 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	damage = xcb_generate_id(pbackend->pcon);
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
 	//xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_NON_EMPTY);
-
-	//The contents of the pixmap are retrieved in GenerateCommandBuffers
-	//https://api.kde.org/frameworks/kwindowsystem/html/kxutils_8cpp_source.html
 }
 
 X11ClientFrame::~X11ClientFrame(){
