@@ -29,6 +29,7 @@ struct GS_OUTPUT{
 [[vk::push_constant]] cbuffer cb{
 	float2 xy0;
 	float2 xy1;
+	float2 screen;
 };
 
 const float2 vertices[4] = {
@@ -38,10 +39,23 @@ const float2 vertices[4] = {
 	xy1
 };
 
-[maxvertexcount(4)]
+[maxvertexcount(8)]
 //void main(point GS_INTPUT input[1], inout TriangleStream<GS_OUTPUT> stream){
 void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 	GS_OUTPUT output;
+	
+	float2 aspect = float2(1.0f,screen.x/screen.y);
+	float2 borderWidth = 0.03f*aspect;
+	//float2 borderWidth = 0.04f*aspect; //2.0*borderWidth
+
+	[unroll]
+	for(uint i = 0; i < 4; ++i){
+		output.posh = float4(vertices[i]+(2.0*vertexPositions[i]-1.0f)*borderWidth,0,1);
+		output.texc = vertexPositions[i];//output.posh-vertices[i
+		stream.Append(output);
+	}
+	stream.RestartStrip();
+
 	[unroll]
 	for(uint i = 0; i < 4; ++i){
 		output.posh = float4(vertices[i],0,1);
@@ -70,6 +84,7 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0) : SV_Target{
 	//float4 c = content.Sample(sm,texc);
 	float2 p = screen*(0.5f*xy0+0.5f);
 	float4 c = content.Load(float3(posh.xy-p,0)); //p already has the 0.5f offset
+	//^^returns black when out of bounds (border)
 	c.w = 1.0f;
 	return c;
 #if 0

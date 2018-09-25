@@ -727,7 +727,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	if(vkBeginCommandBuffer(pcommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
 
-	static const VkClearValue clearValue = {0.0f,0.0f,0.0f,1.0};
+	static const VkClearValue clearValue = {1.0f,1.0f,1.0f,1.0};
 	VkRenderPassBeginInfo renderPassBeginInfo = {};
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassBeginInfo.renderPass = renderPass;
