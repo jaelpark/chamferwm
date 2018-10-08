@@ -50,6 +50,8 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 	float2 borderWidth = border*aspect;//0.03f*aspect;
 	//float2 borderWidth = 0.04f*aspect; //2.0*borderWidth
 
+	//todo: bitmask as adjacency information
+
 	[unroll]
 	for(uint i = 0; i < 4; ++i){
 		output.posh = float4(vertices[i]+(2.0*vertexPositions[i]-1.0f)*borderWidth,0,1);

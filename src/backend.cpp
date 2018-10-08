@@ -195,6 +195,7 @@ void Default::Start(){
 		throw Exception("Screen unavailable.\n");
 
 	DebugPrintf(stdout,"Screen size: %ux%u\n",pscr->width_in_pixels,pscr->height_in_pixels);
+	//https://standards.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
 
 	xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
 
@@ -286,9 +287,7 @@ bool Default::HandleEvent(){
 			xcb_map_request_event_t *pev = (xcb_map_request_event_t*)pevent;
 			
 			//check if window already exists
-			if(std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
-				return pclient->window == pev->window;
-			}) != clients.end())
+			if(FindClient(pev->window))
 				break;
 
 			X11Client::CreateInfo createInfo;
@@ -298,6 +297,25 @@ bool Default::HandleEvent(){
 			clients.push_back(pclient);
 
 			DebugPrintf(stdout,"map request, %u\n",pev->window);
+			}
+			break;
+		case XCB_MAP_NOTIFY:{
+			xcb_map_notify_event_t *pev = (xcb_map_notify_event_t*)pevent;
+
+			//check if window already exists
+			if(FindClient(pev->window))
+				break;
+
+			//TODO: something was mapped without explicit request, just put it on screen where it wants
+			//TODO: check if the window is being remapped (after unmapping), need to just hide and show it somehow
+			//SetupClient(...,true/false) somehow, to indicate a creation of a container
+			//All these windows get the DESTROY_NOTIFY when they're done
+			DebugPrintf(stdout,"map notify, %u\n",pev->window);
+			}
+			break;
+		case XCB_UNMAP_NOTIFY:{
+			//
+			DebugPrintf(stdout,"unmap notify\n");
 			}
 			break;
 		case XCB_CLIENT_MESSAGE:{
@@ -348,15 +366,12 @@ bool Default::HandleEvent(){
 			}
 			break;
 		case XCB_MAPPING_NOTIFY:
+			//keyboard related stuff
 			DebugPrintf(stdout,"mapping\n");
 			break;
-		case XCB_UNMAP_NOTIFY:{
-			//
-			}
-			break;
 		case XCB_DESTROY_NOTIFY:{
-			DebugPrintf(stdout,"destroy notify (%lu)\n",clients.size());
 			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
+			DebugPrintf(stdout,"destroy notify, %u (%lu)\n",pev->window,clients.size());
 
 			auto m = std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
 				return pclient->window == pev->window;
@@ -390,15 +405,6 @@ bool Default::HandleEvent(){
 
 X11Client * Default::FindClient(xcb_window_t window) const{
 	auto m = std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
-		/*printf("%x, %x\n",pclient->window,window);
-		xcb_query_tree_cookie_t queryTreeCookie = xcb_query_tree(pcon,pclient->window);
-		xcb_query_tree_reply_t *pqueryTreeReply = xcb_query_tree_reply(pcon,queryTreeCookie,0);
-		if(!pqueryTreeReply)
-			DebugPrintf(stdout,"failed to query\n");
-		xcb_window_t *pchs = xcb_query_tree_children(pqueryTreeReply);
-		for(uint i = 0; i < pqueryTreeReply->children_len; ++i)
-			printf("-- %x (ch)\n",pchs[i]);
-		free(pqueryTreeReply);*/
 		return pclient->window == window;
 	});
 	if(m == clients.end())

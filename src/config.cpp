@@ -6,11 +6,11 @@
 
 namespace Config{
 
-ClientProxy::ClientProxy() : pcontainer(0){
+ClientProxy::ClientProxy() : pclient(0){
 	//
 }
 
-ClientProxy::ClientProxy(WManager::Container *_pcontainer) : pcontainer(_pcontainer){
+ClientProxy::ClientProxy(WManager::Client *_pclient) : pclient(_pclient){
 	//
 }
 
@@ -19,7 +19,7 @@ ClientProxy::~ClientProxy(){
 }
 
 WManager::Container * ClientProxy::GetContainer() const{
-	return pcontainer;
+	return pclient->pcontainer;
 }
 
 BackendInterface::BackendInterface(){

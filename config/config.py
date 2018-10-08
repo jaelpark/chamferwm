@@ -36,6 +36,10 @@ class Backend(chamfer.Backend):
 		binder.BindKey(ord('j'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_DOWN.value);
 
 		binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
+	
+	def SetupClient(self, client):
+		#
+		pass;
 
 	def OnCreateClient(self, client):
 		#TODO: define minimum and maximum dimensions. Minimum size clients will start overlapping,

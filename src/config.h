@@ -9,6 +9,7 @@ class X11KeyBinder;
 }
 
 namespace WManager{
+class Client;
 class Container;
 }
 
@@ -17,16 +18,16 @@ namespace Config{
 class ClientProxy{
 public:
 	ClientProxy();
-	ClientProxy(WManager::Container *);
+	ClientProxy(WManager::Client *);
 	~ClientProxy();
 	WManager::Container * GetContainer() const;
-	WManager::Container *pcontainer;
+	WManager::Client *pclient;
 };
 
 class BackendInterface{
 public:
 	BackendInterface();
-	~BackendInterface();
+	virtual ~BackendInterface();
 	virtual void SetupKeys(Backend::X11KeyBinder *);
 	virtual void OnCreateClient(const ClientProxy &);
 	virtual void OnKeyPress(uint);

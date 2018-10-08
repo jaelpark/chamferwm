@@ -123,7 +123,6 @@ public:
 	virtual void WaitIdle() = 0;
 protected:
 	WManager::Container *proot;
-	//Clock clock;
 };
 
 class DefaultBackend : public Backend::Default, public RunBackend{
@@ -146,7 +145,9 @@ public:
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
 		WManager::Container *pcontainer = new WManager::Container(proot);
 		pcontainer->borderWidth = glm::vec2(0.02f);
+		//pcontainer->minSize = glm::vec2(0.4f); //needs to be set as constructor params
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
+		//TODO: All the dimension related parameters should be set before the container is created and the siblings adjusted.
 
 		Backend::X11Client *pclient11;
 		if(!pcomp11)
@@ -154,7 +155,7 @@ public:
 		else pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pcomp11);
 		pcontainer->pclient = pclient11;
 
-		Config::ClientProxy client(pcontainer);
+		Config::ClientProxy client(pclient11);
 		Config::BackendInterface::pbackendInt->OnCreateClient(client);
 
 		return pclient11;
@@ -202,7 +203,7 @@ public:
 		else pclient = new Compositor::X11DebugClientFrame(pcontainer,pcreateInfo,pcomp11);
 		pcontainer->pclient = pclient;
 
-		Config::ClientProxy client(pcontainer);
+		Config::ClientProxy client(pclient);
 		Config::BackendInterface::pbackendInt->OnCreateClient(client);
 
 		return pclient;

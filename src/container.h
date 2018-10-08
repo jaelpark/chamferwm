@@ -34,20 +34,23 @@ public:
 	~Container();
 	void SetTranslation(glm::vec2, glm::vec2);
 	void Remove();
-	//Container * FindFocus();
 	void Focus();
 	Container * GetNext();
 	Container * GetPrev();
 	Container * GetParent();
 	Container * GetFocus();
 
+	glm::vec2 GetMinSize() const;
+	//glm::vec2 GetOverlap(glm::vec2) const;
+	void TranslateRecursive(glm::vec2, glm::vec2);
+	void Translate();
 	//Stack order: pnext is always below the current one
 	enum LAYOUT{
 		LAYOUT_VSPLIT,
 		LAYOUT_HSPLIT,
 		//Title is rendered as tabs on the same row. Render titles inside a chamfered box.
 		//stack mode: render titles vertically to the left?
-		LAYOUT_STACKED,
+		LAYOUT_STACKED, //Do we need these modes? Stacking is already implemented with min window sizes.
 		LAYOUT_TABBED,
 	};
 	void SetLayout(LAYOUT);
@@ -62,12 +65,18 @@ public:
 	glm::vec2 scale;
 	// = 1.0f: default size, scale with the number of containers
 	// < 1.0f: smaller than default, leaving the unscaled parallel containers more space
+	//glm::vec2 adjustScale;
 
 	//absolute normalized coordinates
 	glm::vec2 p;
 	glm::vec2 e;
 
+	glm::vec2 e1; //iteration e
+
 	glm::vec2 borderWidth;
+
+	glm::vec2 minSize;
+	glm::vec2 maxSize;
 
 	LAYOUT layout;
 
