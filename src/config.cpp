@@ -154,9 +154,9 @@ BOOST_PYTHON_MODULE(chamfer){
 
 	boost::python::enum_<WManager::Container::LAYOUT>("layout")
 		.value("VSPLIT",WManager::Container::LAYOUT_VSPLIT)
-		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT)
-		.value("STACKED",WManager::Container::LAYOUT_STACKED)
-		.value("TABBED",WManager::Container::LAYOUT_TABBED);
+		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT);
+		//.value("STACKED",WManager::Container::LAYOUT_STACKED)
+		//.value("TABBED",WManager::Container::LAYOUT_TABBED);
 	
 	boost::python::class_<ClientProxy>("Client")
 		.def("GetContainer",&ClientProxy::GetContainer,boost::python::return_value_policy<boost::python::reference_existing_object>());

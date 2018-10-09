@@ -44,14 +44,15 @@ public:
 	//glm::vec2 GetOverlap(glm::vec2) const;
 	void TranslateRecursive(glm::vec2, glm::vec2);
 	void Translate();
+	void Stack();
 	//Stack order: pnext is always below the current one
 	enum LAYOUT{
 		LAYOUT_VSPLIT,
 		LAYOUT_HSPLIT,
 		//Title is rendered as tabs on the same row. Render titles inside a chamfered box.
 		//stack mode: render titles vertically to the left?
-		LAYOUT_STACKED, //Do we need these modes? Stacking is already implemented with min window sizes.
-		LAYOUT_TABBED,
+		//LAYOUT_STACKED, //Do we need these modes? Stacking is already implemented with min window sizes.
+		//LAYOUT_TABBED,
 	};
 	void SetLayout(LAYOUT);
 
@@ -59,6 +60,7 @@ public:
 	Container *pch; //First children
 	Container *pnext; //Subsequent container in the parent container
 	std::deque<Container *> focusQueue;
+	std::deque<Container *> stackQueue;
 
 	Client *pclient;
 

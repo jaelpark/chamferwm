@@ -296,6 +296,8 @@ bool Default::HandleEvent(){
 			X11Client *pclient = SetupClient(&createInfo);
 			clients.push_back(pclient);
 
+			//TODO: restack clients
+
 			DebugPrintf(stdout,"map request, %u\n",pev->window);
 			}
 			break;

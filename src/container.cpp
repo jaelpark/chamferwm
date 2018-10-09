@@ -47,6 +47,7 @@ Container::Container(Container *_pParent) : pParent(_pParent), pch(0), pnext(0),
 	}
 
 	//pParent->SetTranslation(pParent->p,pParent->e);
+	pParent->Stack();
 	pParent->Translate();
 }
 
@@ -66,6 +67,7 @@ void Container::Remove(){
 		}
 	
 	//pParent->SetTranslation(pParent->p,pParent->e);
+	pParent->Stack();
 	pParent->Translate();
 }
 
@@ -76,6 +78,8 @@ void Container::Focus(){
 	}
 	if(pclient)
 		pclient->Focus();
+	
+	pParent->Stack();
 }
 
 Container * Container::GetNext(){
@@ -201,6 +205,21 @@ void Container::Translate(){
 		pcontainer = this; //reached the root
 
 	pcontainer->TranslateRecursive(pcontainer->p,pcontainer->e);
+}
+
+void Container::Stack(){
+	stackQueue.clear();
+	for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
+		stackQueue.push_back(pcontainer);
+
+	if(focusQueue.size() == 0)
+		return;
+	Container *pfocus = focusQueue.back();
+
+	std::sort(stackQueue.begin(),stackQueue.end(),[&](Container *pa, Container *pb)->bool{
+		return pb == pfocus || pb->p[layout] > pfocus->p[layout]+pfocus->e[layout] || pb->p[layout]+pb->e[layout] < pfocus->p[layout];
+		//
+	});
 }
 
 void Container::SetLayout(LAYOUT layout){

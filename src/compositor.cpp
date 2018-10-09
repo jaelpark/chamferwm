@@ -624,7 +624,7 @@ void CompositorInterface::WaitIdle(){
 }
 
 void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer){
-	for(const WManager::Container *pcont = pcontainer; pcont; pcont = pcont->pnext){
+	/*for(const WManager::Container *pcont = pcontainer; pcont; pcont = pcont->pnext){
 		if(!pcont->pclient)
 			continue;
 		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
@@ -640,6 +640,21 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			CreateRenderQueue(pcont->pch);
 		//worry about stacks later
 		//stacks: render in same order, except skip focus? Focus is rendered last.
+	}*/
+	for(const WManager::Container *pcont : pcontainer->stackQueue){
+		if(!pcont->pclient)
+			continue;
+		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
+		if(!pclientFrame)
+			continue;
+		
+		RenderObject renderObject;
+		renderObject.pclient = pcont->pclient;
+		renderObject.pclientFrame = pclientFrame;
+		renderQueue.push_back(renderObject);
+
+		if(pcont->pch)
+			CreateRenderQueue(pcont->pch);
 	}
 }
 
@@ -673,7 +688,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	//Create a render list elements arranged from back to front
 	renderQueue.clear();
 	//frameObjectPool.clear();
-	CreateRenderQueue(proot->pch);
+	//CreateRenderQueue(proot->pch);
+	CreateRenderQueue(proot);
 
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
