@@ -76,9 +76,9 @@ void Container::Focus(){
 		pParent->focusQueue.erase(std::remove(pParent->focusQueue.begin(),pParent->focusQueue.end(),this),pParent->focusQueue.end());
 		pParent->focusQueue.push_back(this);
 	}
-	if(pclient)
-		pclient->Focus();
-	
+	//if(pclient)
+		//pclient->Focus();
+	Focus1();
 	pParent->Stack();
 }
 
@@ -220,6 +220,10 @@ void Container::Stack(){
 		return pb == pfocus || pb->p[layout] > pfocus->p[layout]+pfocus->e[layout] || pb->p[layout]+pb->e[layout] < pfocus->p[layout];
 		//
 	});
+
+	//if(pclient)
+		//pclient->Stack();
+	Stack1();
 }
 
 void Container::SetLayout(LAYOUT layout){

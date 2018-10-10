@@ -140,10 +140,43 @@ void X11Client::UpdateTranslation(){
 	AdjustSurface1(); //virtual function gets called only if the compositor client class has been initialized
 }
 
-void X11Client::Focus(){
-	xcb_set_input_focus(pbackend->pcon,XCB_INPUT_FOCUS_POINTER_ROOT,window,XCB_CURRENT_TIME);
+X11Container::X11Container(class X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
+	//
+}
+
+X11Container::X11Container(WManager::Container *_pParent, class X11Backend *_pbackend) : WManager::Container(_pParent), pbackend(_pbackend){
+	//
+}
+
+X11Container::~X11Container(){
+	//
+}
+
+void X11Container::Focus1(){
+	if(pclient){
+		X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
+		xcb_set_input_focus(pbackend->pcon,XCB_INPUT_FOCUS_POINTER_ROOT,pclient11->window,XCB_CURRENT_TIME);
+	}else xcb_set_input_focus(pbackend->pcon,XCB_INPUT_FOCUS_POINTER_ROOT,pbackend->pscr->root,XCB_CURRENT_TIME);
 
 	xcb_flush(pbackend->pcon);
+}
+
+void X11Container::StackRecursive(WManager::Container *pcontainer){
+	for(WManager::Container *pcont : pcontainer->stackQueue){
+		if(pcont->pclient){
+			X11Client *pclient11 = dynamic_cast<X11Client *>(pcont->pclient);
+
+			uint values[1] = {XCB_STACK_MODE_ABOVE};
+			xcb_configure_window(pbackend->pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		}else StackRecursive(pcont);
+	}
+}
+
+void X11Container::Stack1(){
+	//
+	WManager::Container *proot = this;
+	for(WManager::Container *pcontainer = pParent; pcontainer; proot = pcontainer, pcontainer = pcontainer->pParent);
+	StackRecursive(proot);
 }
 
 X11Backend::X11Backend(){
@@ -199,11 +232,6 @@ void Default::Start(){
 
 	xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
 
-	//xcb_keycode_t kk = SymbolToKeycode(XK_Return,psymbols);
-	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,kk,
-		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_SHIFT|XCB_MOD_MASK_1,kk,
-		//XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
@@ -439,9 +467,29 @@ void DebugClient::UpdateTranslation(){
 	AdjustSurface1();
 }
 
-void DebugClient::Focus(){
+DebugContainer::DebugContainer(class X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
 	//
-	DebugPrintf(stdout,"Setting focus [%x]\n",this);
+}
+
+DebugContainer::DebugContainer(WManager::Container *_pParent, class X11Backend *_pbackend) : WManager::Container(_pParent), pbackend(_pbackend){
+	//
+}
+
+DebugContainer::~DebugContainer(){
+	//
+}
+
+void DebugContainer::Focus1(){
+	//
+	printf("focusing ...\n");
+}
+
+void DebugContainer::Stack1(){
+	//
+	WManager::Container *proot = this;
+	for(WManager::Container *pcontainer = pParent; pcontainer; proot = pcontainer, pcontainer = pcontainer->pParent);
+
+	printf("stacking ...\n");
 }
 
 Debug::Debug() : X11Backend(){

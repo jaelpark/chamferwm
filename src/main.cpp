@@ -110,7 +110,7 @@ public:
 			ReleaseContainersRecursive(proot->pch);
 	}
 	
-protected:
+//protected:
 	WManager::Container *proot;
 	class RunCompositor *pcomp;
 };
@@ -127,13 +127,13 @@ protected:
 
 class DefaultBackend : public Backend::Default, public RunBackend{
 public:
-	DefaultBackend(WManager::Container *_proot) : Default(), RunBackend(_proot){
+	DefaultBackend() : Default(), RunBackend(new Backend::X11Container(this)){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
 
 	~DefaultBackend(){
-		//
+		delete proot;
 	}
 
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
@@ -143,7 +143,7 @@ public:
 	}
 
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
-		WManager::Container *pcontainer = new WManager::Container(proot);
+		WManager::Container *pcontainer = new Backend::X11Container(proot,this);
 		pcontainer->borderWidth = glm::vec2(0.02f);
 		//pcontainer->minSize = glm::vec2(0.4f); //needs to be set as constructor params
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
@@ -186,15 +186,17 @@ public:
 
 class DebugBackend : public Backend::Debug, public RunBackend{
 public:
-	DebugBackend(WManager::Container *_proot) : Debug(), RunBackend(_proot){
+	DebugBackend() : Debug(), RunBackend(new Backend::DebugContainer(this)){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
 
-	~DebugBackend(){}
+	~DebugBackend(){
+		delete proot;
+	}
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
-		WManager::Container *pcontainer = new WManager::Container(proot);
+		WManager::Container *pcontainer = new Backend::DebugContainer(proot,this);
 		pcontainer->borderWidth = glm::vec2(0.02f);
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		Backend::DebugClient *pclient;
@@ -333,21 +335,20 @@ int main(sint argc, const char **pargv){
 		return 1;
 	}*/
 
-	WManager::Container *proot = new WManager::Container();
-	Config::BackendInterface::pfocus = proot;
-
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
 	pconfigLoader->Run(configPath.Get().c_str(),"config.py");
 
 	RunBackend *pbackend;
 	try{
 		if(debugBackend.Get())
-			pbackend = new DebugBackend(proot);
-		else pbackend = new DefaultBackend(proot);
+			pbackend = new DebugBackend();
+		else pbackend = new DefaultBackend();
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		return 1;
 	}
+
+	Config::BackendInterface::pfocus = pbackend->proot;
 
 	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
 	/*sint fd = pbackend11->GetEventFileDescriptor();
@@ -365,8 +366,8 @@ int main(sint argc, const char **pargv){
 			pcomp = new NullCompositor();
 		else
 		if(debugBackend.Get())
-			pcomp = new DebugCompositor(gpuIndex.Get(),proot,pbackend11);
-		else pcomp = new DefaultCompositor(gpuIndex.Get(),proot,pbackend11);
+			pcomp = new DebugCompositor(gpuIndex.Get(),pbackend->proot,pbackend11);
+		else pcomp = new DefaultCompositor(gpuIndex.Get(),pbackend->proot,pbackend11);
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		delete pbackend;
@@ -395,7 +396,6 @@ int main(sint argc, const char **pargv){
 
 	delete pcomp;
 	delete pbackend;
-	delete proot;
 	delete pconfigLoader;
 
 	return 0;

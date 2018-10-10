@@ -18,7 +18,8 @@ public:
 	//
 	//virtual functions for the backend implementation
 	virtual void UpdateTranslation() = 0;
-	virtual void Focus() = 0;
+	//virtual void Focus() = 0; //TODO: these should be in container class
+	//virtual void Stack() = 0;
 	//Resize
 	//SetLayer
 	//virtual Rectangle GetRect() const = 0;
@@ -31,7 +32,7 @@ class Container{
 public:
 	Container(); //root container
 	Container(Container *);
-	~Container();
+	virtual ~Container();
 	void SetTranslation(glm::vec2, glm::vec2);
 	void Remove();
 	void Focus();
@@ -55,6 +56,9 @@ public:
 		//LAYOUT_TABBED,
 	};
 	void SetLayout(LAYOUT);
+
+	virtual void Focus1(){}// = 0;
+	virtual void Stack1(){}// = 0;
 
 	Container *pParent;
 	Container *pch; //First children

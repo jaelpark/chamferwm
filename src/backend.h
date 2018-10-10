@@ -73,9 +73,21 @@ public:
 	~X11Client();
 	virtual void AdjustSurface1(){};
 	void UpdateTranslation();
-	void Focus();
+	//void Focus();
+	//void Stack();
 	//virtual void UpdateCompositor();
 	xcb_window_t window;
+	const X11Backend *pbackend;
+};
+
+class X11Container : public WManager::Container{
+public:
+	X11Container(class X11Backend *);
+	X11Container(WManager::Container *, class X11Backend *);
+	~X11Container();
+	void Focus1();
+	void StackRecursive(WManager::Container *);
+	void Stack1();
 	const X11Backend *pbackend;
 };
 
@@ -83,6 +95,7 @@ class X11Backend : public BackendInterface{
 friend class X11Event;
 friend class X11KeyBinder;
 friend class X11Client;
+friend class X11Container;
 friend class Default;
 friend class DebugClient;
 friend class Compositor::X11ClientFrame;
@@ -131,7 +144,16 @@ public:
 	~DebugClient();
 	virtual void AdjustSurface1(){};
 	void UpdateTranslation();
-	void Focus();
+	const X11Backend *pbackend;
+};
+
+class DebugContainer : public WManager::Container{
+public:
+	DebugContainer(class X11Backend *);
+	DebugContainer(WManager::Container *, class X11Backend *);
+	~DebugContainer();
+	void Focus1();
+	void Stack1();
 	const X11Backend *pbackend;
 };
 
