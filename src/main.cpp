@@ -143,6 +143,9 @@ public:
 	}
 
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
+		//Containers should be created always under the parent of the current focus.
+		//config script should manage this (point to container which should be the parent of the
+		//new one), while also setting some of the parameters like border width and such.
 		WManager::Container *pcontainer = new Backend::X11Container(proot,this);
 		pcontainer->borderWidth = glm::vec2(0.02f);
 		//pcontainer->minSize = glm::vec2(0.4f); //needs to be set as constructor params
@@ -163,8 +166,13 @@ public:
 
 	void DestroyClient(Backend::X11Client *pclient){
 		pclient->pcontainer->Remove();
-		if(pclient->pcontainer->pParent->focusQueue.size() > 0)
-			Config::BackendInterface::SetFocus(pclient->pcontainer->pParent->focusQueue.back());
+		Config::BackendInterface::pfocus = proot;
+		//find the first parent which has clients available to be focused
+		for(WManager::Container *pcontainer = pclient->pcontainer->pParent; pcontainer; pcontainer = pcontainer->pParent)
+			if(pcontainer->focusQueue.size() > 0){
+				Config::BackendInterface::SetFocus(pcontainer->focusQueue.back());
+				break;
+			}
 		delete pclient->pcontainer;
 		delete pclient;
 	}
@@ -213,8 +221,12 @@ public:
 
 	void DestroyClient(Backend::DebugClient *pclient){
 		pclient->pcontainer->Remove();
-		if(pclient->pcontainer->pParent->focusQueue.size() > 0)
-			Config::BackendInterface::SetFocus(pclient->pcontainer->pParent->focusQueue.back());
+		Config::BackendInterface::pfocus = proot;
+		for(WManager::Container *pcontainer = pclient->pcontainer->pParent; pcontainer; pcontainer = pcontainer->pParent)
+			if(pcontainer->focusQueue.size() > 0){
+				Config::BackendInterface::SetFocus(pcontainer->focusQueue.back());
+				break;
+			}
 		delete pclient->pcontainer;
 		delete pclient;
 	}

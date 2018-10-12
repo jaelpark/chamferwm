@@ -37,7 +37,7 @@ class Backend(chamfer.Backend):
 
 		binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
 	
-	def SetupClient(self, client):
+	def OnSetupClient(self, client):
 		#
 		pass;
 
@@ -51,8 +51,12 @@ class Backend(chamfer.Backend):
 		print("key press: {}".format(keyId));
 		focus = chamfer.GetFocus();
 		parent = focus.GetParent();
+		if parent is None:
+			return; #root container
 
 		if keyId == Key.FOCUS_RIGHT.value and parent.layout == chamfer.layout.VSPLIT:
+			#should GetNext() jump to the next container in parent if this is the last in this level?
+			#maybe additional GetNext2() for that
 			focus = focus.GetNext();
 			chamfer.SetFocus(focus);
 

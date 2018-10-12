@@ -171,26 +171,6 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readonly("layout",&WManager::Container::layout)
 		;
 	
-	/*boost::python::class_<Backend::X11Container>("Container",boost::python::no_init)
-		.def("GetNext",&Backend::X11Container::GetNext,boost::python::return_value_policy<boost::python::reference_existing_object>())
-		.def("GetPrev",&Backend::X11Container::GetPrev,boost::python::return_value_policy<boost::python::reference_existing_object>())
-		.def("GetParent",&Backend::X11Container::GetParent,boost::python::return_value_policy<boost::python::reference_existing_object>())
-		.def("GetFocus",&Backend::X11Container::GetFocus,boost::python::return_value_policy<boost::python::reference_existing_object>())
-
-		.def("ShiftLayout",&Backend::X11Container::SetLayout)
-		.def_readonly("layout",&Backend::X11Container::layout)
-		;
-
-	boost::python::class_<Backend::DebugContainer>("Container",boost::python::no_init)
-		.def("GetNext",&Backend::DebugContainer::GetNext,boost::python::return_value_policy<boost::python::reference_existing_object>())
-		.def("GetPrev",&Backend::DebugContainer::GetPrev,boost::python::return_value_policy<boost::python::reference_existing_object>())
-		.def("GetParent",&Backend::DebugContainer::GetParent,boost::python::return_value_policy<boost::python::reference_existing_object>())
-		.def("GetFocus",&Backend::DebugContainer::GetFocus,boost::python::return_value_policy<boost::python::reference_existing_object>())
-
-		.def("ShiftLayout",&Backend::DebugContainer::SetLayout)
-		.def_readonly("layout",&Backend::DebugContainer::layout)
-		;*/
-	
 	boost::python::def("GetFocus",&BackendInterface::GetFocus,boost::python::return_value_policy<boost::python::reference_existing_object>());
 	boost::python::def("SetFocus",&BackendInterface::SetFocus);
 }
