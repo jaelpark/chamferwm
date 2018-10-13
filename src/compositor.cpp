@@ -991,6 +991,9 @@ bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 			return true;
 		}
 
+		if(pclient->rect.w < pev->area.x+pev->area.width || pclient->rect.h < pev->area.y+pev->area.height)
+			return true; //filter out outdated events after client shrink in size
+
 		//ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pclient);
 		X11ClientFrame *pclientFrame = dynamic_cast<X11ClientFrame *>(pclient);
 		if(std::find(updateQueue.begin(),updateQueue.end(),pclientFrame) == updateQueue.end())
