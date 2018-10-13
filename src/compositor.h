@@ -37,6 +37,7 @@ protected:
 	std::vector<PipelineDescriptorSet> descSets;
 	struct timespec creationTime;
 	float time;
+	bool fullRegionUpdate;
 };
 
 class CompositorInterface{

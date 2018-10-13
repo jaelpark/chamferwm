@@ -11,8 +11,9 @@
 
 namespace Compositor{
 
-ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f){
+ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), fullRegionUpdate(false){
 	pcomp->updateQueue.push_back(this);
+	fullRegionUpdate = true;
 
 	ptexture = pcomp->CreateTexture(w,h);
 	if(!AssignPipeline(pcomp->pdefaultPipeline))
@@ -69,6 +70,7 @@ void ClientFrame::AdjustSurface(uint w, uint h){
 	pcomp->ReleaseTexture(ptexture);
 
 	pcomp->updateQueue.push_back(this);
+	fullRegionUpdate = true;
 
 	ptexture = pcomp->CreateTexture(w,h);
 	//In this case updating the descriptor sets would be enough, but we can't do that because of them being used currently by frames in flight.
@@ -879,11 +881,16 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	unsigned char *pdata = (unsigned char *)ptexture->Map();
 
 	unsigned char *pchpixels = xcb_get_image_data(pimageReply);
-	//memcpy(pdata,pchpixels,rect.w*rect.h*4);
-	for(VkRect2D &rect1 : damageRegions){
-		for(uint y = rect1.offset.y, Y = y+rect1.extent.height; y < Y; ++y){
-			uint offset = 4*(rect.w*y+rect1.offset.x);
-			memcpy(pdata+offset,pchpixels+offset,4*rect1.extent.width);
+	if(fullRegionUpdate){
+		memcpy(pdata,pchpixels,rect.w*rect.h*4);
+		fullRegionUpdate = false;
+
+	}else{
+		for(VkRect2D &rect1 : damageRegions){
+			for(uint y = rect1.offset.y, Y = y+rect1.extent.height; y < Y; ++y){
+				uint offset = 4*(rect.w*y+rect1.offset.x);
+				memcpy(pdata+offset,pchpixels+offset,4*rect1.extent.width);
+			}
 		}
 	}
 
