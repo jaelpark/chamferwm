@@ -287,6 +287,12 @@ bool Default::HandleEvent(){
 		switch(pevent->response_type & 0x7f){
 		case XCB_CONFIGURE_REQUEST:{
 			xcb_configure_request_event_t *pev = (xcb_configure_request_event_t*)pevent;
+
+			//check if window already exists
+			//further configuration should be blocked (for example Firefox on restore session)
+			if(FindClient(pev->window))
+				break;
+
 			struct{
 				uint16_t m;
 				uint32_t v;
