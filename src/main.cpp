@@ -1,7 +1,7 @@
 #include "main.h"
-#include "config.h"
 #include "container.h"
 #include "backend.h"
+#include "config.h"
 #include "CompositorResource.h"
 #include "compositor.h"
 
@@ -138,7 +138,7 @@ public:
 
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
 		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
-		Config::BackendInterface::pbackendInt->SetupKeys(pkeyBinder11);
+		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11);
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
@@ -146,6 +146,9 @@ public:
 		//Containers should be created always under the parent of the current focus.
 		//config script should manage this (point to container which should be the parent of the
 		//new one), while also setting some of the parameters like border width and such.
+		//Config::SetupProxy setup;
+		//Config::BackendInterface::pbackendInt->OnSetupClient(setup);
+
 		WManager::Container *pcontainer = new Backend::X11Container(proot,this);
 		pcontainer->borderWidth = glm::vec2(0.02f);
 		//pcontainer->minSize = glm::vec2(0.4f); //needs to be set as constructor params
@@ -194,7 +197,10 @@ public:
 
 class DebugBackend : public Backend::Debug, public RunBackend{
 public:
-	DebugBackend() : Debug(), RunBackend(new Backend::DebugContainer(this)){
+	//DebugBackend() : Debug(), RunBackend(new Backend::DebugContainer(this)){
+	DebugBackend() : Debug(), RunBackend(new Config::DebugContainerConfig(this)){
+		dynamic_cast<Config::DebugContainerConfig *>(proot)->pcontainerInt = new Config::ContainerProxy();
+
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -204,7 +210,19 @@ public:
 	}
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
-		WManager::Container *pcontainer = new Backend::DebugContainer(proot,this);
+		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
+		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
+		if(!containerExtract.check()){
+			DebugPrintf(stderr,"Invalid container object returned.\n");
+			return 0;
+		}
+		Config::ContainerInterface &containerInt = containerExtract();
+		containerInt.OnSetup();
+		//printf("%f, %f\n",boost::python::extract<double>(containerInt.minSize[0])(),boost::python::extract<double>(containerInt.minSize[1])());
+
+		//WManager::Container *pcontainer = new Backend::DebugContainer(proot,this);
+		//WManager::Container *pcontainer = new Config::DebugContainerConfig(&containerInt,proot,this);
+		Config::DebugContainerConfig *pcontainer = new Config::DebugContainerConfig(&containerInt,proot,this);
 		pcontainer->borderWidth = glm::vec2(0.02f);
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		Backend::DebugClient *pclient;
@@ -233,7 +251,7 @@ public:
 
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
 		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
-		Config::BackendInterface::pbackendInt->SetupKeys(pkeyBinder11);
+		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11);
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 

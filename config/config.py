@@ -11,9 +11,17 @@ class Key(Enum):
 	FOCUS_CHILD = auto()
 
 	LAYOUT = auto()
+	SPLIT_V = auto()
 
+class Container(chamfer.ContainerA):
+	def OnSetup(self): #later on this will take parameters
+		print("OnSetup");
+		self.minSize = (0.4,0.2);
+		self.test = 23.0;
+		print(self.minSize);
+		
 class Backend(chamfer.Backend):
-	def SetupKeys(self, binder):
+	def OnSetupKeys(self, binder):
 		print("setting up keys...");
 
 		binder.BindKey(ord('l'),chamfer.MOD_MASK_1,Key.FOCUS_RIGHT.value);
@@ -24,6 +32,7 @@ class Backend(chamfer.Backend):
 		binder.BindKey(ord('x'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
 
 		binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
+		#bunder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
 
 		#/ - search for a window
 		#n - next match
@@ -37,13 +46,30 @@ class Backend(chamfer.Backend):
 
 		binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
 	
-	def OnSetupClient(self, client):
-		#
-		pass;
+	#def OnSetupClient(self, client):
+		#client.borderWidth = (0.02,0.02);
+		#print(client.minSize);
+		#client.minSize = (0.4,0.2); #note: doesn't work. client is a copy object
+		#print(client.minSize);
+		#print(client.minSize);
+
+		#return the container under which to create this new one
+		#focus = chamfer.GetFocus();
+		#parent = focus.GetParent();
+		#if parent is None:
+		#	return focus;
+		#return parent;
+		#TODO: self.borderWidth?
+
+		#client.SetBorderWidth(0.02,0.02);
+		#client.SetParent(parent);
+		#pass
+	
+	def OnCreateContainer(self):
+		print("OnCreateContainer()");
+		return Container();
 
 	def OnCreateClient(self, client):
-		#TODO: define minimum and maximum dimensions. Minimum size clients will start overlapping,
-		#while clients exceeding the maximum won't stretch any further.
 		container = client.GetContainer();
 		chamfer.SetFocus(container);
 
@@ -78,6 +104,10 @@ class Backend(chamfer.Backend):
 				chamfer.layout.HSPLIT:chamfer.layout.VSPLIT
 			}[parent.layout];
 			parent.ShiftLayout(layout); #TODO: layout = ..., use UpdateLayout() to update all changes?
+		
+		elif keyId == Key.SPLIT_V.value:
+			#arm the container split
+			pass;
 	
 	def OnKeyRelease(self, keyId):
 		print("key release: {}".format(keyId));

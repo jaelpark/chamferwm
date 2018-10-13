@@ -18,8 +18,6 @@ public:
 	//
 	//virtual functions for the backend implementation
 	virtual void UpdateTranslation() = 0;
-	//virtual void Focus() = 0; //TODO: these should be in container class
-	//virtual void Stack() = 0;
 	//Resize
 	//SetLayer
 	//virtual Rectangle GetRect() const = 0;

@@ -15,6 +15,40 @@ class Container;
 
 namespace Config{
 
+class ContainerInterface{
+public:
+	ContainerInterface();
+	virtual ~ContainerInterface();
+	virtual void OnSetup();
+	//void Link(container); //copy the settings to the container
+	boost::python::tuple borderWidth;
+	boost::python::tuple minSize;
+	boost::python::tuple maxSize;
+};
+
+class ContainerProxy : public ContainerInterface, public boost::python::wrapper<ContainerInterface>{
+public:
+	ContainerProxy();
+	~ContainerProxy();
+	void OnSetup();
+};
+
+class X11ContainerConfig : public Backend::X11Container{
+public:
+	X11ContainerConfig(ContainerInterface *, WManager::Container *, class Backend::X11Backend *);
+	//X11ContainerConfig(class Backend::X11Backend *);
+	~X11ContainerConfig();
+	ContainerInterface *pcontainerInt;
+};
+
+class DebugContainerConfig : public Backend::DebugContainer{
+public:
+	DebugContainerConfig(ContainerInterface *, WManager::Container *, class Backend::X11Backend *);
+	DebugContainerConfig(class Backend::X11Backend *);
+	~DebugContainerConfig();
+	ContainerInterface *pcontainerInt;
+};
+
 class ClientProxy{
 public:
 	ClientProxy();
@@ -28,7 +62,9 @@ class BackendInterface{
 public:
 	BackendInterface();
 	virtual ~BackendInterface();
-	virtual void SetupKeys(Backend::X11KeyBinder *);
+	virtual void OnSetupKeys(Backend::X11KeyBinder *);
+	//virtual void OnSetupClient(const SetupProxy &);
+	virtual boost::python::object OnCreateContainer();
 	virtual void OnCreateClient(const ClientProxy &);
 	virtual void OnKeyPress(uint);
 	virtual void OnKeyRelease(uint);
@@ -47,7 +83,9 @@ public:
 	BackendProxy();
 	~BackendProxy();
 	//
-	void SetupKeys(Backend::X11KeyBinder *);
+	void OnSetupKeys(Backend::X11KeyBinder *);
+	//void OnSetupClient(const SetupProxy &);
+	boost::python::object OnCreateContainer();
 	void OnCreateClient(const ClientProxy &);
 	void OnKeyPress(uint);
 	void OnKeyRelease(uint);

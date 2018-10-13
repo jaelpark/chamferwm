@@ -1,10 +1,61 @@
 #include "main.h"
-#include "config.h"
 #include "container.h"
 #include "backend.h"
+#include "config.h"
 #include <xcb/xcb_keysyms.h> //todo: should not depend on xcb here
 
 namespace Config{
+
+ContainerInterface::ContainerInterface() :
+borderWidth(boost::python::make_tuple(0.0f,0.0f)),
+minSize(boost::python::make_tuple(0.0f,0.0f)),
+maxSize(boost::python::make_tuple(1.0f,1.0f)){
+	//
+}
+
+ContainerInterface::~ContainerInterface(){
+	//
+}
+
+void ContainerInterface::OnSetup(){
+	//
+}
+
+ContainerProxy::ContainerProxy() : ContainerInterface(){
+	//
+}
+
+ContainerProxy::~ContainerProxy(){
+	//
+}
+
+void ContainerProxy::OnSetup(){
+	boost::python::override ovr = this->get_override("OnSetup");
+	if(ovr)
+		ovr();
+	else ContainerInterface::OnSetup();
+}
+
+X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, Backend::X11Backend *_pbackend) : Backend::X11Container(_pParent,_pbackend), pcontainerInt(_pcontainerInt){
+	//
+}
+
+X11ContainerConfig::~X11ContainerConfig(){
+	//
+}
+
+DebugContainerConfig::DebugContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pParent,_pbackend), pcontainerInt(_pcontainerInt){
+	//
+}
+
+DebugContainerConfig::DebugContainerConfig(Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pbackend), pcontainerInt(0){
+	//
+}
+
+DebugContainerConfig::~DebugContainerConfig(){
+	//
+}
+
 
 ClientProxy::ClientProxy() : pclient(0){
 	//
@@ -30,9 +81,13 @@ BackendInterface::~BackendInterface(){
 	//
 }
 
-void BackendInterface::SetupKeys(Backend::X11KeyBinder *pkeyBinder){
+void BackendInterface::OnSetupKeys(Backend::X11KeyBinder *pkeyBinder){
 	//
 	DebugPrintf(stdout,"No KeyConfig interface, skipping configuration.\n");
+}
+
+boost::python::object BackendInterface::OnCreateContainer(){
+	//TODO
 }
 
 void BackendInterface::OnCreateClient(const ClientProxy &client){
@@ -75,18 +130,25 @@ BackendProxy::~BackendProxy(){
 	//
 }
 
+void BackendProxy::OnSetupKeys(Backend::X11KeyBinder *pkeyBinder){
+	boost::python::override ovr = this->get_override("OnSetupKeys");
+	if(ovr)
+		ovr(pkeyBinder);
+	else BackendInterface::OnSetupKeys(pkeyBinder);
+}
+
+boost::python::object BackendProxy::OnCreateContainer(){
+	boost::python::override ovr = this->get_override("OnCreateContainer");
+	if(ovr)
+		return ovr();
+	else return BackendInterface::OnCreateContainer();
+}
+
 void BackendProxy::OnCreateClient(const ClientProxy &client){
 	boost::python::override ovr = this->get_override("OnCreateClient");
 	if(ovr)
 		ovr(client);
 	else BackendInterface::OnCreateClient(client);
-}
-
-void BackendProxy::SetupKeys(Backend::X11KeyBinder *pkeyBinder){
-	boost::python::override ovr = this->get_override("SetupKeys");
-	if(ovr)
-		ovr(pkeyBinder);
-	else BackendInterface::SetupKeys(pkeyBinder);
 }
 
 void BackendProxy::OnKeyPress(uint keyId){
@@ -139,9 +201,18 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::class_<Backend::X11KeyBinder>("KeyBinder",boost::python::no_init)
 		.def("BindKey",&Backend::X11KeyBinder::BindKey)
 		;
+	
+	boost::python::class_<ContainerProxy,boost::noncopyable>("ContainerA") //TODO: remove A
+		.def("OnSetup",&ContainerInterface::OnSetup)
+		.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
+		.def_readwrite("minSize",&ContainerInterface::minSize)
+		.def_readwrite("maxSize",&ContainerInterface::maxSize)
+		;
 
 	boost::python::class_<BackendProxy,boost::noncopyable>("Backend")
-		.def("SetupKeys",&BackendInterface::SetupKeys)
+		.def("OnSetupKeys",&BackendInterface::OnSetupKeys)
+		//.def("OnSetupClient",&BackendInterface::OnSetupClient)
+		.def("OnCreateContainer",&BackendInterface::OnCreateContainer)
 		.def("OnCreateClient",&BackendInterface::OnCreateClient)
 		.def("OnKeyPress",&BackendInterface::OnKeyPress)
 		.def("OnKeyRelease",&BackendInterface::OnKeyRelease)
@@ -155,11 +226,10 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::enum_<WManager::Container::LAYOUT>("layout")
 		.value("VSPLIT",WManager::Container::LAYOUT_VSPLIT)
 		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT);
-		//.value("STACKED",WManager::Container::LAYOUT_STACKED)
-		//.value("TABBED",WManager::Container::LAYOUT_TABBED);
-	
+
 	boost::python::class_<ClientProxy>("Client")
-		.def("GetContainer",&ClientProxy::GetContainer,boost::python::return_value_policy<boost::python::reference_existing_object>());
+		.def("GetContainer",&ClientProxy::GetContainer,boost::python::return_value_policy<boost::python::reference_existing_object>())
+		;
 
 	boost::python::class_<WManager::Container>("Container",boost::python::no_init)
 		.def("GetNext",&WManager::Container::GetNext,boost::python::return_value_policy<boost::python::reference_existing_object>())
