@@ -48,6 +48,7 @@ boost::python::object ContainerInterface::GetParent() const{
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pParent);
 	if(pcontainer1)
 		return pcontainer1->pcontainerInt->self;
+	printf("fail\n");
 	return boost::python::object();
 }
 
@@ -99,29 +100,12 @@ ContainerConfig::ContainerConfig(ContainerInterface *_pcontainerInt) : pcontaine
 	//
 }
 
-ContainerConfig::~ContainerConfig(){
-	//
-}
-
-X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, Backend::X11Backend *_pbackend) : Backend::X11Container(_pParent,_pbackend), ContainerConfig(_pcontainerInt){
-	//
-}
-
-X11ContainerConfig::~X11ContainerConfig(){
-	//
-}
-
-DebugContainerConfig::DebugContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pParent,_pbackend), ContainerConfig(_pcontainerInt){
-	//
-}
-
-DebugContainerConfig::DebugContainerConfig(Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pbackend), ContainerConfig(0){
-	//
+ContainerConfig::ContainerConfig(){
 	try{
 		//https://code.activestate.com/lists/python-cplusplus-sig/17025/
 		const char *prootsrc =
 			"import chamfer\n"
-			"class RootContainer(chamfer.ContainerA):\n"
+			"class RootContainer(chamfer.Container):\n"
 			"    pass;\n";
 		boost::python::object main = boost::python::import("__main__");
 		boost::python::object global(main.attr("__dict__"));
@@ -132,13 +116,38 @@ DebugContainerConfig::DebugContainerConfig(Backend::X11Backend *_pbackend) : Bac
 		boost::python::object object = type();
 		boost::python::incref(object.ptr());
 		pcontainerInt = &boost::python::extract<Config::ContainerInterface &>(object)();
-		pcontainerInt->pcontainer = this;
 		pcontainerInt->self = object;
 
 	}catch(boost::python::error_already_set &){
 
 		PyErr_Print();
 	}
+}
+
+ContainerConfig::~ContainerConfig(){
+	//
+}
+
+X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, Backend::X11Backend *_pbackend) : Backend::X11Container(_pParent,_pbackend), ContainerConfig(_pcontainerInt){
+	//
+}
+
+X11ContainerConfig::X11ContainerConfig(Backend::X11Backend *_pbackend) : Backend::X11Container(_pbackend), ContainerConfig(){
+	//
+	pcontainerInt->pcontainer = this;
+}
+
+X11ContainerConfig::~X11ContainerConfig(){
+	//
+}
+
+DebugContainerConfig::DebugContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pParent,_pbackend), ContainerConfig(_pcontainerInt){
+	//
+}
+
+DebugContainerConfig::DebugContainerConfig(Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pbackend), ContainerConfig(){
+	//
+	pcontainerInt->pcontainer = this;
 }
 
 DebugContainerConfig::~DebugContainerConfig(){
@@ -267,7 +276,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("BindKey",&Backend::X11KeyBinder::BindKey)
 		;
 	
-	boost::python::class_<ContainerProxy,boost::noncopyable>("ContainerA") //TODO: remove A
+	boost::python::class_<ContainerProxy,boost::noncopyable>("Container")
 		.def("OnSetup",&ContainerInterface::OnSetup)
 		.def("OnCreate",&ContainerInterface::OnCreate)
 		.def("GetNext",&ContainerInterface::GetNext)

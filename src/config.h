@@ -25,7 +25,6 @@ public:
 	boost::python::object GetPrev() const;
 	boost::python::object GetParent() const;
 	boost::python::object GetFocus() const;
-	//void ShiftLayout(WManager::Container::LAYOUT);
 	//void Link(container); //copy the settings to the container
 	boost::python::tuple borderWidth;
 	boost::python::tuple minSize;
@@ -46,6 +45,7 @@ public:
 class ContainerConfig{
 public:
 	ContainerConfig(ContainerInterface *);
+	ContainerConfig();
 	virtual ~ContainerConfig();
 	ContainerInterface *pcontainerInt;
 };
@@ -53,7 +53,7 @@ public:
 class X11ContainerConfig : public Backend::X11Container, public ContainerConfig{
 public:
 	X11ContainerConfig(ContainerInterface *, WManager::Container *, class Backend::X11Backend *);
-	//X11ContainerConfig(class Backend::X11Backend *);
+	X11ContainerConfig(class Backend::X11Backend *);
 	~X11ContainerConfig();
 };
 

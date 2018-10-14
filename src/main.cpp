@@ -127,7 +127,7 @@ protected:
 
 class DefaultBackend : public Backend::Default, public RunBackend{
 public:
-	DefaultBackend() : Default(), RunBackend(new Backend::X11Container(this)){
+	DefaultBackend() : Default(), RunBackend(new Config::X11ContainerConfig(this)){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -146,14 +146,20 @@ public:
 		//Containers should be created always under the parent of the current focus.
 		//config script should manage this (point to container which should be the parent of the
 		//new one), while also setting some of the parameters like border width and such.
-		//Config::SetupProxy setup;
-		//Config::BackendInterface::pbackendInt->OnSetupClient(setup);
+		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
+		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
+		if(!containerExtract.check()){
+			DebugPrintf(stderr,"Invalid container object returned.\n");
+			return 0;
+		}
+		Config::ContainerInterface &containerInt = containerExtract();
+		containerInt.self = containerObject;
+		containerInt.OnSetup();
 
-		WManager::Container *pcontainer = new Backend::X11Container(proot,this);
+		Config::X11ContainerConfig *pcontainer = new Config::X11ContainerConfig(&containerInt,proot,this);
+		containerInt.pcontainer = pcontainer;
 		pcontainer->borderWidth = glm::vec2(0.02f);
-		//pcontainer->minSize = glm::vec2(0.4f); //needs to be set as constructor params
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
-		//TODO: All the dimension related parameters should be set before the container is created and the siblings adjusted.
 
 		Backend::X11Client *pclient11;
 		if(!pcomp11)
@@ -161,8 +167,7 @@ public:
 		else pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pcomp11);
 		pcontainer->pclient = pclient11;
 
-		//Config::ClientProxy client(pclient11);
-		//Config::BackendInterface::pbackendInt->OnCreateClient(client);
+		containerInt.OnCreate();
 
 		return pclient11;
 	}
@@ -219,8 +224,6 @@ public:
 		containerInt.OnSetup();
 		//printf("%f, %f\n",boost::python::extract<double>(containerInt.minSize[0])(),boost::python::extract<double>(containerInt.minSize[1])());
 
-		//WManager::Container *pcontainer = new Backend::DebugContainer(proot,this);
-		//WManager::Container *pcontainer = new Config::DebugContainerConfig(&containerInt,proot,this);
 		Config::DebugContainerConfig *pcontainer = new Config::DebugContainerConfig(&containerInt,proot,this);
 		containerInt.pcontainer = pcontainer;
 		pcontainer->borderWidth = glm::vec2(0.02f);
@@ -232,23 +235,6 @@ public:
 		pcontainer->pclient = pclient;
 
 		containerInt.OnCreate();
-		/*try{
-			Config::ClientProxy client(pclient);
-			Config::BackendInterface::pbackendInt->OnCreateClient(client);
-
-		}catch(boost::python::error_already_set &){
-			PyObject *ptype, *pvalue, *ptrace;
-			PyErr_Fetch(&ptype,&pvalue,&ptrace);
-		
-			//https://stackoverflow.com/questions/1418015/how-to-get-python-exception-text
-			std::string msg = boost::python::extract<std::string>(pvalue);
-			printf("%s\n",msg.c_str());
-
-			//or: PyErr_Print();
-
-			boost::python::handle_exception();
-			PyErr_Clear();
-		}*/
 
 		return pclient;
 	}

@@ -13,9 +13,8 @@ class Key(Enum):
 	LAYOUT = auto()
 	SPLIT_V = auto()
 
-class Container(chamfer.ContainerA):
+class Container(chamfer.Container):
 	def OnSetup(self): #later on this will take parameters
-		print("OnSetup");
 		self.minSize = (0.4,0.2);
 		
 		#focus = chamfer.GetFocus();
@@ -25,6 +24,7 @@ class Container(chamfer.ContainerA):
 		#return parent;
 	
 	def OnCreate(self):
+		print("OnCreate");
 		self.Focus();
 		
 class Backend(chamfer.Backend):

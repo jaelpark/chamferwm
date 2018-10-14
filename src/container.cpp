@@ -46,7 +46,6 @@ Container::Container(Container *_pParent) : pParent(_pParent), pch(0), pnext(0),
 		pclient->pcontainer = this;
 	}
 
-	//pParent->SetTranslation(pParent->p,pParent->e);
 	pParent->Stack();
 	pParent->Translate();
 }
@@ -76,8 +75,7 @@ void Container::Focus(){
 		pParent->focusQueue.erase(std::remove(pParent->focusQueue.begin(),pParent->focusQueue.end(),this),pParent->focusQueue.end());
 		pParent->focusQueue.push_back(this);
 	}
-	//if(pclient)
-		//pclient->Focus();
+
 	Focus1();
 	pParent->Stack();
 }
@@ -218,7 +216,6 @@ void Container::Stack(){
 
 	std::sort(stackQueue.begin(),stackQueue.end(),[&](Container *pa, Container *pb)->bool{
 		return pb == pfocus || pb->p[layout] > pfocus->p[layout]+pfocus->e[layout] || pb->p[layout]+pb->e[layout] < pfocus->p[layout];
-		//
 	});
 
 	Stack1();
@@ -226,7 +223,6 @@ void Container::Stack(){
 
 void Container::SetLayout(LAYOUT layout){
 	this->layout = layout;
-	//SetTranslation(p,e);
 	Translate();
 }
 
