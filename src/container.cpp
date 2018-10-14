@@ -20,9 +20,10 @@ Container::Container() : pParent(0), pch(0), pnext(0),
 	//
 }
 
-Container::Container(Container *_pParent) : pParent(_pParent), pch(0), pnext(0),
+Container::Container(Container *_pParent, const Container::Setup &setup) :
+	pParent(_pParent), pch(0), pnext(0),
 	pclient(0),
-	scale(1.0f), borderWidth(0.0f), minSize(0.4f), maxSize(1.0f),
+	scale(1.0f), borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize),
 	layout(LAYOUT_VSPLIT){
 	
 	if(pParent->focusQueue.size() > 0){
@@ -65,7 +66,6 @@ void Container::Remove(){
 			break;
 		}
 	
-	//pParent->SetTranslation(pParent->p,pParent->e);
 	pParent->Stack();
 	pParent->Translate();
 }
@@ -226,7 +226,7 @@ void Container::SetLayout(LAYOUT layout){
 	Translate();
 }
 
-void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
+/*void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
 	glm::vec2 scaleSum(0.0f);
 	for(Container *pcontainer = pch; pcontainer; scaleSum += pcontainer->scale, pcontainer = pcontainer->pnext);
 
@@ -252,7 +252,7 @@ void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
 	this->e = e;
 	if(pclient)
 		pclient->UpdateTranslation();
-}
+}*/
 
 }
 

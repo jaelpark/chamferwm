@@ -83,7 +83,7 @@ public:
 class X11Container : public WManager::Container{
 public:
 	X11Container(class X11Backend *);
-	X11Container(WManager::Container *, class X11Backend *);
+	X11Container(WManager::Container *, const WManager::Container::Setup &, class X11Backend *);
 	virtual ~X11Container();
 	void Focus1();
 	void StackRecursive(WManager::Container *);
@@ -150,7 +150,7 @@ public:
 class DebugContainer : public WManager::Container{
 public:
 	DebugContainer(class X11Backend *);
-	DebugContainer(WManager::Container *, class X11Backend *);
+	DebugContainer(WManager::Container *, const WManager::Container::Setup &, class X11Backend *);
 	virtual ~DebugContainer();
 	void Focus1();
 	void Stack1();

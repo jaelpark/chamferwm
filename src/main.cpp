@@ -156,9 +156,11 @@ public:
 		containerInt.self = containerObject;
 		containerInt.OnSetup();
 
-		Config::X11ContainerConfig *pcontainer = new Config::X11ContainerConfig(&containerInt,proot,this);
+		WManager::Container::Setup setup;
+		containerInt.CopySettings(setup);
+
+		Config::X11ContainerConfig *pcontainer = new Config::X11ContainerConfig(&containerInt,proot,setup,this);
 		containerInt.pcontainer = pcontainer;
-		pcontainer->borderWidth = glm::vec2(0.02f);
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 
 		Backend::X11Client *pclient11;
@@ -222,11 +224,12 @@ public:
 		Config::ContainerInterface &containerInt = containerExtract();
 		containerInt.self = containerObject;
 		containerInt.OnSetup();
-		//printf("%f, %f\n",boost::python::extract<double>(containerInt.minSize[0])(),boost::python::extract<double>(containerInt.minSize[1])());
 
-		Config::DebugContainerConfig *pcontainer = new Config::DebugContainerConfig(&containerInt,proot,this);
+		WManager::Container::Setup setup;
+		containerInt.CopySettings(setup);
+
+		Config::DebugContainerConfig *pcontainer = new Config::DebugContainerConfig(&containerInt,proot,setup,this);
 		containerInt.pcontainer = pcontainer;
-		pcontainer->borderWidth = glm::vec2(0.02f);
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		Backend::DebugClient *pclient;
 		if(!pcomp11)

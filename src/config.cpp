@@ -17,6 +17,15 @@ ContainerInterface::~ContainerInterface(){
 	//
 }
 
+void ContainerInterface::CopySettings(WManager::Container::Setup &setup){
+	setup.borderWidth.x = boost::python::extract<float>(borderWidth[0])();
+	setup.borderWidth.y = boost::python::extract<float>(borderWidth[1])();
+	setup.minSize.x = boost::python::extract<float>(minSize[0])();
+	setup.minSize.y = boost::python::extract<float>(minSize[1])();
+	setup.maxSize.x = boost::python::extract<float>(maxSize[0])();
+	setup.maxSize.y = boost::python::extract<float>(maxSize[1])();
+}
+
 void ContainerInterface::OnSetup(){
 	//
 }
@@ -48,7 +57,6 @@ boost::python::object ContainerInterface::GetParent() const{
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pParent);
 	if(pcontainer1)
 		return pcontainer1->pcontainerInt->self;
-	printf("fail\n");
 	return boost::python::object();
 }
 
@@ -101,6 +109,8 @@ ContainerConfig::ContainerConfig(ContainerInterface *_pcontainerInt) : pcontaine
 }
 
 ContainerConfig::ContainerConfig(){
+	//TODO: setting root node properties (e.g. maxSize) should be allowed, this can be used for example
+	//to make space for docks and other widgets
 	try{
 		//https://code.activestate.com/lists/python-cplusplus-sig/17025/
 		const char *prootsrc =
@@ -128,7 +138,7 @@ ContainerConfig::~ContainerConfig(){
 	//
 }
 
-X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, Backend::X11Backend *_pbackend) : Backend::X11Container(_pParent,_pbackend), ContainerConfig(_pcontainerInt){
+X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, const WManager::Container::Setup &_setup, Backend::X11Backend *_pbackend) : Backend::X11Container(_pParent,_setup,_pbackend), ContainerConfig(_pcontainerInt){
 	//
 }
 
@@ -141,7 +151,7 @@ X11ContainerConfig::~X11ContainerConfig(){
 	//
 }
 
-DebugContainerConfig::DebugContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pParent,_pbackend), ContainerConfig(_pcontainerInt){
+DebugContainerConfig::DebugContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, const WManager::Container::Setup &_setup, Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pParent,_setup,_pbackend), ContainerConfig(_pcontainerInt){
 	//
 }
 
@@ -318,7 +328,6 @@ BOOST_PYTHON_MODULE(chamfer){
 		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT);
 
 	boost::python::def("GetFocus",&BackendInterface::GetFocus);
-	//boost::python::def("SetFocus",&BackendInterface::SetFocus);
 }
 
 Loader::Loader(const char *pargv0){

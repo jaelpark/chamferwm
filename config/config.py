@@ -15,7 +15,9 @@ class Key(Enum):
 
 class Container(chamfer.Container):
 	def OnSetup(self): #later on this will take parameters
-		self.minSize = (0.4,0.2);
+		self.borderWidth = (0.02,0.02);
+		self.minSize = (0.4,0.3);
+		self.splitArmed = False;
 		
 		#focus = chamfer.GetFocus();
 		#parent = focus.GetParent();
@@ -24,7 +26,6 @@ class Container(chamfer.Container):
 		#return parent;
 	
 	def OnCreate(self):
-		print("OnCreate");
 		self.Focus();
 		
 class Backend(chamfer.Backend):
@@ -63,6 +64,8 @@ class Backend(chamfer.Backend):
 		parent = focus.GetParent();
 		if parent is None:
 			return; #root container
+
+		print(focus.splitArmed);
 
 		if keyId == Key.FOCUS_RIGHT.value and parent.layout == chamfer.layout.VSPLIT:
 			#should GetNext() jump to the next container in parent if this is the last in this level?

@@ -28,8 +28,15 @@ public:
 
 class Container{
 public:
+	struct Setup{
+		//Border width can be set anytime before the client creation
+		glm::vec2 borderWidth = glm::vec2(0.0f);
+		//For performance reasons, the min/maxSize has to be known before the container is created.
+		glm::vec2 minSize = glm::vec2(0.0f);
+		glm::vec2 maxSize = glm::vec2(1.0f);
+	};
 	Container(); //root container
-	Container(Container *);
+	Container(Container *, const Setup &);
 	virtual ~Container();
 	void SetTranslation(glm::vec2, glm::vec2);
 	void Remove();
@@ -40,7 +47,6 @@ public:
 	Container * GetFocus();
 
 	glm::vec2 GetMinSize() const;
-	//glm::vec2 GetOverlap(glm::vec2) const;
 	void TranslateRecursive(glm::vec2, glm::vec2);
 	void Translate();
 	void Stack();

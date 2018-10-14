@@ -144,7 +144,7 @@ X11Container::X11Container(class X11Backend *_pbackend) : WManager::Container(),
 	//
 }
 
-X11Container::X11Container(WManager::Container *_pParent, class X11Backend *_pbackend) : WManager::Container(_pParent), pbackend(_pbackend){
+X11Container::X11Container(WManager::Container *_pParent, const WManager::Container::Setup &_setup, class X11Backend *_pbackend) : WManager::Container(_pParent,_setup), pbackend(_pbackend){
 	//
 }
 
@@ -477,7 +477,7 @@ DebugContainer::DebugContainer(class X11Backend *_pbackend) : WManager::Containe
 	//
 }
 
-DebugContainer::DebugContainer(WManager::Container *_pParent, class X11Backend *_pbackend) : WManager::Container(_pParent), pbackend(_pbackend){
+DebugContainer::DebugContainer(WManager::Container *_pParent, const WManager::Container::Setup &_setup, class X11Backend *_pbackend) : WManager::Container(_pParent,_setup), pbackend(_pbackend){
 	//
 }
 

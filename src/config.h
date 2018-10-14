@@ -19,6 +19,7 @@ class ContainerInterface{
 public:
 	ContainerInterface();
 	virtual ~ContainerInterface();
+	void CopySettings(WManager::Container::Setup &);
 	virtual void OnSetup();
 	virtual void OnCreate();
 	boost::python::object GetNext() const;
@@ -52,14 +53,14 @@ public:
 
 class X11ContainerConfig : public Backend::X11Container, public ContainerConfig{
 public:
-	X11ContainerConfig(ContainerInterface *, WManager::Container *, class Backend::X11Backend *);
+	X11ContainerConfig(ContainerInterface *, WManager::Container *, const WManager::Container::Setup &, class Backend::X11Backend *);
 	X11ContainerConfig(class Backend::X11Backend *);
 	~X11ContainerConfig();
 };
 
 class DebugContainerConfig : public Backend::DebugContainer, public ContainerConfig{
 public:
-	DebugContainerConfig(ContainerInterface *, WManager::Container *, class Backend::X11Backend *);
+	DebugContainerConfig(ContainerInterface *, WManager::Container *, const WManager::Container::Setup &, class Backend::X11Backend *);
 	DebugContainerConfig(class Backend::X11Backend *);
 	~DebugContainerConfig();
 };
