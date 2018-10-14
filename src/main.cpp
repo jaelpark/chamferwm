@@ -161,8 +161,8 @@ public:
 		else pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pcomp11);
 		pcontainer->pclient = pclient11;
 
-		Config::ClientProxy client(pclient11);
-		Config::BackendInterface::pbackendInt->OnCreateClient(client);
+		//Config::ClientProxy client(pclient11);
+		//Config::BackendInterface::pbackendInt->OnCreateClient(client);
 
 		return pclient11;
 	}
@@ -199,8 +199,6 @@ class DebugBackend : public Backend::Debug, public RunBackend{
 public:
 	//DebugBackend() : Debug(), RunBackend(new Backend::DebugContainer(this)){
 	DebugBackend() : Debug(), RunBackend(new Config::DebugContainerConfig(this)){
-		dynamic_cast<Config::DebugContainerConfig *>(proot)->pcontainerInt = new Config::ContainerProxy();
-
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -217,12 +215,14 @@ public:
 			return 0;
 		}
 		Config::ContainerInterface &containerInt = containerExtract();
+		containerInt.self = containerObject;
 		containerInt.OnSetup();
 		//printf("%f, %f\n",boost::python::extract<double>(containerInt.minSize[0])(),boost::python::extract<double>(containerInt.minSize[1])());
 
 		//WManager::Container *pcontainer = new Backend::DebugContainer(proot,this);
 		//WManager::Container *pcontainer = new Config::DebugContainerConfig(&containerInt,proot,this);
 		Config::DebugContainerConfig *pcontainer = new Config::DebugContainerConfig(&containerInt,proot,this);
+		containerInt.pcontainer = pcontainer;
 		pcontainer->borderWidth = glm::vec2(0.02f);
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		Backend::DebugClient *pclient;
@@ -231,8 +231,24 @@ public:
 		else pclient = new Compositor::X11DebugClientFrame(pcontainer,pcreateInfo,pcomp11);
 		pcontainer->pclient = pclient;
 
-		Config::ClientProxy client(pclient);
-		Config::BackendInterface::pbackendInt->OnCreateClient(client);
+		containerInt.OnCreate();
+		/*try{
+			Config::ClientProxy client(pclient);
+			Config::BackendInterface::pbackendInt->OnCreateClient(client);
+
+		}catch(boost::python::error_already_set &){
+			PyObject *ptype, *pvalue, *ptrace;
+			PyErr_Fetch(&ptype,&pvalue,&ptrace);
+		
+			//https://stackoverflow.com/questions/1418015/how-to-get-python-exception-text
+			std::string msg = boost::python::extract<std::string>(pvalue);
+			printf("%s\n",msg.c_str());
+
+			//or: PyErr_Print();
+
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}*/
 
 		return pclient;
 	}

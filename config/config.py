@@ -17,8 +17,15 @@ class Container(chamfer.ContainerA):
 	def OnSetup(self): #later on this will take parameters
 		print("OnSetup");
 		self.minSize = (0.4,0.2);
-		self.test = 23.0;
-		print(self.minSize);
+		
+		#focus = chamfer.GetFocus();
+		#parent = focus.GetParent();
+		#if parent is None:
+		#	return focus;
+		#return parent;
+	
+	def OnCreate(self):
+		self.Focus();
 		
 class Backend(chamfer.Backend):
 	def OnSetupKeys(self, binder):
@@ -46,32 +53,9 @@ class Backend(chamfer.Backend):
 
 		binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
 	
-	#def OnSetupClient(self, client):
-		#client.borderWidth = (0.02,0.02);
-		#print(client.minSize);
-		#client.minSize = (0.4,0.2); #note: doesn't work. client is a copy object
-		#print(client.minSize);
-		#print(client.minSize);
-
-		#return the container under which to create this new one
-		#focus = chamfer.GetFocus();
-		#parent = focus.GetParent();
-		#if parent is None:
-		#	return focus;
-		#return parent;
-		#TODO: self.borderWidth?
-
-		#client.SetBorderWidth(0.02,0.02);
-		#client.SetParent(parent);
-		#pass
-	
 	def OnCreateContainer(self):
 		print("OnCreateContainer()");
 		return Container();
-
-	def OnCreateClient(self, client):
-		container = client.GetContainer();
-		chamfer.SetFocus(container);
 
 	def OnKeyPress(self, keyId):
 		print("key press: {}".format(keyId));
@@ -84,19 +68,19 @@ class Backend(chamfer.Backend):
 			#should GetNext() jump to the next container in parent if this is the last in this level?
 			#maybe additional GetNext2() for that
 			focus = focus.GetNext();
-			chamfer.SetFocus(focus);
+			focus.Focus();
 
 		elif keyId == Key.FOCUS_LEFT.value and parent.layout == chamfer.layout.VSPLIT:
 			focus = focus.GetPrev();
-			chamfer.SetFocus(focus);
+			focus.Focus();
 
 		elif keyId == Key.FOCUS_DOWN.value and parent.layout == chamfer.layout.HSPLIT:
 			focus = focus.GetNext();
-			chamfer.SetFocus(focus);
+			focus.Focus();
 
 		elif keyId == Key.FOCUS_UP.value and parent.layout == chamfer.layout.HSPLIT:
 			focus = focus.GetPrev();
-			chamfer.SetFocus(focus);
+			focus.Focus();
 			
 		elif keyId == Key.LAYOUT.value:
 			layout = {

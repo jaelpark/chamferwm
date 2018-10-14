@@ -221,8 +221,6 @@ void Container::Stack(){
 		//
 	});
 
-	//if(pclient)
-		//pclient->Stack();
 	Stack1();
 }
 
