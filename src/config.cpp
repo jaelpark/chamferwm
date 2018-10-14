@@ -3,6 +3,7 @@
 #include "backend.h"
 #include "config.h"
 #include <xcb/xcb_keysyms.h> //todo: should not depend on xcb here
+#include <X11/keysym.h>
 
 namespace Config{
 
@@ -26,8 +27,9 @@ void ContainerInterface::CopySettings(WManager::Container::Setup &setup){
 	setup.maxSize.y = boost::python::extract<float>(maxSize[1])();
 }
 
-void ContainerInterface::OnSetup(){
+boost::python::object ContainerInterface::OnSetup(){
 	//
+	return BackendInterface::GetFocus(); //TODO: sensible default
 }
 
 void ContainerInterface::OnCreate(){
@@ -76,18 +78,19 @@ ContainerProxy::~ContainerProxy(){
 	//
 }
 
-void ContainerProxy::OnSetup(){
+boost::python::object ContainerProxy::OnSetup(){
 	boost::python::override ovr = this->get_override("OnSetup");
 	if(ovr){
 		try{
-			ovr();
+			return ovr();
 		}catch(boost::python::error_already_set &){
 			PyErr_Print();
 			//
 			boost::python::handle_exception();
 			PyErr_Clear();
 		}
-	}else ContainerInterface::OnSetup();
+	}
+	return ContainerInterface::OnSetup();
 }
 
 void ContainerProxy::OnCreate(){
@@ -223,9 +226,16 @@ BackendProxy::~BackendProxy(){
 
 void BackendProxy::OnSetupKeys(Backend::X11KeyBinder *pkeyBinder){
 	boost::python::override ovr = this->get_override("OnSetupKeys");
-	if(ovr)
-		ovr(pkeyBinder);
-	else BackendInterface::OnSetupKeys(pkeyBinder);
+	if(ovr){
+		try{
+			ovr(pkeyBinder);
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else BackendInterface::OnSetupKeys(pkeyBinder);
 }
 
 boost::python::object BackendProxy::OnCreateContainer(){
@@ -281,6 +291,9 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::scope().attr("MOD_MASK_5") = uint(XCB_MOD_MASK_5);
 	boost::python::scope().attr("MOD_MASK_SHIFT") = uint(XCB_MOD_MASK_SHIFT);
 	boost::python::scope().attr("MOD_MASK_CONTROL") = uint(XCB_MOD_MASK_CONTROL);
+
+	boost::python::scope().attr("KEY_RETURN") = uint(XK_Return);
+	boost::python::scope().attr("KEY_TAB") = uint(XK_Tab);
 
 	boost::python::class_<Backend::X11KeyBinder>("KeyBinder",boost::python::no_init)
 		.def("BindKey",&Backend::X11KeyBinder::BindKey)

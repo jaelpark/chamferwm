@@ -149,21 +149,29 @@ public:
 		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
 		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
 		if(!containerExtract.check()){
-			DebugPrintf(stderr,"Invalid container object returned.\n");
+			DebugPrintf(stderr,"OnCreateContainer(): Invalid container object returned.\n");
 			return 0;
 		}
 		Config::ContainerInterface &containerInt = containerExtract();
 		containerInt.self = containerObject;
+
 		containerInt.OnSetup();
+		boost::python::object parentObject = containerInt.OnSetup();
+		boost::python::extract<Config::ContainerInterface &> parentExtract(parentObject);
+		if(!parentExtract.check()){
+			DebugPrintf(stderr,"OnSetup(): Invalid parent container object returned.\n");
+			return 0;
+		}
+		Config::ContainerInterface &parentInt = parentExtract();
 
 		WManager::Container::Setup setup;
 		containerInt.CopySettings(setup);
 
-		Config::X11ContainerConfig *pcontainer = new Config::X11ContainerConfig(&containerInt,proot,setup,this);
+		Config::X11ContainerConfig *pcontainer = new Config::X11ContainerConfig(&containerInt,parentInt.pcontainer,setup,this);
 		containerInt.pcontainer = pcontainer;
-		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 
 		Backend::X11Client *pclient11;
+		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 		if(!pcomp11)
 			pclient11 = new Backend::X11Client(pcontainer,pcreateInfo);
 		else pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pcomp11);
@@ -218,20 +226,28 @@ public:
 		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
 		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
 		if(!containerExtract.check()){
-			DebugPrintf(stderr,"Invalid container object returned.\n");
+			DebugPrintf(stderr,"OnCreateContainer(): Invalid container object returned.\n");
 			return 0;
 		}
 		Config::ContainerInterface &containerInt = containerExtract();
 		containerInt.self = containerObject;
-		containerInt.OnSetup();
+		
+		boost::python::object parentObject = containerInt.OnSetup();
+		boost::python::extract<Config::ContainerInterface &> parentExtract(parentObject);
+		if(!parentExtract.check()){
+			DebugPrintf(stderr,"OnSetup(): Invalid parent container object returned.\n");
+			return 0;
+		}
+		Config::ContainerInterface &parentInt = parentExtract();
 
 		WManager::Container::Setup setup;
 		containerInt.CopySettings(setup);
 
-		Config::DebugContainerConfig *pcontainer = new Config::DebugContainerConfig(&containerInt,proot,setup,this);
+		Config::DebugContainerConfig *pcontainer = new Config::DebugContainerConfig(&containerInt,parentInt.pcontainer,setup,this);
 		containerInt.pcontainer = pcontainer;
-		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
+
 		Backend::DebugClient *pclient;
+		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		if(!pcomp11)
 			pclient = new Backend::DebugClient(pcontainer,pcreateInfo);
 		else pclient = new Compositor::X11DebugClientFrame(pcontainer,pcreateInfo,pcomp11);

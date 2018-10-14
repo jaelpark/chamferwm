@@ -20,7 +20,7 @@ public:
 	ContainerInterface();
 	virtual ~ContainerInterface();
 	void CopySettings(WManager::Container::Setup &);
-	virtual void OnSetup();
+	virtual boost::python::object OnSetup();
 	virtual void OnCreate();
 	boost::python::object GetNext() const;
 	boost::python::object GetPrev() const;
@@ -39,7 +39,7 @@ class ContainerProxy : public ContainerInterface, public boost::python::wrapper<
 public:
 	ContainerProxy();
 	~ContainerProxy();
-	void OnSetup();
+	boost::python::object OnSetup();
 	void OnCreate();
 };
 

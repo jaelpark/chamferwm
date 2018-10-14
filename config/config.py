@@ -14,19 +14,37 @@ class Key(Enum):
 	SPLIT_V = auto()
 
 class Container(chamfer.Container):
-	def OnSetup(self): #later on this will take parameters
+	def OnSetup(self):
 		self.borderWidth = (0.02,0.02);
 		self.minSize = (0.4,0.3);
+
 		self.splitArmed = False;
+
+		focus = chamfer.GetFocus();
+		parent = focus.GetParent();
+		if parent is None:
+			return focus;
+		return parent;
 		
 		#focus = chamfer.GetFocus();
+		#return focus;
+		#if focus.splitArmed:
+		#	focus.splitArmed = False;
+		#	return focus;
+
 		#parent = focus.GetParent();
 		#if parent is None:
-		#	return focus;
+		#	return focus; #root container
+
 		#return parent;
 	
 	def OnCreate(self):
 		self.Focus();
+	
+	#def OnProperty(self):
+		#called on property changes and once before creation
+		#not called on containers without clients
+		#pass;
 		
 class Backend(chamfer.Backend):
 	def OnSetupKeys(self, binder):
@@ -40,7 +58,7 @@ class Backend(chamfer.Backend):
 		binder.BindKey(ord('x'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
 
 		binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
-		#bunder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
+		binder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
 
 		#/ - search for a window
 		#n - next match
@@ -64,8 +82,6 @@ class Backend(chamfer.Backend):
 		parent = focus.GetParent();
 		if parent is None:
 			return; #root container
-
-		print(focus.splitArmed);
 
 		if keyId == Key.FOCUS_RIGHT.value and parent.layout == chamfer.layout.VSPLIT:
 			#should GetNext() jump to the next container in parent if this is the last in this level?
@@ -94,6 +110,7 @@ class Backend(chamfer.Backend):
 		
 		elif keyId == Key.SPLIT_V.value:
 			#arm the container split
+			focus.splitArmed = not focus.splitArmed;
 			pass;
 	
 	def OnKeyRelease(self, keyId):
