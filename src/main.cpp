@@ -217,8 +217,16 @@ public:
 				Config::BackendInterface::SetFocus(pcontainer->pch);
 				break;
 			}
-		ReleaseContainersRecursive(premoved);
-		//ReleaseContainersRecursive(pcollapsed);
+		if(premoved->pch)
+			ReleaseContainersRecursive(premoved->pch);
+		if(premoved->pclient)
+			delete premoved->pclient;
+		delete premoved;
+		if(pcollapsed){
+			if(pcollapsed->pch)
+				ReleaseContainersRecursive(pcollapsed->pch);
+			delete pcollapsed;
+		}
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
@@ -266,7 +274,7 @@ public:
 
 	void DestroyClient(Backend::DebugClient *pclient){
 		WManager::Container *premoved = pclient->pcontainer->Remove();
-		//WManager::Container *pcollapsed = premoved->pParent->Collapse();
+		WManager::Container *pcollapsed = premoved->pParent->Collapse();
 		Config::BackendInterface::pfocus = proot;
 		for(WManager::Container *pcontainer = premoved->pParent; pcontainer; pcontainer = pcontainer->pParent)
 			if(pcontainer->focusQueue.size() > 0){
@@ -283,11 +291,11 @@ public:
 		if(premoved->pclient)
 			delete premoved->pclient;
 		delete premoved;
-		/*if(pcollapsed){
+		if(pcollapsed){
 			if(pcollapsed->pch)
 				ReleaseContainersRecursive(pcollapsed->pch);
 			delete pcollapsed;
-		}*/
+		}
 	}
 
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){

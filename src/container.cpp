@@ -95,17 +95,18 @@ Container * Container::Remove(){
 }
 
 Container * Container::Collapse(){
-	if(!pParent || pParent->pch->pnext)
+	if(!pParent || pch->pnext)
 		return 0;
+	//printf("---searching...\n");
 	Container *psource = pch; //'this' is the target
 	for(; psource; psource = psource->pch){
-		if(psource->pnext || psource->pclient)
-		//if(psource->pnext)
+		if(psource->pParent->pch->pnext || psource->pclient)
 			break;
 	}
 	if(!psource) //???
 		return 0; //nothing to do
 
+	//printf("---collapsing...\n");
 	std::replace(pParent->focusQueue.begin(),pParent->focusQueue.end(),this,psource);
 	for(Container *pcontainer = pParent->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
 		if(pcontainer == this){
@@ -118,7 +119,7 @@ Container * Container::Collapse(){
 	
 	pParent->Stack();
 
-	psource->pParent->pch = 0;
+	psource->pParent->pch = 0; //dereference the the source from its original parent
 	psource->pParent = pParent;
 
 	return this;
