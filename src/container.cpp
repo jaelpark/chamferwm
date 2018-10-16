@@ -280,3 +280,5 @@ void Container::SetLayout(LAYOUT layout){
 	Translate();
 }
 
+}
+
