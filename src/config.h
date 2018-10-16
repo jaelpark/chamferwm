@@ -20,13 +20,14 @@ public:
 	ContainerInterface();
 	virtual ~ContainerInterface();
 	void CopySettings(WManager::Container::Setup &);
-	virtual boost::python::object OnSetup();
+	virtual void OnSetup();
+	virtual boost::python::object OnParent();
 	virtual void OnCreate();
 	boost::python::object GetNext() const;
 	boost::python::object GetPrev() const;
 	boost::python::object GetParent() const;
 	boost::python::object GetFocus() const;
-	//void Link(container); //copy the settings to the container
+
 	boost::python::tuple borderWidth;
 	boost::python::tuple minSize;
 	boost::python::tuple maxSize;
@@ -39,7 +40,8 @@ class ContainerProxy : public ContainerInterface, public boost::python::wrapper<
 public:
 	ContainerProxy();
 	~ContainerProxy();
-	boost::python::object OnSetup();
+	void OnSetup();
+	boost::python::object OnParent();
 	void OnCreate();
 };
 
@@ -50,6 +52,14 @@ public:
 	virtual ~ContainerConfig();
 	ContainerInterface *pcontainerInt;
 };
+
+/*template<typename T>
+class BackendContainerConfig : public T, public ContainerConfig{
+public:
+	BackendContainerConfig(ContainerInterface *, WManager::Container *, const WManager::Container::Setup &, class Backend::X11Backend *);
+	BackendContainerConfig(class Backend::X11Backend *);
+	~BackendContainerConfig();
+};*/
 
 class X11ContainerConfig : public Backend::X11Container, public ContainerConfig{
 public:

@@ -643,20 +643,23 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 		//worry about stacks later
 		//stacks: render in same order, except skip focus? Focus is rendered last.
 	}*/
-	for(const WManager::Container *pcont : pcontainer->stackQueue){
-		if(!pcont->pclient)
-			continue;
-		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
-		if(!pclientFrame)
-			continue;
-		
-		RenderObject renderObject;
-		renderObject.pclient = pcont->pclient;
-		renderObject.pclientFrame = pclientFrame;
-		renderQueue.push_back(renderObject);
+	uint n = 0;
+	for(const WManager::Container *pcont = pcontainer->pch; pcont; ++n, pcont = pcont->pnext);
+	printf("queue(): %u/%u\n",pcontainer->stackQueue.size(),n);
 
-		if(pcont->pch)
-			CreateRenderQueue(pcont->pch);
+	for(const WManager::Container *pcont : pcontainer->stackQueue){
+		if(pcont->pclient){
+			ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
+			if(!pclientFrame)
+				continue;
+			
+			RenderObject renderObject;
+			renderObject.pclient = pcont->pclient;
+			renderObject.pclientFrame = pclientFrame;
+			renderQueue.push_back(renderObject);
+			printf("draw()\n");
+
+		}else CreateRenderQueue(pcont);
 	}
 }
 
@@ -691,6 +694,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	renderQueue.clear();
 	//frameObjectPool.clear();
 	//CreateRenderQueue(proot->pch);
+	printf("----------\n");
 	CreateRenderQueue(proot);
 
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};

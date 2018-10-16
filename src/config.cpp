@@ -27,7 +27,11 @@ void ContainerInterface::CopySettings(WManager::Container::Setup &setup){
 	setup.maxSize.y = boost::python::extract<float>(maxSize[1])();
 }
 
-boost::python::object ContainerInterface::OnSetup(){
+void ContainerInterface::OnSetup(){
+	//
+}
+
+boost::python::object ContainerInterface::OnParent(){
 	//
 	return BackendInterface::GetFocus(); //TODO: sensible default
 }
@@ -78,8 +82,22 @@ ContainerProxy::~ContainerProxy(){
 	//
 }
 
-boost::python::object ContainerProxy::OnSetup(){
+void ContainerProxy::OnSetup(){
 	boost::python::override ovr = this->get_override("OnSetup");
+	if(ovr){
+		try{
+			ovr();
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else ContainerInterface::OnSetup();
+}
+
+boost::python::object ContainerProxy::OnParent(){
+	boost::python::override ovr = this->get_override("OnParent");
 	if(ovr){
 		try{
 			return ovr();
@@ -90,7 +108,7 @@ boost::python::object ContainerProxy::OnSetup(){
 			PyErr_Clear();
 		}
 	}
-	return ContainerInterface::OnSetup();
+	return ContainerInterface::OnParent();
 }
 
 void ContainerProxy::OnCreate(){
@@ -140,6 +158,24 @@ ContainerConfig::ContainerConfig(){
 ContainerConfig::~ContainerConfig(){
 	//
 }
+
+/*template<typename T>
+BackendContainerConfig<T>::BackendContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, const WManager::Container::Setup &_setup, Backend::X11Backend *_pbackend) : T(_pParent,_setup,_pbackend), ContainerConfig(_pcontainerInt){
+	//
+}
+
+template<typename T>
+BackendContainerConfig<T>::BackendContainerConfig(Backend::X11Backend *_pbackend) : T(_pbackend), ContainerConfig(){
+	//
+	pcontainerInt->pcontainer = this;
+}
+
+template<typename T>
+BackendContainerConfig<T>::~BackendContainerConfig(){
+	//
+}
+
+class template BackendContainerConfig<Backend::X11Container>;*/
 
 X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, const WManager::Container::Setup &_setup, Backend::X11Backend *_pbackend) : Backend::X11Container(_pParent,_setup,_pbackend), ContainerConfig(_pcontainerInt){
 	//
@@ -301,6 +337,7 @@ BOOST_PYTHON_MODULE(chamfer){
 	
 	boost::python::class_<ContainerProxy,boost::noncopyable>("Container")
 		.def("OnSetup",&ContainerInterface::OnSetup)
+		.def("OnParent",&ContainerInterface::OnParent)
 		.def("OnCreate",&ContainerInterface::OnCreate)
 		.def("GetNext",&ContainerInterface::GetNext)
 		.def("GetPrev",&ContainerInterface::GetPrev)

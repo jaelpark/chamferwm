@@ -25,26 +25,44 @@ Container::Container(Container *_pParent, const Container::Setup &setup) :
 	pclient(0),
 	scale(1.0f), borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize),
 	layout(LAYOUT_VSPLIT){
-	
-	if(pParent->focusQueue.size() > 0){
-		Container *pfocus = pParent->focusQueue.back();
-		pnext = pfocus->pnext;
-		pfocus->pnext = this;
+
+	if(pParent->pclient){
+		//reparent
+		Container *pbase = pParent->pParent;
+
+		//replace the original parent with this new container
+		std::replace(pbase->focusQueue.begin(),pbase->focusQueue.end(),pParent,this);
+		for(Container *pcontainer = pbase->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
+			if(pcontainer == pParent){
+				if(pPrev)
+					pPrev->pnext = this;
+				else pbase->pch = this;
+				pnext = pcontainer->pnext;
+				break;
+			}
+
+		//add the original parent under the new one
+		pParent->pParent = this;
+		pParent->pnext = 0;
+
+		pch = pParent;
+		pParent = pbase;
+
+		Stack();
 
 	}else{
-		Container **pn = &pParent->pch;
-		while(*pn)
-			pn = &(*pn)->pnext;
-		*pn = this;
-	}
+		if(pParent->focusQueue.size() > 0){
+			//place the next to the focused container
+			Container *pfocus = pParent->focusQueue.back();
+			pnext = pfocus->pnext;
+			pfocus->pnext = this;
 
-	//If parent has a client, this container is a result of a new split.
-	//Move the client to this new container.
-	if(pParent->pclient){
-		pclient = pParent->pclient;
-		pParent->pclient = 0;
-
-		pclient->pcontainer = this;
+		}else{
+			Container **pn = &pParent->pch;
+			while(*pn)
+				pn = &(*pn)->pnext;
+			*pn = this;
+		}
 	}
 
 	pParent->Stack();
@@ -55,19 +73,55 @@ Container::~Container(){
 	//
 }
 
-void Container::Remove(){
-	if(pParent)
-		pParent->focusQueue.erase(std::remove(pParent->focusQueue.begin(),pParent->focusQueue.end(),this),pParent->focusQueue.end());
+Container * Container::Remove(){
+	Container *pbase = pParent, *pch1 = this; //remove all the split containers (although there should be only one)
+	for(; pbase->pParent; pch1 = pbase, pbase = pbase->pParent){
+		if(pbase->pch->pnext)
+			break; //more than one container
+	}
+	pbase->focusQueue.erase(std::remove(pbase->focusQueue.begin(),pbase->focusQueue.end(),pch1),pbase->focusQueue.end());
+	for(Container *pcontainer = pbase->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
+		if(pcontainer == pch1){
+			if(pPrev)
+				pPrev->pnext = pcontainer->pnext;
+			else pbase->pch = pcontainer->pnext;
+			break;
+		}
+	
+	pbase->Stack();
+	pbase->Translate();
+
+	return pch1;
+}
+
+Container * Container::Collapse(){
+	if(!pParent || pParent->pch->pnext)
+		return 0;
+	Container *psource = pch; //'this' is the target
+	for(; psource; psource = psource->pch){
+		if(psource->pnext || psource->pclient)
+		//if(psource->pnext)
+			break;
+	}
+	if(!psource) //???
+		return 0; //nothing to do
+
+	std::replace(pParent->focusQueue.begin(),pParent->focusQueue.end(),this,psource);
 	for(Container *pcontainer = pParent->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
 		if(pcontainer == this){
 			if(pPrev)
-				pPrev->pnext = pcontainer->pnext;
-			else pParent->pch = pcontainer->pnext;
+				pPrev->pnext = psource;
+			else pParent->pch = psource;
+			psource->pnext = pcontainer->pnext;
 			break;
 		}
 	
 	pParent->Stack();
-	pParent->Translate();
+
+	psource->pParent->pch = 0;
+	psource->pParent = pParent;
+
+	return this;
 }
 
 void Container::Focus(){
@@ -136,7 +190,7 @@ void Container::TranslateRecursive(glm::vec2 p, glm::vec2 e){
 	-assign the remaining equally
 	*/
 
-	glm::vec2 position(0.0f);
+	glm::vec2 position(p);
 	switch(layout){
 	default:
 	case LAYOUT_VSPLIT:
@@ -224,35 +278,5 @@ void Container::Stack(){
 void Container::SetLayout(LAYOUT layout){
 	this->layout = layout;
 	Translate();
-}
-
-/*void Container::SetTranslation(glm::vec2 p, glm::vec2 e){
-	glm::vec2 scaleSum(0.0f);
-	for(Container *pcontainer = pch; pcontainer; scaleSum += pcontainer->scale, pcontainer = pcontainer->pnext);
-
-	glm::vec2 position(0.0f);
-	for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
-		glm::vec2 e1 = e;
-		glm::vec2 p1 = position;
-		switch(layout){
-		default:
-		case LAYOUT_VSPLIT:
-			e1.x = pcontainer->scale.x/scaleSum.x; //note: fail with subcontainers
-			position.x += e1.x;
-			break;
-		case LAYOUT_HSPLIT:
-			e1.y = pcontainer->scale.y/scaleSum.y;
-			position.y += e1.y;
-			break;
-		};
-		pcontainer->SetTranslation(p1,e1);
-	}
-
-	this->p = p;
-	this->e = e;
-	if(pclient)
-		pclient->UpdateTranslation();
-}*/
-
 }
 

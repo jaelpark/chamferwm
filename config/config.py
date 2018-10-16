@@ -20,23 +20,24 @@ class Container(chamfer.Container):
 
 		self.splitArmed = False;
 
-		focus = chamfer.GetFocus();
-		parent = focus.GetParent();
-		if parent is None:
-			return focus;
-		return parent;
-		
+	def OnParent(self):
 		#focus = chamfer.GetFocus();
-		#return focus;
-		#if focus.splitArmed:
-		#	focus.splitArmed = False;
-		#	return focus;
-
 		#parent = focus.GetParent();
 		#if parent is None:
-		#	return focus; #root container
-
+		#	return focus;
 		#return parent;
+		#return chamfer.GetFocus();
+		
+		focus = chamfer.GetFocus();
+		if hasattr(focus,'splitArmed') and focus.splitArmed:
+			focus.splitArmed = False;
+			return focus;
+
+		parent = focus.GetParent();
+		if parent is None:
+			return focus; #root container
+
+		return parent;
 	
 	def OnCreate(self):
 		self.Focus();
@@ -58,7 +59,8 @@ class Backend(chamfer.Backend):
 		binder.BindKey(ord('x'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
 
 		binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
-		binder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
+		#binder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
+		#binder.BindKey(ord('s'),chamfer.MOD_MASK_1,Key.SPLIT_V.value);
 
 		#/ - search for a window
 		#n - next match
@@ -71,6 +73,7 @@ class Backend(chamfer.Backend):
 		binder.BindKey(ord('j'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_DOWN.value);
 
 		binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
+		binder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
 	
 	def OnCreateContainer(self):
 		print("OnCreateContainer()");
@@ -110,8 +113,13 @@ class Backend(chamfer.Backend):
 		
 		elif keyId == Key.SPLIT_V.value:
 			#arm the container split
+			print("split armed.");
 			focus.splitArmed = not focus.splitArmed;
-			pass;
+			#----
+			#focus.Split();
+			#creates a container to which the 'self' is reparented
+			#split can be removed only if the children count is one
+			#pass;
 	
 	def OnKeyRelease(self, keyId):
 		print("key release: {}".format(keyId));

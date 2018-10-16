@@ -90,15 +90,57 @@ public:
 		this->pcomp = pcomp;
 	}
 
+	template<class T, class U>
+	Config::ContainerInterface & SetupContainer(WManager::Container *pParent){
+		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
+		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
+		if(!containerExtract.check())
+			throw Exception("OnCreateContainer(): Invalid container object returned.\n"); //TODO: create default
+
+		Config::ContainerInterface &containerInt = containerExtract();
+		containerInt.self = containerObject;
+
+		containerInt.OnSetup();
+
+		WManager::Container::Setup setup;
+		containerInt.CopySettings(setup);
+	
+		if(!pParent){
+			boost::python::object parentObject = containerInt.OnParent();
+			boost::python::extract<Config::ContainerInterface &> parentExtract(parentObject);
+			if(!parentExtract.check())
+				throw Exception("OnParent(): Invalid parent container object returned.\n");
+
+			Config::ContainerInterface &parentInt = parentExtract();
+			if(parentInt.pcontainer == containerInt.pcontainer)
+				throw Exception("OnParent(): Cannot parent to itself.\n");
+
+			if(parentInt.pcontainer->pclient){
+				//1. detach parentInt from its parent (NOTE: should replace in position)
+				//   parentInt.pcontainer->Replace(new Container())
+				//   Container() needs a new param: container to replace
+				//2. create parent1 under parentInt's original parent
+				//bug: check the coordinates in RenderQueue!
+				Config::ContainerInterface &parentInt1 = SetupContainer<T,U>(parentInt.pcontainer);
+				pParent = parentInt1.pcontainer;
+
+			}else pParent = parentInt.pcontainer;
+		}
+
+		T *pcontainer = new T(&containerInt,pParent,setup,static_cast<U*>(this));
+		containerInt.pcontainer = pcontainer;
+
+		return containerInt;
+	}
+
 	void ReleaseContainersRecursive(const WManager::Container *pcontainer){
 		for(const WManager::Container *pcont = pcontainer; pcont;){
 			if(pcont->pclient)
 				delete pcont->pclient;
-			if(pcont->pch){
+			else
+			if(pcont->pch)
 				ReleaseContainersRecursive(pcont->pch);
-				delete pcont->pch;
-			}
-			
+
 			const WManager::Container *pdiscard = pcont;
 			pcont = pcont->pnext;
 			delete pdiscard;
@@ -146,36 +188,14 @@ public:
 		//Containers should be created always under the parent of the current focus.
 		//config script should manage this (point to container which should be the parent of the
 		//new one), while also setting some of the parameters like border width and such.
-		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
-		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
-		if(!containerExtract.check()){
-			DebugPrintf(stderr,"OnCreateContainer(): Invalid container object returned.\n");
-			return 0;
-		}
-		Config::ContainerInterface &containerInt = containerExtract();
-		containerInt.self = containerObject;
-
-		containerInt.OnSetup();
-		boost::python::object parentObject = containerInt.OnSetup();
-		boost::python::extract<Config::ContainerInterface &> parentExtract(parentObject);
-		if(!parentExtract.check()){
-			DebugPrintf(stderr,"OnSetup(): Invalid parent container object returned.\n");
-			return 0;
-		}
-		Config::ContainerInterface &parentInt = parentExtract();
-
-		WManager::Container::Setup setup;
-		containerInt.CopySettings(setup);
-
-		Config::X11ContainerConfig *pcontainer = new Config::X11ContainerConfig(&containerInt,parentInt.pcontainer,setup,this);
-		containerInt.pcontainer = pcontainer;
+		Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0);
 
 		Backend::X11Client *pclient11;
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 		if(!pcomp11)
-			pclient11 = new Backend::X11Client(pcontainer,pcreateInfo);
-		else pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pcomp11);
-		pcontainer->pclient = pclient11;
+			pclient11 = new Backend::X11Client(containerInt.pcontainer,pcreateInfo);
+		else pclient11 = new Compositor::X11ClientFrame(containerInt.pcontainer,pcreateInfo,pcomp11);
+		containerInt.pcontainer->pclient = pclient11;
 
 		containerInt.OnCreate();
 
@@ -183,16 +203,22 @@ public:
 	}
 
 	void DestroyClient(Backend::X11Client *pclient){
-		pclient->pcontainer->Remove();
+		WManager::Container *premoved = pclient->pcontainer->Remove();
+		WManager::Container *pcollapsed = premoved->pParent->Collapse();
 		Config::BackendInterface::pfocus = proot;
 		//find the first parent which has clients available to be focused
-		for(WManager::Container *pcontainer = pclient->pcontainer->pParent; pcontainer; pcontainer = pcontainer->pParent)
+		for(WManager::Container *pcontainer = premoved->pParent; pcontainer; pcontainer = pcontainer->pParent)
 			if(pcontainer->focusQueue.size() > 0){
 				Config::BackendInterface::SetFocus(pcontainer->focusQueue.back());
 				break;
+			}else
+			if(pcontainer->pch){
+				//should always have at least one container available
+				Config::BackendInterface::SetFocus(pcontainer->pch);
+				break;
 			}
-		delete pclient->pcontainer;
-		delete pclient;
+		ReleaseContainersRecursive(premoved);
+		//ReleaseContainersRecursive(pcollapsed);
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
@@ -210,6 +236,7 @@ public:
 	}
 };
 
+//TODO: some of these functions can be templated and shared with the DefaultBackend
 class DebugBackend : public Backend::Debug, public RunBackend{
 public:
 	//DebugBackend() : Debug(), RunBackend(new Backend::DebugContainer(this)){
@@ -223,35 +250,14 @@ public:
 	}
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
-		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
-		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
-		if(!containerExtract.check()){
-			DebugPrintf(stderr,"OnCreateContainer(): Invalid container object returned.\n");
-			return 0;
-		}
-		Config::ContainerInterface &containerInt = containerExtract();
-		containerInt.self = containerObject;
-		
-		boost::python::object parentObject = containerInt.OnSetup();
-		boost::python::extract<Config::ContainerInterface &> parentExtract(parentObject);
-		if(!parentExtract.check()){
-			DebugPrintf(stderr,"OnSetup(): Invalid parent container object returned.\n");
-			return 0;
-		}
-		Config::ContainerInterface &parentInt = parentExtract();
-
-		WManager::Container::Setup setup;
-		containerInt.CopySettings(setup);
-
-		Config::DebugContainerConfig *pcontainer = new Config::DebugContainerConfig(&containerInt,parentInt.pcontainer,setup,this);
-		containerInt.pcontainer = pcontainer;
+		Config::ContainerInterface &containerInt = SetupContainer<Config::DebugContainerConfig,DebugBackend>(0);
 
 		Backend::DebugClient *pclient;
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		if(!pcomp11)
-			pclient = new Backend::DebugClient(pcontainer,pcreateInfo);
-		else pclient = new Compositor::X11DebugClientFrame(pcontainer,pcreateInfo,pcomp11);
-		pcontainer->pclient = pclient;
+			pclient = new Backend::DebugClient(containerInt.pcontainer,pcreateInfo);
+		else pclient = new Compositor::X11DebugClientFrame(containerInt.pcontainer,pcreateInfo,pcomp11);
+		containerInt.pcontainer->pclient = pclient;
 
 		containerInt.OnCreate();
 
@@ -259,15 +265,29 @@ public:
 	}
 
 	void DestroyClient(Backend::DebugClient *pclient){
-		pclient->pcontainer->Remove();
+		WManager::Container *premoved = pclient->pcontainer->Remove();
+		//WManager::Container *pcollapsed = premoved->pParent->Collapse();
 		Config::BackendInterface::pfocus = proot;
-		for(WManager::Container *pcontainer = pclient->pcontainer->pParent; pcontainer; pcontainer = pcontainer->pParent)
+		for(WManager::Container *pcontainer = premoved->pParent; pcontainer; pcontainer = pcontainer->pParent)
 			if(pcontainer->focusQueue.size() > 0){
 				Config::BackendInterface::SetFocus(pcontainer->focusQueue.back());
 				break;
+			}else
+			if(pcontainer->pch){
+				//should always have at least one container available
+				Config::BackendInterface::SetFocus(pcontainer->pch);
+				break;
 			}
-		delete pclient->pcontainer;
-		delete pclient;
+		if(premoved->pch)
+			ReleaseContainersRecursive(premoved->pch);
+		if(premoved->pclient)
+			delete premoved->pclient;
+		delete premoved;
+		/*if(pcollapsed){
+			if(pcollapsed->pch)
+				ReleaseContainersRecursive(pcollapsed->pch);
+			delete pcollapsed;
+		}*/
 	}
 
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){

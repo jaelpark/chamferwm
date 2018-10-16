@@ -27,8 +27,10 @@ public:
 };
 
 class Container{
+	//TODO: MODE_APPEND and MODE_REPLACE_REPARENT. Or just directly determine when to reparent (the parent has a client)
 public:
 	struct Setup{
+		//Container *preplace = 0; //temp: move to constructor params
 		//Border width can be set anytime before the client creation
 		glm::vec2 borderWidth = glm::vec2(0.0f);
 		//For performance reasons, the min/maxSize has to be known before the container is created.
@@ -39,7 +41,8 @@ public:
 	Container(Container *, const Setup &);
 	virtual ~Container();
 	void SetTranslation(glm::vec2, glm::vec2);
-	void Remove();
+	Container * Remove();
+	Container * Collapse();
 	void Focus();
 	Container * GetNext();
 	Container * GetPrev();
