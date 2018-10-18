@@ -625,27 +625,10 @@ void CompositorInterface::WaitIdle(){
 	vkDeviceWaitIdle(logicalDev);
 }
 
-void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer){
-	/*for(const WManager::Container *pcont = pcontainer; pcont; pcont = pcont->pnext){
-		if(!pcont->pclient)
-			continue;
-		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
-		if(!pclientFrame)
-			continue;
-		
-		RenderObject renderObject;
-		renderObject.pclient = pcont->pclient;
-		renderObject.pclientFrame = pclientFrame;
-		renderQueue.push_back(renderObject);
-
-		if(pcont->pch)
-			CreateRenderQueue(pcont->pch);
-		//worry about stacks later
-		//stacks: render in same order, except skip focus? Focus is rendered last.
-	}*/
-	uint n = 0;
+void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const WManager::Container *pfocus){
+	/*uint n = 0;
 	for(const WManager::Container *pcont = pcontainer->pch; pcont; ++n, pcont = pcont->pnext);
-	printf("queue(): %u/%u\n",pcontainer->stackQueue.size(),n);
+	printf("queue(): %u/%u%s\n",pcontainer->stackQueue.size(),n,pcontainer == pfocus?" [focus]":"");*/
 
 	for(const WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
@@ -657,9 +640,9 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			renderObject.pclient = pcont->pclient;
 			renderObject.pclientFrame = pclientFrame;
 			renderQueue.push_back(renderObject);
-			printf("draw()\n");
+			//printf("draw()%s\n",pcont == pfocus?" [focus]":"");
 
-		}else CreateRenderQueue(pcont);
+		}else CreateRenderQueue(pcont,pfocus);
 	}
 }
 
@@ -686,7 +669,7 @@ bool CompositorInterface::PollFrameFence(){
 	return true;
 }
 
-void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot){
+void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot, const WManager::Container *pfocus){
 	if(!proot)
 		return;
 	
@@ -694,8 +677,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	renderQueue.clear();
 	//frameObjectPool.clear();
 	//CreateRenderQueue(proot->pch);
-	printf("----------\n");
-	CreateRenderQueue(proot);
+	//printf("----------\n");
+	CreateRenderQueue(proot,pfocus);
 
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

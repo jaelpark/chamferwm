@@ -40,7 +40,6 @@ public:
 	Container(); //root container
 	Container(Container *, const Setup &);
 	virtual ~Container();
-	void SetTranslation(glm::vec2, glm::vec2);
 	Container * Remove();
 	Container * Collapse();
 	void Focus();
@@ -48,6 +47,16 @@ public:
 	Container * GetPrev();
 	Container * GetParent();
 	Container * GetFocus();
+	enum ADJACENT{
+		ADJACENT_LEFT,
+		ADJACENT_RIGHT,
+		ADJACENT_UP,
+		ADJACENT_DOWN
+	};
+	Container * GetAdjacent(ADJACENT);
+
+	void MoveNext();
+	void MovePrev();
 
 	glm::vec2 GetMinSize() const;
 	void TranslateRecursive(glm::vec2, glm::vec2);

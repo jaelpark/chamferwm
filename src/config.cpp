@@ -74,6 +74,14 @@ boost::python::object ContainerInterface::GetFocus() const{
 	return boost::python::object();
 }
 
+boost::python::object ContainerInterface::GetAdjacent(WManager::Container::ADJACENT a) const{
+	WManager::Container *padj = pcontainer->GetAdjacent(a);
+	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(padj);
+	if(pcontainer1)
+		return pcontainer1->pcontainerInt->self;
+	return boost::python::object();
+}
+
 ContainerProxy::ContainerProxy() : ContainerInterface(){
 	//
 }
@@ -276,23 +284,45 @@ void BackendProxy::OnSetupKeys(Backend::X11KeyBinder *pkeyBinder){
 
 boost::python::object BackendProxy::OnCreateContainer(){
 	boost::python::override ovr = this->get_override("OnCreateContainer");
-	if(ovr)
-		return ovr();
-	else return BackendInterface::OnCreateContainer();
+	if(ovr){
+		try{
+			return ovr();
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}
+	return BackendInterface::OnCreateContainer();
 }
 
 void BackendProxy::OnKeyPress(uint keyId){
 	boost::python::override ovr = this->get_override("OnKeyPress");
-	if(ovr)
-		ovr(keyId);
-	else BackendInterface::OnKeyPress(keyId);
+	if(ovr){
+		try{
+			ovr(keyId);
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else BackendInterface::OnKeyPress(keyId);
 }
 
 void BackendProxy::OnKeyRelease(uint keyId){
 	boost::python::override ovr = this->get_override("OnKeyRelease");
-	if(ovr)
-		ovr(keyId);
-	else BackendInterface::OnKeyRelease(keyId);
+	if(ovr){
+		try{
+			ovr(keyId);
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else BackendInterface::OnKeyRelease(keyId);
 }
 
 CompositorInterface::CompositorInterface() : shaderPath("."){
@@ -343,6 +373,15 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("GetPrev",&ContainerInterface::GetPrev)
 		.def("GetParent",&ContainerInterface::GetParent)
 		.def("GetFocus",&ContainerInterface::GetFocus)
+		.def("GetAdjacent",&ContainerInterface::GetAdjacent)
+		.def("MoveNext",boost::python::make_function(
+			[](ContainerInterface &container){
+				container.pcontainer->MoveNext();
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
+		.def("MovePrev",boost::python::make_function(
+			[](ContainerInterface &container){
+				container.pcontainer->MovePrev();
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("Focus",boost::python::make_function(
 			[](ContainerInterface &container){
 				Config::BackendInterface::pfocus = container.pcontainer;
@@ -360,6 +399,16 @@ BOOST_PYTHON_MODULE(chamfer){
 				return container.pcontainer->layout;
 			},boost::python::default_call_policies(),boost::mpl::vector<WManager::Container::LAYOUT, ContainerInterface &>()))
 		;
+	
+	boost::python::enum_<WManager::Container::ADJACENT>("adjacent")
+		.value("LEFT",WManager::Container::ADJACENT_LEFT)
+		.value("RIGHT",WManager::Container::ADJACENT_RIGHT)
+		.value("UP",WManager::Container::ADJACENT_UP)
+		.value("DOWN",WManager::Container::ADJACENT_DOWN);
+
+	boost::python::enum_<WManager::Container::LAYOUT>("layout")
+		.value("VSPLIT",WManager::Container::LAYOUT_VSPLIT)
+		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT);
 
 	boost::python::class_<BackendProxy,boost::noncopyable>("Backend")
 		.def("OnSetupKeys",&BackendInterface::OnSetupKeys)
@@ -372,10 +421,6 @@ BOOST_PYTHON_MODULE(chamfer){
 		.add_property("shaderPath",&CompositorInterface::shaderPath)
 		;
 	boost::python::def("bind_Compositor",CompositorInterface::Bind);
-
-	boost::python::enum_<WManager::Container::LAYOUT>("layout")
-		.value("VSPLIT",WManager::Container::LAYOUT_VSPLIT)
-		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT);
 
 	boost::python::def("GetFocus",&BackendInterface::GetFocus);
 }

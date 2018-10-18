@@ -27,6 +27,7 @@ public:
 	boost::python::object GetPrev() const;
 	boost::python::object GetParent() const;
 	boost::python::object GetFocus() const;
+	boost::python::object GetAdjacent(WManager::Container::ADJACENT) const;
 
 	boost::python::tuple borderWidth;
 	boost::python::tuple minSize;

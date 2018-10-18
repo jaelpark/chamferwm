@@ -97,16 +97,15 @@ Container * Container::Remove(){
 Container * Container::Collapse(){
 	if(!pParent || pch->pnext)
 		return 0;
-	//printf("---searching...\n");
+	
 	Container *psource = pch; //'this' is the target
 	for(; psource; psource = psource->pch){
 		if(psource->pParent->pch->pnext || psource->pclient)
 			break;
 	}
-	if(!psource) //???
+	if(!psource)
 		return 0; //nothing to do
 
-	//printf("---collapsing...\n");
 	std::replace(pParent->focusQueue.begin(),pParent->focusQueue.end(),this,psource);
 	for(Container *pcontainer = pParent->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
 		if(pcontainer == this){
@@ -129,15 +128,16 @@ void Container::Focus(){
 	if(pParent){
 		pParent->focusQueue.erase(std::remove(pParent->focusQueue.begin(),pParent->focusQueue.end(),this),pParent->focusQueue.end());
 		pParent->focusQueue.push_back(this);
+
+		pParent->Stack();
 	}
 
 	Focus1();
-	pParent->Stack();
 }
 
 Container * Container::GetNext(){
 	if(!pParent)
-		return 0; //root container
+		return this; //root container
 	if(!pnext)
 		return pParent->pch;
 	return pnext;
@@ -145,7 +145,7 @@ Container * Container::GetNext(){
 
 Container * Container::GetPrev(){
 	if(!pParent)
-		return 0; //root container
+		return this; //root container
 	Container *pcontainer = pParent->pch;
 	if(pcontainer == this)
 		for(; pcontainer->pnext; pcontainer = pcontainer->pnext);
@@ -158,7 +158,121 @@ Container * Container::GetParent(){
 }
 
 Container * Container::GetFocus(){
-	return focusQueue.size() > 0?focusQueue.back():0;
+	return focusQueue.size() > 0?focusQueue.back():pch;
+}
+
+Container * Container::GetAdjacent(ADJACENT d){
+	if(!pParent)
+		return this;
+	switch(d){
+	case ADJACENT_LEFT:{
+		//traverse up to get the first container to the left
+		Container *pbase = GetPrev(); //if nothing is found below, it means we are already the most left container
+		for(Container *pcontainer = pParent, *pPrev = this; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pParent){
+			if(pcontainer->layout == LAYOUT_VSPLIT){
+				if(pcontainer->pch != this){
+					pbase = pPrev->GetPrev();
+					break;
+				}
+			}else continue; //cannot move left in vertical placement, continue up
+		}
+		//traverse back down to get the right most container
+		Container *padj = pbase;
+		for(; padj->pch;){
+			if(padj->layout == LAYOUT_VSPLIT || padj->focusQueue.size() == 0)
+				padj = padj->pch->GetPrev();
+			else padj = padj->focusQueue.back();
+		}
+
+		return padj;
+		}
+	case ADJACENT_RIGHT:{
+		Container *pbase = GetNext();
+		for(Container *pcontainer = pParent, *pPrev = this; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pParent){
+			if(pcontainer->layout == LAYOUT_VSPLIT){
+				if(pcontainer->pch->GetPrev() != this){
+					pbase = pPrev->GetNext();
+					break;
+				}
+			}else continue;
+		}
+		Container *padj = pbase;
+		for(; padj->pch;){
+			if(padj->layout == LAYOUT_VSPLIT || padj->focusQueue.size() == 0)
+				padj = padj->pch;
+			else padj = padj->focusQueue.back();
+		}
+
+		return padj;
+		}
+	case ADJACENT_UP:{
+		Container *pbase = GetPrev();
+		for(Container *pcontainer = pParent, *pPrev = this; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pParent){
+			if(pcontainer->layout == LAYOUT_HSPLIT){
+				if(pcontainer->pch != this){
+					pbase = pPrev->GetPrev();
+					break;
+				}
+			}else continue;
+		}
+		Container *padj = pbase;
+		for(; padj->pch;){
+			if(padj->layout == LAYOUT_HSPLIT || padj->focusQueue.size() == 0)
+				padj = padj->pch->GetPrev();
+			else padj = padj->focusQueue.back();
+		}
+
+		return padj;
+		}
+	case ADJACENT_DOWN:{
+		Container *pbase = GetNext();
+		for(Container *pcontainer = pParent, *pPrev = this; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pParent){
+			if(pcontainer->layout == LAYOUT_HSPLIT){
+				if(pcontainer->pch->GetPrev() != this){
+					pbase = pPrev->GetNext();
+					break;
+				}
+			}else continue;
+		}
+		Container *padj = pbase;
+		for(; padj->pch;){
+			if(padj->layout == LAYOUT_HSPLIT || padj->focusQueue.size() == 0)
+				padj = padj->pch;
+			else padj = padj->focusQueue.back();
+		}
+
+		return padj;
+		}
+	}
+	return this;
+}
+
+void Container::MoveNext(){
+	if(!pParent)
+		return;
+	Container *pcontainer = GetNext();
+	Container *pPrev = GetPrev();
+	Container *pPrevNext = pPrev->pnext;
+
+	Container *pnext1 = pcontainer->pnext;
+	pcontainer->pnext = pnext?this:0;
+	pnext = pnext1 != this?pnext1:pcontainer;
+
+	if(pParent->pch == this)
+		pParent->pch = pcontainer;
+	else
+	if(pParent->pch == pcontainer)
+		pParent->pch = this;
+	
+	if(pPrevNext != 0 && pPrev != pcontainer)
+		pPrev->pnext = pcontainer;
+	
+	pParent->Stack();
+	pParent->Translate();
+}
+
+void Container::MovePrev(){
+	GetPrev()->MoveNext();
 }
 
 glm::vec2 Container::GetMinSize() const{
@@ -270,7 +384,7 @@ void Container::Stack(){
 	Container *pfocus = focusQueue.back();
 
 	std::sort(stackQueue.begin(),stackQueue.end(),[&](Container *pa, Container *pb)->bool{
-		return pb == pfocus || pb->p[layout] > pfocus->p[layout]+pfocus->e[layout] || pb->p[layout]+pb->e[layout] < pfocus->p[layout];
+		return pa != pfocus && (pb == pfocus || pb->p[layout] > pfocus->p[layout]+pfocus->e[layout] || pb->p[layout]+pb->e[layout] < pfocus->p[layout]);
 	});
 
 	Stack1();
