@@ -16,7 +16,7 @@ Client::~Client(){
 Container::Container() : pParent(0), pch(0), pnext(0),
 	pclient(0),
 	scale(1.0f), p(0.0f), e(1.0f), borderWidth(0.0f), minSize(0.0f), maxSize(1.0f),
-	layout(LAYOUT_VSPLIT){
+	layout(LAYOUT_VSPLIT), flags(0){
 	//
 }
 
@@ -24,7 +24,7 @@ Container::Container(Container *_pParent, const Container::Setup &setup) :
 	pParent(_pParent), pch(0), pnext(0),
 	pclient(0),
 	scale(1.0f), borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize),
-	layout(LAYOUT_VSPLIT){
+	layout(LAYOUT_VSPLIT), flags(0){
 
 	if(pParent->pclient){
 		//reparent

@@ -80,7 +80,7 @@ class BackendInterface{
 public:
 	BackendInterface();
 	virtual ~BackendInterface();
-	virtual void OnSetupKeys(Backend::X11KeyBinder *);
+	virtual void OnSetupKeys(Backend::X11KeyBinder *, bool);
 	virtual boost::python::object OnCreateContainer();
 	virtual void OnKeyPress(uint);
 	virtual void OnKeyRelease(uint);
@@ -99,7 +99,7 @@ public:
 	BackendProxy();
 	~BackendProxy();
 	//
-	void OnSetupKeys(Backend::X11KeyBinder *);
+	void OnSetupKeys(Backend::X11KeyBinder *, bool);
 	boost::python::object OnCreateContainer();
 	void OnKeyPress(uint);
 	void OnKeyRelease(uint);

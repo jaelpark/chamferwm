@@ -20,6 +20,7 @@ xcb = [
 	dependency('xcb-xfixes'),
 	dependency('xcb-damage'),
 	dependency('xcb-composite'),
+	dependency('xcb-ewmh')
 ]
 
 vk = [

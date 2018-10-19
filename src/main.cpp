@@ -180,7 +180,7 @@ public:
 
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
 		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
-		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11);
+		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,false);
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
@@ -300,7 +300,7 @@ public:
 
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
 		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
-		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11);
+		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,true);
 		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
@@ -405,7 +405,6 @@ int main(sint argc, const char **pargv){
 		std::cout<<e.what()<<std::endl<<parser;
 		return 1;
 	}
-
 /*#define MAX_EVENTS 1024
 	struct epoll_event event1, events[MAX_EVENTS];
 	sint efd = epoll_create1(0);

@@ -37,7 +37,7 @@ ClientFrame::~ClientFrame(){
 			}
 }
 
-void ClientFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, const VkCommandBuffer *pcommandBuffer){
+void ClientFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, uint flags, const VkCommandBuffer *pcommandBuffer){
 	time = timespec_diff(pcomp->frameTime,creationTime);
 
 	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
@@ -46,20 +46,26 @@ void ClientFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, cons
 			descPointer += passignedSet->p->pshaderModule[i]->setCount;
 		}
 	
-	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
-	frameVec += 0.5f;
-	frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
-	frameVec *= 2.0f;
-	frameVec -= 1.0f;
+	struct{
+		glm::vec4 frameVec;
+		glm::vec2 imageExtent;
+		glm::vec2 borderWidth;
+		uint flags;
+		float time;
+	} pushConstants;
 
-	const float pushConstants[] = {
-		frameVec.x,frameVec.y,
-		frameVec.z,frameVec.w,
-		pcomp->imageExtent.width,pcomp->imageExtent.height,
-		borderWidth.x,borderWidth.y,
-		time,0.0f
-	};
-	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,40,pushConstants); //size in CompositorResource VkPushConstantRange
+	pushConstants.frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
+	pushConstants.frameVec += 0.5f;
+	pushConstants.frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
+	pushConstants.frameVec *= 2.0f;
+	pushConstants.frameVec -= 1.0f;
+
+	pushConstants.imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
+	pushConstants.borderWidth = borderWidth;
+	pushConstants.flags = flags;
+	pushConstants.time = time;
+
+	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,40,&pushConstants); //size fixed also in CompositorResource VkPushConstantRange
 
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 
@@ -630,6 +636,7 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 	for(const WManager::Container *pcont = pcontainer->pch; pcont; ++n, pcont = pcont->pnext);
 	printf("queue(): %u/%u%s\n",pcontainer->stackQueue.size(),n,pcontainer == pfocus?" [focus]":"");*/
 
+	//glm::uvec2 edge(0.0f); //(right) edge of the previous container
 	for(const WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
 			ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
@@ -639,6 +646,8 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			RenderObject renderObject;
 			renderObject.pclient = pcont->pclient;
 			renderObject.pclientFrame = pclientFrame;
+			renderObject.flags =
+				pcont == pfocus || pcontainer == pfocus?0x1:0;
 			renderQueue.push_back(renderObject);
 			//printf("draw()%s\n",pcont == pfocus?" [focus]":"");
 
@@ -717,7 +726,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		frame.offset = {renderObject.pclient->rect.x,renderObject.pclient->rect.y};
 		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
 
-		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,&pcommandBuffers[currentFrame]);
+		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.flags,&pcommandBuffers[currentFrame]);
 	}
 
 	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);
@@ -854,6 +863,9 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	}
 	DebugPrintf(stdout,"---- rect: %ux%u, pixmap: %ux%u\n",rect.w,rect.h,pgeometryReply->width,pgeometryReply->height);
 	free(pgeometryReply);*/
+
+	if(!fullRegionUpdate && damageRegions.size() == 0)
+		return;
 
 	xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,windowPixmap,0,0,rect.w,rect.h,~0);
 	xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pbackend->pcon,imageCookie,0);

@@ -102,6 +102,12 @@ public:
 
 	LAYOUT layout;
 
+	enum FLAG{
+		FLAG_FLOATING = 0x1,
+		FLAG_HIDDEN = 0x2
+	};
+	uint flags;
+
 };
 
 }

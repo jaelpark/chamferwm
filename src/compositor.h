@@ -20,7 +20,7 @@ public:
 	ClientFrame(uint, uint, class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
-	void Draw(const VkRect2D &, const glm::vec2 &, const VkCommandBuffer *);
+	void Draw(const VkRect2D &, const glm::vec2 &, uint, const VkCommandBuffer *);
 	void AdjustSurface(uint, uint);
 	bool AssignPipeline(const Pipeline *);
 private:
@@ -118,6 +118,7 @@ private:
 	struct RenderObject{
 		WManager::Client *pclient;
 		ClientFrame *pclientFrame;
+		uint flags;
 	};
 	std::vector<RenderObject> renderQueue;
 	//std::vector<ClientFrame *> renderQueue;

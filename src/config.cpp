@@ -219,7 +219,7 @@ BackendInterface::~BackendInterface(){
 	//
 }
 
-void BackendInterface::OnSetupKeys(Backend::X11KeyBinder *pkeyBinder){
+void BackendInterface::OnSetupKeys(Backend::X11KeyBinder *pkeyBinder, bool debug){
 	//
 	DebugPrintf(stdout,"No KeyConfig interface, skipping configuration.\n");
 }
@@ -268,18 +268,18 @@ BackendProxy::~BackendProxy(){
 	//
 }
 
-void BackendProxy::OnSetupKeys(Backend::X11KeyBinder *pkeyBinder){
+void BackendProxy::OnSetupKeys(Backend::X11KeyBinder *pkeyBinder, bool debug){
 	boost::python::override ovr = this->get_override("OnSetupKeys");
 	if(ovr){
 		try{
-			ovr(pkeyBinder);
+			ovr(pkeyBinder,debug);
 		}catch(boost::python::error_already_set &){
 			PyErr_Print();
 			//
 			boost::python::handle_exception();
 			PyErr_Clear();
 		}
-	}else BackendInterface::OnSetupKeys(pkeyBinder);
+	}else BackendInterface::OnSetupKeys(pkeyBinder,debug);
 }
 
 boost::python::object BackendProxy::OnCreateContainer(){
@@ -359,6 +359,7 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::scope().attr("MOD_MASK_CONTROL") = uint(XCB_MOD_MASK_CONTROL);
 
 	boost::python::scope().attr("KEY_RETURN") = uint(XK_Return);
+	boost::python::scope().attr("KEY_SPACE") = uint(XK_space);
 	boost::python::scope().attr("KEY_TAB") = uint(XK_Tab);
 
 	boost::python::class_<Backend::X11KeyBinder>("KeyBinder",boost::python::no_init)

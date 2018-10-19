@@ -9,6 +9,7 @@
 #include <xcb/xcb_keysyms.h>
 #include <xcb/xcb_atom.h>
 #include <xcb/xcb_icccm.h>
+//#include <xcb/xcb_ewmh.h>
 #include <xcb/xcb_util.h>
 
 #include <X11/keysym.h>
@@ -199,6 +200,20 @@ bool X11Backend::QueryExtension(const char *pname, sint *pfirstEvent, sint *pfir
 	return true;
 }
 
+/*xcb_atom_t X11Backend::GetAtom(const char *pstr) const{
+	xcb_generic_error_t *perr;
+	xcb_intern_atom_cookie_t atomCookie = xcb_intern_atom(pcon,0,strlen(pstr),pstr);
+	xcb_intern_atom_reply_t *patomReply = xcb_intern_atom_reply(pcon,atomCookie,&perr);
+	if(!patomReply || perr)
+		return 0;
+	xcb_atom_t atom = patomReply->atom;
+	free(patomReply);
+	return atom;
+}
+
+const char *X11Backend::patomStrs[ATOM_COUNT] = {
+	"_NET_WM_WINDOW_TYPE","_NET_WM_WINDOW_TYPE_DESKTOP","_NET_WM_WINDOW_TYPE_DOCK","_NET_WM_WINDOW_TYPE_TOOLBAR","_NET_WM_WINDOW_TYPE_TOOLBAR*/
+
 Default::Default() : X11Backend(){
 	//
 }
@@ -207,6 +222,7 @@ Default::~Default(){
 	//sigprocmask(SIG_UNBLOCK,&signals,0);
 
 	//cleanup
+	xcb_ewmh_connection_wipe(&ewmh);
 	xcb_set_input_focus(pcon,XCB_NONE,XCB_INPUT_FOCUS_POINTER_ROOT,XCB_CURRENT_TIME);
 	xcb_disconnect(pcon);
 	xcb_flush(pcon);
@@ -235,9 +251,6 @@ void Default::Start(){
 	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-	launchKeycode = SymbolToKeycode(XK_space,psymbols);
-	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,launchKeycode,
-		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	
 	X11KeyBinder binder(psymbols,this);
 	DefineBindings(&binder); //TODO: an interface to define bindings? This is passed to config before calling SetupKeys
@@ -263,6 +276,10 @@ void Default::Start(){
 		snprintf(Exception::buffer,sizeof(Exception::buffer),"Substructure redirection failed (%d). WM already present.\n",perr->error_code);
 		throw Exception();
 	}
+
+	xcb_intern_atom_cookie_t *patomCookie = xcb_ewmh_init_atoms(pcon,&ewmh);
+	if(!xcb_ewmh_init_atoms_replies(&ewmh,patomCookie,0))
+		throw Exception("Failed to initialize EWMH atoms.\n");
 }
 
 /*sint Default::GetEventFileDescriptor(){
@@ -329,8 +346,24 @@ bool Default::HandleEvent(){
 			createInfo.pbackend = this;
 			X11Client *pclient = SetupClient(&createInfo);
 			clients.push_back(pclient);
-
-			//TODO: restack clients
+			
+			//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
+			xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
+			xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+			xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
+			printf("%u, %u\n",*patom,ewmh._NET_WM_WINDOW_TYPE_DESKTOP);
+			if(*patom == ewmh._NET_WM_WINDOW_TYPE_POPUP_MENU)
+				printf("popup\n");
+			else
+			if(*patom == ewmh._NET_WM_WINDOW_TYPE_TOOLBAR)
+				printf("toolbar\n");
+			else
+			if(*patom == ewmh._NET_WM_WINDOW_TYPE_DROPDOWN_MENU)
+				printf("dropdown\n");
+			else
+			if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG)
+				printf("dialog\n");
+			free(propertyReply);
 
 			DebugPrintf(stdout,"map request, %u\n",pev->window);
 			}
@@ -367,11 +400,6 @@ bool Default::HandleEvent(){
 				free(pevent);
 				return false;
 			//
-			}else
-			if(pev->state & XCB_MOD_MASK_1 && pev->detail == launchKeycode){
-				//create test client
-				DebugPrintf(stdout,"Spawning test client...\n");
-				system("termite & >/tmp/chamferwm-test");
 			}else
 			for(KeyBinding &binding : keycodes){
 				if(pev->state == binding.mask && pev->detail == binding.keycode){
@@ -550,7 +578,7 @@ void Debug::Start(){
 		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
 	
 	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,window,pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pscr->root_visual,mask,values);
-	const char title[] = "xwm compositor debug mode";
+	const char title[] = "chamferwm compositor debug mode";
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,window,XCB_ATOM_WM_NAME,XCB_ATOM_STRING,8,strlen(title),title);
 	xcb_map_window(pcon,window);
 

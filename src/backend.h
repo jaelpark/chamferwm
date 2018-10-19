@@ -3,6 +3,7 @@
 
 #include <xcb/xproto.h>
 #include <xcb/xcb_keysyms.h>
+#include <xcb/xcb_ewmh.h>
 
 namespace Compositor{
 //declarations for friend classes
@@ -105,6 +106,7 @@ public:
 	X11Backend();
 	virtual ~X11Backend();
 	bool QueryExtension(const char *, sint *, sint *) const;
+	//xcb_atom_t GetAtom(const char *) const;
 	virtual X11Client * FindClient(xcb_window_t) const = 0;
 protected:
 	xcb_connection_t *pcon;
@@ -116,6 +118,13 @@ protected:
 		uint keyId;
 	};
 	std::vector<KeyBinding> keycodes; //user defined id associated with the keycode
+	enum ATOM{
+		ATOM_NET_WM_WINDOW_TYPE,
+		ATOM_COUNT
+	};
+	xcb_ewmh_connection_t ewmh;
+	//xcb_atom_t atoms[ATOM_COUNT];
+	//static const char *patomStrs[ATOM_COUNT];
 };
 
 class Default : public X11Backend{
@@ -131,7 +140,6 @@ protected:
 	virtual void DestroyClient(X11Client *) = 0;
 private:
 	xcb_keycode_t exitKeycode;
-	xcb_keycode_t launchKeycode;
 	std::vector<X11Client *> clients;
 };
 
