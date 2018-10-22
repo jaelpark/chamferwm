@@ -18,6 +18,7 @@ class Key(Enum):
 	LAYOUT = auto()
 	SPLIT_V = auto()
 
+	KILL = auto()
 	LAUNCH_TERMINAL = auto()
 
 class Container(chamfer.Container):
@@ -65,6 +66,7 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
 			binder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
 			
+			binder.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
 			binder.BindKey(chamfer.KEY_RETURN,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
 
 			#/ - search for a window
@@ -174,6 +176,10 @@ class Backend(chamfer.Backend):
 			#TODO: add render flags property, bitwise or them
 			print("split armed.");
 			focus.splitArmed = not focus.splitArmed;
+
+		elif keyId == Key.KILL.value:
+			print("killing client...");
+			focus.Kill();
 
 		elif keyId == Key.LAUNCH_TERMINAL.value:
 			Popen(["termite"],stdout=None,stderr=None);

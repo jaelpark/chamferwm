@@ -18,6 +18,7 @@ public:
 	//
 	//virtual functions for the backend implementation
 	virtual void UpdateTranslation() = 0;
+	virtual void Kill() = 0;
 	//Resize
 	//SetLayer
 	//virtual Rectangle GetRect() const = 0;
@@ -27,7 +28,6 @@ public:
 };
 
 class Container{
-	//TODO: MODE_APPEND and MODE_REPLACE_REPARENT. Or just directly determine when to reparent (the parent has a client)
 public:
 	struct Setup{
 		//Container *preplace = 0; //temp: move to constructor params
@@ -36,6 +36,7 @@ public:
 		//For performance reasons, the min/maxSize has to be known before the container is created.
 		glm::vec2 minSize = glm::vec2(0.0f);
 		glm::vec2 maxSize = glm::vec2(1.0f);
+		uint flags = 0;
 	};
 	Container(); //root container
 	Container(Container *, const Setup &);
@@ -62,14 +63,9 @@ public:
 	void TranslateRecursive(glm::vec2, glm::vec2);
 	void Translate();
 	void Stack();
-	//Stack order: pnext is always below the current one
 	enum LAYOUT{
 		LAYOUT_VSPLIT,
 		LAYOUT_HSPLIT,
-		//Title is rendered as tabs on the same row. Render titles inside a chamfered box.
-		//stack mode: render titles vertically to the left?
-		//LAYOUT_STACKED, //Do we need these modes? Stacking is already implemented with min window sizes.
-		//LAYOUT_TABBED,
 	};
 	void SetLayout(LAYOUT);
 

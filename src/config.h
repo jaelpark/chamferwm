@@ -33,6 +33,8 @@ public:
 	boost::python::tuple minSize;
 	boost::python::tuple maxSize;
 
+	//bool floating;
+
 	WManager::Container *pcontainer;
 	boost::python::object self;
 };

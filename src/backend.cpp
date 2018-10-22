@@ -12,7 +12,10 @@
 //#include <xcb/xcb_ewmh.h>
 #include <xcb/xcb_util.h>
 
+//#include <X11/X.h>
+typedef xcb_atom_t Atom;
 #include <X11/keysym.h>
+#include <X11/Xatom.h>
 
 namespace Backend{
 
@@ -141,6 +144,40 @@ void X11Client::UpdateTranslation(){
 	AdjustSurface1(); //virtual function gets called only if the compositor client class has been initialized
 }
 
+bool X11Client::ProtocolSupport(xcb_atom_t atom){
+	xcb_get_property_cookie_t propertyCookie = xcb_icccm_get_wm_protocols(pbackend->pcon,window,atom);
+	xcb_icccm_get_wm_protocols_reply_t protocols;
+	if(xcb_icccm_get_wm_protocols_reply(pbackend->pcon,propertyCookie,&protocols,0) != 1)
+		return false;
+	
+	for(uint i = 0; i < protocols.atoms_len; ++i)
+		if(protocols.atoms[i] == atom){
+			xcb_icccm_get_wm_protocols_reply_wipe(&protocols);
+			return true;
+		}
+	//
+	xcb_icccm_get_wm_protocols_reply_wipe(&protocols);
+	return false;
+}
+
+void X11Client::Kill(){
+	if(ProtocolSupport(pbackend->atoms[X11Backend::ATOM_WM_PROTOCOLS])){
+		char buffer[32];
+
+		xcb_client_message_event_t *pev = (xcb_client_message_event_t*)buffer;
+		pev->response_type = XCB_CLIENT_MESSAGE;
+		pev->format = 32;
+		pev->window = window;
+		pev->type = pbackend->atoms[X11Backend::ATOM_WM_PROTOCOLS];
+		pev->data.data32[0] = pbackend->atoms[X11Backend::ATOM_WM_DELETE_WINDOW];
+		pev->data.data32[1] = XCB_CURRENT_TIME;
+
+		xcb_send_event(pbackend->pcon,false,window,XCB_EVENT_MASK_NO_EVENT,buffer);
+		xcb_flush(pbackend->pcon);
+
+	}else xcb_destroy_window(pbackend->pcon,window);
+}
+
 X11Container::X11Container(class X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
 	//
 }
@@ -200,7 +237,7 @@ bool X11Backend::QueryExtension(const char *pname, sint *pfirstEvent, sint *pfir
 	return true;
 }
 
-/*xcb_atom_t X11Backend::GetAtom(const char *pstr) const{
+xcb_atom_t X11Backend::GetAtom(const char *pstr) const{
 	xcb_generic_error_t *perr;
 	xcb_intern_atom_cookie_t atomCookie = xcb_intern_atom(pcon,0,strlen(pstr),pstr);
 	xcb_intern_atom_reply_t *patomReply = xcb_intern_atom_reply(pcon,atomCookie,&perr);
@@ -212,7 +249,8 @@ bool X11Backend::QueryExtension(const char *pname, sint *pfirstEvent, sint *pfir
 }
 
 const char *X11Backend::patomStrs[ATOM_COUNT] = {
-	"_NET_WM_WINDOW_TYPE","_NET_WM_WINDOW_TYPE_DESKTOP","_NET_WM_WINDOW_TYPE_DOCK","_NET_WM_WINDOW_TYPE_TOOLBAR","_NET_WM_WINDOW_TYPE_TOOLBAR*/
+	"WM_PROTOCOLS","WM_DELETE_WINDOW"
+};
 
 Default::Default() : X11Backend(){
 	//
@@ -248,8 +286,8 @@ void Default::Start(){
 
 	xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
 
-	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
-	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
+	exitKeycode = SymbolToKeycode(XK_E,psymbols);
+	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	
 	X11KeyBinder binder(psymbols,this);
@@ -280,6 +318,9 @@ void Default::Start(){
 	xcb_intern_atom_cookie_t *patomCookie = xcb_ewmh_init_atoms(pcon,&ewmh);
 	if(!xcb_ewmh_init_atoms_replies(&ewmh,patomCookie,0))
 		throw Exception("Failed to initialize EWMH atoms.\n");
+	
+	for(uint i = 0; i < ATOM_COUNT; ++i)
+		atoms[i] = GetAtom(patomStrs[i]);
 }
 
 /*sint Default::GetEventFileDescriptor(){
@@ -341,17 +382,10 @@ bool Default::HandleEvent(){
 			if(FindClient(pev->window))
 				break;
 
-			X11Client::CreateInfo createInfo;
-			createInfo.window = pev->window;
-			createInfo.pbackend = this;
-			X11Client *pclient = SetupClient(&createInfo);
-			clients.push_back(pclient);
-			
 			//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
 			xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
 			xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
 			xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
-			printf("%u, %u\n",*patom,ewmh._NET_WM_WINDOW_TYPE_DESKTOP);
 			if(*patom == ewmh._NET_WM_WINDOW_TYPE_POPUP_MENU)
 				printf("popup\n");
 			else
@@ -365,15 +399,39 @@ bool Default::HandleEvent(){
 				printf("dialog\n");
 			free(propertyReply);
 
+			X11Client::CreateInfo createInfo;
+			createInfo.window = pev->window;
+			createInfo.pbackend = this;
+			X11Client *pclient = SetupClient(&createInfo);
+			clients.push_back(pclient);
+			
 			DebugPrintf(stdout,"map request, %u\n",pev->window);
 			}
 			break;
 		case XCB_MAP_NOTIFY:{
 			xcb_map_notify_event_t *pev = (xcb_map_notify_event_t*)pevent;
 
+			//WM_TRANSIENT_FOR
+			/*xcb_get_property_cookie_t propertyCookie1 = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
+			xcb_get_property_reply_t *propertyReply1 = xcb_get_property_reply(pcon,propertyCookie1,0);
+			if(propertyReply1){
+				xcb_window_t *base = (xcb_window_t*)xcb_get_property_value(propertyReply1);
+				//xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
+
+				printf("transient for %u\n",*base);
+
+				free(propertyReply1);
+			}else printf("not transient\n");*/
+
 			//check if window already exists
-			if(FindClient(pev->window))
-				break;
+			X11Client *pclient = FindClient(pev->window);
+			if(!pclient){
+				//
+				break; //TODO: create client
+			}
+			pclient->pcontainer->flags &= ~WManager::Container::FLAG_HIDDEN;
+
+			//popup: place on top of the current stack.
 
 			//TODO: something was mapped without explicit request, just put it on screen where it wants
 			//TODO: check if the window is being remapped (after unmapping), need to just hide and show it somehow
@@ -384,6 +442,14 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_UNMAP_NOTIFY:{
 			//
+			xcb_unmap_notify_event_t *pev = (xcb_unmap_notify_event_t*)pevent;
+
+			X11Client *pclient = FindClient(pev->window);
+			if(!pclient)
+				break;
+			pclient->pcontainer->flags |= WManager::Container::FLAG_HIDDEN;
+
+
 			DebugPrintf(stdout,"unmap notify\n");
 			}
 			break;
@@ -501,6 +567,10 @@ void DebugClient::UpdateTranslation(){
 	AdjustSurface1();
 }
 
+void DebugClient::Kill(){
+	//
+}
+
 DebugContainer::DebugContainer(class X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
 	//
 }
@@ -520,9 +590,6 @@ void DebugContainer::Focus1(){
 
 void DebugContainer::Stack1(){
 	//
-	WManager::Container *proot = this;
-	for(WManager::Container *pcontainer = pParent; pcontainer; proot = pcontainer, pcontainer = pcontainer->pParent);
-
 	printf("stacking ...\n");
 }
 

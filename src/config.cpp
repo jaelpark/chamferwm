@@ -388,6 +388,11 @@ BOOST_PYTHON_MODULE(chamfer){
 				Config::BackendInterface::pfocus = container.pcontainer;
 				container.pcontainer->Focus();
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
+		.def("Kill",boost::python::make_function(
+			[](ContainerInterface &container){
+				if(container.pcontainer->pclient)
+					container.pcontainer->pclient->Kill();
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("ShiftLayout",boost::python::make_function(
 			[](ContainerInterface &container, WManager::Container::LAYOUT layout){
 				container.pcontainer->SetLayout(layout);

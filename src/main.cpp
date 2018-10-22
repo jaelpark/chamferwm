@@ -116,11 +116,6 @@ public:
 				throw Exception("OnParent(): Cannot parent to itself.\n");
 
 			if(parentInt.pcontainer->pclient){
-				//1. detach parentInt from its parent (NOTE: should replace in position)
-				//   parentInt.pcontainer->Replace(new Container())
-				//   Container() needs a new param: container to replace
-				//2. create parent1 under parentInt's original parent
-				//bug: check the coordinates in RenderQueue!
 				Config::ContainerInterface &parentInt1 = SetupContainer<T,U>(parentInt.pcontainer);
 				pParent = parentInt1.pcontainer;
 

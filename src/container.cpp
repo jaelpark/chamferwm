@@ -24,7 +24,7 @@ Container::Container(Container *_pParent, const Container::Setup &setup) :
 	pParent(_pParent), pch(0), pnext(0),
 	pclient(0),
 	scale(1.0f), borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize),
-	layout(LAYOUT_VSPLIT), flags(0){
+	layout(LAYOUT_VSPLIT), flags(setup.flags){
 
 	if(pParent->pclient){
 		//reparent

@@ -74,6 +74,8 @@ public:
 	~X11Client();
 	virtual void AdjustSurface1(){};
 	void UpdateTranslation();
+	bool ProtocolSupport(xcb_atom_t);
+	void Kill();
 	//void Focus();
 	//void Stack();
 	//virtual void UpdateCompositor();
@@ -97,7 +99,6 @@ friend class X11Event;
 friend class X11KeyBinder;
 friend class X11Client;
 friend class X11Container;
-friend class Default;
 friend class DebugClient;
 friend class Compositor::X11ClientFrame;
 friend class Compositor::X11Compositor;
@@ -106,7 +107,7 @@ public:
 	X11Backend();
 	virtual ~X11Backend();
 	bool QueryExtension(const char *, sint *, sint *) const;
-	//xcb_atom_t GetAtom(const char *) const;
+	xcb_atom_t GetAtom(const char *) const;
 	virtual X11Client * FindClient(xcb_window_t) const = 0;
 protected:
 	xcb_connection_t *pcon;
@@ -118,13 +119,15 @@ protected:
 		uint keyId;
 	};
 	std::vector<KeyBinding> keycodes; //user defined id associated with the keycode
+	xcb_ewmh_connection_t ewmh;
+
 	enum ATOM{
-		ATOM_NET_WM_WINDOW_TYPE,
+		ATOM_WM_PROTOCOLS,
+		ATOM_WM_DELETE_WINDOW,
 		ATOM_COUNT
 	};
-	xcb_ewmh_connection_t ewmh;
-	//xcb_atom_t atoms[ATOM_COUNT];
-	//static const char *patomStrs[ATOM_COUNT];
+	xcb_atom_t atoms[ATOM_COUNT];
+	static const char *patomStrs[ATOM_COUNT];
 };
 
 class Default : public X11Backend{
@@ -152,6 +155,7 @@ public:
 	~DebugClient();
 	virtual void AdjustSurface1(){};
 	void UpdateTranslation();
+	void Kill();
 	const X11Backend *pbackend;
 };
 
