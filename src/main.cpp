@@ -73,11 +73,11 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 
 	va_list args;
 	va_start(args,pfmt);
-	//pf = fopen("/tmp/log1","a+");
+	pf = fopen("/tmp/log1","a+");
 	if(pf == stderr)
 		fprintf(pf,"Error: ");
 	vfprintf(pf,pfmt,args);
-	//fclose(pf);
+	fclose(pf);
 	va_end(args);
 }
 
@@ -176,7 +176,6 @@ public:
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
 		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
 		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,false);
-		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
@@ -185,11 +184,7 @@ public:
 		//new one), while also setting some of the parameters like border width and such.
 		Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0);
 
-		Backend::X11Client *pclient11;
-		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
-		if(!pcomp11)
-			pclient11 = new Backend::X11Client(containerInt.pcontainer,pcreateInfo);
-		else pclient11 = new Compositor::X11ClientFrame(containerInt.pcontainer,pcreateInfo,pcomp11);
+		Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo);
 		containerInt.pcontainer->pclient = pclient11;
 
 		containerInt.OnCreate();
@@ -197,7 +192,28 @@ public:
 		return pclient11;
 	}
 
+	Backend::X11Client * SetupClient(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *pcreateInfo){
+		if(!pcontainer)
+			pcontainer = proot;
+
+		Backend::X11Client *pclient11;
+		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
+		if(!pcomp11)
+			pclient11 = new Backend::X11Client(pcontainer,pcreateInfo);
+		else{
+			if(pcreateInfo->window == pcomp11->overlay)
+				return 0;
+			pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pcomp11);
+		}
+
+		return pclient11;
+	}
+
 	void DestroyClient(Backend::X11Client *pclient){
+		if(pclient->pcontainer == proot){
+			delete pclient;
+			return;
+		}
 		WManager::Container *premoved = pclient->pcontainer->Remove();
 		WManager::Container *pcollapsed = premoved->pParent->Collapse();
 		Config::BackendInterface::pfocus = proot;
@@ -268,6 +284,10 @@ public:
 	}
 
 	void DestroyClient(Backend::DebugClient *pclient){
+		if(pclient->pcontainer == proot){
+			delete pclient;
+			return;
+		}
 		WManager::Container *premoved = pclient->pcontainer->Remove();
 		WManager::Container *pcollapsed = premoved->pParent->Collapse();
 		Config::BackendInterface::pfocus = proot;
@@ -296,7 +316,6 @@ public:
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
 		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
 		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,true);
-		DebugPrintf(stdout,"DefineKeybindings()\n");
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){

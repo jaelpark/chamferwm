@@ -121,7 +121,9 @@ X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateI
 	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
-	UpdateTranslation();
+	if(!pcreateInfo->prect)
+		UpdateTranslation();
+	else rect = *pcreateInfo->prect; //floating client without its own container: assume that xcb_configure_window was already called
 
 	xcb_map_window(pbackend->pcon,window);
 }
@@ -132,7 +134,7 @@ X11Client::~X11Client(){
 
 void X11Client::UpdateTranslation(){
 	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
-	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y); //TODO: needs to be handled in container class
+	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
 	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
 
@@ -141,7 +143,16 @@ void X11Client::UpdateTranslation(){
 
 	xcb_flush(pbackend->pcon);
 
-	AdjustSurface1(); //virtual function gets called only if the compositor client class has been initialized
+	//Virtual function gets called only if the compositor client class has been initialized.
+	//In case compositor client class hasn't been initialized yet, this will be taken care of
+	//later on subsequent constructor calls.
+	AdjustSurface1();
+}
+
+void X11Client::UpdateTranslation(const WManager::Rectangle *prect){
+	rect = *prect;
+
+	AdjustSurface1();
 }
 
 bool X11Client::ProtocolSupport(xcb_atom_t atom){
@@ -348,7 +359,7 @@ bool Default::HandleEvent(){
 
 			//check if window already exists
 			//further configuration should be blocked (for example Firefox on restore session)
-			if(FindClient(pev->window))
+			if(FindClient(pev->window,MODE_MANUAL))
 				break;
 
 			struct{
@@ -379,11 +390,14 @@ bool Default::HandleEvent(){
 			xcb_map_request_event_t *pev = (xcb_map_request_event_t*)pevent;
 			
 			//check if window already exists
-			if(FindClient(pev->window))
+			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
+			if(pclient1){
+				xcb_map_window(pcon,pev->window);
 				break;
+			}
 
 			//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
-			xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
+			/*xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
 			xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
 			xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
 			if(*patom == ewmh._NET_WM_WINDOW_TYPE_POPUP_MENU)
@@ -397,13 +411,16 @@ bool Default::HandleEvent(){
 			else
 			if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG)
 				printf("dialog\n");
-			free(propertyReply);
+			free(propertyReply);*/
 
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
+			createInfo.prect = 0;
 			createInfo.pbackend = this;
 			X11Client *pclient = SetupClient(&createInfo);
-			clients.push_back(pclient);
+			if(!pclient)
+				break;
+			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_MANUAL));
 			
 			DebugPrintf(stdout,"map request, %u\n",pev->window);
 			}
@@ -411,32 +428,37 @@ bool Default::HandleEvent(){
 		case XCB_MAP_NOTIFY:{
 			xcb_map_notify_event_t *pev = (xcb_map_notify_event_t*)pevent;
 
-			//WM_TRANSIENT_FOR
-			/*xcb_get_property_cookie_t propertyCookie1 = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
-			xcb_get_property_reply_t *propertyReply1 = xcb_get_property_reply(pcon,propertyCookie1,0);
-			if(propertyReply1){
-				xcb_window_t *base = (xcb_window_t*)xcb_get_property_value(propertyReply1);
-				//xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
-
-				printf("transient for %u\n",*base);
-
-				free(propertyReply1);
-			}else printf("not transient\n");*/
-
 			//check if window already exists
-			X11Client *pclient = FindClient(pev->window);
-			if(!pclient){
-				//
-				break; //TODO: create client
+			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
+			if(pclient1)
+				break;
+
+			X11Client *pbaseClient = 0;
+
+			xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
+			xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+			if(propertyReply){
+				xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReply);
+				pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
+				free(propertyReply);
 			}
-			pclient->pcontainer->flags &= ~WManager::Container::FLAG_HIDDEN;
 
-			//popup: place on top of the current stack.
+			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+				return pev->window == p.first;
+			});
+			WManager::Rectangle &rect = (*m).second;
 
-			//TODO: something was mapped without explicit request, just put it on screen where it wants
-			//TODO: check if the window is being remapped (after unmapping), need to just hide and show it somehow
-			//SetupClient(...,true/false) somehow, to indicate a creation of a container
-			//All these windows get the DESTROY_NOTIFY when they're done
+			X11Client::CreateInfo createInfo;
+			createInfo.window = pev->window;
+			createInfo.prect = &rect;
+			createInfo.pbackend = this;
+			X11Client *pclient = SetupClient(0,&createInfo);
+			if(!pclient)
+				break;
+			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
+
+			stackAppendix.push_back(std::pair<X11Client *, X11Client *>(pbaseClient,pclient));
+
 			DebugPrintf(stdout,"map notify, %u\n",pev->window);
 			}
 			break;
@@ -444,11 +466,23 @@ bool Default::HandleEvent(){
 			//
 			xcb_unmap_notify_event_t *pev = (xcb_unmap_notify_event_t*)pevent;
 
-			X11Client *pclient = FindClient(pev->window);
-			if(!pclient)
+			auto m = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
+				return p.first->window == pev->window;
+			});
+			if(m == clients.end())
 				break;
-			pclient->pcontainer->flags |= WManager::Container::FLAG_HIDDEN;
+			//delete *m;
+			DestroyClient((*m).first);
+			
+			std::iter_swap(m,clients.end()-1);
+			clients.pop_back();
 
+			configCache.erase(std::remove_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+				return pev->window == p.first;
+			}));
+			stackAppendix.erase(std::remove_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
+				return (*m).first == p.first || (*m).first == p.second;
+			}));
 
 			DebugPrintf(stdout,"unmap notify\n");
 			}
@@ -462,7 +496,7 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_KEY_PRESS:{
 			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
-			if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
+			if(pev->state == XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT && pev->detail == exitKeycode){
 				free(pevent);
 				return false;
 			//
@@ -487,11 +521,24 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_CONFIGURE_NOTIFY:{
 			xcb_configure_notify_event_t *pev = (xcb_configure_notify_event_t*)pevent;
-			/*if(pev->window != pscr->root)
+
+			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
+			
+			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+				return pev->window == p.first;
+			});
+			if(m == configCache.end()){
+				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				m = configCache.end()-1;
+
+			}else (*m).second = rect;
+
+			X11Client *pclient1 = FindClient(pev->window,MODE_AUTOMATIC);
+			if(!pclient1)
 				break;
 
-			pscr->width_in_pixels = pev->width;
-			pscr->height_in_pixels = pev->height;*/
+			pclient1->UpdateTranslation(&rect);
+
 			DebugPrintf(stdout,"configure to %ux%u\n",pev->width,pev->height);
 			}
 			break;
@@ -502,17 +549,7 @@ bool Default::HandleEvent(){
 		case XCB_DESTROY_NOTIFY:{
 			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
 			DebugPrintf(stdout,"destroy notify, %u (%lu)\n",pev->window,clients.size());
-
-			auto m = std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
-				return pclient->window == pev->window;
-			});
-			if(m == clients.end())
-				break;
-			//delete *m;
-			DestroyClient(*m);
-			
-			std::iter_swap(m,clients.end()-1);
-			clients.pop_back();
+			//
 			}
 			break;
 		case 0:
@@ -533,13 +570,13 @@ bool Default::HandleEvent(){
 	return true;
 }
 
-X11Client * Default::FindClient(xcb_window_t window) const{
-	auto m = std::find_if(clients.begin(),clients.end(),[&](X11Client *pclient)->bool{
-		return pclient->window == window;
+X11Client * Default::FindClient(xcb_window_t window, MODE mode) const{
+	auto m = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
+		return p.first->window == window && (mode == MODE_UNDEFINED || p.second == mode);
 	});
 	if(m == clients.end())
 		return 0;
-	return *m;
+	return (*m).first;
 }
 
 DebugClient::DebugClient(WManager::Container *pcontainer, const DebugClient::CreateInfo *pcreateInfo) : Client(pcontainer), pbackend(pcreateInfo->pbackend){
@@ -558,7 +595,6 @@ void DebugClient::UpdateTranslation(){
 	glm::uvec2 se(pgeometryReply->width,pgeometryReply->height);
 	free(pgeometryReply);
 
-	//glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
 	glm::vec4 screen(se.x,se.y,se.x,se.y);
 	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
 	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
@@ -686,7 +722,6 @@ bool Debug::HandleEvent(){
 			break;
 		case XCB_KEY_PRESS:{
 			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
-			//DebugPrintf(stdout,"key: %u(%u), state: %x & %x\n",pev->detail,exitKeycode,pev->state,XCB_MOD_MASK_1);
 			if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
 				free(pevent);
 				return false;
@@ -696,6 +731,8 @@ bool Debug::HandleEvent(){
 				DebugClient::CreateInfo createInfo = {};
 				createInfo.pbackend = this;
 				DebugClient *pclient = SetupClient(&createInfo);
+				if(!pclient)
+					break;
 				clients.push_back(pclient);
 			}else
 			if(pev->detail == closeKeycode){
@@ -740,7 +777,7 @@ bool Debug::HandleEvent(){
 	return true;
 }
 
-X11Client * Debug::FindClient(xcb_window_t window) const{
+X11Client * Debug::FindClient(xcb_window_t window, MODE mode) const{
 	return 0;
 }
 

@@ -67,13 +67,15 @@ class X11Client : public WManager::Client{
 public:
 	struct CreateInfo{
 		xcb_window_t window;
+		const WManager::Rectangle *prect;
 		const class X11Backend *pbackend;
 	};
 	//X11Client(xcb_window_t, const class X11Backend *);
 	X11Client(WManager::Container *, const CreateInfo *);
 	~X11Client();
 	virtual void AdjustSurface1(){};
-	void UpdateTranslation();
+	void UpdateTranslation(); //manual mode update
+	void UpdateTranslation(const WManager::Rectangle *); //automatic mode update
 	bool ProtocolSupport(xcb_atom_t);
 	void Kill();
 	//void Focus();
@@ -108,7 +110,14 @@ public:
 	virtual ~X11Backend();
 	bool QueryExtension(const char *, sint *, sint *) const;
 	xcb_atom_t GetAtom(const char *) const;
-	virtual X11Client * FindClient(xcb_window_t) const = 0;
+	enum MODE{
+		MODE_UNDEFINED,
+		MODE_MANUAL,
+		MODE_AUTOMATIC
+	};
+	virtual X11Client * FindClient(xcb_window_t, MODE) const = 0;
+	//void * GetProperty(xcb_atom_t, xcb_atom_t) const;
+	//void FreeProperty(...) const;
 protected:
 	xcb_connection_t *pcon;
 	xcb_screen_t *pscr;
@@ -137,13 +146,16 @@ public:
 	void Start();
 	//sint GetEventFileDescriptor();
 	bool HandleEvent();
-	X11Client * FindClient(xcb_window_t) const;
+	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
 	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
+	virtual X11Client * SetupClient(WManager::Container *, const X11Client::CreateInfo *) = 0;
 	virtual void DestroyClient(X11Client *) = 0;
 private:
 	xcb_keycode_t exitKeycode;
-	std::vector<X11Client *> clients;
+	std::vector<std::pair<X11Client *, MODE>> clients;
+	std::vector<std::pair<X11Client *, X11Client *>> stackAppendix;
+	std::vector<std::pair<xcb_window_t, WManager::Rectangle>> configCache;
 };
 
 class DebugClient : public WManager::Client{
@@ -176,7 +188,7 @@ public:
 	void Start();
 	//sint GetEventFileDescriptor();
 	bool HandleEvent();
-	X11Client * FindClient(xcb_window_t) const;
+	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
 	virtual DebugClient * SetupClient(const DebugClient::CreateInfo *) = 0;
 	virtual void DestroyClient(DebugClient *) = 0;

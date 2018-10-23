@@ -173,9 +173,9 @@ public:
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
 	VkExtent2D GetExtent() const;
-protected:
 	const Backend::X11Backend *pbackend;
 	xcb_window_t overlay;
+protected:
 	sint compEventOffset;
 	sint compErrorOffset;
 	sint xfixesEventOffset;

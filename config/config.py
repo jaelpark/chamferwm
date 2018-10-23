@@ -77,6 +77,8 @@ class Backend(chamfer.Backend):
 
 			#alt+shift+a, select the top most base container under root
 
+			#alt+tab, cycle between floating containers?
+
 			#moving windows between containers: a cut/paste mechanism
 			#not only indivudal clients can be replaced, but whole container hierarchies
 		else:

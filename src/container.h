@@ -36,7 +36,7 @@ public:
 		//For performance reasons, the min/maxSize has to be known before the container is created.
 		glm::vec2 minSize = glm::vec2(0.0f);
 		glm::vec2 maxSize = glm::vec2(1.0f);
-		uint flags = 0;
+		//uint flags = 0;
 	};
 	Container(); //root container
 	Container(Container *, const Setup &);
@@ -98,11 +98,11 @@ public:
 
 	LAYOUT layout;
 
-	enum FLAG{
+	/*enum FLAG{
 		FLAG_FLOATING = 0x1,
 		FLAG_HIDDEN = 0x2
 	};
-	uint flags;
+	uint flags;*/
 
 };
 

@@ -651,6 +651,8 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			renderQueue.push_back(renderObject);
 			//printf("draw()%s\n",pcont == pfocus?" [focus]":"");
 
+			//pbackend;
+
 		}else CreateRenderQueue(pcont,pfocus);
 	}
 }
@@ -934,6 +936,7 @@ void X11Compositor::Start(){
 		throw Exception("Unable to get overlay window.\n");
 	overlay = poverlayReply->overlay_win;
 	free(poverlayReply);
+	DebugPrintf(stdout,"overlay xid: %u\n",overlay);
 
 	uint mask = XCB_CW_EVENT_MASK;
 	uint values[1] = {XCB_EVENT_MASK_EXPOSURE};
@@ -991,7 +994,7 @@ bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 	if(pevent->pevent->response_type == XCB_DAMAGE_NOTIFY+damageEventOffset){
 		xcb_damage_notify_event_t *pev = (xcb_damage_notify_event_t*)pevent->pevent;
 
-		Backend::X11Client *pclient = pevent->pbackend->FindClient(pev->drawable);
+		Backend::X11Client *pclient = pevent->pbackend->FindClient(pev->drawable,Backend::X11Backend::MODE_UNDEFINED);
 		if(!pclient){
 			DebugPrintf(stderr,"Unknown damage event.\n");
 			return true;
@@ -1000,7 +1003,6 @@ bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 		if(pclient->rect.w < pev->area.x+pev->area.width || pclient->rect.h < pev->area.y+pev->area.height)
 			return true; //filter out outdated events after client shrink in size
 
-		//ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pclient);
 		X11ClientFrame *pclientFrame = dynamic_cast<X11ClientFrame *>(pclient);
 		if(std::find(updateQueue.begin(),updateQueue.end(),pclientFrame) == updateQueue.end())
 			updateQueue.push_back(pclientFrame);
