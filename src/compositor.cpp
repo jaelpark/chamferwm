@@ -631,11 +631,7 @@ void CompositorInterface::WaitIdle(){
 	vkDeviceWaitIdle(logicalDev);
 }
 
-void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const WManager::Container *pfocus){
-	/*uint n = 0;
-	for(const WManager::Container *pcont = pcontainer->pch; pcont; ++n, pcont = pcont->pnext);
-	printf("queue(): %u/%u%s\n",pcontainer->stackQueue.size(),n,pcontainer == pfocus?" [focus]":"");*/
-
+void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
 	//glm::uvec2 edge(0.0f); //(right) edge of the previous container
 	for(const WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
@@ -649,9 +645,23 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			renderObject.flags =
 				pcont == pfocus || pcontainer == pfocus?0x1:0;
 			renderQueue.push_back(renderObject);
-			//printf("draw()%s\n",pcont == pfocus?" [focus]":"");
 
-		}else CreateRenderQueue(pcont,pfocus);
+		}else CreateRenderQueue(pcont,pstackAppendix,pfocus);
+
+		auto s = [&](auto &p)->bool{
+			return pcont == p.first;
+		};
+		for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
+			m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
+
+			RenderObject renderObject;
+			renderObject.pclient = (*m).second;
+			renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
+			renderObject.flags = 0;
+			renderQueue.push_back(renderObject);
+
+			m = appendixQueue.erase(m);
+		}
 	}
 }
 
@@ -684,7 +694,18 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	
 	//Create a render list elements arranged from back to front
 	renderQueue.clear();
-	CreateRenderQueue(proot,pfocus);
+	appendixQueue.clear();
+	for(auto &p : *pstackAppendix)
+		appendixQueue.push_back(p);
+
+	CreateRenderQueue(proot,pstackAppendix,pfocus);
+	for(auto &r : appendixQueue){ //push the remaining (untransient) windows to the end of the queue
+		RenderObject renderObject;
+		renderObject.pclient = r.second;
+		renderObject.pclientFrame = dynamic_cast<ClientFrame *>(r.second);
+		renderObject.flags = 0;
+		renderQueue.push_back(renderObject);
+	}
 
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

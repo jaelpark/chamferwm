@@ -54,7 +54,7 @@ protected:
 	void InitializeRenderEngine();
 	void DestroyRenderEngine();
 	void WaitIdle();
-	void CreateRenderQueue(const WManager::Container *, const WManager::Container *);
+	void CreateRenderQueue(const WManager::Container *, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *, const WManager::Container *);
 	bool PollFrameFence();
 	void GenerateCommandBuffers(const WManager::Container *, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *, const WManager::Container *);
 	void Present();
@@ -121,7 +121,7 @@ private:
 		uint flags;
 	};
 	std::vector<RenderObject> renderQueue;
-	//std::vector<ClientFrame *> renderQueue;
+	std::deque<std::pair<const WManager::Container *, WManager::Client *>> appendixQueue;
 
 	//Used textures get stored for potential reuse before they get destroyed.
 	//Many of the allocated window textures will initially have some common reoccuring size.

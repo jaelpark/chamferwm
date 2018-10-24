@@ -189,7 +189,8 @@ public:
 		//new one), while also setting some of the parameters like border width and such.
 		if(pcreateInfo->pstackContainer){
 			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo);
-			stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
+			if(pclient11)
+				stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
 			return pclient11;
 		}
 		
@@ -489,6 +490,7 @@ int main(sint argc, const char **pargv){
 	pbackend->SetCompositor(pcomp);
 
 	for(;;){
+		//TODO: can we wait for vsync before handling the event? Might help with the stuttering
 		if(!pbackend11->HandleEvent())
 			break;
 
