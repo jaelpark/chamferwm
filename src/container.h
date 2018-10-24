@@ -48,6 +48,7 @@ public:
 	Container * GetPrev();
 	Container * GetParent();
 	Container * GetFocus();
+	//Container * GetRoot();
 	enum ADJACENT{
 		ADJACENT_LEFT,
 		ADJACENT_RIGHT,

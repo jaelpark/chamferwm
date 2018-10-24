@@ -651,8 +651,6 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			renderQueue.push_back(renderObject);
 			//printf("draw()%s\n",pcont == pfocus?" [focus]":"");
 
-			//pbackend;
-
 		}else CreateRenderQueue(pcont,pfocus);
 	}
 }
@@ -680,15 +678,12 @@ bool CompositorInterface::PollFrameFence(){
 	return true;
 }
 
-void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot, const WManager::Container *pfocus){
+void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
 	if(!proot)
 		return;
 	
 	//Create a render list elements arranged from back to front
 	renderQueue.clear();
-	//frameObjectPool.clear();
-	//CreateRenderQueue(proot->pch);
-	//printf("----------\n");
 	CreateRenderQueue(proot,pfocus);
 
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};

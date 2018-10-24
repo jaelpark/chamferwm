@@ -156,44 +156,47 @@ void X11Client::UpdateTranslation(const WManager::Rectangle *prect){
 }
 
 bool X11Client::ProtocolSupport(xcb_atom_t atom){
-	xcb_get_property_cookie_t propertyCookie = xcb_icccm_get_wm_protocols(pbackend->pcon,window,atom);
+	xcb_get_property_cookie_t propertyCookie = xcb_icccm_get_wm_protocols(pbackend->pcon,window,pbackend->atoms[X11Backend::ATOM_WM_PROTOCOLS]);
 	xcb_icccm_get_wm_protocols_reply_t protocols;
 	if(xcb_icccm_get_wm_protocols_reply(pbackend->pcon,propertyCookie,&protocols,0) != 1)
 		return false;
-	
+
+	bool support = false;
 	for(uint i = 0; i < protocols.atoms_len; ++i)
 		if(protocols.atoms[i] == atom){
-			xcb_icccm_get_wm_protocols_reply_wipe(&protocols);
-			return true;
+			support = true;
+			break;
 		}
 	//
 	xcb_icccm_get_wm_protocols_reply_wipe(&protocols);
-	return false;
+	return support;
 }
 
 void X11Client::Kill(){
-	if(ProtocolSupport(pbackend->atoms[X11Backend::ATOM_WM_PROTOCOLS])){
-		char buffer[32];
+	if(!ProtocolSupport(pbackend->atoms[X11Backend::ATOM_WM_PROTOCOLS])){
+		xcb_destroy_window(pbackend->pcon,window);
+		return;
+	}
 
-		xcb_client_message_event_t *pev = (xcb_client_message_event_t*)buffer;
-		pev->response_type = XCB_CLIENT_MESSAGE;
-		pev->format = 32;
-		pev->window = window;
-		pev->type = pbackend->atoms[X11Backend::ATOM_WM_PROTOCOLS];
-		pev->data.data32[0] = pbackend->atoms[X11Backend::ATOM_WM_DELETE_WINDOW];
-		pev->data.data32[1] = XCB_CURRENT_TIME;
+	char buffer[32];
 
-		xcb_send_event(pbackend->pcon,false,window,XCB_EVENT_MASK_NO_EVENT,buffer);
-		xcb_flush(pbackend->pcon);
+	xcb_client_message_event_t *pev = (xcb_client_message_event_t*)buffer;
+	pev->response_type = XCB_CLIENT_MESSAGE;
+	pev->format = 32;
+	pev->window = window;
+	pev->type = pbackend->atoms[X11Backend::ATOM_WM_PROTOCOLS];
+	pev->data.data32[0] = pbackend->atoms[X11Backend::ATOM_WM_DELETE_WINDOW];
+	pev->data.data32[1] = XCB_CURRENT_TIME;
 
-	}else xcb_destroy_window(pbackend->pcon,window);
+	xcb_send_event(pbackend->pcon,false,window,XCB_EVENT_MASK_NO_EVENT,buffer);
+	xcb_flush(pbackend->pcon);
 }
 
-X11Container::X11Container(class X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
+X11Container::X11Container(X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
 	//
 }
 
-X11Container::X11Container(WManager::Container *_pParent, const WManager::Container::Setup &_setup, class X11Backend *_pbackend) : WManager::Container(_pParent,_setup), pbackend(_pbackend){
+X11Container::X11Container(WManager::Container *_pParent, const WManager::Container::Setup &_setup, X11Backend *_pbackend) : WManager::Container(_pParent,_setup), pbackend(_pbackend){
 	//
 }
 
@@ -222,9 +225,7 @@ void X11Container::StackRecursive(WManager::Container *pcontainer){
 }
 
 void X11Container::Stack1(){
-	//
-	WManager::Container *proot = this;
-	for(WManager::Container *pcontainer = pParent; pcontainer; proot = pcontainer, pcontainer = pcontainer->pParent);
+	WManager::Container *proot = pbackend->GetRoot();
 	StackRecursive(proot);
 }
 
@@ -416,6 +417,7 @@ bool Default::HandleEvent(){
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
 			createInfo.prect = 0;
+			createInfo.pstackContainer = 0;
 			createInfo.pbackend = this;
 			X11Client *pclient = SetupClient(&createInfo);
 			if(!pclient)
@@ -432,13 +434,15 @@ bool Default::HandleEvent(){
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
 			if(pclient1)
 				break;
-
+			
 			X11Client *pbaseClient = 0;
 
+			//TODO: property change client messages
 			xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
 			xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
 			if(propertyReply){
 				xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReply);
+				printf("base window: %u\n",*pbaseWindow);
 				pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
 				free(propertyReply);
 			}
@@ -451,14 +455,13 @@ bool Default::HandleEvent(){
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
 			createInfo.prect = &rect;
+			createInfo.pstackContainer = pbaseClient?pbaseClient->pcontainer:GetRoot();
 			createInfo.pbackend = this;
-			X11Client *pclient = SetupClient(0,&createInfo);
+			X11Client *pclient = SetupClient(&createInfo);
 			if(!pclient)
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
-
-			stackAppendix.push_back(std::pair<X11Client *, X11Client *>(pbaseClient,pclient));
-
+		
 			DebugPrintf(stdout,"map notify, %u\n",pev->window);
 			}
 			break;
@@ -471,7 +474,6 @@ bool Default::HandleEvent(){
 			});
 			if(m == clients.end())
 				break;
-			//delete *m;
 			DestroyClient((*m).first);
 			
 			std::iter_swap(m,clients.end()-1);
@@ -480,9 +482,9 @@ bool Default::HandleEvent(){
 			configCache.erase(std::remove_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return pev->window == p.first;
 			}));
-			stackAppendix.erase(std::remove_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
-				return (*m).first == p.first || (*m).first == p.second;
-			}));
+			/*stackAppendix.erase(std::remove_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
+				return (*m).first == p.second;
+			}));*/
 
 			DebugPrintf(stdout,"unmap notify\n");
 			}
@@ -496,7 +498,7 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_KEY_PRESS:{
 			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
-			if(pev->state == XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT && pev->detail == exitKeycode){
+			if(pev->state == (XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT) && pev->detail == exitKeycode){
 				free(pevent);
 				return false;
 			//
@@ -607,11 +609,11 @@ void DebugClient::Kill(){
 	//
 }
 
-DebugContainer::DebugContainer(class X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
+DebugContainer::DebugContainer(X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
 	//
 }
 
-DebugContainer::DebugContainer(WManager::Container *_pParent, const WManager::Container::Setup &_setup, class X11Backend *_pbackend) : WManager::Container(_pParent,_setup), pbackend(_pbackend){
+DebugContainer::DebugContainer(WManager::Container *_pParent, const WManager::Container::Setup &_setup, X11Backend *_pbackend) : WManager::Container(_pParent,_setup), pbackend(_pbackend){
 	//
 }
 

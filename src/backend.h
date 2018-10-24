@@ -44,6 +44,7 @@ protected:
 	virtual void DefineBindings(BackendKeyBinder *) = 0;
 	virtual void EventNotify(const BackendEvent *) = 0;
 	virtual void KeyPress(uint, bool) = 0;
+	virtual WManager::Container * GetRoot() const = 0;
 };
 
 class X11Event : public BackendEvent{
@@ -68,9 +69,9 @@ public:
 	struct CreateInfo{
 		xcb_window_t window;
 		const WManager::Rectangle *prect;
+		const WManager::Container *pstackContainer;
 		const class X11Backend *pbackend;
 	};
-	//X11Client(xcb_window_t, const class X11Backend *);
 	X11Client(WManager::Container *, const CreateInfo *);
 	~X11Client();
 	virtual void AdjustSurface1(){};
@@ -78,9 +79,6 @@ public:
 	void UpdateTranslation(const WManager::Rectangle *); //automatic mode update
 	bool ProtocolSupport(xcb_atom_t);
 	void Kill();
-	//void Focus();
-	//void Stack();
-	//virtual void UpdateCompositor();
 	xcb_window_t window;
 	const X11Backend *pbackend;
 };
@@ -149,12 +147,10 @@ public:
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
 	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
-	virtual X11Client * SetupClient(WManager::Container *, const X11Client::CreateInfo *) = 0;
 	virtual void DestroyClient(X11Client *) = 0;
 private:
 	xcb_keycode_t exitKeycode;
 	std::vector<std::pair<X11Client *, MODE>> clients;
-	std::vector<std::pair<X11Client *, X11Client *>> stackAppendix;
 	std::vector<std::pair<xcb_window_t, WManager::Rectangle>> configCache;
 };
 

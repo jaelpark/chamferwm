@@ -56,7 +56,7 @@ protected:
 	void WaitIdle();
 	void CreateRenderQueue(const WManager::Container *, const WManager::Container *);
 	bool PollFrameFence();
-	void GenerateCommandBuffers(const WManager::Container *, const WManager::Container *);
+	void GenerateCommandBuffers(const WManager::Container *, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *, const WManager::Container *);
 	void Present();
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;

@@ -67,17 +67,17 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	time(&rt);
 	const struct tm *pti = localtime(&rt);
 
+	//pf = fopen("/tmp/log1","a+");
 	char tbuf[256];
 	strftime(tbuf,sizeof(tbuf),"[chamferwm %F %T]",pti);
 	fprintf(pf,"%s ",tbuf);
 
 	va_list args;
 	va_start(args,pfmt);
-	pf = fopen("/tmp/log1","a+");
 	if(pf == stderr)
 		fprintf(pf,"Error: ");
 	vfprintf(pf,pfmt,args);
-	fclose(pf);
+	//fclose(pf);
 	va_end(args);
 }
 
@@ -143,23 +143,28 @@ public:
 	}
 
 	void ReleaseContainers(){
+		//TODO: cleanup clients that are not part of the hierarchy!
 		if(proot->pch)
 			ReleaseContainersRecursive(proot->pch);
+		for(auto &p : stackAppendix)
+			delete p.second;
 	}
-	
+
 //protected:
 	WManager::Container *proot;
+	std::vector<std::pair<const WManager::Container *, WManager::Client *>> stackAppendix;
 	class RunCompositor *pcomp;
 };
 
 class RunCompositor{
 public:
-	RunCompositor(WManager::Container *_proot) : proot(_proot){}
+	RunCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Container *, WManager::Client *>> *_pstackAppendix) : proot(_proot), pstackAppendix(_pstackAppendix){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
 	virtual void WaitIdle() = 0;
 protected:
 	WManager::Container *proot;
+	std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix;
 };
 
 class DefaultBackend : public Backend::Default, public RunBackend{
@@ -182,6 +187,12 @@ public:
 		//Containers should be created always under the parent of the current focus.
 		//config script should manage this (point to container which should be the parent of the
 		//new one), while also setting some of the parameters like border width and such.
+		if(pcreateInfo->pstackContainer){
+			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo);
+			stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
+			return pclient11;
+		}
+		
 		Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0);
 
 		Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo);
@@ -193,9 +204,6 @@ public:
 	}
 
 	Backend::X11Client * SetupClient(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *pcreateInfo){
-		if(!pcontainer)
-			pcontainer = proot;
-
 		Backend::X11Client *pclient11;
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 		if(!pcomp11)
@@ -211,6 +219,10 @@ public:
 
 	void DestroyClient(Backend::X11Client *pclient){
 		if(pclient->pcontainer == proot){
+			WManager::Client *pbase = pclient;
+			stackAppendix.erase(std::remove_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
+				return pbase == p.second;
+			}));
 			delete pclient;
 			return;
 		}
@@ -252,6 +264,10 @@ public:
 		if(down)
 			Config::BackendInterface::pbackendInt->OnKeyPress(keyId);
 		else Config::BackendInterface::pbackendInt->OnKeyRelease(keyId);
+	}
+
+	WManager::Container * GetRoot() const{
+		return proot;
 	}
 };
 
@@ -327,11 +343,15 @@ public:
 			Config::BackendInterface::pbackendInt->OnKeyPress(keyId);
 		else Config::BackendInterface::pbackendInt->OnKeyRelease(keyId);
 	}
+
+	WManager::Container * GetRoot() const{
+		return proot;
+	}
 };
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(uint gpuIndex, WManager::Container *_proot, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend), RunCompositor(_proot){
+	DefaultCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Container *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
 		Start();
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
@@ -343,7 +363,7 @@ public:
 	void Present(){
 		if(!PollFrameFence())
 			return;
-		GenerateCommandBuffers(proot,Config::BackendInterface::pfocus);
+		GenerateCommandBuffers(proot,pstackAppendix,Config::BackendInterface::pfocus);
 		Compositor::X11Compositor::Present();
 	}
 
@@ -354,7 +374,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(uint gpuIndex, WManager::Container *_proot, Backend::X11Backend *pbackend) : X11DebugCompositor(gpuIndex,pbackend), RunCompositor(_proot){
+	DebugCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Container *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend) : X11DebugCompositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
 		Compositor::X11DebugCompositor::Start();
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
@@ -366,7 +386,7 @@ public:
 	void Present(){
 		if(!PollFrameFence())
 			return;
-		GenerateCommandBuffers(proot,Config::BackendInterface::pfocus);
+		GenerateCommandBuffers(proot,pstackAppendix,Config::BackendInterface::pfocus);
 		Compositor::X11DebugCompositor::Present();
 	}
 
@@ -377,7 +397,7 @@ public:
 
 class NullCompositor : public Compositor::NullCompositor, public RunCompositor{
 public:
-	NullCompositor() : Compositor::NullCompositor(), RunCompositor(0){
+	NullCompositor() : Compositor::NullCompositor(), RunCompositor(0,0){
 		Start();
 	}
 
@@ -458,8 +478,8 @@ int main(sint argc, const char **pargv){
 			pcomp = new NullCompositor();
 		else
 		if(debugBackend.Get())
-			pcomp = new DebugCompositor(gpuIndex.Get(),pbackend->proot,pbackend11);
-		else pcomp = new DefaultCompositor(gpuIndex.Get(),pbackend->proot,pbackend11);
+			pcomp = new DebugCompositor(gpuIndex.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11);
+		else pcomp = new DefaultCompositor(gpuIndex.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11);
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		delete pbackend;
