@@ -74,11 +74,16 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID0) : SV_Target{
 	//float4 c = content.Sample(sm,texc);
 	float2 p = screen*(0.5f*xy0+0.5f);
-	float4 c = content.Load(float3(posh.xy-p,0)); //p already has the 0.5f offset
+	float2 r = posh.xy-p;
+	float4 c = content.Load(float3(r,0)); //p already has the 0.5f offset
 	//^^returns black when out of bounds (border)
-	if(flags & FLAGS_FOCUS && geomId == 0)
-		c.xyz = float3(1,0,0);
-	c.w = 1.0f;
+	if(geomId == 0){
+		if(all(r > 0.5f) && c.w > 0.0f)
+			discard;
+		c = float4(0,0,0,1);
+		if(flags & FLAGS_FOCUS)
+			c.x = 1.0f;
+	}
 	return c;
 #if 0
 	float2 s = saturate(abs(2.0f*(xy1-xy0))); //reference

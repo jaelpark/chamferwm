@@ -874,18 +874,10 @@ X11ClientFrame::~X11ClientFrame(){
 }
 
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
-	/*xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry_unchecked(pbackend->pcon,windowPixmap);
-	xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
-	if(!pgeometryReply){
-		DebugPrintf(stderr,"Failed to get pixmap geometry.\n");
-		return;
-	}
-	DebugPrintf(stdout,"---- rect: %ux%u, pixmap: %ux%u\n",rect.w,rect.h,pgeometryReply->width,pgeometryReply->height);
-	free(pgeometryReply);*/
-
 	if(!fullRegionUpdate && damageRegions.size() == 0)
 		return;
 
+	//TODO: can we acquire only the damaged regions?
 	xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,windowPixmap,0,0,rect.w,rect.h,~0);
 	xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pbackend->pcon,imageCookie,0);
 	if(!pimageReply){
@@ -901,6 +893,9 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	unsigned char *pchpixels = xcb_get_image_data(pimageReply);
 	if(fullRegionUpdate){
 		memcpy(pdata,pchpixels,rect.w*rect.h*4);
+		if(pimageReply->depth != 32)
+			for(uint i = 0; i < rect.w*rect.h; ++i)
+				pdata[4*i+3] = 255;
 		fullRegionUpdate = false;
 
 	}else{
@@ -908,6 +903,9 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 			for(uint y = rect1.offset.y, Y = y+rect1.extent.height; y < Y; ++y){
 				uint offset = 4*(rect.w*y+rect1.offset.x);
 				memcpy(pdata+offset,pchpixels+offset,4*rect1.extent.width);
+				if(pimageReply->depth != 32)
+					for(uint i = 0; i < rect1.extent.width; ++i)
+						pdata[offset+4*i+3] = 255;
 			}
 		}
 	}
@@ -1074,14 +1072,15 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//
 	uint color[3];
 	for(uint &t : color)
-		t = rand()%255;
+		//t = rand()%255;
+		t = rand()%190;
 	const void *pdata = ptexture->Map();
 	for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
 		//unsigned char t = (float)(i/rect.w)/(float)rect.h*255;
 		((unsigned char*)pdata)[4*i+0] = color[0];
 		((unsigned char*)pdata)[4*i+1] = color[1];
 		((unsigned char*)pdata)[4*i+2] = color[2];
-		((unsigned char*)pdata)[4*i+3] = 255;
+		((unsigned char*)pdata)[4*i+3] = 190;//255;
 	}
 	VkRect2D rect1;
 	rect1.offset = {0,0};
