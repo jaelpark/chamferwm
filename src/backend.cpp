@@ -117,7 +117,7 @@ void X11KeyBinder::BindKey(uint symbol, uint mask, uint keyId){
 	pbackend->keycodes.push_back(binding);
 }
 
-X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend){
+X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend), flags(0){
 	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
@@ -133,6 +133,8 @@ X11Client::~X11Client(){
 }
 
 void X11Client::UpdateTranslation(){
+	if(flags & FLAG_UNMAPPING)
+		return; //if the window is about to be destroyed, do not attempt to adjust the surface of anything
 	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
 	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
 	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
@@ -474,17 +476,12 @@ bool Default::HandleEvent(){
 			});
 			if(m == clients.end())
 				break;
-			DestroyClient((*m).first);
-			
+
+			(*m).first->flags |= X11Client::FLAG_UNMAPPING;
+			unmappingQueue.push_back((*m).first);
+
 			std::iter_swap(m,clients.end()-1);
 			clients.pop_back();
-
-			configCache.erase(std::remove_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
-			}));
-			/*stackAppendix.erase(std::remove_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
-				return (*m).first == p.second;
-			}));*/
 
 			DebugPrintf(stdout,"unmap notify\n");
 			}
@@ -568,6 +565,12 @@ bool Default::HandleEvent(){
 		free(pevent);
 		xcb_flush(pcon);
 	}
+
+	//Destroy the clients here, after the event queue has been cleared. This is to ensure that no already destroyed
+	//client is attempted to be readjusted.
+	for(X11Client *pclient : unmappingQueue)
+		DestroyClient(pclient);
+	unmappingQueue.clear();
 
 	return true;
 }

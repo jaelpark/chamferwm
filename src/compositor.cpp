@@ -828,6 +828,7 @@ VkDescriptorSet * CompositorInterface::CreateDescSets(const ShaderModule *pshade
 	descSetAllocateInfo.descriptorPool = descPool;
 	descSetAllocateInfo.pSetLayouts = pshaderModule->pdescSetLayouts;
 	descSetAllocateInfo.descriptorSetCount = pshaderModule->setCount;
+	//TODO: check VK_ERROR_OUT_OF_POOL_MEMORY, allocate a new pool in that case
 	if(vkAllocateDescriptorSets(logicalDev,&descSetAllocateInfo,pdescSets) != VK_SUCCESS){
 		delete []pdescSets;
 		return 0;
@@ -1027,7 +1028,7 @@ bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 		rect.offset = {pev->area.x,pev->area.y};
 		rect.extent = {pev->area.width,pev->area.height};
 		pclientFrame->damageRegions.push_back(rect);
-		DebugPrintf(stdout,"DAMAGE_EVENT, (%hd,%hd), (%hux%hu)\n",pev->area.x,pev->area.y,pev->area.width,pev->area.height);
+		//DebugPrintf(stdout,"DAMAGE_EVENT, (%hd,%hd), (%hux%hu)\n",pev->area.x,pev->area.y,pev->area.width,pev->area.height);
 		
 		return true;
 	}

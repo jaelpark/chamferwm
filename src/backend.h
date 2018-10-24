@@ -80,6 +80,10 @@ public:
 	bool ProtocolSupport(xcb_atom_t);
 	void Kill();
 	xcb_window_t window;
+	enum FLAG{
+		FLAG_UNMAPPING = 0x1
+	};
+	uint flags;
 	const X11Backend *pbackend;
 };
 
@@ -152,6 +156,7 @@ private:
 	xcb_keycode_t exitKeycode;
 	std::vector<std::pair<X11Client *, MODE>> clients;
 	std::vector<std::pair<xcb_window_t, WManager::Rectangle>> configCache;
+	std::vector<X11Client *> unmappingQueue;
 };
 
 class DebugClient : public WManager::Client{
