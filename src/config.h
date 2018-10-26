@@ -19,7 +19,8 @@ class ContainerInterface{
 public:
 	ContainerInterface();
 	virtual ~ContainerInterface();
-	void CopySettings(WManager::Container::Setup &);
+	void CopySettingsSetup(WManager::Container::Setup &);
+	void CopySettingsContainer();
 	virtual void OnSetup();
 	virtual boost::python::object OnParent();
 	virtual void OnCreate();
@@ -90,6 +91,7 @@ public:
 	static void Bind(boost::python::object);
 	static void SetFocus(WManager::Container *);
 	static boost::python::object GetFocus();
+	static boost::python::object GetRoot();
 
 	static BackendInterface defaultInt;
 	static BackendInterface *pbackendInt;

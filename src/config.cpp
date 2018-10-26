@@ -18,13 +18,29 @@ ContainerInterface::~ContainerInterface(){
 	//
 }
 
-void ContainerInterface::CopySettings(WManager::Container::Setup &setup){
+void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 	setup.borderWidth.x = boost::python::extract<float>(borderWidth[0])();
 	setup.borderWidth.y = boost::python::extract<float>(borderWidth[1])();
 	setup.minSize.x = boost::python::extract<float>(minSize[0])();
 	setup.minSize.y = boost::python::extract<float>(minSize[1])();
 	setup.maxSize.x = boost::python::extract<float>(maxSize[0])();
 	setup.maxSize.y = boost::python::extract<float>(maxSize[1])();
+}
+
+void ContainerInterface::CopySettingsContainer(){
+	pcontainer->borderWidth.x = boost::python::extract<float>(borderWidth[0])();
+	pcontainer->borderWidth.y = boost::python::extract<float>(borderWidth[1])();
+	pcontainer->minSize.x = boost::python::extract<float>(minSize[0])();
+	pcontainer->minSize.y = boost::python::extract<float>(minSize[1])();
+	pcontainer->maxSize.x = boost::python::extract<float>(maxSize[0])();
+	pcontainer->maxSize.y = boost::python::extract<float>(maxSize[1])();
+
+	for(WManager::Container *pcontainter1 = pcontainer->pch; pcontainter1; pcontainter1 = pcontainter1->pnext){
+		ContainerConfig *pcontainerConfig = dynamic_cast<ContainerConfig *>(pcontainter1);
+		if(!pcontainerConfig)
+			break;
+		pcontainerConfig->pcontainerInt->CopySettingsContainer();
+	}
 }
 
 void ContainerInterface::OnSetup(){
@@ -256,6 +272,15 @@ boost::python::object BackendInterface::GetFocus(){
 	return boost::python::object();
 }
 
+boost::python::object BackendInterface::GetRoot(){
+	WManager::Container *pParent = pfocus;
+	for(WManager::Container *pcontainer = pfocus->pParent; pcontainer; pParent = pcontainer, pcontainer = pcontainer->pParent);
+	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pParent);
+	if(pcontainer1)
+		return pcontainer1->pcontainerInt->self;
+	return boost::python::object();
+}
+
 BackendInterface BackendInterface::defaultInt;
 BackendInterface *BackendInterface::pbackendInt = &BackendInterface::defaultInt;
 WManager::Container *BackendInterface::pfocus = 0; //initially set to root container as soon as it's created
@@ -395,6 +420,7 @@ BOOST_PYTHON_MODULE(chamfer){
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("ShiftLayout",boost::python::make_function(
 			[](ContainerInterface &container, WManager::Container::LAYOUT layout){
+				container.CopySettingsContainer();
 				container.pcontainer->SetLayout(layout);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, WManager::Container::LAYOUT>()))
 		.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
@@ -429,6 +455,7 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::def("bind_Compositor",CompositorInterface::Bind);
 
 	boost::python::def("GetFocus",&BackendInterface::GetFocus);
+	boost::python::def("GetRoot",&BackendInterface::GetRoot);
 }
 
 Loader::Loader(const char *pargv0){

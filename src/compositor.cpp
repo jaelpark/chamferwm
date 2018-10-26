@@ -73,6 +73,8 @@ void ClientFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, uint
 }
 
 void ClientFrame::AdjustSurface(uint w, uint h){
+	if(w == ptexture->w && h == ptexture->h)
+		return;
 	pcomp->ReleaseTexture(ptexture);
 
 	pcomp->updateQueue.push_back(this);
@@ -892,14 +894,34 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 
 	unsigned char *pchpixels = xcb_get_image_data(pimageReply);
 	if(fullRegionUpdate){
+		/*xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,windowPixmap,0,0,rect.w,rect.h,~0);
+		xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pbackend->pcon,imageCookie,0);
+		if(!pimageReply){
+			DebugPrintf(stderr,"Failed to receive image reply.\n");
+			return;
+		}
+
+		unsigned char *pchpixels = xcb_get_image_data(pimageReply);*/
+
 		memcpy(pdata,pchpixels,rect.w*rect.h*4);
 		if(pimageReply->depth != 32)
 			for(uint i = 0; i < rect.w*rect.h; ++i)
 				pdata[4*i+3] = 255;
 		fullRegionUpdate = false;
 
+		//free(pimageReply);
+
 	}else{
 		for(VkRect2D &rect1 : damageRegions){
+			/*xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0);
+			xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pbackend->pcon,imageCookie,0);
+			if(!pimageReply){
+				DebugPrintf(stderr,"Failed to receive image reply.\n");
+				return;
+			}
+
+			unsigned char *pchpixels = xcb_get_image_data(pimageReply);*/
+
 			for(uint y = rect1.offset.y, Y = y+rect1.extent.height; y < Y; ++y){
 				uint offset = 4*(rect.w*y+rect1.offset.x);
 				memcpy(pdata+offset,pchpixels+offset,4*rect1.extent.width);
@@ -907,6 +929,8 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 					for(uint i = 0; i < rect1.extent.width; ++i)
 						pdata[offset+4*i+3] = 255;
 			}
+
+			//free(pimageReply);
 		}
 	}
 

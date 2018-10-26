@@ -103,7 +103,7 @@ public:
 		containerInt.OnSetup();
 
 		WManager::Container::Setup setup;
-		containerInt.CopySettings(setup);
+		containerInt.CopySettingsSetup(setup);
 	
 		if(!pParent){
 			boost::python::object parentObject = containerInt.OnParent();
@@ -221,26 +221,33 @@ public:
 	void DestroyClient(Backend::X11Client *pclient){
 		if(pclient->pcontainer == proot){
 			WManager::Client *pbase = pclient;
-			stackAppendix.erase(std::remove_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
+			auto m = std::find_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
 				return pbase == p.second;
-			}));
+			});
+			if(Config::BackendInterface::pfocus == pbase->pcontainer)
+				Config::BackendInterface::SetFocus(m != stackAppendix.end()?
+					(WManager::Container*)(*m).first:proot); //hack cast, TODO: remove const from the vector
+			stackAppendix.erase(m);
+
 			delete pclient;
 			return;
 		}
 		WManager::Container *premoved = pclient->pcontainer->Remove();
 		WManager::Container *pcollapsed = premoved->pParent->Collapse();
-		Config::BackendInterface::pfocus = proot;
-		//find the first parent which has clients available to be focused
-		for(WManager::Container *pcontainer = premoved->pParent; pcontainer; pcontainer = pcontainer->pParent)
-			if(pcontainer->focusQueue.size() > 0){
-				Config::BackendInterface::SetFocus(pcontainer->focusQueue.back());
-				break;
-			}else
-			if(pcontainer->pch){
-				//should always have at least one container available
-				Config::BackendInterface::SetFocus(pcontainer->pch);
-				break;
-			}
+		if(Config::BackendInterface::pfocus == pclient->pcontainer){
+			Config::BackendInterface::pfocus = proot;
+			//find the first parent which has clients available to be focused
+			for(WManager::Container *pcontainer = premoved->pParent; pcontainer; pcontainer = pcontainer->pParent)
+				if(pcontainer->focusQueue.size() > 0){
+					Config::BackendInterface::SetFocus(pcontainer->focusQueue.back());
+					break;
+				}else
+				if(pcontainer->pch){
+					//should always have at least one container available
+					Config::BackendInterface::SetFocus(pcontainer->pch);
+					break;
+				}
+		}
 		if(premoved->pch)
 			ReleaseContainersRecursive(premoved->pch);
 		if(premoved->pclient)
@@ -267,8 +274,12 @@ public:
 		else Config::BackendInterface::pbackendInt->OnKeyRelease(keyId);
 	}
 
-	WManager::Container * GetRoot() const{
+	const WManager::Container * GetRoot() const{
 		return proot;
+	}
+
+	const std::vector<std::pair<const WManager::Container *, WManager::Client *>> * GetStackAppendix() const{
+		return &stackAppendix;
 	}
 };
 
@@ -302,22 +313,25 @@ public:
 
 	void DestroyClient(Backend::DebugClient *pclient){
 		if(pclient->pcontainer == proot){
+			Config::BackendInterface::SetFocus(proot);
 			delete pclient;
 			return;
 		}
 		WManager::Container *premoved = pclient->pcontainer->Remove();
 		WManager::Container *pcollapsed = premoved->pParent->Collapse();
-		Config::BackendInterface::pfocus = proot;
-		for(WManager::Container *pcontainer = premoved->pParent; pcontainer; pcontainer = pcontainer->pParent)
-			if(pcontainer->focusQueue.size() > 0){
-				Config::BackendInterface::SetFocus(pcontainer->focusQueue.back());
-				break;
-			}else
-			if(pcontainer->pch){
-				//should always have at least one container available
-				Config::BackendInterface::SetFocus(pcontainer->pch);
-				break;
-			}
+		if(Config::BackendInterface::pfocus == pclient->pcontainer){
+			Config::BackendInterface::pfocus = proot;
+			for(WManager::Container *pcontainer = premoved->pParent; pcontainer; pcontainer = pcontainer->pParent)
+				if(pcontainer->focusQueue.size() > 0){
+					Config::BackendInterface::SetFocus(pcontainer->focusQueue.back());
+					break;
+				}else
+				if(pcontainer->pch){
+					//should always have at least one container available
+					Config::BackendInterface::SetFocus(pcontainer->pch);
+					break;
+				}
+		}
 		if(premoved->pch)
 			ReleaseContainersRecursive(premoved->pch);
 		if(premoved->pclient)
@@ -345,8 +359,12 @@ public:
 		else Config::BackendInterface::pbackendInt->OnKeyRelease(keyId);
 	}
 
-	WManager::Container * GetRoot() const{
+	const WManager::Container * GetRoot() const{
 		return proot;
+	}
+
+	const std::vector<std::pair<const WManager::Container *, WManager::Client *>> * GetStackAppendix() const{
+		return &stackAppendix;
 	}
 };
 

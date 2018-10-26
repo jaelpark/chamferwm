@@ -16,6 +16,7 @@ class Key(Enum):
 	MOVE_RIGHT = auto()
 
 	LAYOUT = auto()
+	MAXIMIZE = auto()
 	SPLIT_V = auto()
 
 	KILL = auto()
@@ -64,6 +65,7 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('x'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
 
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
+			binder.BindKey(ord('m'),chamfer.MOD_MASK_1,Key.MAXIMIZE.value);
 			binder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
 			
 			binder.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
@@ -94,6 +96,7 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('x'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_CHILD.value);
 
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
+			binder.BindKey(ord('m'),chamfer.MOD_MASK_SHIFT,Key.MAXIMIZE.value);
 			binder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
 	
 	def OnCreateContainer(self):
@@ -161,7 +164,7 @@ class Backend(chamfer.Backend):
 		elif keyId == Key.FOCUS_CHILD.value:
 			focus = focus.GetFocus();
 			if focus is None:
-				return; #TODO: get first child if it exists
+				return;
 			focus.Focus();
 			
 		elif keyId == Key.LAYOUT.value:
@@ -172,6 +175,10 @@ class Backend(chamfer.Backend):
 				chamfer.layout.HSPLIT:chamfer.layout.VSPLIT
 			}[parent.layout];
 			parent.ShiftLayout(layout); #TODO: layout = ..., use UpdateLayout() to update all changes?
+
+		elif keyId == Key.MAXIMIZE.value:
+			focus.minSize = (0.9,0.9);
+			focus.ShiftLayout(focus.layout);
 		
 		elif keyId == Key.SPLIT_V.value:
 			#arm the container split

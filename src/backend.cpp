@@ -175,7 +175,7 @@ bool X11Client::ProtocolSupport(xcb_atom_t atom){
 }
 
 void X11Client::Kill(){
-	if(!ProtocolSupport(pbackend->atoms[X11Backend::ATOM_WM_PROTOCOLS])){
+	if(!ProtocolSupport(pbackend->atoms[X11Backend::ATOM_WM_DELETE_WINDOW])){
 		xcb_destroy_window(pbackend->pcon,window);
 		return;
 	}
@@ -215,20 +215,33 @@ void X11Container::Focus1(){
 	xcb_flush(pbackend->pcon);
 }
 
-void X11Container::StackRecursive(WManager::Container *pcontainer){
+void X11Container::StackRecursive(const WManager::Container *pcontainer, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix){
 	for(WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
 			X11Client *pclient11 = dynamic_cast<X11Client *>(pcont->pclient);
 
 			uint values[1] = {XCB_STACK_MODE_ABOVE};
 			xcb_configure_window(pbackend->pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
-		}else StackRecursive(pcont);
+		}else StackRecursive(pcont,pstackAppendix);
+
+		auto s = [&](auto &p)->bool{
+			return pcont == p.first;
+		};
+		for(auto m = std::find_if(pstackAppendix->begin(),pstackAppendix->end(),s);
+			m != pstackAppendix->end(); m = std::find_if(m,pstackAppendix->end(),s)){
+
+			X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
+
+			uint values[1] = {XCB_STACK_MODE_ABOVE};
+			xcb_configure_window(pbackend->pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		}
 	}
 }
 
 void X11Container::Stack1(){
-	WManager::Container *proot = pbackend->GetRoot();
-	StackRecursive(proot);
+	const WManager::Container *proot = pbackend->GetRoot();
+	const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix = pbackend->GetStackAppendix();
+	StackRecursive(proot,pstackAppendix);
 }
 
 X11Backend::X11Backend(){
@@ -399,27 +412,37 @@ bool Default::HandleEvent(){
 				break;
 			}
 
-			//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
-			/*xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
-			xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
-			xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
-			if(*patom == ewmh._NET_WM_WINDOW_TYPE_POPUP_MENU)
-				printf("popup\n");
-			else
-			if(*patom == ewmh._NET_WM_WINDOW_TYPE_TOOLBAR)
-				printf("toolbar\n");
-			else
-			if(*patom == ewmh._NET_WM_WINDOW_TYPE_DROPDOWN_MENU)
-				printf("dropdown\n");
-			else
-			if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG)
-				printf("dialog\n");
-			free(propertyReply);*/
+			WManager::Rectangle *prect = 0;
+			X11Client *pbaseClient = 0;
+
+			{
+				//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
+				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
+				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
+				if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG){
+					auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+						return pev->window == p.first;
+					});
+					prect = &(*m).second;
+				}
+				free(propertyReply);
+			}
+			{
+				//
+				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
+				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+				if(propertyReply){
+					xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReply);
+					pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
+					free(propertyReply);
+				}
+			}
 
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
-			createInfo.prect = 0;
-			createInfo.pstackContainer = 0;
+			createInfo.prect = prect;
+			createInfo.pstackContainer = prect?(pbaseClient?pbaseClient->pcontainer:GetRoot()):0;
 			createInfo.pbackend = this;
 			X11Client *pclient = SetupClient(&createInfo);
 			if(!pclient)
@@ -439,24 +462,25 @@ bool Default::HandleEvent(){
 			
 			X11Client *pbaseClient = 0;
 
-			//TODO: property change client messages
-			xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
-			xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
-			if(propertyReply){
-				xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReply);
-				printf("base window: %u\n",*pbaseWindow);
-				pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
-				free(propertyReply);
+			{
+				//TODO: property change client messages
+				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
+				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+				if(propertyReply){
+					xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReply);
+					pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
+					free(propertyReply);
+				}
 			}
 
 			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return pev->window == p.first;
 			});
-			WManager::Rectangle &rect = (*m).second;
+			WManager::Rectangle *prect = &(*m).second;
 
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
-			createInfo.prect = &rect;
+			createInfo.prect = prect;
 			createInfo.pstackContainer = pbaseClient?pbaseClient->pcontainer:GetRoot();
 			createInfo.pbackend = this;
 			X11Client *pclient = SetupClient(&createInfo);

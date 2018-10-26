@@ -44,7 +44,8 @@ protected:
 	virtual void DefineBindings(BackendKeyBinder *) = 0;
 	virtual void EventNotify(const BackendEvent *) = 0;
 	virtual void KeyPress(uint, bool) = 0;
-	virtual WManager::Container * GetRoot() const = 0;
+	virtual const WManager::Container * GetRoot() const = 0;
+	virtual const std::vector<std::pair<const WManager::Container *, WManager::Client *>> * GetStackAppendix() const = 0;
 };
 
 class X11Event : public BackendEvent{
@@ -93,7 +94,7 @@ public:
 	X11Container(WManager::Container *, const WManager::Container::Setup &, class X11Backend *);
 	virtual ~X11Container();
 	void Focus1();
-	void StackRecursive(WManager::Container *);
+	void StackRecursive(const WManager::Container *, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *);
 	void Stack1();
 	const X11Backend *pbackend;
 };

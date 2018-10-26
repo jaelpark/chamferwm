@@ -286,11 +286,17 @@ void Container::TranslateRecursive(glm::vec2 p, glm::vec2 e){
 	uint count = 0;
 
 	glm::vec2 minSizeSum(0.0f);
+	glm::vec2 maxMinSize(0.0f);
 	for(Container *pcontainer = pch; pcontainer; ++count, pcontainer = pcontainer->pnext){
 		pcontainer->e1 = pcontainer->GetMinSize();
+		//pcontainer->c1 = minSizeSum+0.5f*pcontainer->e1;
 		minSizeSum += pcontainer->e1;
+		maxMinSize = glm::max(pcontainer->e1,maxMinSize);
 	}
-	
+
+	//glm::vec2 position1(0.0f);
+	//for(Container *pcontainer = pch; pcontainer; ++count, pcontainer = pcontainer->pnext)
+	//	position1 += pcontainer->e1;
 	/*
 	minimize overlap1(e1)/e1+overlap2(e2)/e2+...
 	st. e1+e2+...=e
@@ -305,6 +311,26 @@ void Container::TranslateRecursive(glm::vec2 p, glm::vec2 e){
 	-assign the remaining equally
 	*/
 
+	/*
+	if overlap required:
+	-place the first container
+	-if the next container fits next to the first one, place it there
+	 else: stretch the first container to the maximum, place the second one to x=0 (unless this is the last container, in which case x=max-e)
+	*/
+
+	//span s = minSizeSum
+	//for each window, get center and its location on s
+	//move centers s/4 distance towards the center of the screen
+	/*for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
+		pcontainer->c1 -= 0.5f*(minSizeSum-1.0f);
+		pcontainer->c1 = (pcontainer->c1+0.5f*pcontainer->e1-0.5f)/(minSizeSum)+0.5f;
+		//pcontainer->c1 += 
+		//pcontainer->c1 -= glm::sign(pcontainer->c1-0.5f)*glm::abs(pcontainer->c1-0.5f)/(minSizeSum);
+		//1.5f*(glm::abs(pcontainer->c1-0.5f)/(minSizeSum-1.0f))*(0.5f*(minSizeSum-1.0f));
+		//0.5: 3
+		//1.0: 4
+	}*/
+
 	glm::vec2 position(p);
 	switch(layout){
 	default:
@@ -312,10 +338,31 @@ void Container::TranslateRecursive(glm::vec2 p, glm::vec2 e){
 		if(e.x-minSizeSum.x < 0.0f){
 			//overlap required, everything has been minimized to the limit
 			for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
-				glm::vec2 e1 = glm::vec2(pcontainer->e1.x,e.y);
-				glm::vec2 p1 = position;
+				//glm::vec2 e1 = glm::vec2(pcontainer->e1.x,e.y);
+				glm::vec2 e1 = glm::vec2(maxMinSize.x,e.y);
+				//glm::vec2 p1 = glm::vec2(position.x,p.y);//position;
+				glm::vec2 p1 = glm::vec2(position.x,p.y);//position;
+				//glm::vec2 p1 = glm::vec2((p+pcontainer->c1-0.5f*e1).x,p.y);//position;
 
-				position.x += e1.x-(minSizeSum.x-e.x)/(float)(count-1);
+				/*if(pcontainer->pnext){
+					if(p1.x+e1.x+pcontainer->pnext->e1.x > 1.0f)
+						e1.x = 1.0f;
+					else position += ...;
+				*/
+					
+				//----
+				/*if(pcontainer->pnext){
+					if(p1.x+e1.x+pcontainer->pnext->e1.x <= 1.0)
+						pcontainer->pnext->p1.x = p1.x+e1.x;
+					else{
+						pcontainer->pnext->p1.x = position.x;
+						//TODO: resize the previous row
+					}
+					position.x += maxMinSize.x-((float)count*maxMinSize.x-e.x)/(float)(count-1);
+				}*/
+
+				//position.x += e1.x-(minSizeSum.x-e.x)/(float)(count-1);
+				position.x += e1.x-((float)count*maxMinSize.x-e.x)/(float)(count-1);
 				pcontainer->TranslateRecursive(p1,e1);
 			}
 

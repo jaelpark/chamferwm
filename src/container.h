@@ -90,6 +90,7 @@ public:
 	glm::vec2 p;
 	glm::vec2 e;
 
+	//glm::vec2 c1; //iteration center
 	glm::vec2 e1; //iteration e
 
 	glm::vec2 borderWidth;
