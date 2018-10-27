@@ -440,8 +440,7 @@ bool Default::HandleEvent(){
 					auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 						return pev->window == p.first;
 					});
-					//TODO: error handling in case of m == end()
-					prect = &(*m).second;
+					prect = m != configCache.end()?&(*m).second:0;
 				}
 				free(propertyReply);
 			}
@@ -500,9 +499,10 @@ bool Default::HandleEvent(){
 				xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pcon,pev->window);
 				xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pcon,geometryCookie,0);
 				WManager::Rectangle rect = {pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
+				free(pgeometryReply);
+
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
 				m = configCache.end()-1;
-				free(pgeometryReply);
 
 			}
 			WManager::Rectangle *prect = &(*m).second;
@@ -603,9 +603,9 @@ bool Default::HandleEvent(){
 			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
 			DebugPrintf(stdout,"destroy notify, %u (%lu)\n",pev->window,clients.size());
 
-			configCache.erase(std::remove_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+			/*configCache.erase(std::remove_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return p.first == pev->window;
-			}));
+			}));*/
 			//
 			}
 			break;
