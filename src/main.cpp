@@ -67,7 +67,7 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	time(&rt);
 	const struct tm *pti = localtime(&rt);
 
-	//pf = fopen("/tmp/log1","a+");
+	pf = fopen("/tmp/log1","a+");
 	char tbuf[256];
 	strftime(tbuf,sizeof(tbuf),"[chamferwm %F %T]",pti);
 	fprintf(pf,"%s ",tbuf);
@@ -77,7 +77,7 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	if(pf == stderr)
 		fprintf(pf,"Error: ");
 	vfprintf(pf,pfmt,args);
-	//fclose(pf);
+	fclose(pf);
 	va_end(args);
 }
 
@@ -103,6 +103,7 @@ public:
 		containerInt.OnSetup();
 
 		WManager::Container::Setup setup;
+		setup.mode = WManager::Container::MODE_TILED;
 		containerInt.CopySettingsSetup(setup);
 	
 		if(!pParent){
@@ -128,6 +129,29 @@ public:
 		return containerInt;
 	}
 
+
+	template<class T, class U>
+	Config::ContainerInterface & SetupFloating(){
+		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
+		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
+		if(!containerExtract.check())
+			throw Exception("OnCreateContainer(): Invalid container object returned.\n"); //TODO: create default
+
+		Config::ContainerInterface &containerInt = containerExtract();
+		containerInt.self = containerObject;
+
+		containerInt.OnSetup();
+
+		WManager::Container::Setup setup;
+		setup.mode = WManager::Container::MODE_FLOATING;
+		containerInt.CopySettingsSetup(setup);
+	
+		T *pcontainer = new T(&containerInt,proot,setup,static_cast<U*>(this));
+		containerInt.pcontainer = pcontainer;
+
+		return containerInt;
+	}
+
 	void ReleaseContainersRecursive(const WManager::Container *pcontainer){
 		for(const WManager::Container *pcont = pcontainer; pcont;){
 			if(pcont->pclient)
@@ -146,8 +170,11 @@ public:
 		//TODO: cleanup clients that are not part of the hierarchy!
 		if(proot->pch)
 			ReleaseContainersRecursive(proot->pch);
-		for(auto &p : stackAppendix)
+		for(auto &p : stackAppendix){
+			if(p.second->pcontainer)
+				delete p.second->pcontainer;
 			delete p.second;
+		}
 	}
 
 //protected:
@@ -187,21 +214,26 @@ public:
 		//Containers should be created always under the parent of the current focus.
 		//config script should manage this (point to container which should be the parent of the
 		//new one), while also setting some of the parameters like border width and such.
-		if(pcreateInfo->pstackContainer){
+		if(pcreateInfo->mode == Backend::X11Client::CreateInfo::CREATE_AUTOMATIC){
 			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo);
 			if(pclient11)
 				stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
 			return pclient11;
+
+		}else{
+			Config::ContainerInterface &containerInt = !pcreateInfo->pstackContainer?
+				SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0):
+				SetupFloating<Config::X11ContainerConfig,DefaultBackend>();
+
+			Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo);
+			containerInt.pcontainer->pclient = pclient11;
+			if(pcreateInfo->pstackContainer)
+				stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
+
+			containerInt.OnCreate();
+
+			return pclient11;
 		}
-		
-		Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0);
-
-		Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo);
-		containerInt.pcontainer->pclient = pclient11;
-
-		containerInt.OnCreate();
-
-		return pclient11;
 	}
 
 	Backend::X11Client * SetupClient(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *pcreateInfo){
@@ -219,16 +251,16 @@ public:
 	}
 
 	void DestroyClient(Backend::X11Client *pclient){
-		if(pclient->pcontainer == proot){
-			WManager::Client *pbase = pclient;
-			auto m = std::find_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
-				return pbase == p.second;
-			});
-			if(Config::BackendInterface::pfocus == pbase->pcontainer)
-				Config::BackendInterface::SetFocus(m != stackAppendix.end()?
-					(WManager::Container*)(*m).first:proot); //hack cast, TODO: remove const from the vector
+		WManager::Client *pbase = pclient;
+		auto m = std::find_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
+			return pbase == p.second;
+		});
+		if(m != stackAppendix.end())
 			stackAppendix.erase(m);
-
+		if(pclient->pcontainer == proot){
+			/*if(Config::BackendInterface::pfocus == pbase->pcontainer)
+				Config::BackendInterface::SetFocus(m != stackAppendix.end()?
+					(WManager::Container*)(*m).first:proot); //hack cast, TODO: remove const from the vector*/
 			delete pclient;
 			return;
 		}

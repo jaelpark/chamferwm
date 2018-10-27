@@ -76,6 +76,7 @@ class Backend(chamfer.Backend):
 			#N - previous match
 			#[num] m - set window min size to [num]0%
 			#... M - set max
+			#f - highlight GTK buttons etc to be activated with keyboard
 
 			#alt+shift+a, select the top most base container under root
 

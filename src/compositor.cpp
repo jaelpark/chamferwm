@@ -649,21 +649,21 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			renderQueue.push_back(renderObject);
 
 		}else CreateRenderQueue(pcont,pstackAppendix,pfocus);
+	}
 
-		auto s = [&](auto &p)->bool{
-			return pcont == p.first;
-		};
-		for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
-			m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
+	auto s = [&](auto &p)->bool{
+		return pcontainer == p.first;
+	};
+	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
+		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
 
-			RenderObject renderObject;
-			renderObject.pclient = (*m).second;
-			renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
-			renderObject.flags = 0;
-			renderQueue.push_back(renderObject);
+		RenderObject renderObject;
+		renderObject.pclient = (*m).second;
+		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
+		renderObject.flags = 0;
+		renderQueue.push_back(renderObject);
 
-			m = appendixQueue.erase(m);
-		}
+		m = appendixQueue.erase(m);
 	}
 }
 
@@ -890,8 +890,6 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//http://doc.qt.io/qt-5/qimage.html
 	//argb can be swizzled (image view)
 
-	unsigned char *pdata = (unsigned char *)ptexture->Map();
-
 	unsigned char *pchpixels = xcb_get_image_data(pimageReply);
 	if(fullRegionUpdate){
 		/*xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,windowPixmap,0,0,rect.w,rect.h,~0);
@@ -902,14 +900,19 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		}
 
 		unsigned char *pchpixels = xcb_get_image_data(pimageReply);*/
+		{
+			unsigned char *pdata = (unsigned char *)ptexture->Map();
 
-		memcpy(pdata,pchpixels,rect.w*rect.h*4);
-		if(pimageReply->depth != 32)
-			for(uint i = 0; i < rect.w*rect.h; ++i)
-				pdata[4*i+3] = 255;
-		fullRegionUpdate = false;
-
-		//free(pimageReply);
+			memcpy(pdata,pchpixels,rect.w*rect.h*4);
+			if(pimageReply->depth != 32)
+				for(uint i = 0; i < rect.w*rect.h; ++i)
+					pdata[4*i+3] = 255;
+			fullRegionUpdate = false;
+			
+			VkRect2D rect1 = {0,0,rect.w,rect.h};
+			ptexture->Unmap(pcommandBuffer,&rect1,1);
+			//free(pimageReply);
+		}
 
 	}else{
 		for(VkRect2D &rect1 : damageRegions){
@@ -922,6 +925,8 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 
 			unsigned char *pchpixels = xcb_get_image_data(pimageReply);*/
 
+			unsigned char *pdata = (unsigned char *)ptexture->Map();
+
 			for(uint y = rect1.offset.y, Y = y+rect1.extent.height; y < Y; ++y){
 				uint offset = 4*(rect.w*y+rect1.offset.x);
 				memcpy(pdata+offset,pchpixels+offset,4*rect1.extent.width);
@@ -930,11 +935,11 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 						pdata[offset+4*i+3] = 255;
 			}
 
+			ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
 			//free(pimageReply);
 		}
 	}
 
-	ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
 	damageRegions.clear();
 
 	free(pimageReply);

@@ -15,7 +15,7 @@ Client::~Client(){
 
 Container::Container() : pParent(0), pch(0), pnext(0),
 	pclient(0),
-	scale(1.0f), p(0.0f), e(1.0f), borderWidth(0.0f), minSize(0.0f), maxSize(1.0f),
+	scale(1.0f), p(0.0f), e(1.0f), borderWidth(0.0f), minSize(0.0f), maxSize(1.0f), mode(MODE_TILED),
 	layout(LAYOUT_VSPLIT){//, flags(0){
 	//
 }
@@ -23,9 +23,13 @@ Container::Container() : pParent(0), pch(0), pnext(0),
 Container::Container(Container *_pParent, const Container::Setup &setup) :
 	pParent(_pParent), pch(0), pnext(0),
 	pclient(0),
-	scale(1.0f), borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize),
+	scale(1.0f), borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize), mode(setup.mode),
 	layout(LAYOUT_VSPLIT){//, flags(setup.flags){
 
+	if(mode == MODE_FLOATING)
+		return;
+
+	//TODO: reparent the floating container
 	if(pParent->pclient){
 		//reparent
 		Container *pbase = pParent->pParent;
@@ -74,6 +78,8 @@ Container::~Container(){
 }
 
 Container * Container::Remove(){
+	if(mode == MODE_FLOATING)
+		return this;
 	Container *pbase = pParent, *pch1 = this; //remove all the split containers (although there should be only one)
 	for(; pbase->pParent; pch1 = pbase, pbase = pbase->pParent){
 		if(pbase->pch->pnext)
@@ -95,6 +101,8 @@ Container * Container::Remove(){
 }
 
 Container * Container::Collapse(){
+	if(mode == MODE_FLOATING)
+		return this;
 	if(!pParent || pch->pnext)
 		return 0;
 	
@@ -125,6 +133,11 @@ Container * Container::Collapse(){
 }
 
 void Container::Focus(){
+	if(mode == MODE_FLOATING){
+		Stack1();
+		Focus1();
+		return;
+	}
 	if(pParent){
 		pParent->focusQueue.erase(std::remove(pParent->focusQueue.begin(),pParent->focusQueue.end(),this),pParent->focusQueue.end());
 		pParent->focusQueue.push_back(this);
@@ -136,6 +149,8 @@ void Container::Focus(){
 }
 
 Container * Container::GetNext(){
+	if(mode == MODE_FLOATING)
+		return this;
 	if(!pParent)
 		return this; //root container
 	if(!pnext)
@@ -144,6 +159,8 @@ Container * Container::GetNext(){
 }
 
 Container * Container::GetPrev(){
+	if(mode == MODE_FLOATING)
+		return this;
 	if(!pParent)
 		return this; //root container
 	Container *pcontainer = pParent->pch;
@@ -248,6 +265,8 @@ Container * Container::GetAdjacent(ADJACENT d){
 }
 
 void Container::MoveNext(){
+	if(mode == MODE_FLOATING)
+		return;
 	if(!pParent)
 		return;
 	Container *pcontainer = GetNext();

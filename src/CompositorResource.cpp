@@ -17,6 +17,8 @@ Texture::Texture(uint _w, uint _h, VkFormat format, const CompositorInterface *_
 	});
 	formatIndex = m-formatSizeMap.begin();
 
+	DebugPrintf(stdout,"*** creating texture: %u, (%ux%u)\n",(*m).second,w,h);
+
 	//staging buffer
 	VkBufferCreateInfo bufferCreateInfo = {};
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;

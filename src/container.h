@@ -29,6 +29,10 @@ public:
 
 class Container{
 public:
+	enum MODE{
+		MODE_TILED,
+		MODE_FLOATING,
+	};
 	struct Setup{
 		//Container *preplace = 0; //temp: move to constructor params
 		//Border width can be set anytime before the client creation
@@ -36,7 +40,7 @@ public:
 		//For performance reasons, the min/maxSize has to be known before the container is created.
 		glm::vec2 minSize = glm::vec2(0.0f);
 		glm::vec2 maxSize = glm::vec2(1.0f);
-		//uint flags = 0;
+		MODE mode;
 	};
 	Container(); //root container
 	Container(Container *, const Setup &);
@@ -98,6 +102,7 @@ public:
 	glm::vec2 minSize;
 	glm::vec2 maxSize;
 
+	MODE mode;
 	LAYOUT layout;
 
 	/*enum FLAG{

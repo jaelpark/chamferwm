@@ -72,6 +72,10 @@ public:
 		const WManager::Rectangle *prect;
 		const WManager::Container *pstackContainer;
 		const class X11Backend *pbackend;
+		enum{
+			CREATE_CONTAINED,
+			CREATE_AUTOMATIC
+		} mode;
 	};
 	X11Client(WManager::Container *, const CreateInfo *);
 	~X11Client();

@@ -222,19 +222,22 @@ void X11Container::StackRecursive(const WManager::Container *pcontainer, const s
 
 			uint values[1] = {XCB_STACK_MODE_ABOVE};
 			xcb_configure_window(pbackend->pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
-		}else StackRecursive(pcont,pstackAppendix);
-
-		auto s = [&](auto &p)->bool{
-			return pcont == p.first;
-		};
-		for(auto m = std::find_if(pstackAppendix->begin(),pstackAppendix->end(),s);
-			m != pstackAppendix->end(); m = std::find_if(m,pstackAppendix->end(),s)){
-
-			X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
-
-			uint values[1] = {XCB_STACK_MODE_ABOVE};
-			xcb_configure_window(pbackend->pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 		}
+		StackRecursive(pcont,pstackAppendix);
+	}
+
+	auto s = [&](auto &p)->bool{
+		return pcontainer == p.first;
+	};
+	for(auto m = std::find_if(pstackAppendix->begin(),pstackAppendix->end(),s);
+		m != pstackAppendix->end(); m = std::find_if(m,pstackAppendix->end(),s)){
+
+		X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
+
+		uint values[1] = {XCB_STACK_MODE_ABOVE};
+		xcb_configure_window(pbackend->pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		
+		++m;
 	}
 }
 
@@ -378,6 +381,19 @@ bool Default::HandleEvent(){
 			if(FindClient(pev->window,MODE_MANUAL))
 				break;
 
+			//TODO: center the window on its base
+
+			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
+			
+			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+				return pev->window == p.first;
+			});
+			if(m == configCache.end()){
+				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				m = configCache.end()-1;
+
+			}else (*m).second = rect;
+
 			struct{
 				uint16_t m;
 				uint32_t v;
@@ -399,7 +415,7 @@ bool Default::HandleEvent(){
 				}
 
 			xcb_configure_window(pcon,pev->window,mask,values);
-			DebugPrintf(stdout,"configure request: %u, %u, %u, %u\n",pev->x,pev->y,pev->width,pev->height);
+			DebugPrintf(stdout,"configure request: %u | %u, %u, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
 			}
 			break;
 		case XCB_MAP_REQUEST:{
@@ -424,6 +440,7 @@ bool Default::HandleEvent(){
 					auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 						return pev->window == p.first;
 					});
+					//TODO: error handling in case of m == end()
 					prect = &(*m).second;
 				}
 				free(propertyReply);
@@ -434,6 +451,7 @@ bool Default::HandleEvent(){
 				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
 				if(propertyReply){
 					xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReply);
+					printf("Transient for: %u\n",*pbaseWindow);
 					pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
 					free(propertyReply);
 				}
@@ -444,6 +462,7 @@ bool Default::HandleEvent(){
 			createInfo.prect = prect;
 			createInfo.pstackContainer = prect?(pbaseClient?pbaseClient->pcontainer:GetRoot()):0;
 			createInfo.pbackend = this;
+			createInfo.mode = X11Client::CreateInfo::CREATE_CONTAINED;
 			X11Client *pclient = SetupClient(&createInfo);
 			if(!pclient)
 				break;
@@ -476,6 +495,16 @@ bool Default::HandleEvent(){
 			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return pev->window == p.first;
 			});
+			if(m == configCache.end()){
+				//it might be the case that no configure notification was received
+				xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pcon,pev->window);
+				xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pcon,geometryCookie,0);
+				WManager::Rectangle rect = {pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
+				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				m = configCache.end()-1;
+				free(pgeometryReply);
+
+			}
 			WManager::Rectangle *prect = &(*m).second;
 
 			X11Client::CreateInfo createInfo;
@@ -483,6 +512,7 @@ bool Default::HandleEvent(){
 			createInfo.prect = prect;
 			createInfo.pstackContainer = pbaseClient?pbaseClient->pcontainer:GetRoot();
 			createInfo.pbackend = this;
+			createInfo.mode = X11Client::CreateInfo::CREATE_AUTOMATIC;
 			X11Client *pclient = SetupClient(&createInfo);
 			if(!pclient)
 				break;
@@ -572,6 +602,10 @@ bool Default::HandleEvent(){
 		case XCB_DESTROY_NOTIFY:{
 			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
 			DebugPrintf(stdout,"destroy notify, %u (%lu)\n",pev->window,clients.size());
+
+			configCache.erase(std::remove_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+				return p.first == pev->window;
+			}));
 			//
 			}
 			break;
