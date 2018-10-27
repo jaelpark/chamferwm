@@ -21,6 +21,8 @@ class Key(Enum):
 
 	KILL = auto()
 	LAUNCH_TERMINAL = auto()
+	LAUNCH_BROWSER = auto()
+	LAUNCH_BROWSER_PRIVATE = auto()
 
 class Container(chamfer.Container):
 	def OnSetup(self):
@@ -70,6 +72,8 @@ class Backend(chamfer.Backend):
 			
 			binder.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
 			binder.BindKey(chamfer.KEY_RETURN,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
+			binder.BindKey(ord('1'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER.value);
+			binder.BindKey(ord('2'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER_PRIVATE.value);
 
 			#/ - search for a window
 			#n - next match
@@ -193,6 +197,12 @@ class Backend(chamfer.Backend):
 
 		elif keyId == Key.LAUNCH_TERMINAL.value:
 			Popen(["termite"],stdout=None,stderr=None);
+
+		elif keyId == Key.LAUNCH_BROWSER.value:
+			Popen(["firefox"],stdout=None,stderr=None);
+
+		elif keyId == Key.LAUNCH_BROWSER_PRIVATE.value:
+			Popen(["firefox","--private-window"],stdout=None,stderr=None);
 	
 	def OnKeyRelease(self, keyId):
 		print("key release: {}".format(keyId));

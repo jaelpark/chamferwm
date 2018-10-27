@@ -545,7 +545,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	descPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descPoolCreateInfo.poolSizeCount = sizeof(descPoolSizes)/sizeof(descPoolSizes[0]);
 	descPoolCreateInfo.pPoolSizes = descPoolSizes;
-	descPoolCreateInfo.maxSets = 16;//swapChainImageCount;
+	descPoolCreateInfo.maxSets = 16;
 	descPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	if(vkCreateDescriptorPool(logicalDev,&descPoolCreateInfo,0,&descPool) != VK_SUCCESS)
 		throw Exception("Failed to create a descriptor pool.");
@@ -664,7 +664,7 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 		RenderObject renderObject;
 		renderObject.pclient = (*m).second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
-		renderObject.flags = renderObject.pclient == pfocus?0x1:0;
+		renderObject.flags = renderObject.pclient->pcontainer == pfocus?0x1:0;
 		renderQueue.push_back(renderObject);
 
 		m = appendixQueue.erase(m);
