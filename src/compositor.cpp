@@ -26,6 +26,10 @@ ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_p
 }
 
 ClientFrame::~ClientFrame(){
+	//if(pcomp->updateQueue.size() > 0)
+		//pcomp->updateQueue.erase(std::remove(pcomp->updateQueue.begin(),pcomp->updateQueue.end(),this));
+	pcomp->updateQueue.clear();
+
 	pcomp->ReleaseTexture(ptexture);
 
 	for(PipelineDescriptorSet &pipelineDescSet : descSets)
@@ -660,7 +664,7 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 		RenderObject renderObject;
 		renderObject.pclient = (*m).second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
-		renderObject.flags = 0;
+		renderObject.flags = renderObject.pclient == pfocus?0x1:0;
 		renderQueue.push_back(renderObject);
 
 		m = appendixQueue.erase(m);
