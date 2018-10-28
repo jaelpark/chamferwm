@@ -530,7 +530,7 @@ void CompositorInterface::InitializeRenderEngine(){
 
 	//descriptor pool
 	//descriptors of this pool
-	VkDescriptorPoolSize descPoolSizes[2];
+	/*VkDescriptorPoolSize descPoolSizes[2];
 	descPoolSizes[0] = (VkDescriptorPoolSize){};
 	descPoolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLER;//VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	descPoolSizes[0].descriptorCount = 16;
@@ -548,7 +548,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	descPoolCreateInfo.maxSets = 16;
 	descPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	if(vkCreateDescriptorPool(logicalDev,&descPoolCreateInfo,0,&descPool) != VK_SUCCESS)
-		throw Exception("Failed to create a descriptor pool.");
+		throw Exception("Failed to create a descriptor pool.");*/
 
 	//command pool and buffers
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
@@ -605,7 +605,10 @@ void CompositorInterface::DestroyRenderEngine(){
 	delete []pcopyCommandBuffers;
 	vkDestroyCommandPool(logicalDev,commandPool,0);
 
-	vkDestroyDescriptorPool(logicalDev,descPool,0);
+	for(VkDescriptorPool &descPool : descPoolArray)
+		vkDestroyDescriptorPool(logicalDev,descPool,0);
+	descPoolArray.clear();
+	//vkDestroyDescriptorPool(logicalDev,descPool,0);
 
 	vkDestroySampler(logicalDev,pointSampler,0);
 
@@ -687,7 +690,15 @@ bool CompositorInterface::PollFrameFence(){
 	descSetCache.erase(std::remove_if(descSetCache.begin(),descSetCache.end(),[&](auto &descSetCacheEntry)->bool{
 		if(frameTag < descSetCacheEntry.releaseTag+swapChainImageCount+1)
 			return false;
-		vkFreeDescriptorSets(logicalDev,descPool,descSetCacheEntry.setCount,descSetCacheEntry.pdescSets);
+		auto m = std::find_if(descPoolReference.begin(),descPoolReference.end(),[&](auto &p)->bool{
+			return descSetCacheEntry.pdescSets == p.first;
+		});
+		if(m == descPoolReference.end())
+			return true;
+		vkFreeDescriptorSets(logicalDev,(*m).second,descSetCacheEntry.setCount,descSetCacheEntry.pdescSets);
+		descPoolReference.erase(m);
+		printf("************ releasing desc set\n");
+
 		delete []descSetCacheEntry.pdescSets;
 		return true;
 	}),descSetCache.end());
@@ -829,18 +840,54 @@ void CompositorInterface::ReleaseTexture(Texture *ptexture){
 VkDescriptorSet * CompositorInterface::CreateDescSets(const ShaderModule *pshaderModule){
 	VkDescriptorSet *pdescSets = new VkDescriptorSet[pshaderModule->setCount];
 
+	for(VkDescriptorPool &descPool : descPoolArray){
+		VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
+		descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		descSetAllocateInfo.descriptorPool = descPool;
+		descSetAllocateInfo.pSetLayouts = pshaderModule->pdescSetLayouts;
+		descSetAllocateInfo.descriptorSetCount = pshaderModule->setCount;
+		if(vkAllocateDescriptorSets(logicalDev,&descSetAllocateInfo,pdescSets) == VK_SUCCESS){
+			descPoolReference.push_back(std::pair<VkDescriptorSet *, VkDescriptorPool>(pdescSets,descPool));
+			return pdescSets;
+		}
+	}
+
+	VkDescriptorPoolSize descPoolSizes[2];
+	descPoolSizes[0] = (VkDescriptorPoolSize){};
+	descPoolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLER;//VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descPoolSizes[0].descriptorCount = 16;
+
+	descPoolSizes[1] = (VkDescriptorPoolSize){};
+	descPoolSizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	descPoolSizes[1].descriptorCount = 16;
+
+	VkDescriptorPool descPool;
+
+	//if there are no pools or they are all out of memory, attempt to create a new one
+	VkDescriptorPoolCreateInfo descPoolCreateInfo = {};
+	descPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descPoolCreateInfo.poolSizeCount = sizeof(descPoolSizes)/sizeof(descPoolSizes[0]);
+	descPoolCreateInfo.pPoolSizes = descPoolSizes;
+	descPoolCreateInfo.maxSets = 16;
+	descPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	if(vkCreateDescriptorPool(logicalDev,&descPoolCreateInfo,0,&descPool) != VK_SUCCESS){
+		delete []pdescSets;
+		return 0;
+	}
+	descPoolArray.push_front(descPool);
+	
 	VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
 	descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	descSetAllocateInfo.descriptorPool = descPool;
 	descSetAllocateInfo.pSetLayouts = pshaderModule->pdescSetLayouts;
 	descSetAllocateInfo.descriptorSetCount = pshaderModule->setCount;
-	//TODO: check VK_ERROR_OUT_OF_POOL_MEMORY, allocate a new pool in that case
-	if(vkAllocateDescriptorSets(logicalDev,&descSetAllocateInfo,pdescSets) != VK_SUCCESS){
-		delete []pdescSets;
-		return 0;
+	if(vkAllocateDescriptorSets(logicalDev,&descSetAllocateInfo,pdescSets) == VK_SUCCESS){
+		descPoolReference.push_back(std::pair<VkDescriptorSet *, VkDescriptorPool>(pdescSets,descPool));
+		return pdescSets;
 	}
-	
-	return pdescSets;
+
+	delete []pdescSets;
+	return 0;
 }
 
 void CompositorInterface::ReleaseDescSets(const ShaderModule *pshaderModule, VkDescriptorSet *pdescSets){

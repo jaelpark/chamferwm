@@ -89,7 +89,9 @@ protected:
 	VkCommandBuffer *pcommandBuffers;
 	VkCommandBuffer *pcopyCommandBuffers;
 
-	VkDescriptorPool descPool;
+	//VkDescriptorPool descPool;
+	std::deque<VkDescriptorPool> descPoolArray;
+	std::vector<std::pair<VkDescriptorSet *, VkDescriptorPool>> descPoolReference;
 
 	uint queueFamilyIndex[QUEUE_INDEX_COUNT]; //
 	uint physicalDevIndex;

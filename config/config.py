@@ -3,6 +3,7 @@ import chamfer
 from enum import Enum,auto
 
 from subprocess import Popen#,PIPE
+import psutil
 
 class Key(Enum):
 	FOCUS_RIGHT = auto()
@@ -11,6 +12,9 @@ class Key(Enum):
 	FOCUS_DOWN = auto()
 	FOCUS_PARENT = auto()
 	FOCUS_CHILD = auto()
+
+	YANK_CONTAINER = auto()
+	PASTE_CONTAINER = auto()
 
 	MOVE_LEFT = auto()
 	MOVE_RIGHT = auto()
@@ -64,7 +68,10 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('j'),chamfer.MOD_MASK_1,Key.FOCUS_DOWN.value);
 			binder.BindKey(ord('a'),chamfer.MOD_MASK_1,Key.FOCUS_PARENT.value);
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
-			binder.BindKey(ord('x'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
+			#binder.BindKey(ord('x'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
+
+			binder.BindKey(ord('y'),chamfer.MOD_MASK_1,Key.YANK_CONTAINER.value);
+			binder.BindKey(ord('p'),chamfer.MOD_MASK_1,Key.PASTE_CONTAINER.value);
 
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
 			binder.BindKey(ord('m'),chamfer.MOD_MASK_1,Key.MAXIMIZE.value);
@@ -99,6 +106,8 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('a'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_PARENT.value);
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_CHILD.value);
 			binder.BindKey(ord('x'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_CHILD.value);
+			binder.BindKey(ord('y'),chamfer.MOD_MASK_SHIFT,Key.YANK_CONTAINER.value);
+			binder.BindKey(ord('p'),chamfer.MOD_MASK_SHIFT,Key.PASTE_CONTAINER.value);
 
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
 			binder.BindKey(ord('m'),chamfer.MOD_MASK_SHIFT,Key.MAXIMIZE.value);
@@ -172,6 +181,17 @@ class Backend(chamfer.Backend):
 				return;
 			focus.Focus();
 			
+		elif keyId == Key.YANK_CONTAINER.value:
+			print("yanking container...");
+			self.yank = focus;
+
+		elif keyId == Key.PASTE_CONTAINER.value:
+			print("pasting container...");
+			try:
+				self.yank;
+			except AttributeError:
+				pass;
+
 		elif keyId == Key.LAYOUT.value:
 			if parent is None:
 				return;
@@ -179,7 +199,7 @@ class Backend(chamfer.Backend):
 				chamfer.layout.VSPLIT:chamfer.layout.HSPLIT,
 				chamfer.layout.HSPLIT:chamfer.layout.VSPLIT
 			}[parent.layout];
-			parent.ShiftLayout(layout); #TODO: layout = ..., use UpdateLayout() to update all changes?
+			parent.ShiftLayout(layout);
 
 		elif keyId == Key.MAXIMIZE.value:
 			focus.minSize = (0.9,0.9);
@@ -220,6 +240,15 @@ class Compositor(chamfer.Compositor):
 
 backend = Backend();
 chamfer.bind_Backend(backend);
+
+pids = psutil.pids();
+pnames = [psutil.Process(pid).name() for pid in pids];
+
+if not "pulseaudio" in pnames:
+	print("starting pulseaudio...");
+	#Popen(["pulseaudio","--start"],stdout=None,stderr=None);
+
+#p.cmdline()
 
 #compositor = Compositor();
 #chamfer.bind_Compositor(compositor);

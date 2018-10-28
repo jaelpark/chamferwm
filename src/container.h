@@ -34,7 +34,6 @@ public:
 		MODE_FLOATING,
 	};
 	struct Setup{
-		//Container *preplace = 0; //temp: move to constructor params
 		//Border width can be set anytime before the client creation
 		glm::vec2 borderWidth = glm::vec2(0.0f);
 		//For performance reasons, the min/maxSize has to be known before the container is created.

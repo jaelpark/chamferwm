@@ -72,17 +72,26 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 
 //TODO: create chamfer with ndc coords and sdf transformation
 float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID0) : SV_Target{
+	float2 aspect = float2(1.0f,screen.x/screen.y);
+	float2 borderWidth = border*aspect; //this results in borders half the gap size
+
 	//float4 c = content.Sample(sm,texc);
 	float2 p = screen*(0.5f*xy0+0.5f);
 	float2 r = posh.xy-p;
 	float4 c = content.Load(float3(r,0)); //p already has the 0.5f offset
 	//^^returns black when out of bounds (border)
 	if(geomId == 0){
+		/*float2 p = screen*(0.25f*(xy0+xy1)+0.5f);
+		if(length(max(abs(p)-0.5f*(xy1-xy0)-borderWidth,0.0f))-0.5f < 10.0f)
+			discard;*/
+		//float2 d = r;
+		//if(dot(d,d) < 50.0f)
+		//	discard;
 		if(all(r > 0.5f) && c.w > 0.0f)
 			discard;
 		c = float4(0,0,0,1);
 		if(flags & FLAGS_FOCUS)
-			c.x = 1.0f;
+			c.xyz = float3(1.0f,0.913f,0.12f);
 	}
 	return c;
 #if 0

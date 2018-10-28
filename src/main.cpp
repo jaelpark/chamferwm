@@ -129,7 +129,6 @@ public:
 		return containerInt;
 	}
 
-
 	template<class T, class U>
 	Config::ContainerInterface & SetupFloating(){
 		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();

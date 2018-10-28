@@ -383,7 +383,18 @@ bool Default::HandleEvent(){
 
 			//TODO: center the window on its base
 
-			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
+			//glm::uvec2 offset = glm::uvec2(pev->x,pev->y);
+			//glm::uvec2 extent = glm::uvec2(pev->width,pev->height);
+			//pscr->width_in_pixels
+
+			//WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
+			WManager::Rectangle rect = {
+				pev->value_mask & XCB_CONFIG_WINDOW_X?pev->x:(pscr->width_in_pixels-pev->width)/2,
+				pev->value_mask & XCB_CONFIG_WINDOW_Y?pev->y:(pscr->height_in_pixels-pev->height)/2,
+				pev->width,pev->height};
+
+			//center the window to screen, otherwise it might end up to the left upper corner
+			pev->value_mask |= XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y;
 			
 			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return pev->window == p.first;
@@ -398,10 +409,14 @@ bool Default::HandleEvent(){
 				uint16_t m;
 				uint32_t v;
 			} maskm[] = {
-				{XCB_CONFIG_WINDOW_X,pev->x},
-				{XCB_CONFIG_WINDOW_Y,pev->y},
-				{XCB_CONFIG_WINDOW_WIDTH,pev->width},
-				{XCB_CONFIG_WINDOW_HEIGHT,pev->height},
+				{XCB_CONFIG_WINDOW_X,rect.x},
+				{XCB_CONFIG_WINDOW_Y,rect.y},
+				{XCB_CONFIG_WINDOW_WIDTH,rect.w},
+				{XCB_CONFIG_WINDOW_HEIGHT,rect.h},
+				//{XCB_CONFIG_WINDOW_X,pev->x},
+				//{XCB_CONFIG_WINDOW_Y,pev->y},
+				//{XCB_CONFIG_WINDOW_WIDTH,pev->width},
+				//{XCB_CONFIG_WINDOW_HEIGHT,pev->height},
 				{XCB_CONFIG_WINDOW_BORDER_WIDTH,pev->border_width},
 				{XCB_CONFIG_WINDOW_SIBLING,pev->sibling},
 				{XCB_CONFIG_WINDOW_STACK_MODE,pev->stack_mode}
@@ -436,12 +451,15 @@ bool Default::HandleEvent(){
 				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
 				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
 				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
-				if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG){
+				if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG || *patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP){
 					auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 						return pev->window == p.first;
 					});
 					prect = m != configCache.end()?&(*m).second:0;
-				}
+				}/*else
+				if(*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP){
+					printf("desktop!\n"); //TODO: needs to be below every other client
+				}*/
 				free(propertyReply);
 			}
 			{
@@ -450,7 +468,6 @@ bool Default::HandleEvent(){
 				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
 				if(propertyReply){
 					xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReply);
-					printf("Transient for: %u\n",*pbaseWindow);
 					pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
 					free(propertyReply);
 				}
