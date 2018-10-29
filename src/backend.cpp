@@ -247,7 +247,7 @@ void X11Container::Stack1(){
 	StackRecursive(proot,pstackAppendix);
 }
 
-X11Backend::X11Backend(){
+X11Backend::X11Backend() : lastTime(XCB_CURRENT_TIME){
 	//
 }
 
@@ -370,6 +370,8 @@ bool Default::HandleEvent(){
 
 			return true;
 		}
+
+		lastTime = XCB_CURRENT_TIME;
 
 		//switch(pevent->response_type & ~0x80){
 		switch(pevent->response_type & 0x7f){
@@ -566,6 +568,7 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_KEY_PRESS:{
 			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
+			lastTime = pev->time;
 			if(pev->state == (XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT) && pev->detail == exitKeycode){
 				free(pevent);
 				return false;
@@ -581,6 +584,7 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_KEY_RELEASE:{
 			xcb_key_release_event_t *pev = (xcb_key_release_event_t*)pevent;
+			lastTime = pev->time;
 			for(KeyBinding &binding : keycodes){
 				if(pev->state == binding.mask && pev->detail == binding.keycode){
 					KeyPress(binding.keyId,false);
@@ -818,7 +822,7 @@ bool Debug::HandleEvent(){
 			if(pev->detail == closeKeycode){
 				if(clients.size() == 0)
 					break;
-				DebugClient *pclient = clients.back();
+				DebugClient *pclient = clients.back(); //!!!
 				DestroyClient(pclient);
 				
 				clients.pop_back();

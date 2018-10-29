@@ -44,6 +44,7 @@ public:
 	Container(); //root container
 	Container(Container *, const Setup &);
 	virtual ~Container();
+	void Place(Container *);
 	Container * Remove();
 	Container * Collapse();
 	void Focus();
@@ -66,6 +67,7 @@ public:
 	glm::vec2 GetMinSize() const;
 	void TranslateRecursive(glm::vec2, glm::vec2);
 	void Translate();
+	void StackRecursive();
 	void Stack();
 	enum LAYOUT{
 		LAYOUT_VSPLIT,

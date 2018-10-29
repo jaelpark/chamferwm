@@ -29,6 +29,7 @@ public:
 	boost::python::object GetParent() const;
 	boost::python::object GetFocus() const;
 	boost::python::object GetAdjacent(WManager::Container::ADJACENT) const;
+	void Move(boost::python::object);
 
 	boost::python::tuple borderWidth;
 	boost::python::tuple minSize;
@@ -51,10 +52,11 @@ public:
 
 class ContainerConfig{
 public:
-	ContainerConfig(ContainerInterface *);
-	ContainerConfig();
+	ContainerConfig(ContainerInterface *, class Backend::X11Backend *);
+	ContainerConfig(class Backend::X11Backend *);
 	virtual ~ContainerConfig();
 	ContainerInterface *pcontainerInt;
+	class Backend::X11Backend *pbackend;
 };
 
 /*template<typename T>

@@ -98,6 +98,20 @@ boost::python::object ContainerInterface::GetAdjacent(WManager::Container::ADJAC
 	return boost::python::object();
 }
 
+void ContainerInterface::Move(boost::python::object containerObject){
+	//
+	boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
+	if(!containerExtract.check()){
+		DebugPrintf(stderr,"Move(): Invalid container parameter.\n");
+		return;
+	}
+
+	Config::ContainerInterface &containerInt = containerExtract();
+	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(containerInt.pcontainer);
+	if(pcontainer1)
+		pcontainer1->pbackend->MoveContainer(pcontainer,containerInt.pcontainer);
+}
+
 ContainerProxy::ContainerProxy() : ContainerInterface(){
 	//
 }
@@ -149,11 +163,11 @@ void ContainerProxy::OnCreate(){
 	}else ContainerInterface::OnCreate();
 }
 
-ContainerConfig::ContainerConfig(ContainerInterface *_pcontainerInt) : pcontainerInt(_pcontainerInt){
+ContainerConfig::ContainerConfig(ContainerInterface *_pcontainerInt, Backend::X11Backend *_pbackend) : pcontainerInt(_pcontainerInt), pbackend(_pbackend){
 	//
 }
 
-ContainerConfig::ContainerConfig(){
+ContainerConfig::ContainerConfig(Backend::X11Backend *_pbackend) : pbackend(_pbackend){
 	//TODO: setting root node properties (e.g. maxSize) should be allowed, this can be used for example
 	//to make space for docks and other widgets
 	try{
@@ -201,11 +215,11 @@ BackendContainerConfig<T>::~BackendContainerConfig(){
 
 class template BackendContainerConfig<Backend::X11Container>;*/
 
-X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, const WManager::Container::Setup &_setup, Backend::X11Backend *_pbackend) : Backend::X11Container(_pParent,_setup,_pbackend), ContainerConfig(_pcontainerInt){
+X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, const WManager::Container::Setup &_setup, Backend::X11Backend *_pbackend) : Backend::X11Container(_pParent,_setup,_pbackend), ContainerConfig(_pcontainerInt,_pbackend){
 	//
 }
 
-X11ContainerConfig::X11ContainerConfig(Backend::X11Backend *_pbackend) : Backend::X11Container(_pbackend), ContainerConfig(){
+X11ContainerConfig::X11ContainerConfig(Backend::X11Backend *_pbackend) : Backend::X11Container(_pbackend), ContainerConfig(_pbackend){
 	//
 	pcontainerInt->pcontainer = this;
 }
@@ -214,11 +228,11 @@ X11ContainerConfig::~X11ContainerConfig(){
 	//
 }
 
-DebugContainerConfig::DebugContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, const WManager::Container::Setup &_setup, Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pParent,_setup,_pbackend), ContainerConfig(_pcontainerInt){
+DebugContainerConfig::DebugContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, const WManager::Container::Setup &_setup, Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pParent,_setup,_pbackend), ContainerConfig(_pcontainerInt,_pbackend){
 	//
 }
 
-DebugContainerConfig::DebugContainerConfig(Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pbackend), ContainerConfig(){
+DebugContainerConfig::DebugContainerConfig(Backend::X11Backend *_pbackend) : Backend::DebugContainer(_pbackend), ContainerConfig(_pbackend){
 	//
 	pcontainerInt->pcontainer = this;
 }
@@ -408,6 +422,7 @@ BOOST_PYTHON_MODULE(chamfer){
 			[](ContainerInterface &container){
 				container.pcontainer->MovePrev();
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
+		.def("Move",&ContainerInterface::Move)
 		.def("Focus",boost::python::make_function(
 			[](ContainerInterface &container){
 				Config::BackendInterface::pfocus = container.pcontainer;

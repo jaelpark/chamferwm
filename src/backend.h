@@ -39,6 +39,7 @@ public:
 	virtual void Start() = 0;
 	//virtual sint GetEventFileDescriptor() = 0;
 	virtual bool HandleEvent() = 0;
+	virtual void MoveContainer(WManager::Container *, WManager::Container *) = 0;
 protected:
 	//Functions defined by the implementing backends.
 	virtual void DefineBindings(BackendKeyBinder *) = 0;
@@ -128,7 +129,8 @@ public:
 protected:
 	xcb_connection_t *pcon;
 	xcb_screen_t *pscr;
-	xcb_window_t window;
+	xcb_window_t window; //root or test window
+	xcb_timestamp_t lastTime;
 	struct KeyBinding{
 		xcb_keycode_t keycode;
 		uint mask;

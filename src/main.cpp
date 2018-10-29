@@ -151,6 +151,41 @@ public:
 		return containerInt;
 	}
 
+	template<class T, class U>
+	void MoveContainer(WManager::Container *pcontainer, WManager::Container *pdst){
+		//
+		PrintTree(proot,0);
+		printf("-----------\n");
+		WManager::Container *premoved = pcontainer->Remove();
+		WManager::Container *pcollapsed = 0;
+		if(premoved->pParent != proot)
+			pcollapsed = premoved->pParent->Collapse();
+		if(!pcollapsed && premoved->pParent->pch) //check if pch is alive, in this case this wasn't the last container
+			pcollapsed = premoved->pParent->pch->Collapse();
+
+
+		if(premoved != pcontainer)
+			pcontainer->pParent->pch = 0;
+
+		if(pdst->pclient){
+			Config::ContainerInterface &parentInt1 = SetupContainer<T,U>(pdst);
+			pdst = parentInt1.pcontainer;
+		}
+
+		PrintTree(proot,0);
+		printf("-----------\n");
+		pcontainer->Place(pdst);
+
+		if(premoved->pch)
+			ReleaseContainersRecursive(premoved->pch);
+		if(pcollapsed){
+			if(pcollapsed->pch)
+				ReleaseContainersRecursive(pcollapsed->pch);
+			delete pcollapsed;
+		}
+		PrintTree(proot,0);
+	}
+
 	void ReleaseContainersRecursive(const WManager::Container *pcontainer){
 		for(const WManager::Container *pcont = pcontainer; pcont;){
 			if(pcont->pclient)
@@ -174,6 +209,21 @@ public:
 				delete p.second->pcontainer;
 			delete p.second;
 		}
+	}
+
+	void PrintTree(WManager::Container *pcontainer, uint level){
+		for(uint i = 0; i < level; ++i)
+			printf(" ");
+		printf("%x: ",pcontainer);
+		if(pcontainer->pclient)
+			printf("(client), ");
+		if(pcontainer->pParent)
+			printf("(parent: %x), ",pcontainer->pParent);
+		if(Config::BackendInterface::pfocus == pcontainer)
+			printf("(focus), ");
+		printf("focusQueue: %u (%x)\n",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0);
+		for(WManager::Container *pcontainer1 = pcontainer->pch; pcontainer1; pcontainer1 = pcontainer1->pnext)
+			PrintTree(pcontainer1,level+1);
 	}
 
 //protected:
@@ -249,7 +299,13 @@ public:
 		return pclient11;
 	}
 
+	void MoveContainer(WManager::Container *pcontainer, WManager::Container *pdst){
+		//
+		RunBackend::MoveContainer<Config::X11ContainerConfig,DefaultBackend>(pcontainer,pdst);
+	}
+
 	void DestroyClient(Backend::X11Client *pclient){
+		PrintTree(proot,0);
 		WManager::Client *pbase = pclient;
 		auto m = std::find_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
 			return pbase == p.second;
@@ -257,27 +313,23 @@ public:
 		if(m != stackAppendix.end())
 			stackAppendix.erase(m);
 		if(pclient->pcontainer == proot){
-			/*if(Config::BackendInterface::pfocus == pbase->pcontainer)
-				Config::BackendInterface::SetFocus(m != stackAppendix.end()?
-					(WManager::Container*)(*m).first:proot); //hack cast, TODO: remove const from the vector*/
 			delete pclient;
 			return;
 		}
 		WManager::Container *premoved = pclient->pcontainer->Remove();
-		WManager::Container *pcollapsed = premoved->pParent->Collapse();
+		printf("----------- removed %x\n",premoved);
+		PrintTree(proot,0);
+
+		WManager::Container *pcollapsed = 0;
+		if(premoved->pParent != proot)
+			pcollapsed = premoved->pParent->Collapse();
+		if(!pcollapsed && premoved->pParent->pch) //check if pch is alive, in this case this wasn't the last container
+			pcollapsed = premoved->pParent->pch->Collapse();
+
 		if(Config::BackendInterface::pfocus == pclient->pcontainer){
-			Config::BackendInterface::pfocus = proot;
-			//find the first parent which has clients available to be focused
-			for(WManager::Container *pcontainer = premoved->pParent; pcontainer; pcontainer = pcontainer->pParent)
-				if(pcontainer->focusQueue.size() > 0){
-					Config::BackendInterface::SetFocus(pcontainer->focusQueue.back());
-					break;
-				}else
-				if(pcontainer->pch){
-					//should always have at least one container available
-					Config::BackendInterface::SetFocus(pcontainer->pch);
-					break;
-				}
+			WManager::Container *pNewFocus = proot;
+			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():pcontainer->pch);
+			Config::BackendInterface::SetFocus(pNewFocus);
 		}
 		if(premoved->pch)
 			ReleaseContainersRecursive(premoved->pch);
@@ -289,6 +341,8 @@ public:
 				ReleaseContainersRecursive(pcollapsed->pch);
 			delete pcollapsed;
 		}
+		printf("----------- collapsed %x\n",pcollapsed);
+		PrintTree(proot,0);
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
@@ -342,26 +396,34 @@ public:
 		return pclient;
 	}
 
+	void MoveContainer(WManager::Container *pcontainer, WManager::Container *pdst){
+		//
+		RunBackend::MoveContainer<Config::DebugContainerConfig,DebugBackend>(pcontainer,pdst);
+	}
+
 	void DestroyClient(Backend::DebugClient *pclient){
+		WManager::Client *pbase = pclient;
+		auto m = std::find_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
+			return pbase == p.second;
+		});
+		if(m != stackAppendix.end())
+			stackAppendix.erase(m);
 		if(pclient->pcontainer == proot){
-			Config::BackendInterface::SetFocus(proot);
 			delete pclient;
 			return;
 		}
 		WManager::Container *premoved = pclient->pcontainer->Remove();
-		WManager::Container *pcollapsed = premoved->pParent->Collapse();
+
+		WManager::Container *pcollapsed = 0;
+		if(premoved->pParent != proot)
+			pcollapsed = premoved->pParent->Collapse();
+		if(!pcollapsed && premoved->pParent->pch) //check if pch is alive, in this case this wasn't the last container
+			pcollapsed = premoved->pParent->pch->Collapse();
+
 		if(Config::BackendInterface::pfocus == pclient->pcontainer){
-			Config::BackendInterface::pfocus = proot;
-			for(WManager::Container *pcontainer = premoved->pParent; pcontainer; pcontainer = pcontainer->pParent)
-				if(pcontainer->focusQueue.size() > 0){
-					Config::BackendInterface::SetFocus(pcontainer->focusQueue.back());
-					break;
-				}else
-				if(pcontainer->pch){
-					//should always have at least one container available
-					Config::BackendInterface::SetFocus(pcontainer->pch);
-					break;
-				}
+			WManager::Container *pNewFocus = proot;
+			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():pcontainer->pch);
+			Config::BackendInterface::SetFocus(pNewFocus);
 		}
 		if(premoved->pch)
 			ReleaseContainersRecursive(premoved->pch);

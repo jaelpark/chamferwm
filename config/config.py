@@ -2,8 +2,16 @@
 import chamfer
 from enum import Enum,auto
 
-from subprocess import Popen#,PIPE
+from subprocess import Popen
 import psutil
+
+from Xlib.keysymdef import latin1,miscellany,xf86
+
+import sys
+try:
+	import pulsectl
+except ModuleNotFoundError:
+	print("No pulsectl module.");
 
 class Key(Enum):
 	FOCUS_RIGHT = auto()
@@ -27,6 +35,9 @@ class Key(Enum):
 	LAUNCH_TERMINAL = auto()
 	LAUNCH_BROWSER = auto()
 	LAUNCH_BROWSER_PRIVATE = auto()
+
+	AUDIO_VOLUME_UP = auto()
+	AUDIO_VOLUME_DOWN = auto()
 
 class Container(chamfer.Container):
 	def OnSetup(self):
@@ -75,12 +86,15 @@ class Backend(chamfer.Backend):
 
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
 			binder.BindKey(ord('m'),chamfer.MOD_MASK_1,Key.MAXIMIZE.value);
-			binder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
+			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
 			
 			binder.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
-			binder.BindKey(chamfer.KEY_RETURN,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
+			binder.BindKey(miscellany.XK_Return,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
 			binder.BindKey(ord('1'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER.value);
 			binder.BindKey(ord('2'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER_PRIVATE.value);
+
+			binder.BindKey(xf86.XK_XF86_AudioRaiseVolume,0,Key.AUDIO_VOLUME_UP.value);
+			binder.BindKey(xf86.XK_XF86_AudioLowerVolume,0,Key.AUDIO_VOLUME_DOWN.value);
 
 			#/ - search for a window
 			#n - next match
@@ -111,7 +125,7 @@ class Backend(chamfer.Backend):
 
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
 			binder.BindKey(ord('m'),chamfer.MOD_MASK_SHIFT,Key.MAXIMIZE.value);
-			binder.BindKey(chamfer.KEY_TAB,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
+			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
 	
 	def OnCreateContainer(self):
 		print("OnCreateContainer()");
@@ -121,29 +135,7 @@ class Backend(chamfer.Backend):
 		print("key press: {}".format(keyId));
 		focus = chamfer.GetFocus();
 		parent = focus.GetParent();
-		#if parent is None:
-			#return; #root container
 
-#		if keyId == Key.FOCUS_RIGHT.value and parent.layout == chamfer.layout.VSPLIT:
-#			#should GetNext() jump to the next container in parent if this is the last in this level?
-#			#maybe additional GetNext2() for that
-#			focus = focus.GetNext();
-#			focus.Focus();
-#
-#		elif keyId == Key.FOCUS_LEFT.value and parent.layout == chamfer.layout.VSPLIT:
-#			#focus = focus.GetAdjacent(chamfer.adjacent.LEFT);
-#			focus = focus.GetPrev();
-#			focus.Focus();
-#
-#		elif keyId == Key.FOCUS_DOWN.value and parent.layout == chamfer.layout.HSPLIT:
-#			focus = focus.GetNext();
-#			focus.Focus();
-#
-#		elif keyId == Key.FOCUS_UP.value and parent.layout == chamfer.layout.HSPLIT:
-#			#focus = focus.GetAdjacent(chamfer.adjacent.LEFT);
-#			focus = focus.GetPrev();
-#			focus.Focus();
-#
 		if keyId == Key.FOCUS_RIGHT.value:
 			focus = focus.GetNext();
 			#focus = focus.GetAdjacent(chamfer.adjacent.RIGHT);
@@ -188,7 +180,7 @@ class Backend(chamfer.Backend):
 		elif keyId == Key.PASTE_CONTAINER.value:
 			print("pasting container...");
 			try:
-				self.yank;
+				self.yank.Move(focus); #warning! need to know wether yank is still alive
 			except AttributeError:
 				pass;
 
@@ -223,6 +215,19 @@ class Backend(chamfer.Backend):
 
 		elif keyId == Key.LAUNCH_BROWSER_PRIVATE.value:
 			Popen(["firefox","--private-window"],stdout=None,stderr=None);
+
+		elif keyId == Key.AUDIO_VOLUME_UP.value:
+			if "pulsectl" in sys.modules:
+				with pulsectl.Pulse('volume-increaser') as pulse:
+					for sink in pulse.sink_list():
+						pulse.volume_change_all_chans(sink,0.05);
+
+		elif keyId == Key.AUDIO_VOLUME_DOWN.value:
+			if "pulsectl" in sys.modules:
+				with pulsectl.Pulse('volume-increaser') as pulse:
+					for sink in pulse.sink_list():
+						pulse.volume_change_all_chans(sink,-0.05);
+
 	
 	def OnKeyRelease(self, keyId):
 		print("key release: {}".format(keyId));
@@ -246,7 +251,7 @@ pnames = [psutil.Process(pid).name() for pid in pids];
 
 if not "pulseaudio" in pnames:
 	print("starting pulseaudio...");
-	#Popen(["pulseaudio","--start"],stdout=None,stderr=None);
+	Popen(["pulseaudio","--start"],stdout=None,stderr=None);
 
 #p.cmdline()
 

@@ -35,7 +35,10 @@ Container::Container(Container *_pParent, const Container::Setup &setup) :
 		Container *pbase = pParent->pParent;
 
 		//replace the original parent with this new container
-		std::replace(pbase->focusQueue.begin(),pbase->focusQueue.end(),pParent,this);
+		if(std::find(pbase->focusQueue.begin(),pbase->focusQueue.end(),pParent) != pbase->focusQueue.end()){
+			std::replace(pbase->focusQueue.begin(),pbase->focusQueue.end(),pParent,this);
+			focusQueue.push_back(pParent); //carry on the focus queue if it exists
+		}
 		for(Container *pcontainer = pbase->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
 			if(pcontainer == pParent){
 				if(pPrev)
@@ -77,6 +80,53 @@ Container::~Container(){
 	//
 }
 
+void Container::Place(Container *pParent1){
+	//TODO: reparent the floating container
+	if(pParent1->pclient){
+		printf("<!> <!> <!> <!> <!> never happens!\n");
+		//reparent
+		Container *pbase = pParent1->pParent;
+
+		//replace the original parent with this new container
+		std::replace(pbase->focusQueue.begin(),pbase->focusQueue.end(),pParent1,this);
+		for(Container *pcontainer = pbase->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
+			if(pcontainer == pParent1){
+				if(pPrev)
+					pPrev->pnext = this;
+				else pbase->pch = this;
+				pnext = pcontainer->pnext;
+				break;
+			}
+
+		//add the original parent under the new one
+		pParent1->pParent = this;
+		pParent1->pnext = 0;
+
+		pch = pParent1;
+		pParent = pbase;
+
+		Stack();
+
+	}else{
+		pParent = pParent1;
+		if(pParent->focusQueue.size() > 0){
+			//place the next to the focused container
+			Container *pfocus = pParent->focusQueue.back();
+			pnext = pfocus->pnext;
+			pfocus->pnext = this;
+
+		}else{
+			Container **pn = &pParent->pch;
+			while(*pn)
+				pn = &(*pn)->pnext;
+			*pn = this;
+		}
+	}
+
+	pParent->Stack();
+	pParent->Translate();
+}
+
 Container * Container::Remove(){
 	if(mode == MODE_FLOATING)
 		return this;
@@ -102,34 +152,53 @@ Container * Container::Remove(){
 
 Container * Container::Collapse(){
 	if(mode == MODE_FLOATING)
-		return this;
-	if(!pParent || pch->pnext)
+		return 0;
+	if(!pParent || !pch)
 		return 0;
 	
-	Container *psource = pch; //'this' is the target
-	for(; psource; psource = psource->pch){
-		if(psource->pParent->pch->pnext || psource->pclient)
-			break;
-	}
-	if(!psource)
-		return 0; //nothing to do
+	if(pParent->pch->pnext){
+		if(pch->pnext)
+			return 0; //todo: combine the expressions
+		//only one container to collapse
+		printf("** type 1 collapse\n");
+		std::replace(pParent->focusQueue.begin(),pParent->focusQueue.end(),this,pch);
 
-	std::replace(pParent->focusQueue.begin(),pParent->focusQueue.end(),this,psource);
-	for(Container *pcontainer = pParent->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext)
-		if(pcontainer == this){
-			if(pPrev)
-				pPrev->pnext = psource;
-			else pParent->pch = psource;
-			psource->pnext = pcontainer->pnext;
-			break;
+		pch->pParent = pParent;
+
+		for(Container *pcontainer = pParent->pch, *pPrev = 0; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pnext){
+			if(pcontainer == this){
+				if(pPrev)
+					pPrev->pnext = pch;
+				else pParent->pch = pch;
+				pch->pnext = pcontainer->pnext;
+				break;
+			}
 		}
-	
-	pParent->Stack();
 
-	psource->pParent->pch = 0; //dereference the the source from its original parent
-	psource->pParent = pParent;
+		pch = 0;
 
-	return this;
+		return this;
+
+	}else
+	if(pch->pnext){ //if there are more than one container
+		if(pParent->pch->pnext) //and there's a container next to this one
+			return 0; //should not collapse
+		//more than one container to deal with
+		printf("** type 2 collapse\n");
+		Container *pfocus = focusQueue.size() > 0?focusQueue.back():pch;
+		std::replace(pParent->focusQueue.begin(),pParent->focusQueue.end(),this,pfocus);
+
+		for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
+			pcontainer->pParent = pParent;
+
+		pParent->pch = pch;
+
+		pch = 0; //deference the leftover container
+
+		return this;
+	}
+
+	return 0;
 }
 
 void Container::Focus(){
@@ -440,6 +509,22 @@ void Container::Translate(){
 	pcontainer->TranslateRecursive(pcontainer->p,pcontainer->e);
 }
 
+/*void Container::StackRecursive(){
+	stackQueue.clear();
+	for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
+		stackQueue.push_back(pcontainer);
+		pcontainer->StackRecursive();
+	}
+
+	if(focusQueue.size() == 0)
+		return;
+	Container *pfocus = focusQueue.back();
+
+	std::sort(stackQueue.begin(),stackQueue.end(),[&](Container *pa, Container *pb)->bool{
+		return pa != pfocus && (pb == pfocus || pb->p[layout] > pfocus->p[layout]+pfocus->e[layout] || pb->p[layout]+pb->e[layout] < pfocus->p[layout]);
+	});
+}*/
+
 void Container::Stack(){
 	stackQueue.clear();
 	for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
@@ -452,7 +537,7 @@ void Container::Stack(){
 	std::sort(stackQueue.begin(),stackQueue.end(),[&](Container *pa, Container *pb)->bool{
 		return pa != pfocus && (pb == pfocus || pb->p[layout] > pfocus->p[layout]+pfocus->e[layout] || pb->p[layout]+pb->e[layout] < pfocus->p[layout]);
 	});
-
+	//StackRecursive();
 	Stack1();
 }
 
