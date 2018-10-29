@@ -527,16 +527,30 @@ void Container::Translate(){
 
 void Container::Stack(){
 	stackQueue.clear();
-	for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
+	Container *pfocus = focusQueue.size() > 0?focusQueue.back():pch;
+	if(!pfocus)
+		return;
+	for(Container *pcontainer = pch; pcontainer != pfocus; pcontainer = pcontainer->pnext)
+		stackQueue.push_back(pcontainer);
+	for(Container *pcontainer = pch->GetPrev(); pcontainer != pfocus; pcontainer = pcontainer->GetPrev())
+		stackQueue.push_back(pcontainer);
+
+	stackQueue.push_back(pfocus);
+	/*for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
 		stackQueue.push_back(pcontainer);
 
 	if(focusQueue.size() == 0)
 		return;
 	Container *pfocus = focusQueue.back();
+	auto m = std::find(stackQueue.begin(),stackQueue.end(),pfocus);
+	std::iter_swap(m,stackQueue.end()-1);*/
 
-	std::sort(stackQueue.begin(),stackQueue.end(),[&](Container *pa, Container *pb)->bool{
+	/*std::sort(stackQueue.begin(),stackQueue.end(),[&](Container *pa, Container *pb)->bool{
 		return pa != pfocus && (pb == pfocus || pb->p[layout] > pfocus->p[layout]+pfocus->e[layout] || pb->p[layout]+pb->e[layout] < pfocus->p[layout]);
-	});
+	});*/
+	/*std::sort(stackQueue.begin(),stackQueue.end(),[&](Container *pa, Container *pb)->bool{
+		return pa != pfocus && (pb == pfocus || pb->p[layout] > pfocus->p[layout]+pfocus->e[layout] || pb->p[layout]+pb->e[layout] < pfocus->p[layout]);
+	});*/
 	//StackRecursive();
 	Stack1();
 }
