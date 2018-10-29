@@ -80,32 +80,28 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 	float2 r = posh.xy-p;
 	float4 c = content.Load(float3(r,0)); //p already has the 0.5f offset
 	//^^returns black when out of bounds (border)
+
+	float2 p1 = screen*(0.25f*(xy0+xy1)+0.5f);
+	float2 m = screen*(0.5f*xy1+0.5f);
+	float2 d1 = m-p; //d1: extent of the window
 	if(geomId == 0){
-		/*float2 p = screen*(0.25f*(xy0+xy1)+0.5f);
-		if(length(max(abs(p)-0.5f*(xy1-xy0)-borderWidth,0.0f))-0.5f < 10.0f)
-			discard;*/
-		//float2 d = r;
-		//if(dot(d,d) < 50.0f)
-		//	discard;
 		if(all(r > 0.5f) && c.w > 0.0f)
 			discard;
 		c = float4(0,0,0,1);
 		if(flags & FLAGS_FOCUS)
-			c.xyz = float3(1.0f,0.913f,0.12f);
+			c.xyz = float3(1.0f,0.6f,0.33f);//float3(1.0f,0.913f,0.12f);
+		c = float4(0,0,0,1);
+
+		//chamfer the edges slightly
+		if(length(max(abs(posh.xy-p1)-(0.5f*d1+0.5f*screen*borderWidth-10.0f),0.0f))-10.0f > 0.0f)
+			discard;
+	}else{
+	
+		//remove transparency around the edges
+		if(length(max(abs(posh.xy-p1)-(0.5f*d1-180.0f),0.0f))-100.0f > 0.0f)
+			c.w = 1.0f;
 	}
 	return c;
-#if 0
-	float2 s = saturate(abs(2.0f*(xy1-xy0))); //reference
-	float2 ct = 2.0f*texc-1.0f;
-	ct = s*ct+sign(ct)*(1-s); //TODO: aspect ratio check, 1.0f/0.5f
-	if(length(max(abs(ct)-1.2*float2(0.5,0.5),0.0f))-0.4f > 0.0f)
-		discard;
-	/*float2 ct = 0.5f*(xy0+xy1);
-	if(length(max(abs(posh.xy+xy0)-float2(0.5,0.5),0.0f))-0.4f > 0.0f)
-		discard;*/
-	
-	return float4(1,1,1,1);
-#endif
 }
 
 #endif
