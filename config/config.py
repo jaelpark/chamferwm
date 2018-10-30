@@ -2,9 +2,7 @@
 import chamfer
 from enum import Enum,auto
 
-from subprocess import Popen
 import psutil
-
 from Xlib.keysymdef import latin1,miscellany,xf86
 
 import sys
@@ -20,6 +18,9 @@ class Key(Enum):
 	FOCUS_DOWN = auto()
 	FOCUS_PARENT = auto()
 	FOCUS_CHILD = auto()
+
+	FOCUS_PARENT_RIGHT = auto()
+	FOCUS_PARENT_LEFT = auto()
 
 	YANK_CONTAINER = auto()
 	PASTE_CONTAINER = auto()
@@ -38,6 +39,9 @@ class Key(Enum):
 
 	AUDIO_VOLUME_UP = auto()
 	AUDIO_VOLUME_DOWN = auto()
+
+	MONITOR_BRIGHTNESS_UP = auto()
+	MONITOR_BRIGHTNESS_DOWN = auto()
 
 class Container(chamfer.Container):
 	def OnSetup(self):
@@ -81,6 +85,9 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
 			#binder.BindKey(ord('x'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
 
+			binder.BindKey(ord('l'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_RIGHT.value);
+			binder.BindKey(ord('h'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_LEFT.value);
+
 			binder.BindKey(ord('y'),chamfer.MOD_MASK_1,Key.YANK_CONTAINER.value);
 			binder.BindKey(ord('p'),chamfer.MOD_MASK_1,Key.PASTE_CONTAINER.value);
 
@@ -96,6 +103,8 @@ class Backend(chamfer.Backend):
 			binder.BindKey(xf86.XK_XF86_AudioRaiseVolume,0,Key.AUDIO_VOLUME_UP.value);
 			binder.BindKey(xf86.XK_XF86_AudioLowerVolume,0,Key.AUDIO_VOLUME_DOWN.value);
 
+			binder.BindKey(xf86.XK_XF86_MonBrightnessUp,0,Key.MONITOR_BRIGHTNESS_UP.value);
+			binder.BindKey(xf86.XK_XF86_MonBrightnessDown,0,Key.MONITOR_BRIGHTNESS_DOWN.value);
 			#/ - search for a window
 			#n - next match
 			#N - previous match
@@ -172,6 +181,24 @@ class Backend(chamfer.Backend):
 			if focus is None:
 				return;
 			focus.Focus();
+
+		elif keyId == Key.FOCUS_PARENT_RIGHT.value:
+			if parent is None:
+				return;
+			parent1 = parent.GetNext();
+			focus = parent1.GetFocus();
+			if focus is None:
+				return;
+			focus.Focus();
+			
+		elif keyId == Key.FOCUS_PARENT_LEFT.value:
+			if parent is None:
+				return;
+			parent1 = parent.GetPrev();
+			focus = parent1.GetFocus();
+			if focus is None:
+				return;
+			focus.Focus();
 			
 		elif keyId == Key.YANK_CONTAINER.value:
 			print("yanking container...");
@@ -194,7 +221,7 @@ class Backend(chamfer.Backend):
 			parent.ShiftLayout(layout);
 
 		elif keyId == Key.MAXIMIZE.value:
-			focus.minSize = (0.9,0.9);
+			focus.minSize = (0.98,0.98);
 			focus.ShiftLayout(focus.layout);
 		
 		elif keyId == Key.SPLIT_V.value:
@@ -208,13 +235,13 @@ class Backend(chamfer.Backend):
 			focus.Kill();
 
 		elif keyId == Key.LAUNCH_TERMINAL.value:
-			Popen(["termite"],stdout=None,stderr=None);
+			psutil.Popen(["termite"],stdout=None,stderr=None);
 
 		elif keyId == Key.LAUNCH_BROWSER.value:
-			Popen(["firefox"],stdout=None,stderr=None);
+			psutil.Popen(["firefox"],stdout=None,stderr=None);
 
 		elif keyId == Key.LAUNCH_BROWSER_PRIVATE.value:
-			Popen(["firefox","--private-window"],stdout=None,stderr=None);
+			psutil.Popen(["firefox","--private-window"],stdout=None,stderr=None);
 
 		elif keyId == Key.AUDIO_VOLUME_UP.value:
 			if "pulsectl" in sys.modules:
@@ -227,6 +254,14 @@ class Backend(chamfer.Backend):
 				with pulsectl.Pulse('volume-increaser') as pulse:
 					for sink in pulse.sink_list():
 						pulse.volume_change_all_chans(sink,-0.05);
+
+		elif keyId == Key.MONITOR_BRIGHTNESS_UP.value:
+			psutil.Popen(["xbacklight","-inc","20"]);
+			pass;
+
+		elif keyId == Key.MONITOR_BRIGHTNESS_DOWN.value:
+			psutil.Popen(["xbacklight","-dec","20"]);
+			pass;
 
 	
 	def OnKeyRelease(self, keyId):
@@ -251,7 +286,12 @@ pnames = [psutil.Process(pid).name() for pid in pids];
 
 if not "pulseaudio" in pnames:
 	print("starting pulseaudio...");
-	Popen(["pulseaudio","--start"],stdout=None,stderr=None);
+	#psutil.Popen(["pulseaudio","--start"],stdout=None,stderr=None);
+	psutil.Popen(["sh","-c","sleep 2.5; pulseaudio --start"],stdout=None,stderr=None);
+
+if not "dunst" in pnames:
+	print("starting dunst..."); #later on, we might have our own notification system
+	psutil.Popen(["dunst"],stdout=None,stderr=None);
 
 #p.cmdline()
 
