@@ -138,6 +138,7 @@ protected:
 	};
 	std::vector<KeyBinding> keycodes; //user defined id associated with the keycode
 	xcb_ewmh_connection_t ewmh;
+	xcb_window_t ewmh_window;
 
 	enum ATOM{
 		ATOM_WM_PROTOCOLS,

@@ -530,11 +530,39 @@ void Container::Stack(){
 	Container *pfocus = focusQueue.size() > 0?focusQueue.back():pch;
 	if(!pfocus)
 		return;
+	//stacking scheme 1: prefer to show left side of the window
+	//problem: may hide some windows completely
+	/*for(Container *pcontainer = pch; pcontainer != pfocus; pcontainer = pcontainer->pnext)
+		stackQueue.push_back(pcontainer);
+	Container *pstack = 0;
+	for(Container *pcontainer = pch->GetPrev(); pcontainer != pfocus; pcontainer = pcontainer->GetPrev()){
+		if((layout == LAYOUT_VSPLIT && pcontainer->p.x < pfocus->p.x+pfocus->e.x) ||
+			(layout == LAYOUT_HSPLIT && pcontainer->p.y < pfocus->p.y+pfocus->e.y))
+			pstack = pcontainer;
+		if(pstack)
+			stackQueue.push_back(pcontainer);
+	}
+	for(Container *pcontainer = pstack; pcontainer; pcontainer = pcontainer->pnext)
+		stackQueue.push_back(pcontainer);*/
+
+	//TODO: stacking scheme 3: stack from left to right, except that all the windows before the
+	//one that would be completely visible after focus (see 1), will be more tightly spaced to
+	//avoid waste. This needs modifications in Translate(), otherwise same as 2.
+
+	//1. check if any of the windows would be visible completely after the focus
+	//2. stack the windows normally until the next after focus
+	//3. for a length of one stack spacing, tighly place all the windows before the one found in 1.
+	//-if no such window was found, continue stacking according to scheme 3.
+	//4. after this, stack the remaining windows according to 2. The first of the remaining should
+	//be in the same place as it would be in normal left to right stacking.
+
+	//stacking scheme 3: for every window always keep at least small part visible
+	//problem(?): may waste screen space if there are many windows with left-aligned text (terminals)
 	for(Container *pcontainer = pch; pcontainer != pfocus; pcontainer = pcontainer->pnext)
 		stackQueue.push_back(pcontainer);
 	for(Container *pcontainer = pch->GetPrev(); pcontainer != pfocus; pcontainer = pcontainer->GetPrev())
 		stackQueue.push_back(pcontainer);
-
+	
 	stackQueue.push_back(pfocus);
 	/*for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
 		stackQueue.push_back(pcontainer);

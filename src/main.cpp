@@ -86,6 +86,10 @@ public:
 	RunBackend(WManager::Container *_proot) : proot(_proot), pcomp(0){}
 	virtual ~RunBackend(){}
 
+	virtual void SetupEnvironment(){
+		//
+	}
+
 	void SetCompositor(class RunCompositor *pcomp){
 		this->pcomp = pcomp;
 	}
@@ -229,6 +233,7 @@ public:
 //protected:
 	WManager::Container *proot;
 	std::vector<std::pair<const WManager::Container *, WManager::Client *>> stackAppendix;
+	//std::vector<WManager::Client *> desktopStack;
 	class RunCompositor *pcomp;
 };
 
@@ -252,6 +257,12 @@ public:
 
 	~DefaultBackend(){
 		delete proot;
+	}
+
+	void SetupEnvironment(){
+		//
+		//TODO: setup client for root window here? (for wallpaper etc)
+		//-need a desktop level stack (needed anyway for widgets and stuff)
 	}
 
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
@@ -599,6 +610,7 @@ int main(sint argc, const char **pargv){
 	}
 
 	pbackend->SetCompositor(pcomp);
+	pbackend->SetupEnvironment();
 
 	for(;;){
 		//TODO: can we wait for vsync before handling the event? Might help with the stuttering

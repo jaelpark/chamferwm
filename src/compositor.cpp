@@ -715,6 +715,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	for(auto &p : *pstackAppendix)
 		appendixQueue.push_back(p);
 
+	//TODO: render desktop stack
 	CreateRenderQueue(proot,pstackAppendix,pfocus);
 	for(auto &r : appendixQueue){ //push the remaining (untransient) windows to the end of the queue
 		RenderObject renderObject;

@@ -207,10 +207,15 @@ X11Container::~X11Container(){
 }
 
 void X11Container::Focus1(){
+	const xcb_window_t *pfocusWindow;
 	if(pclient){
 		X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
-		xcb_set_input_focus(pbackend->pcon,XCB_INPUT_FOCUS_POINTER_ROOT,pclient11->window,XCB_CURRENT_TIME);
-	}else xcb_set_input_focus(pbackend->pcon,XCB_INPUT_FOCUS_POINTER_ROOT,pbackend->pscr->root,XCB_CURRENT_TIME);
+		pfocusWindow = &pclient11->window;
+
+	}else pfocusWindow = &pbackend->ewmh_window;
+
+	xcb_set_input_focus(pbackend->pcon,XCB_INPUT_FOCUS_POINTER_ROOT,*pfocusWindow,pbackend->lastTime);
+	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_ACTIVE_WINDOW,XCB_ATOM_WINDOW,32,1,pfocusWindow);
 
 	xcb_flush(pbackend->pcon);
 }
@@ -290,6 +295,7 @@ Default::~Default(){
 	//sigprocmask(SIG_UNBLOCK,&signals,0);
 
 	//cleanup
+	xcb_destroy_window(pcon,ewmh_window);
 	xcb_ewmh_connection_wipe(&ewmh);
 	xcb_set_input_focus(pcon,XCB_NONE,XCB_INPUT_FOCUS_POINTER_ROOT,XCB_CURRENT_TIME);
 	xcb_disconnect(pcon);
@@ -351,6 +357,49 @@ void Default::Start(){
 	
 	for(uint i = 0; i < ATOM_COUNT; ++i)
 		atoms[i] = GetAtom(patomStrs[i]);
+	
+	const char wmName[] = "chamfer";
+
+	//setup EWMH hints
+	ewmh_window = xcb_generate_id(pcon);
+
+	values[0] = 1;
+	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,ewmh_window,pscr->root,
+		-1,-1,1,1,0,XCB_WINDOW_CLASS_INPUT_ONLY,XCB_COPY_FROM_PARENT,XCB_CW_OVERRIDE_REDIRECT,values);
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,ewmh_window,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,ewmh_window,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
+
+	//https://specifications.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
+	const xcb_atom_t supportedAtoms[] = {
+		ewmh._NET_WM_NAME,
+		ewmh._NET_CURRENT_DESKTOP,
+		ewmh._NET_NUMBER_OF_DESKTOPS,
+		ewmh._NET_DESKTOP_VIEWPORT,
+		ewmh._NET_DESKTOP_GEOMETRY,
+		ewmh._NET_ACTIVE_WINDOW
+		//TODO: _NET_CLIENT_LIST, _NET_CLIENT_LIST_STACKING
+	};
+
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTED,XCB_ATOM_ATOM,32,sizeof(supportedAtoms)/sizeof(supportedAtoms[0]),supportedAtoms);
+
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
+	values[0] = 0;
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
+	values[0] = 1;
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
+	values[0] = 0;
+	values[1] = 0;
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
+	values[0] = pscr->width_in_pixels;
+	values[1] = pscr->height_in_pixels;
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_ACTIVE_WINDOW,XCB_ATOM_WINDOW,32,1,&ewmh_window);
+
+	xcb_map_window(pcon,ewmh_window);
+
+	values[0] = XCB_STACK_MODE_BELOW;
+	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 }
 
 /*sint Default::GetEventFileDescriptor(){
@@ -437,6 +486,10 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_MAP_REQUEST:{
 			xcb_map_request_event_t *pev = (xcb_map_request_event_t*)pevent;
+			if(pev->window == ewmh_window){
+				xcb_map_window(pcon,pev->window);
+				break;
+			}
 			
 			//check if window already exists
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
