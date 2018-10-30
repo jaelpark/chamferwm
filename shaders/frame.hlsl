@@ -89,8 +89,13 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 			discard;
 		c = float4(0,0,0,1);
 		if(flags & FLAGS_FOCUS)
-			c.xyz = float3(1.0f,0.6f,0.33f);//float3(1.0f,0.913f,0.12f);
-		c = float4(0,0,0,1);
+			//dashed line around focus
+			if(any(posh > p1-0.5f*d1 && posh < p1+0.5f*d1 && fmod(floor(posh/50.0f),3.0f) < 0.5f) &&
+				any(posh < p1-0.5f*d1-0.25f*screen*borderWidth || posh > p1+0.5f*d1+0.25f*screen*borderWidth))
+			//edge highlight
+			//if(all(posh > p1+0.4f*d1 || posh < p1-0.4f*d1) &&
+			//	any(posh < p1-0.5f*d1-0.25f*screen*borderWidth || posh > p1+0.5f*d1+0.25f*screen*borderWidth))
+				c.xyz = float3(1.0f,0.6f,0.33f);
 
 		//chamfer the edges slightly
 		if(length(max(abs(posh.xy-p1)-(0.5f*d1+0.5f*screen*borderWidth-10.0f),0.0f))-10.0f > 0.0f)
@@ -101,6 +106,7 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 		if(length(max(abs(posh.xy-p1)-(0.5f*d1-180.0f),0.0f))-100.0f > 0.0f)
 			c.w = 1.0f;
 	}
+
 	return c;
 }
 
