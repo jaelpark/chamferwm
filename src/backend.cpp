@@ -517,6 +517,8 @@ bool Default::HandleEvent(){
 				//it might be the case that no configure notification was received
 				xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pcon,pev->window);
 				xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pcon,geometryCookie,0);
+				if(!pgeometryReply)
+					break; //happens sometimes on high rate of events
 				WManager::Rectangle rect = {pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
 				free(pgeometryReply);
 
