@@ -77,6 +77,11 @@ public:
 			CREATE_CONTAINED,
 			CREATE_AUTOMATIC
 		} mode;
+		enum{
+			HINT_DESKTOP = 0x1,
+			HINT_ABOVE = 0x2
+		};
+		uint hints;
 	};
 	X11Client(WManager::Container *, const CreateInfo *);
 	~X11Client();
@@ -99,7 +104,6 @@ public:
 	X11Container(WManager::Container *, const WManager::Container::Setup &, class X11Backend *);
 	virtual ~X11Container();
 	void Focus1();
-	void StackRecursive(const WManager::Container *, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *);
 	void Stack1();
 	const X11Backend *pbackend;
 };
@@ -118,6 +122,8 @@ public:
 	virtual ~X11Backend();
 	bool QueryExtension(const char *, sint *, sint *) const;
 	xcb_atom_t GetAtom(const char *) const;
+	void StackRecursive(const WManager::Container *);
+	void StackClients();
 	enum MODE{
 		MODE_UNDEFINED,
 		MODE_MANUAL,
@@ -139,6 +145,8 @@ protected:
 	std::vector<KeyBinding> keycodes; //user defined id associated with the keycode
 	xcb_ewmh_connection_t ewmh;
 	xcb_window_t ewmh_window;
+	
+	std::deque<std::pair<const WManager::Container *, WManager::Client *>> appendixQueue;
 
 	enum ATOM{
 		ATOM_WM_PROTOCOLS,
@@ -147,6 +155,7 @@ protected:
 	};
 	xcb_atom_t atoms[ATOM_COUNT];
 	static const char *patomStrs[ATOM_COUNT];
+
 };
 
 class Default : public X11Backend{

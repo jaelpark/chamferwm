@@ -82,6 +82,8 @@ Container::~Container(){
 
 void Container::Place(Container *pParent1){
 	//TODO: reparent the floating container
+	if(mode == MODE_FLOATING)
+		return;
 	if(pParent1->pclient){
 		printf("<!> <!> <!> <!> <!> never happens!\n");
 		//reparent

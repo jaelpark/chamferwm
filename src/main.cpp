@@ -274,6 +274,7 @@ public:
 		//Containers should be created always under the parent of the current focus.
 		//config script should manage this (point to container which should be the parent of the
 		//new one), while also setting some of the parameters like border width and such.
+		//under the menus
 		if(pcreateInfo->mode == Backend::X11Client::CreateInfo::CREATE_AUTOMATIC){
 			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo);
 			if(pclient11)
@@ -281,13 +282,13 @@ public:
 			return pclient11;
 
 		}else{
-			Config::ContainerInterface &containerInt = !pcreateInfo->pstackContainer?
+			Config::ContainerInterface &containerInt = !pcreateInfo->prect?
 				SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0):
 				SetupFloating<Config::X11ContainerConfig,DefaultBackend>();
 
 			Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo);
 			containerInt.pcontainer->pclient = pclient11;
-			if(pcreateInfo->pstackContainer)
+			if(pcreateInfo->prect && (pcreateInfo->pstackContainer || pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_DESKTOP))
 				stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
 
 			containerInt.OnCreate();
@@ -354,6 +355,7 @@ public:
 		}
 		printf("----------- collapsed %x\n",pcollapsed);
 		PrintTree(proot,0);
+		printf("stackAppendix: %u\n",stackAppendix.size());
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){

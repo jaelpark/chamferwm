@@ -712,15 +712,25 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	//Create a render list elements arranged from back to front
 	renderQueue.clear();
 	appendixQueue.clear();
-	for(auto &p : *pstackAppendix)
-		appendixQueue.push_back(p);
+	for(auto &p : *pstackAppendix){
+		if(p.first){
+			appendixQueue.push_back(p);
+			continue;
+		}
+		//desktop features are placed first
+		RenderObject renderObject;
+		renderObject.pclient = p.second;
+		renderObject.pclientFrame = dynamic_cast<ClientFrame *>(p.second);
+		renderObject.flags = renderObject.pclient->pcontainer == pfocus?0x1:0;
+		renderQueue.push_back(renderObject);
+	}
 
 	//TODO: render desktop stack
 	CreateRenderQueue(proot,pstackAppendix,pfocus);
-	for(auto &r : appendixQueue){ //push the remaining (untransient) windows to the end of the queue
+	for(auto &p : appendixQueue){ //push the remaining (untransient) windows to the end of the queue
 		RenderObject renderObject;
-		renderObject.pclient = r.second;
-		renderObject.pclientFrame = dynamic_cast<ClientFrame *>(r.second);
+		renderObject.pclient = p.second;
+		renderObject.pclientFrame = dynamic_cast<ClientFrame *>(p.second);
 		renderObject.flags = 0;
 		renderQueue.push_back(renderObject);
 	}
