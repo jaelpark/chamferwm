@@ -283,20 +283,25 @@ chamfer.bind_Backend(backend);
 
 pids = psutil.pids();
 pnames = [psutil.Process(pid).name() for pid in pids];
+pcmdls = [a for p in [psutil.Process(pid).cmdline() for pid in pids] for a in p];
 
 if not "pulseaudio" in pnames:
 	print("starting pulseaudio...");
-	#psutil.Popen(["pulseaudio","--start"],stdout=None,stderr=None);
-	psutil.Popen(["sh","-c","sleep 2.5; pulseaudio --start"],stdout=None,stderr=None);
+	#need to wait some time before starting pulseaudio for it initialize successfully
+	psutil.Popen(["sh","-c","sleep 5.0; pulseaudio --start"],stdout=None,stderr=None);
 
 if not "dunst" in pnames:
 	print("starting dunst..."); #later on, we might have our own notification system
 	psutil.Popen(["dunst"],stdout=None,stderr=None);
 
-#p.cmdline()
+if not any(["clipster" in p for p in pcmdls]):
+	print("starting clipster..."); #clipboard manager
+	psutil.Popen(["clipster","-d"],stdout=None,stderr=None);
+
+if not any(["libinput-gestures" in p for p in pcmdls]):
+	print("starting libinput-gestures..."); #touchpad gestures
+	psutil.Popen(["libinput-gestures-setup","start"],stdout=None,stderr=None);
 
 #compositor = Compositor();
 #chamfer.bind_Compositor(compositor);
-
-#startup applications here?
 
