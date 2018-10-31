@@ -40,6 +40,10 @@ public:
 		glm::vec2 minSize = glm::vec2(0.0f);
 		glm::vec2 maxSize = glm::vec2(1.0f);
 		MODE mode;
+		/*enum INSERT{
+			INSERT_APPEND,
+			INSERT_REPARENT //always with client
+		} insert;*/
 	};
 	Container(); //root container
 	Container(Container *, const Setup &);

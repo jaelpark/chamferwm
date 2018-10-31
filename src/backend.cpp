@@ -220,36 +220,9 @@ void X11Container::Focus1(){
 	xcb_flush(pbackend->pcon);
 }
 
-void X11Container::StackRecursive(const WManager::Container *pcontainer, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix){
-	for(WManager::Container *pcont : pcontainer->stackQueue){
-		if(pcont->pclient){
-			X11Client *pclient11 = dynamic_cast<X11Client *>(pcont->pclient);
-
-			uint values[1] = {XCB_STACK_MODE_ABOVE};
-			xcb_configure_window(pbackend->pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
-		}
-		StackRecursive(pcont,pstackAppendix);
-	}
-
-	auto s = [&](auto &p)->bool{
-		return pcontainer == p.first;
-	};
-	for(auto m = std::find_if(pstackAppendix->begin(),pstackAppendix->end(),s);
-		m != pstackAppendix->end(); m = std::find_if(m,pstackAppendix->end(),s)){
-
-		X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
-
-		uint values[1] = {XCB_STACK_MODE_ABOVE};
-		xcb_configure_window(pbackend->pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
-		
-		++m;
-	}
-}
-
 void X11Container::Stack1(){
-	const WManager::Container *proot = pbackend->GetRoot();
-	const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix = pbackend->GetStackAppendix();
-	StackRecursive(proot,pstackAppendix);
+	printf("stacking clients!\n");
+	((X11Backend*)pbackend)->StackClients(); //hack, bypass const qualifier
 }
 
 X11Backend::X11Backend() : lastTime(XCB_CURRENT_TIME){
@@ -281,6 +254,57 @@ xcb_atom_t X11Backend::GetAtom(const char *pstr) const{
 	xcb_atom_t atom = patomReply->atom;
 	free(patomReply);
 	return atom;
+}
+
+void X11Backend::StackRecursive(const WManager::Container *pcontainer){
+	for(WManager::Container *pcont : pcontainer->stackQueue){
+		if(pcont->pclient){
+			X11Client *pclient11 = dynamic_cast<X11Client *>(pcont->pclient);
+
+			uint values[1] = {XCB_STACK_MODE_ABOVE};
+			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		}
+		StackRecursive(pcont);
+	}
+
+	auto s = [&](auto &p)->bool{
+		return pcontainer == p.first;
+	};
+	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
+		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
+
+		X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
+
+		uint values[1] = {XCB_STACK_MODE_ABOVE};
+		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+
+		m = appendixQueue.erase(m);
+	}
+}
+
+void X11Backend::StackClients(){
+	const WManager::Container *proot = GetRoot();
+	const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix = GetStackAppendix();
+
+	appendixQueue.clear();
+	for(auto &p : *pstackAppendix){
+		if(p.first){
+			appendixQueue.push_back(p);
+			continue;
+		}
+
+		X11Client *pclient11 = dynamic_cast<X11Client *>(p.second);
+
+		uint values[1] = {XCB_STACK_MODE_ABOVE};
+		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+	}
+	StackRecursive(proot);
+	for(auto &p : appendixQueue){ //stack the remaining (untransient) windows
+		X11Client *pclient11 = dynamic_cast<X11Client *>(p.second);
+
+		uint values[1] = {XCB_STACK_MODE_ABOVE};
+		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+	}
 }
 
 const char *X11Backend::patomStrs[ATOM_COUNT] = {
@@ -500,23 +524,48 @@ bool Default::HandleEvent(){
 
 			WManager::Rectangle *prect = 0;
 			X11Client *pbaseClient = 0;
+			uint hints = 0;
 
-			{
+			do{ //process window type
 				//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
 				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
 				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+				if(!propertyReply)
+					break;
 				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
-				if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG || *patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP){
+				if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG ||
+					*patom == ewmh._NET_WM_WINDOW_TYPE_DOCK ||
+					*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP ||
+					*patom == ewmh._NET_WM_WINDOW_TYPE_MENU ||
+					*patom == ewmh._NET_WM_WINDOW_TYPE_UTILITY ||
+					*patom == ewmh._NET_WM_WINDOW_TYPE_SPLASH){
 					auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 						return pev->window == p.first;
 					});
 					prect = m != configCache.end()?&(*m).second:0;
-				}/*else
-				if(*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP){
-					printf("desktop!\n"); //TODO: needs to be below every other client
-				}*/
+
+					hints |= 
+						(*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP?X11Client::CreateInfo::HINT_DESKTOP:0)|
+						(*patom == ewmh._NET_WM_WINDOW_TYPE_DOCK?X11Client::CreateInfo::HINT_ABOVE:0);
+				}
 				free(propertyReply);
-			}
+			}while(0);
+			do{ //process window state
+				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_STATE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
+				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+				if(!propertyReply)
+					break;
+				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
+				if(*patom == ewmh._NET_WM_STATE_MODAL){
+					auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+						return pev->window == p.first;
+					});
+					prect = m != configCache.end()?&(*m).second:0;
+
+					hints |= (*patom = ewmh._NET_WM_STATE_ABOVE?X11Client::CreateInfo::HINT_ABOVE:0);
+				}
+				free(propertyReply);
+			}while(0);
 			{
 				//
 				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
@@ -531,9 +580,15 @@ bool Default::HandleEvent(){
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
 			createInfo.prect = prect;
-			createInfo.pstackContainer = prect?(pbaseClient?pbaseClient->pcontainer:GetRoot()):0;
+			createInfo.pstackContainer =
+				!(hints & X11Client::CreateInfo::HINT_DESKTOP)?
+					((pbaseClient && !(hints & X11Client::CreateInfo::HINT_ABOVE))?
+						pbaseClient->pcontainer
+					:GetRoot())
+				:0;
 			createInfo.pbackend = this;
 			createInfo.mode = X11Client::CreateInfo::CREATE_CONTAINED;
+			createInfo.hints = hints;
 			X11Client *pclient = SetupClient(&createInfo);
 			if(!pclient)
 				break;
@@ -544,6 +599,10 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_MAP_NOTIFY:{
 			xcb_map_notify_event_t *pev = (xcb_map_notify_event_t*)pevent;
+			if(pev->window == ewmh_window){
+				xcb_map_window(pcon,pev->window);
+				break;
+			}
 
 			//check if window already exists
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
@@ -587,6 +646,7 @@ bool Default::HandleEvent(){
 			createInfo.pstackContainer = pbaseClient?pbaseClient->pcontainer:GetRoot();
 			createInfo.pbackend = this;
 			createInfo.mode = X11Client::CreateInfo::CREATE_AUTOMATIC;
+			createInfo.hints = 0;
 			X11Client *pclient = SetupClient(&createInfo);
 			if(!pclient)
 				break;

@@ -30,6 +30,7 @@ Container::Container(Container *_pParent, const Container::Setup &setup) :
 		return;
 
 	//TODO: reparent the floating container
+	//TODO: allow reparenting containers without client
 	if(pParent->pclient){
 		//reparent
 		Container *pbase = pParent->pParent;

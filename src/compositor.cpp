@@ -208,7 +208,9 @@ void CompositorInterface::InitializeRenderEngine(){
 	const char *pextensions[] = {
 		VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
 		"VK_KHR_surface",
-		"VK_KHR_xcb_surface"
+		"VK_KHR_xcb_surface",
+		//"VK_KHR_get_physical_device_properties2",
+		//VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME
 	};
 	DebugPrintf(stdout,"Enumerating required extensions\n");
 	uint extFound = 0;
