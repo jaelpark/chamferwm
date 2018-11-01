@@ -5,6 +5,9 @@
 #include <xcb/xcb_keysyms.h>
 #include <xcb/xcb_ewmh.h>
 
+struct _XDisplay;
+typedef struct _XDisplay Display;
+
 namespace Compositor{
 //declarations for friend classes
 class X11ClientFrame;
@@ -180,6 +183,8 @@ public:
 	//void * GetProperty(xcb_atom_t, xcb_atom_t) const;
 	//void FreeProperty(...) const;
 protected:
+	Display *pdisplay;
+	sint defaultScreen;
 	xcb_connection_t *pcon;
 	xcb_screen_t *pscr;
 	xcb_window_t window; //root or test window

@@ -363,7 +363,8 @@ public:
 		if(!pcomp11)
 			pclient11 = new Backend::X11Client(pcontainer,pcreateInfo);
 		else{
-			if(pcreateInfo->window == pcomp11->overlay)
+			if(pcreateInfo->window == pcomp11->overlay ||
+				pcreateInfo->window == pcomp11->glcontextwin)
 				return 0;
 			pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pshaderName,pcomp11);
 		}

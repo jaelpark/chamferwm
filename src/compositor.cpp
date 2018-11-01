@@ -4,6 +4,12 @@
 #include "CompositorResource.h"
 #include "compositor.h"
 
+//only reason to have these is the interoperation with GL for EXT_texture_from_pixmap
+#include <GL/glx.h>
+#include <GL/gl.h>
+//#include <GL/glew.h>
+//#include <GL/glxew.h>
+
 #include <set>
 #include <algorithm>
 #include <cstdlib>
@@ -208,8 +214,8 @@ void CompositorInterface::InitializeRenderEngine(){
 		VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
 		"VK_KHR_surface",
 		"VK_KHR_xcb_surface",
-		//"VK_KHR_get_physical_device_properties2",
-		//VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME
+		"VK_KHR_get_physical_device_properties2",
+		VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME
 	};
 	DebugPrintf(stdout,"Enumerating required extensions\n");
 	uint extFound = 0;
@@ -1264,11 +1270,63 @@ void X11Compositor::Start(){
 	xcb_flush(pbackend->pcon);
 
 	InitializeRenderEngine();
+
+	// Initialize GL interop, setup window to get the context
+	int visualAttributes[] = { 
+		GLX_X_RENDERABLE,True,
+		GLX_DRAWABLE_TYPE,GLX_WINDOW_BIT,
+		GLX_RENDER_TYPE,GLX_RGBA_BIT,
+		GLX_X_VISUAL_TYPE,GLX_TRUE_COLOR,
+		GLX_RED_SIZE,8,
+		GLX_GREEN_SIZE,8,
+		GLX_BLUE_SIZE,8,
+		GLX_ALPHA_SIZE,8,
+		GLX_DEPTH_SIZE,24,
+		GLX_STENCIL_SIZE,8,
+		GLX_DOUBLEBUFFER,True,
+		None
+	};
+	sint fbconfigCount;
+	GLXFBConfig *pfbconfig = glXChooseFBConfig(pbackend->pdisplay,pbackend->defaultScreen,visualAttributes,&fbconfigCount);
+	if(!pfbconfig || fbconfigCount == 0)
+		throw Exception("glXChooseFBConfig failed.\n");
+
+	int visualId;
+	glXGetFBConfigAttrib(pbackend->pdisplay,*pfbconfig,GLX_VISUAL_ID,&visualId);
+	
+	context = glXCreateNewContext(pbackend->pdisplay,*pfbconfig,GLX_RGBA_TYPE,0,True);
+
+	glcontextwin = xcb_generate_id(pbackend->pcon);
+	//mask and values from above
+	xcb_create_window(pbackend->pcon,XCB_COPY_FROM_PARENT,glcontextwin,pbackend->pscr->root,
+		0,0,10,10,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,visualId,mask,values);
+	xcb_map_window(pbackend->pcon,glcontextwin);
+
+	values[0] = XCB_STACK_MODE_BELOW;
+	xcb_configure_window(pbackend->pcon,glcontextwin,XCB_CONFIG_WINDOW_STACK_MODE,values);
+
+	glxwindow = glXCreateWindow(pbackend->pdisplay,*pfbconfig,glcontextwin,0);
+	if(!glXMakeContextCurrent(pbackend->pdisplay,glxwindow,glxwindow,context))
+		throw Exception("Failed to set current GLX context.\n");
+	
+	/*if(glewInit() != GLEW_OK)
+		throw Exception("glewInit() failed.\n");
+	if(!GLX_EXT_texture_from_pixmap)
+		throw Exception("GLX_EXT_texture_from_pixmap not available.\n");*/
+	
+	DebugPrintf(stdout,"GL interop initialized.\n");
+	printf("* %s, OpenGL %s\n",glGetString(GL_RENDERER),glGetString(GL_VERSION));
 }
 
 void X11Compositor::Stop(){
 	if(pbackground)
 		delete pbackground;
+	
+	glXDestroyWindow(pbackend->pdisplay,glxwindow);
+	xcb_destroy_window(pbackend->pcon,glcontextwin);
+
+	glXDestroyContext(pbackend->pdisplay,context);
+	
 	DestroyRenderEngine();
 
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);

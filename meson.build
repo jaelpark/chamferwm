@@ -30,6 +30,13 @@ vk = [
 	dependency('vulkan')
 ]
 
+gl = [
+	dependency('x11'),
+	dependency('x11-xcb'),
+	dependency('gl')
+	#dependency('glew')
+]
+
 python = [
 	dependency('python3'),
 	dependency('boost',modules:['system','filesystem','python3'])
@@ -47,5 +54,5 @@ custom_target('frame_vertex',output:'frame_vertex.spv',input:'shaders/frame.hlsl
 custom_target('frame_geometry',output:'frame_geometry.spv',input:'shaders/frame.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
 custom_target('frame_fragment',output:'frame_fragment.spv',input:'shaders/frame.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
 
-executable('chamfer',sources:src,include_directories:inc,dependencies:[xcb,vk,python],cpp_args:['-std=c++17'])
+executable('chamfer',sources:src,include_directories:inc,dependencies:[xcb,vk,gl,python],cpp_args:['-std=c++17'])
 

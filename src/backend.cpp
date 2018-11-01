@@ -4,6 +4,10 @@
 #include <cstdlib>
 #include <algorithm>
 
+#include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+#undef KeyPress
+
 #include <xcb/xcb.h>
 #include <xcb/randr.h>
 #include <xcb/xcb_keysyms.h>
@@ -12,8 +16,7 @@
 //#include <xcb/xcb_ewmh.h>
 #include <xcb/xcb_util.h>
 
-//#include <X11/X.h>
-typedef xcb_atom_t Atom;
+//typedef xcb_atom_t Atom;
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 
@@ -462,15 +465,26 @@ Default::~Default(){
 	xcb_destroy_window(pcon,ewmh_window);
 	xcb_ewmh_connection_wipe(&ewmh);
 	xcb_set_input_focus(pcon,XCB_NONE,XCB_INPUT_FOCUS_POINTER_ROOT,XCB_CURRENT_TIME);
-	xcb_disconnect(pcon);
+	//xcb_disconnect(pcon);
+	XCloseDisplay(pdisplay);
 	xcb_flush(pcon);
 }
 
 void Default::Start(){
 	sint scount;
-	pcon = xcb_connect(0,&scount);
-	if(xcb_connection_has_error(pcon))
+	//unfortunately need the Xlib to work with the GLX,
+	//which in turn is required for the texture_from_pixmap
+	pdisplay = XOpenDisplay(0);
+	if(!pdisplay)
+		throw Exception("Failed to open display.\n");
+	defaultScreen = DefaultScreen(pdisplay);
+	//pcon = xcb_connect(0,&scount);
+	pcon = XGetXCBConnection(pdisplay);
+	//if(xcb_connection_has_error(pcon))
+	if(!pcon)
 		throw Exception("Failed to connect to X server.\n");
+	
+	XSetEventQueueOwner(pdisplay,XCBOwnsEventQueue);
 
 	const xcb_setup_t *psetup = xcb_get_setup(pcon);
 	xcb_screen_iterator_t sm = xcb_setup_roots_iterator(psetup);
@@ -480,7 +494,7 @@ void Default::Start(){
 	pscr = sm.data;
 	if(!pscr)
 		throw Exception("Screen unavailable.\n");
-
+	
 	DebugPrintf(stdout,"Screen size: %ux%u\n",pscr->width_in_pixels,pscr->height_in_pixels);
 	//https://standards.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
 
