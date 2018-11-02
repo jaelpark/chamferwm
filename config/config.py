@@ -65,10 +65,8 @@ class Container(chamfer.Container):
 	def OnCreate(self):
 		self.Focus();
 	
-	#def OnProperty(self):
-		#called on property changes and once before creation
-		#not called on containers without clients
-		#pass;
+	def OnPropertyChange(self, propId):
+		print(self.wm_name);
 		
 class Backend(chamfer.Backend):
 	def OnSetupKeys(self, binder, debug):

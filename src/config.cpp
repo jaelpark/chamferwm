@@ -56,6 +56,10 @@ void ContainerInterface::OnCreate(){
 	//TODO: focus on this
 }
 
+void ContainerInterface::OnPropertyChange(PROPERTY_ID id){
+	//
+}
+
 boost::python::object ContainerInterface::GetNext() const{
 	WManager::Container *pnext = pcontainer->GetNext();
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pnext);
@@ -161,6 +165,20 @@ void ContainerProxy::OnCreate(){
 			PyErr_Clear();
 		}
 	}else ContainerInterface::OnCreate();
+}
+
+void ContainerProxy::OnPropertyChange(PROPERTY_ID id){
+	boost::python::override ovr = this->get_override("OnPropertyChange");
+	if(ovr){
+		try{
+			ovr(id);
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else return ContainerInterface::OnPropertyChange(id);
 }
 
 ContainerConfig::ContainerConfig(ContainerInterface *_pcontainerInt, Backend::X11Backend *_pbackend) : pcontainerInt(_pcontainerInt), pbackend(_pbackend){
@@ -405,10 +423,15 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("BindKey",&Backend::X11KeyBinder::BindKey)
 		;
 	
+	boost::python::enum_<ContainerInterface::PROPERTY_ID>("property")
+		.value("NAME",ContainerInterface::PROPERTY_ID_NAME)
+		.value("CLASS",ContainerInterface::PROPERTY_ID_CLASS);
+
 	boost::python::class_<ContainerProxy,boost::noncopyable>("Container")
 		.def("OnSetup",&ContainerInterface::OnSetup)
 		.def("OnParent",&ContainerInterface::OnParent)
 		.def("OnCreate",&ContainerInterface::OnCreate)
+		.def("OnProperty",&ContainerInterface::OnPropertyChange)
 		.def("GetNext",&ContainerInterface::GetNext)
 		.def("GetPrev",&ContainerInterface::GetPrev)
 		.def("GetParent",&ContainerInterface::GetParent)
@@ -441,6 +464,8 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
 		.def_readwrite("minSize",&ContainerInterface::minSize)
 		.def_readwrite("maxSize",&ContainerInterface::maxSize)
+		.def_readonly("wm_name",&ContainerInterface::wm_name)
+		.def_readonly("wm_class",&ContainerInterface::wm_class)
 		.add_property("layout",boost::python::make_function(
 			[](ContainerInterface &container){
 				return container.pcontainer->layout;

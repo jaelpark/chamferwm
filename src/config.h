@@ -24,6 +24,11 @@ public:
 	virtual void OnSetup();
 	virtual boost::python::object OnParent();
 	virtual void OnCreate();
+	enum PROPERTY_ID{
+		PROPERTY_ID_NAME,
+		PROPERTY_ID_CLASS
+	};
+	virtual void OnPropertyChange(PROPERTY_ID);
 	boost::python::object GetNext() const;
 	boost::python::object GetPrev() const;
 	boost::python::object GetParent() const;
@@ -35,6 +40,8 @@ public:
 	boost::python::tuple minSize;
 	boost::python::tuple maxSize;
 
+	std::string wm_name;
+	std::string wm_class;
 	//bool floating;
 
 	WManager::Container *pcontainer;
@@ -48,6 +55,7 @@ public:
 	void OnSetup();
 	boost::python::object OnParent();
 	void OnCreate();
+	void OnPropertyChange(PROPERTY_ID);
 };
 
 class ContainerConfig{

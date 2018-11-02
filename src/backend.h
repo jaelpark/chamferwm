@@ -19,6 +19,31 @@ class Container;
 
 namespace Backend{
 
+class BackendProperty{
+public:
+	enum PROPERTY_TYPE{
+		PROPERTY_TYPE_STRING,
+		PROPERTY_TYPE_CLIENT,
+	};
+	BackendProperty(PROPERTY_TYPE);
+	virtual ~BackendProperty();
+	PROPERTY_TYPE type;
+};
+
+class BackendStringProperty : public BackendProperty{
+public:
+	BackendStringProperty(const char *);
+	~BackendStringProperty();
+	const char *pstr;
+};
+
+class BackendContainerProperty : public BackendProperty{
+public:
+	BackendContainerProperty(WManager::Container *);
+	~BackendContainerProperty();
+	WManager::Container *pcontainer;
+};
+
 class BackendEvent{
 public:
 	BackendEvent();
@@ -167,7 +192,13 @@ public:
 	bool HandleEvent();
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
+	enum PROPERTY_ID{
+		PROPERTY_ID_WM_NAME,
+		PROPERTY_ID_WM_CLASS,
+		PROPERTY_ID_TRANSIENT_FOR,
+	};
 	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
+	virtual void PropertyChange(X11Client *, PROPERTY_ID, const BackendProperty *) = 0;
 	virtual void DestroyClient(X11Client *) = 0;
 private:
 	xcb_keycode_t exitKeycode;

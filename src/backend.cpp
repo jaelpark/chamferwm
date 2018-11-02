@@ -66,6 +66,30 @@ static xcb_keycode_t SymbolToKeycode(xcb_keysym_t symbol, xcb_key_symbols_t *psy
 	return key;
 }
 
+BackendProperty::BackendProperty(PROPERTY_TYPE _type) : type(_type){
+	//
+}
+
+BackendProperty::~BackendProperty(){
+	//
+}
+
+BackendStringProperty::BackendStringProperty(const char *_pstr) : BackendProperty(PROPERTY_TYPE_STRING), pstr(_pstr){
+	//
+}
+
+BackendStringProperty::~BackendStringProperty(){
+	//
+}
+
+BackendContainerProperty::BackendContainerProperty(WManager::Container *_pcontainer) : BackendProperty(PROPERTY_TYPE_CLIENT), pcontainer(_pcontainer){
+	//
+}
+
+BackendContainerProperty::~BackendContainerProperty(){
+	//
+}
+
 BackendEvent::BackendEvent(){
 	//
 }
@@ -118,7 +142,7 @@ void X11KeyBinder::BindKey(uint symbol, uint mask, uint keyId){
 }
 
 X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend), flags(0){
-	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE};
+	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE|XCB_EVENT_MASK_PROPERTY_CHANGE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
 	if(!pcreateInfo->prect)
@@ -221,7 +245,6 @@ void X11Container::Focus1(){
 }
 
 void X11Container::Stack1(){
-	printf("stacking clients!\n");
 	((X11Backend*)pbackend)->StackClients(); //hack, bypass const qualifier
 }
 
@@ -448,12 +471,30 @@ bool Default::HandleEvent(){
 
 		//switch(pevent->response_type & ~0x80){
 		switch(pevent->response_type & 0x7f){
+		case XCB_CREATE_NOTIFY:{
+			xcb_create_notify_event_t *pev = (xcb_create_notify_event_t*)pevent;
+
+			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
+			
+			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+				return pev->window == p.first;
+			});
+			if(m == configCache.end()){
+				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				m = configCache.end()-1;
+
+			}else (*m).second = rect;
+
+			DebugPrintf(stdout,"create %ux%u\n",pev->width,pev->height);
+			}
+			break;
 		case XCB_CONFIGURE_REQUEST:{
 			xcb_configure_request_event_t *pev = (xcb_configure_request_event_t*)pevent;
 
 			//check if window already exists
 			//further configuration should be blocked (for example Firefox on restore session)
-			if(FindClient(pev->window,MODE_MANUAL))
+			X11Client *pclient1 = FindClient(pev->window,MODE_MANUAL);
+			if(pclient1 && pclient1->pcontainer->mode != WManager::Container::MODE_FLOATING)
 				break;
 
 			//TODO: center the window on its base
@@ -505,6 +546,10 @@ bool Default::HandleEvent(){
 				}
 
 			xcb_configure_window(pcon,pev->window,mask,values);
+
+			if(pclient1)
+				pclient1->UpdateTranslation(&rect);
+
 			DebugPrintf(stdout,"configure request: %u | %u, %u, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
 			}
 			break;
@@ -593,8 +638,31 @@ bool Default::HandleEvent(){
 			if(!pclient)
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_MANUAL));
-			
+
 			DebugPrintf(stdout,"map request, %u\n",pev->window);
+			}
+			break;
+		case XCB_CONFIGURE_NOTIFY:{
+			xcb_configure_notify_event_t *pev = (xcb_configure_notify_event_t*)pevent;
+
+			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
+			
+			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+				return pev->window == p.first;
+			});
+			if(m == configCache.end()){
+				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				m = configCache.end()-1;
+
+			}else (*m).second = rect;
+
+			X11Client *pclient1 = FindClient(pev->window,MODE_AUTOMATIC);
+			if(!pclient1)
+				break;
+
+			pclient1->UpdateTranslation(&rect);
+
+			DebugPrintf(stdout,"configure to %ux%u\n",pev->width,pev->height);
 			}
 			break;
 		case XCB_MAP_NOTIFY:{
@@ -674,6 +742,56 @@ bool Default::HandleEvent(){
 			DebugPrintf(stdout,"unmap notify\n");
 			}
 			break;
+		case XCB_PROPERTY_NOTIFY:{
+			xcb_property_notify_event_t *pev = (xcb_property_notify_event_t*)pevent;
+			lastTime = pev->time;
+			if(pev->state == XCB_PROPERTY_DELETE)
+				break;
+
+			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
+			if(!pclient1)
+				break;
+
+			if(pev->atom == XCB_ATOM_WM_NAME){
+				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_NAME,XCB_GET_PROPERTY_TYPE_ANY,0,128);
+				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+				if(!propertyReply)
+					break; //TODO: get legacy XCB_ATOM_WM_NAME
+				BackendStringProperty prop((const char *)xcb_get_property_value(propertyReply));
+				PropertyChange(pclient1,PROPERTY_ID_WM_NAME,&prop);
+
+				free(propertyReply);
+
+			}else
+			if(pev->atom == XCB_ATOM_WM_CLASS){
+				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,XCB_ATOM_WM_CLASS,XCB_GET_PROPERTY_TYPE_ANY,0,128);
+				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+				if(!propertyReply)
+					break;
+				BackendStringProperty prop((const char *)xcb_get_property_value(propertyReply));
+				PropertyChange(pclient1,PROPERTY_ID_WM_CLASS,&prop);
+
+				free(propertyReply);
+			}else
+			if(pev->atom == XA_WM_TRANSIENT_FOR){
+				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
+
+				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+				if(!propertyReply)
+					break;
+				//
+				xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReply);
+				X11Client *pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
+				if(pbaseClient){
+					BackendContainerProperty prop(pbaseClient->pcontainer);
+					PropertyChange(pclient1,PROPERTY_ID_TRANSIENT_FOR,&prop);
+				}
+
+				free(propertyReply);
+			}
+
+			}
+			break;
 		case XCB_CLIENT_MESSAGE:{
 			//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
 			//if(pev->data.data32[0] == wmD
@@ -708,27 +826,10 @@ bool Default::HandleEvent(){
 			}
 			}
 			break;
-		case XCB_CONFIGURE_NOTIFY:{
-			xcb_configure_notify_event_t *pev = (xcb_configure_notify_event_t*)pevent;
-
-			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
-			
-			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
-			});
-			if(m == configCache.end()){
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
-				m = configCache.end()-1;
-
-			}else (*m).second = rect;
-
-			X11Client *pclient1 = FindClient(pev->window,MODE_AUTOMATIC);
-			if(!pclient1)
-				break;
-
-			pclient1->UpdateTranslation(&rect);
-
-			DebugPrintf(stdout,"configure to %ux%u\n",pev->width,pev->height);
+		case XCB_ENTER_NOTIFY:{
+			xcb_enter_notify_event_t *pev = (xcb_enter_notify_event_t*)pevent;
+			lastTime = pev->time;
+			DebugPrintf(stdout,"enter\n");
 			}
 			break;
 		case XCB_MAPPING_NOTIFY:

@@ -316,6 +316,30 @@ public:
 		RunBackend::MoveContainer<Config::X11ContainerConfig,DefaultBackend>(pcontainer,pdst);
 	}
 
+	void PropertyChange(Backend::X11Client *pclient, PROPERTY_ID id, const Backend::BackendProperty *pProperty){
+		if(pclient->pcontainer == proot)
+			return;
+		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
+		if(id == PROPERTY_ID_WM_NAME){
+			pcontainer1->pcontainerInt->wm_name = dynamic_cast<const Backend::BackendStringProperty *>(pProperty)->pstr;
+			pcontainer1->pcontainerInt->OnPropertyChange(Config::ContainerInterface::PROPERTY_ID_NAME);
+		}else
+		if(id == PROPERTY_ID_WM_CLASS){
+			pcontainer1->pcontainerInt->wm_name = dynamic_cast<const Backend::BackendStringProperty *>(pProperty)->pstr;
+			pcontainer1->pcontainerInt->OnPropertyChange(Config::ContainerInterface::PROPERTY_ID_CLASS);
+		}else
+		if(id == PROPERTY_ID_TRANSIENT_FOR){
+			//
+			WManager::Container *pstackContainer = dynamic_cast<const Backend::BackendContainerProperty *>(pProperty)->pcontainer;
+			auto m = std::find_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
+				return pclient == p.second;
+			});
+			if(m != stackAppendix.end())
+				(*m).first = pstackContainer;
+			//else: TODO: should we remove it from the tiling tree and make it floating according to its rect?
+		}
+	}
+
 	void DestroyClient(Backend::X11Client *pclient){
 		PrintTree(proot,0);
 		WManager::Client *pbase = pclient;
