@@ -291,6 +291,8 @@ public:
 			if(pcreateInfo->prect && (pcreateInfo->pstackContainer || pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_DESKTOP))
 				stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
 
+			containerInt.wm_name = pcreateInfo->pwmName->pstr;
+			containerInt.wm_class = pcreateInfo->pwmClass->pstr;
 			containerInt.OnCreate();
 
 			return pclient11;

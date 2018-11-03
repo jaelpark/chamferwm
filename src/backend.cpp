@@ -622,6 +622,16 @@ bool Default::HandleEvent(){
 				}
 			}
 
+			xcb_get_property_cookie_t propertyCookie1[2];
+			xcb_get_property_reply_t *propertyReply1[2];
+
+			propertyCookie1[0] = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_NAME,XCB_GET_PROPERTY_TYPE_ANY,0,128);
+			propertyCookie1[1] = xcb_get_property(pcon,0,pev->window,XCB_ATOM_WM_CLASS,XCB_GET_PROPERTY_TYPE_ANY,0,128);
+			for(uint i = 0; i < 2; ++i)
+				propertyReply1[i] = xcb_get_property_reply(pcon,propertyCookie1[i],0);
+			BackendStringProperty wmName((const char *)xcb_get_property_value(propertyReply1[0]));
+			BackendStringProperty wmClass((const char *)xcb_get_property_value(propertyReply1[1]));
+
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
 			createInfo.prect = prect;
@@ -634,11 +644,16 @@ bool Default::HandleEvent(){
 			createInfo.pbackend = this;
 			createInfo.mode = X11Client::CreateInfo::CREATE_CONTAINED;
 			createInfo.hints = hints;
+			createInfo.pwmName = &wmName;
+			createInfo.pwmClass = &wmClass;
 			X11Client *pclient = SetupClient(&createInfo);
 			if(!pclient)
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_MANUAL));
 
+			for(uint i = 0; i < 2; ++i)
+				free(propertyReply1[i]);
+		
 			DebugPrintf(stdout,"map request, %u\n",pev->window);
 			}
 			break;
@@ -715,11 +730,13 @@ bool Default::HandleEvent(){
 			createInfo.pbackend = this;
 			createInfo.mode = X11Client::CreateInfo::CREATE_AUTOMATIC;
 			createInfo.hints = 0;
+			createInfo.pwmName = 0;
+			createInfo.pwmClass = 0;
 			X11Client *pclient = SetupClient(&createInfo);
 			if(!pclient)
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
-		
+
 			DebugPrintf(stdout,"map notify, %u\n",pev->window);
 			}
 			break;

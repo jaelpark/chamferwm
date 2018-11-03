@@ -107,6 +107,8 @@ public:
 			HINT_ABOVE = 0x2
 		};
 		uint hints;
+		const BackendStringProperty *pwmName;
+		const BackendStringProperty *pwmClass;
 	};
 	X11Client(WManager::Container *, const CreateInfo *);
 	~X11Client();

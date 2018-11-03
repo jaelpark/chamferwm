@@ -63,6 +63,7 @@ class Container(chamfer.Container):
 		return parent;
 	
 	def OnCreate(self):
+		print("created client, {} ({})".format(self.wm_name,self.wm_class));
 		self.Focus();
 	
 	def OnPropertyChange(self, propId):
