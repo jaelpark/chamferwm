@@ -77,8 +77,6 @@ void ClientFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, uint
 }
 
 void ClientFrame::AdjustSurface(uint w, uint h){
-	if(w == ptexture->w && h == ptexture->h)
-		return;
 	pcomp->ReleaseTexture(ptexture);
 
 	pcomp->updateQueue.push_back(this);
@@ -991,7 +989,6 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 }
 
 void X11ClientFrame::AdjustSurface1(){
-	//TODO: should window be re-redirected?
 	xcb_free_pixmap(pbackend->pcon,windowPixmap);
 	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 

@@ -6,8 +6,8 @@ namespace WManager{
 struct Rectangle{
 	sint x;
 	sint y;
-	uint w;
-	uint h;
+	sint w;
+	sint h;
 };
 
 class Client{

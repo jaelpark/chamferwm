@@ -176,9 +176,10 @@ void X11Client::UpdateTranslation(){
 }
 
 void X11Client::UpdateTranslation(const WManager::Rectangle *prect){
-	rect = *prect;
-
-	AdjustSurface1();
+	if(prect->w != rect.w || prect->h != rect.h){
+		rect = *prect;
+		AdjustSurface1();
+	}else rect = *prect;
 }
 
 bool X11Client::ProtocolSupport(xcb_atom_t atom){
@@ -485,7 +486,7 @@ bool Default::HandleEvent(){
 
 			}else (*m).second = rect;
 
-			DebugPrintf(stdout,"create %ux%u\n",pev->width,pev->height);
+			DebugPrintf(stdout,"create %d,%d %ux%u, %x\n",pev->x,pev->y,pev->width,pev->height,pev->window);
 			}
 			break;
 		case XCB_CONFIGURE_REQUEST:{
@@ -497,17 +498,11 @@ bool Default::HandleEvent(){
 			if(pclient1 && pclient1->pcontainer->mode != WManager::Container::MODE_FLOATING)
 				break;
 
-			//TODO: center the window on its base
-
-			//glm::uvec2 offset = glm::uvec2(pev->x,pev->y);
-			//glm::uvec2 extent = glm::uvec2(pev->width,pev->height);
-			//pscr->width_in_pixels
-
 			//WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			WManager::Rectangle rect = {
 				pev->value_mask & XCB_CONFIG_WINDOW_X?pev->x:(pscr->width_in_pixels-pev->width)/2,
 				pev->value_mask & XCB_CONFIG_WINDOW_Y?pev->y:(pscr->height_in_pixels-pev->height)/2,
-				pev->width,pev->height};
+				std::max(pev->width,(uint16_t)100),std::max(pev->height,(uint16_t)100)};
 
 			//center the window to screen, otherwise it might end up to the left upper corner
 			pev->value_mask |= XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y;
@@ -581,6 +576,7 @@ bool Default::HandleEvent(){
 				if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG ||
 					*patom == ewmh._NET_WM_WINDOW_TYPE_DOCK ||
 					*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP ||
+					*patom == ewmh._NET_WM_WINDOW_TYPE_TOOLBAR ||
 					*patom == ewmh._NET_WM_WINDOW_TYPE_MENU ||
 					*patom == ewmh._NET_WM_WINDOW_TYPE_UTILITY ||
 					*patom == ewmh._NET_WM_WINDOW_TYPE_SPLASH){
@@ -654,7 +650,7 @@ bool Default::HandleEvent(){
 			for(uint i = 0; i < 2; ++i)
 				free(propertyReply1[i]);
 		
-			DebugPrintf(stdout,"map request, %u\n",pev->window);
+			DebugPrintf(stdout,"map request, %x\n",pev->window);
 			}
 			break;
 		case XCB_CONFIGURE_NOTIFY:{
@@ -677,15 +673,13 @@ bool Default::HandleEvent(){
 
 			pclient1->UpdateTranslation(&rect);
 
-			DebugPrintf(stdout,"configure to %ux%u\n",pev->width,pev->height);
+			DebugPrintf(stdout,"configure to %d,%d %ux%u, %x\n",pev->x,pev->y,pev->width,pev->height,pev->window);
 			}
 			break;
 		case XCB_MAP_NOTIFY:{
 			xcb_map_notify_event_t *pev = (xcb_map_notify_event_t*)pevent;
-			if(pev->window == ewmh_window){
-				xcb_map_window(pcon,pev->window);
+			if(pev->window == ewmh_window)
 				break;
-			}
 
 			//check if window already exists
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
@@ -722,6 +716,8 @@ bool Default::HandleEvent(){
 
 			}
 			WManager::Rectangle *prect = &(*m).second;
+			if(prect->x+prect->w <= 1 || prect->y+prect->h <= 1)
+				break; //hack: don't manage, this will mess the compositor
 
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
@@ -737,7 +733,7 @@ bool Default::HandleEvent(){
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
 
-			DebugPrintf(stdout,"map notify, %u\n",pev->window);
+			DebugPrintf(stdout,"map notify, %x\n",pev->window);
 			}
 			break;
 		case XCB_UNMAP_NOTIFY:{
@@ -756,7 +752,7 @@ bool Default::HandleEvent(){
 			std::iter_swap(m,clients.end()-1);
 			clients.pop_back();
 
-			DebugPrintf(stdout,"unmap notify\n");
+			DebugPrintf(stdout,"unmap notify %x\n",pev->window);
 			}
 			break;
 		case XCB_PROPERTY_NOTIFY:{
@@ -855,7 +851,7 @@ bool Default::HandleEvent(){
 			break;
 		case XCB_DESTROY_NOTIFY:{
 			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
-			DebugPrintf(stdout,"destroy notify, %u (%lu)\n",pev->window,clients.size());
+			DebugPrintf(stdout,"destroy notify, %x\n",pev->window);
 
 			/*configCache.erase(std::remove_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return p.first == pev->window;
