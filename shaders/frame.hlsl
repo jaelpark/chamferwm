@@ -42,7 +42,7 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 	float2 aspect = float2(1.0f,screen.x/screen.y);
 	float2 borderWidth = border*aspect; //this results in borders half the gap size
 
-	//todo: bitmask as adjacency information
+	borderWidth *= 2.0f;
 
 	[unroll]
 	for(uint i = 0; i < 4; ++i){
@@ -84,9 +84,11 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 	float2 p1 = screen*(0.25f*(xy0+xy1)+0.5f);
 	float2 m = screen*(0.5f*xy1+0.5f);
 	float2 d1 = m-p; //d1: extent of the window
+	if(length(max(abs(posh.xy-p1)-(0.5f*d1-50.0f),0.0f))-75.0f > 0.0f)
+		discard;
 	if(geomId == 0){
-		if(all(r > 0.5f) && c.w > 0.0f)
-			discard;
+		//if(length(max(abs(posh.xy-p1)-(0.5f*d1-180.0f),0.0f))-100.0f < 0.0f)
+			//discard;
 		c = float4(0,0,0,1);
 		if(flags & FLAGS_FOCUS)
 			//dashed line around focus
@@ -96,15 +98,12 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 			//if(all(posh > p1+0.4f*d1 || posh < p1-0.4f*d1) &&
 			//	any(posh < p1-0.5f*d1-0.25f*screen*borderWidth || posh > p1+0.5f*d1+0.25f*screen*borderWidth))
 				c.xyz = float3(1.0f,0.6f,0.33f);
-
-		//chamfer the edges slightly
-		if(length(max(abs(posh.xy-p1)-(0.5f*d1+0.5f*screen*borderWidth-10.0f),0.0f))-10.0f > 0.0f)
-			discard;
 	}else{
-	
+		if(length(max(abs(posh.xy-p1)-(0.5f*d1-40.0f),0.0f))-40.0f > 0.0f)
+			discard;
 		//remove transparency around the edges
-		if(length(max(abs(posh.xy-p1)-(0.5f*d1-180.0f),0.0f))-100.0f > 0.0f)
-			c.w = 1.0f;
+		//if(length(max(abs(posh.xy-p1)-(0.5f*d1-180.0f),0.0f))-100.0f > 0.0f)
+		//	c.w = 1.0f;
 	}
 
 	return c;
