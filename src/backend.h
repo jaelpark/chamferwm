@@ -207,6 +207,7 @@ private:
 	std::vector<std::pair<X11Client *, MODE>> clients;
 	std::vector<std::pair<xcb_window_t, WManager::Rectangle>> configCache;
 	std::vector<X11Client *> unmappingQueue;
+	std::vector<xcb_window_t> netClientList; //used only to update the property - not maintained
 };
 
 class DebugClient : public WManager::Client{

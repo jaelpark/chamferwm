@@ -420,18 +420,20 @@ void Default::Start(){
 	//https://specifications.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
 	const xcb_atom_t supportedAtoms[] = {
 		ewmh._NET_WM_NAME,
+		ewmh._NET_CLIENT_LIST,
+		//TODO: _NET_CLIENT_LIST_STACKING
 		ewmh._NET_CURRENT_DESKTOP,
 		ewmh._NET_NUMBER_OF_DESKTOPS,
 		ewmh._NET_DESKTOP_VIEWPORT,
 		ewmh._NET_DESKTOP_GEOMETRY,
 		ewmh._NET_ACTIVE_WINDOW
-		//TODO: _NET_CLIENT_LIST, _NET_CLIENT_LIST_STACKING
 	};
 
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTED,XCB_ATOM_ATOM,32,sizeof(supportedAtoms)/sizeof(supportedAtoms[0]),supportedAtoms);
 
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,0,0);
 	values[0] = 0;
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
 	values[0] = 1;
@@ -649,6 +651,11 @@ bool Default::HandleEvent(){
 
 			for(uint i = 0; i < 2; ++i)
 				free(propertyReply1[i]);
+
+			netClientList.clear();
+			for(auto &p : clients)
+				netClientList.push_back(p.first->window);
+			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
 		
 			DebugPrintf(stdout,"map request, %x\n",pev->window);
 			}
@@ -733,6 +740,11 @@ bool Default::HandleEvent(){
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
 
+			netClientList.clear();
+			for(auto &p : clients)
+				netClientList.push_back(p.first->window);
+			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
+
 			DebugPrintf(stdout,"map notify, %x\n",pev->window);
 			}
 			break;
@@ -751,6 +763,11 @@ bool Default::HandleEvent(){
 
 			std::iter_swap(m,clients.end()-1);
 			clients.pop_back();
+
+			netClientList.clear();
+			for(auto &p : clients)
+				netClientList.push_back(p.first->window);
+			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
 
 			DebugPrintf(stdout,"unmap notify %x\n",pev->window);
 			}
