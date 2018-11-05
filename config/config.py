@@ -265,6 +265,29 @@ class Backend(chamfer.Backend):
 	
 	def OnKeyRelease(self, keyId):
 		print("key release: {}".format(keyId));
+	
+	def OnTimer(self):
+		battery = psutil.sensors_battery();
+		try:
+			if not battery.power_plugged:
+				self.batteryFullNotified = False;
+				if battery.percent <= 5 and self.batteryAlarmLevel < 3:
+					psutil.Popen(["dunstify","--urgency=2","-p","100","Battery below 5%"]);
+					self.batteryAlarmLevel = 3;
+				elif battery.percent <= 10 and self.batteryAlarmLevel < 2:
+					psutil.Popen(["dunstify","--urgency=2","-p","100","Battery below 10%"]);
+					self.batteryAlarmLevel = 2;
+				elif battery.percent <= 15 and self.batteryAlarmLevel < 1:
+					psutil.Popen(["dunstify","--urgency=2","-p","100","Battery below 15%"]);
+					self.batteryAlarmLevel = 1;
+			else:
+				self.batteryAlarmLevel = 0;
+				if battery.percent >= 99 and not self.batteryFullNotified:
+					psutil.Popen(["dunstify","--urgency=0","-p","100","Battery full"]);
+					self.batteryFullNotified = True;
+		except AttributeError:
+			self.batteryFullNotified = True;
+			self.batteryAlarmLevel = 0;
 
 class Compositor(chamfer.Compositor):
 	def __init__(self):
@@ -286,7 +309,7 @@ pcmdls = [a for p in [psutil.Process(pid).cmdline() for pid in pids] for a in p]
 
 if not "pulseaudio" in pnames:
 	print("starting pulseaudio...");
-	#need to wait some time before starting pulseaudio for it initialize successfully
+	#need to wait some time before starting pulseaudio for it to initialize successfully
 	psutil.Popen(["sh","-c","sleep 5.0; pulseaudio --start"],stdout=None,stderr=None);
 
 if not "dunst" in pnames:
