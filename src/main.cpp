@@ -12,10 +12,6 @@
 #include <args.hxx>
 #include <iostream>
 
-//#include <sys/epoll.h>
-//#include <signal.h>
-//#include <sys/signalfd.h>
-
 Exception::Exception(){
 	this->pmsg = buffer;
 }
@@ -405,6 +401,11 @@ public:
 	const std::vector<std::pair<const WManager::Container *, WManager::Client *>> * GetStackAppendix() const{
 		return &stackAppendix;
 	}
+
+	void TimerEvent(){
+		//
+		Config::BackendInterface::pbackendInt->OnTimer();
+	}
 };
 
 //TODO: some of these functions can be templated and shared with the DefaultBackend
@@ -498,6 +499,10 @@ public:
 	const std::vector<std::pair<const WManager::Container *, WManager::Client *>> * GetStackAppendix() const{
 		return &stackAppendix;
 	}
+
+	void TimerEvent(){
+		//
+	}
 };
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
@@ -590,13 +595,6 @@ int main(sint argc, const char **pargv){
 		std::cout<<e.what()<<std::endl<<parser;
 		return 1;
 	}
-/*#define MAX_EVENTS 1024
-	struct epoll_event event1, events[MAX_EVENTS];
-	sint efd = epoll_create1(0);
-	if(efd == -1){
-		DebugPrintf(stderr,"epoll efd\n");
-		return 1;
-	}*/
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
 	pconfigLoader->Run(configPath.Get().c_str(),"config.py");
@@ -606,6 +604,7 @@ int main(sint argc, const char **pargv){
 		if(debugBackend.Get())
 			pbackend = new DebugBackend();
 		else pbackend = new DefaultBackend();
+
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		return 1;
@@ -614,14 +613,6 @@ int main(sint argc, const char **pargv){
 	Config::BackendInterface::pfocus = pbackend->proot;
 
 	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
-	/*sint fd = pbackend11->GetEventFileDescriptor();
-	if(fd == -1){
-		DebugPrintf(stderr,"XCB fd\n");
-		return 1;
-	}*/
-	/*event1.data.ptr = &fd;
-	event1.events = EPOLLIN;
-	epoll_ctl(efd,EPOLL_CTL_ADD,fd,&event1);*/
 
 	RunCompositor *pcomp;
 	try{

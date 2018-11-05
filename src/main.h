@@ -22,6 +22,16 @@ void DebugPrintf(FILE *, const char *, ...);
 
 #define timespec_diff(b,a) (float)(b.tv_sec-a.tv_sec)+(float)((b.tv_nsec-a.tv_nsec)/1e9)
 
+static inline void timespec_diff_ptr(struct timespec &b, struct timespec &a, struct timespec &r){
+	if(b.tv_nsec < a.tv_nsec){
+		r.tv_sec = b.tv_sec-1-a.tv_sec;
+		r.tv_nsec = b.tv_nsec-a.tv_nsec+1e9;
+	}else{
+		r.tv_sec = b.tv_sec-a.tv_sec;
+		r.tv_nsec = b.tv_nsec-a.tv_nsec;
+	}
+}
+
 class Exception{
 public:
 	Exception();

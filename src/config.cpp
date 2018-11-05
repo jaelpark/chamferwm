@@ -285,6 +285,10 @@ void BackendInterface::OnKeyRelease(uint keyId){
 	//
 }
 
+void BackendInterface::OnTimer(){
+	//
+}
+
 void BackendInterface::Bind(boost::python::object obj){
 	BackendInterface &backendInt1 = boost::python::extract<BackendInterface&>(obj)();
 	pbackendInt = &backendInt1;
@@ -380,6 +384,20 @@ void BackendProxy::OnKeyRelease(uint keyId){
 			PyErr_Clear();
 		}
 	}else BackendInterface::OnKeyRelease(keyId);
+}
+
+void BackendProxy::OnTimer(){
+	boost::python::override ovr = this->get_override("OnTimer");
+	if(ovr){
+		try{
+			ovr();
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else BackendInterface::OnTimer();
 }
 
 CompositorInterface::CompositorInterface() : shaderPath("."){
@@ -487,6 +505,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("OnCreateContainer",&BackendInterface::OnCreateContainer)
 		.def("OnKeyPress",&BackendInterface::OnKeyPress)
 		.def("OnKeyRelease",&BackendInterface::OnKeyRelease)
+		.def("OnTimer",&BackendInterface::OnTimer)
 		;
 	boost::python::def("bind_Backend",BackendInterface::Bind);
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")

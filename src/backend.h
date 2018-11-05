@@ -151,12 +151,14 @@ public:
 	xcb_atom_t GetAtom(const char *) const;
 	void StackRecursive(const WManager::Container *);
 	void StackClients();
+	//void HandleTimer() const;
 	enum MODE{
 		MODE_UNDEFINED,
 		MODE_MANUAL,
 		MODE_AUTOMATIC
 	};
 	virtual X11Client * FindClient(xcb_window_t, MODE) const = 0;
+	virtual void TimerEvent() = 0;
 	//void * GetProperty(xcb_atom_t, xcb_atom_t) const;
 	//void FreeProperty(...) const;
 protected:
@@ -164,6 +166,7 @@ protected:
 	xcb_screen_t *pscr;
 	xcb_window_t window; //root or test window
 	xcb_timestamp_t lastTime;
+	struct timespec eventTimer;
 	struct KeyBinding{
 		xcb_keycode_t keycode;
 		uint mask;
@@ -176,6 +179,7 @@ protected:
 	std::deque<std::pair<const WManager::Container *, WManager::Client *>> appendixQueue;
 
 	enum ATOM{
+		//ATOM_CHAMFER_ALARM,
 		ATOM_WM_PROTOCOLS,
 		ATOM_WM_DELETE_WINDOW,
 		ATOM_COUNT

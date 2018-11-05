@@ -17,6 +17,8 @@ typedef xcb_atom_t Atom;
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 
+#include <cerrno>
+
 namespace Backend{
 
 /*inline uint GetModMask1(uint keysym, xcb_key_symbols_t *psymbols, xcb_get_modifier_mapping_reply_t *pmodmapReply){
@@ -331,12 +333,28 @@ void X11Backend::StackClients(){
 	}
 }
 
+/*void X11Backend::HandleTimer() const{
+	char buffer[32];
+
+	xcb_client_message_event_t *pev = (xcb_client_message_event_t*)buffer;
+	pev->response_type = XCB_CLIENT_MESSAGE;
+	pev->format = 32;
+	pev->window = ewmh_window;
+	pev->type = atoms[X11Backend::ATOM_CHAMFER_ALARM];
+	//pev->data.data32[0] = XCB_CURRENT_TIME;
+
+	xcb_send_event(pcon,false,ewmh_window,XCB_EVENT_MASK_NO_EVENT,buffer);
+	xcb_flush(pcon);
+}*/
+
 const char *X11Backend::patomStrs[ATOM_COUNT] = {
+	//"CHAMFER_ALARM",
 	"WM_PROTOCOLS","WM_DELETE_WINDOW"
 };
 
 Default::Default() : X11Backend(){
 	//
+	clock_gettime(CLOCK_MONOTONIC,&eventTimer);
 }
 
 Default::~Default(){
@@ -452,15 +470,42 @@ void Default::Start(){
 	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 }
 
-/*sint Default::GetEventFileDescriptor(){
-	sint fd = xcb_get_file_descriptor(pcon);
-	return fd;
-}*/
-
 bool Default::HandleEvent(){
-	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
-	//for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
-	for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
+	sint fd = xcb_get_file_descriptor(pcon);
+
+	fd_set in;
+	FD_ZERO(&in);
+	FD_SET(fd,&in);
+	
+	struct timespec currentTime;
+	clock_gettime(CLOCK_MONOTONIC,&currentTime);
+	//-> get 5s - (currentTime-eventTimer);
+
+	struct timespec interval = {
+		tv_sec: 5,
+		tv_nsec: 0
+	}, timeout, eventDiff;
+	timespec_diff_ptr(currentTime,eventTimer,eventDiff);
+
+	if(eventDiff.tv_sec >= interval.tv_sec){
+		timeout.tv_sec = 0;
+		timeout.tv_nsec = 0;
+	}else timespec_diff_ptr(interval,eventDiff,timeout);
+
+	sint sr = pselect(fd+1,&in,0,0,&timeout,0);
+	if(sr == 0){
+		//timer event
+		TimerEvent();
+		clock_gettime(CLOCK_MONOTONIC,&eventTimer);
+		return true;
+	}else
+	if(sr == -1){
+		if(errno == EINTR)
+			printf("signal!\n"); //TODO: actually handle it
+	}
+
+	for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
+	//for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
 		if(!pevent){
 			if(xcb_connection_has_error(pcon)){
 				DebugPrintf(stderr,"X server connection lost\n");
@@ -823,7 +868,12 @@ bool Default::HandleEvent(){
 			}
 			break;
 		case XCB_CLIENT_MESSAGE:{
-			//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
+			xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
+			/*if(pev->window == ewmh_window){
+				if(pev->type == atoms[X11Backend::ATOM_CHAMFER_ALARM])
+					TimerEvent();
+				break;
+			}*/
 			//if(pev->data.data32[0] == wmD
 			//_NET_WM_STATE
 			//_NET_WM_STATE_FULLSCREEN, _NET_WM_STATE_DEMANDS_ATTENTION

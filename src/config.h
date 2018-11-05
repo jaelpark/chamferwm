@@ -97,6 +97,7 @@ public:
 	virtual boost::python::object OnCreateContainer();
 	virtual void OnKeyPress(uint);
 	virtual void OnKeyRelease(uint);
+	virtual void OnTimer();
 
 	static void Bind(boost::python::object);
 	static void SetFocus(WManager::Container *);
@@ -117,6 +118,7 @@ public:
 	boost::python::object OnCreateContainer();
 	void OnKeyPress(uint);
 	void OnKeyRelease(uint);
+	void OnTimer();
 };
 
 class CompositorInterface{
