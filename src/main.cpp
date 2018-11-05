@@ -633,8 +633,12 @@ int main(sint argc, const char **pargv){
 
 	for(;;){
 		//TODO: can we wait for vsync before handling the event? Might help with the stuttering
-		if(!pbackend11->HandleEvent())
+		sint result = pbackend11->HandleEvent();
+		if(result == -1)
 			break;
+		else
+		if(result == 0)
+			continue;
 
 		try{
 			pcomp->Present();

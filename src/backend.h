@@ -63,7 +63,7 @@ public:
 	virtual ~BackendInterface();
 	virtual void Start() = 0;
 	//virtual sint GetEventFileDescriptor() = 0;
-	virtual bool HandleEvent() = 0;
+	virtual sint HandleEvent() = 0;
 	virtual void MoveContainer(WManager::Container *, WManager::Container *) = 0;
 protected:
 	//Functions defined by the implementing backends.
@@ -195,7 +195,7 @@ public:
 	virtual ~Default();
 	void Start();
 	//sint GetEventFileDescriptor();
-	bool HandleEvent();
+	sint HandleEvent();
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
 	enum PROPERTY_ID{
@@ -243,7 +243,7 @@ public:
 	virtual ~Debug();
 	void Start();
 	//sint GetEventFileDescriptor();
-	bool HandleEvent();
+	sint HandleEvent();
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
 	virtual DebugClient * SetupClient(const DebugClient::CreateInfo *) = 0;

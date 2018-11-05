@@ -470,8 +470,9 @@ void Default::Start(){
 	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 }
 
-bool Default::HandleEvent(){
-	sint fd = xcb_get_file_descriptor(pcon);
+sint Default::HandleEvent(){
+	//NOTE: the code works, but it makes client scrolling etc. jittery. Disabled until resolved.
+	/*sint fd = xcb_get_file_descriptor(pcon);
 
 	fd_set in;
 	FD_ZERO(&in);
@@ -502,19 +503,16 @@ bool Default::HandleEvent(){
 	if(sr == -1){
 		if(errno == EINTR)
 			printf("signal!\n"); //TODO: actually handle it
-	}
+	}*/
 
-	for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
-	//for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
-		if(!pevent){
-			if(xcb_connection_has_error(pcon)){
-				DebugPrintf(stderr,"X server connection lost\n");
-				return false;
-			}
+	//TODO: xcb_poll_for_event doesn't seem to cause stutter. select() on the other hand does.
+	//consider: if there has been an event during last five seconds, keep rendering. If not,
+	//switch to select() with some timeout.
 
-			return true;
-		}
+	sint result = 0;
 
+	//for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
+	for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
 		lastTime = XCB_CURRENT_TIME;
 
 		//switch(pevent->response_type & ~0x80){
@@ -601,6 +599,8 @@ bool Default::HandleEvent(){
 				xcb_map_window(pcon,pev->window);
 				break;
 			}
+
+			result = 1;
 			
 			//check if window already exists
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
@@ -733,6 +733,8 @@ bool Default::HandleEvent(){
 			if(pev->window == ewmh_window)
 				break;
 
+			result = 1;
+
 			//check if window already exists
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
 			if(pclient1)
@@ -803,6 +805,8 @@ bool Default::HandleEvent(){
 			if(m == clients.end())
 				break;
 
+			result = 1;
+
 			(*m).first->flags |= X11Client::FLAG_UNMAPPING;
 			unmappingQueue.push_back((*m).first);
 
@@ -822,6 +826,8 @@ bool Default::HandleEvent(){
 			lastTime = pev->time;
 			if(pev->state == XCB_PROPERTY_DELETE)
 				break;
+
+			result = 1;
 
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
 			if(!pclient1)
@@ -877,6 +883,7 @@ bool Default::HandleEvent(){
 			//if(pev->data.data32[0] == wmD
 			//_NET_WM_STATE
 			//_NET_WM_STATE_FULLSCREEN, _NET_WM_STATE_DEMANDS_ATTENTION
+			result = 1;
 			}
 			break;
 		case XCB_KEY_PRESS:{
@@ -884,7 +891,7 @@ bool Default::HandleEvent(){
 			lastTime = pev->time;
 			if(pev->state == (XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT) && pev->detail == exitKeycode){
 				free(pevent);
-				return false;
+				return -1;
 			//
 			}else
 			for(KeyBinding &binding : keycodes){
@@ -934,6 +941,8 @@ bool Default::HandleEvent(){
 
 			X11Event event11(pevent,this);
 			EventNotify(&event11);
+
+			result = 1;
 			break;
 		}
 		
@@ -947,7 +956,12 @@ bool Default::HandleEvent(){
 		DestroyClient(pclient);
 	unmappingQueue.clear();
 
-	return true;
+	if(xcb_connection_has_error(pcon)){
+		DebugPrintf(stderr,"X server connection lost\n");
+		return -1;
+	}
+
+	return result;
 }
 
 X11Client * Default::FindClient(xcb_window_t window, MODE mode) const{
@@ -1075,19 +1089,10 @@ void Debug::Start(){
 	return fd;
 }*/
 
-bool Debug::HandleEvent(){
+sint Debug::HandleEvent(){
 	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
 	//for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
 	for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
-		if(!pevent){
-			if(xcb_connection_has_error(pcon)){
-				DebugPrintf(stderr,"X server connection lost\n");
-				return false;
-			}
-
-			return true;
-		}
-
 		//switch(pevent->response_type & ~0x80){
 		switch(pevent->response_type & 0x7f){
 		/*case XCB_EXPOSE:{
@@ -1104,7 +1109,7 @@ bool Debug::HandleEvent(){
 			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
 			if(pev->state & XCB_MOD_MASK_1 && pev->detail == exitKeycode){
 				free(pevent);
-				return false;
+				return -1;
 			}else
 			if(pev->detail == launchKeycode){
 				//create test client
@@ -1154,7 +1159,12 @@ bool Debug::HandleEvent(){
 		xcb_flush(pcon);
 	}
 
-	return true;
+	if(xcb_connection_has_error(pcon)){
+		DebugPrintf(stderr,"X server connection lost\n");
+		return -1;
+	}
+
+	return 1;
 }
 
 X11Client * Debug::FindClient(xcb_window_t window, MODE mode) const{
