@@ -355,6 +355,8 @@ const char *X11Backend::patomStrs[ATOM_COUNT] = {
 Default::Default() : X11Backend(){
 	//
 	clock_gettime(CLOCK_MONOTONIC,&eventTimer);
+	pollTimer.tv_sec = 0;
+	pollTimer.tv_nsec = 0;
 }
 
 Default::~Default(){
@@ -471,38 +473,51 @@ void Default::Start(){
 }
 
 sint Default::HandleEvent(){
-	//NOTE: the code works, but it makes client scrolling etc. jittery. Disabled until resolved.
-	/*sint fd = xcb_get_file_descriptor(pcon);
-
-	fd_set in;
-	FD_ZERO(&in);
-	FD_SET(fd,&in);
-	
 	struct timespec currentTime;
 	clock_gettime(CLOCK_MONOTONIC,&currentTime);
-	//-> get 5s - (currentTime-eventTimer);
+	
+	/*if(timespec_diff(currentTime,pollTimer) >= 0.1f){
+		sint fd = xcb_get_file_descriptor(pcon);
 
-	struct timespec interval = {
-		tv_sec: 5,
-		tv_nsec: 0
-	}, timeout, eventDiff;
-	timespec_diff_ptr(currentTime,eventTimer,eventDiff);
+		fd_set in;
+		FD_ZERO(&in);
+		FD_SET(fd,&in);
+		
+		//-> get 5s - (currentTime-eventTimer);
+		struct timespec interval = {
+			tv_sec: 5,
+			tv_nsec: 0
+		}, timeout, eventDiff;
+		timespec_diff_ptr(currentTime,eventTimer,eventDiff);
 
-	if(eventDiff.tv_sec >= interval.tv_sec){
-		timeout.tv_sec = 0;
-		timeout.tv_nsec = 0;
-	}else timespec_diff_ptr(interval,eventDiff,timeout);
+		if(eventDiff.tv_sec >= interval.tv_sec){
+			timeout.tv_sec = 0;
+			timeout.tv_nsec = 0;
+		}else timespec_diff_ptr(interval,eventDiff,timeout);
 
-	sint sr = pselect(fd+1,&in,0,0,&timeout,0);
-	if(sr == 0){
-		//timer event
-		TimerEvent();
-		clock_gettime(CLOCK_MONOTONIC,&eventTimer);
-		return true;
-	}else
-	if(sr == -1){
-		if(errno == EINTR)
-			printf("signal!\n"); //TODO: actually handle it
+		sint sr = pselect(fd+1,&in,0,0,&timeout,0);
+		if(sr == 0){
+			//timer event
+			TimerEvent();
+			clock_gettime(CLOCK_MONOTONIC,&eventTimer);
+			return 0;
+		}else
+		if(sr == -1){
+			if(errno == EINTR)
+				printf("signal!\n"); //TODO: actually handle it
+		}
+		
+	}else{
+		//There has been an event during the past two seconds. Poll xcb events until these
+		//two seconds elapse, while also checking the callback timer.
+		//This cumbersome mechanism is to ensure that the refresh interval matches that of the
+		//application that sends the highest rate of damage events, thus preventing stutter.
+		//Using select() alone seemingly stutters some of applications, while this keeps everything
+		//smooth, and still makes callbacks possible without continued polling by the CPU.
+		if(timespec_diff(currentTime,eventTimer) >= 5.0f){
+			TimerEvent();
+			clock_gettime(CLOCK_MONOTONIC,&eventTimer);
+		}
 	}*/
 
 	//TODO: xcb_poll_for_event doesn't seem to cause stutter. select() on the other hand does.
@@ -513,6 +528,9 @@ sint Default::HandleEvent(){
 
 	//for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
 	for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
+		//Event found, move to polling mode for some time.
+		clock_gettime(CLOCK_MONOTONIC,&pollTimer);
+
 		lastTime = XCB_CURRENT_TIME;
 
 		//switch(pevent->response_type & ~0x80){
@@ -594,6 +612,7 @@ sint Default::HandleEvent(){
 			}
 			break;
 		case XCB_MAP_REQUEST:{
+			//TODO: use xprop to identify windows that don't behave as expected.
 			xcb_map_request_event_t *pev = (xcb_map_request_event_t*)pevent;
 			if(pev->window == ewmh_window){
 				xcb_map_window(pcon,pev->window);
@@ -613,13 +632,40 @@ sint Default::HandleEvent(){
 			X11Client *pbaseClient = 0;
 			uint hints = 0;
 
-			do{ //process window type
+			xcb_get_property_cookie_t propertyCookieNormalHints = xcb_icccm_get_wm_normal_hints(pcon,pev->window);
+			xcb_get_property_cookie_t propertyCookieWindowType
+				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
+			xcb_get_property_cookie_t propertyCookieWindowState
+				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_STATE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
+			xcb_get_property_cookie_t propertyCookieTransientFor
+				= xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
+
+			xcb_size_hints_t sizeHints;
+			bool boolSizeHints = xcb_icccm_get_wm_size_hints_reply(pcon,propertyCookieNormalHints,&sizeHints,0);
+			xcb_get_property_reply_t *propertyReplyWindowType
+				= xcb_get_property_reply(pcon,propertyCookieWindowType,0);
+			xcb_get_property_reply_t *propertyReplyWindowState
+				= xcb_get_property_reply(pcon,propertyCookieWindowState,0);
+			xcb_get_property_reply_t *propertyReplyTransientFor
+				= xcb_get_property_reply(pcon,propertyCookieTransientFor,0);
+
+			if(boolSizeHints){
+				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE &&
+				sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE &&
+				sizeHints.min_width == sizeHints.max_width &&
+				sizeHints.min_height == sizeHints.min_height){
+					//
+					{
+						auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+							return pev->window == p.first;
+						});
+						prect = m != configCache.end()?&(*m).second:0;
+					}
+				}
+			}
+			if(propertyReplyWindowType){
 				//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
-				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
-				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
-				if(!propertyReply)
-					break;
-				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
+				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowType);
 				if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG ||
 					*patom == ewmh._NET_WM_WINDOW_TYPE_DOCK ||
 					*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP ||
@@ -627,42 +673,39 @@ sint Default::HandleEvent(){
 					*patom == ewmh._NET_WM_WINDOW_TYPE_MENU ||
 					*patom == ewmh._NET_WM_WINDOW_TYPE_UTILITY ||
 					*patom == ewmh._NET_WM_WINDOW_TYPE_SPLASH){
-					auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-						return pev->window == p.first;
-					});
-					prect = m != configCache.end()?&(*m).second:0;
+					if(!prect){
+						auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+							return pev->window == p.first;
+						});
+						prect = m != configCache.end()?&(*m).second:0;
+					}
 
 					hints |= 
 						(*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP?X11Client::CreateInfo::HINT_DESKTOP:0)|
 						(*patom == ewmh._NET_WM_WINDOW_TYPE_DOCK?X11Client::CreateInfo::HINT_ABOVE:0);
 				}
-				free(propertyReply);
-			}while(0);
-			do{ //process window state
-				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_STATE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
-				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
-				if(!propertyReply)
-					break;
-				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReply);
-				if(*patom == ewmh._NET_WM_STATE_MODAL){
-					auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-						return pev->window == p.first;
-					});
-					prect = m != configCache.end()?&(*m).second:0;
+				free(propertyReplyWindowType);
+			}
+			if(propertyReplyWindowState){
+				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowState);
+				if(*patom == ewmh._NET_WM_STATE_MODAL ||
+					*patom == ewmh._NET_WM_STATE_ABOVE ||
+					*patom == ewmh._NET_WM_STATE_SKIP_TASKBAR){
+					if(!prect){
+						auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+							return pev->window == p.first;
+						});
+						prect = m != configCache.end()?&(*m).second:0;
+					}
 
-					hints |= (*patom = ewmh._NET_WM_STATE_ABOVE?X11Client::CreateInfo::HINT_ABOVE:0);
+					hints |= (*patom == ewmh._NET_WM_STATE_ABOVE?X11Client::CreateInfo::HINT_ABOVE:0);
 				}
-				free(propertyReply);
-			}while(0);
-			{
-				//
-				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
-				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
-				if(propertyReply){
-					xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReply);
-					pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
-					free(propertyReply);
-				}
+				free(propertyReplyWindowState);
+			}
+			if(propertyReplyTransientFor){
+				xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReplyTransientFor);
+				pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
+				free(propertyReplyTransientFor);
 			}
 
 			xcb_get_property_cookie_t propertyCookie1[2];
@@ -742,15 +785,16 @@ sint Default::HandleEvent(){
 			
 			X11Client *pbaseClient = 0;
 
-			{
-				//TODO: property change client messages
-				xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
-				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
-				if(propertyReply){
-					xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReply);
-					pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
-					free(propertyReply);
-				}
+			xcb_get_property_cookie_t propertyCookieTransientFor
+				= xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
+
+			xcb_get_property_reply_t *propertyReplyTransientFor
+				= xcb_get_property_reply(pcon,propertyCookieTransientFor,0);
+
+			if(propertyReplyTransientFor){
+				xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReplyTransientFor);
+				pbaseClient = FindClient(*pbaseWindow,MODE_UNDEFINED);
+				free(propertyReplyTransientFor);
 			}
 
 			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{

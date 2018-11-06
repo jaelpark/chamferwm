@@ -167,6 +167,7 @@ protected:
 	xcb_window_t window; //root or test window
 	xcb_timestamp_t lastTime;
 	struct timespec eventTimer;
+	struct timespec pollTimer;
 	struct KeyBinding{
 		xcb_keycode_t keycode;
 		uint mask;
