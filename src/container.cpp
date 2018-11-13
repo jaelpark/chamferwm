@@ -509,10 +509,6 @@ void Container::Translate(){
 
 void Container::StackRecursive(){
 	stackQueue.clear();
-	for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
-		stackQueue.push_back(pcontainer);
-		pcontainer->StackRecursive();
-	}
 
 	Container *pfocus = focusQueue.size() > 0?focusQueue.back():pch;
 	if(!pfocus)
@@ -524,6 +520,9 @@ void Container::StackRecursive(){
 		stackQueue.push_back(pcontainer);
 	
 	stackQueue.push_back(pfocus);
+
+	for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
+		pcontainer->StackRecursive();
 }
 
 void Container::Stack(){

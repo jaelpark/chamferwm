@@ -942,10 +942,10 @@ sint Default::HandleEvent(){
 			for(KeyBinding &binding : keycodes){
 				if(pev->state == binding.mask && pev->detail == binding.keycode){
 					KeyPress(binding.keyId,true);
+					result = 1;
 					break;
 				}
 			}
-			result = 1;
 			}
 			break;
 		case XCB_KEY_RELEASE:{
@@ -954,6 +954,7 @@ sint Default::HandleEvent(){
 			for(KeyBinding &binding : keycodes){
 				if(pev->state == binding.mask && pev->detail == binding.keycode){
 					KeyPress(binding.keyId,false);
+					result = 1;
 					break;
 				}
 			}
