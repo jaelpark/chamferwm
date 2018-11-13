@@ -61,6 +61,8 @@ void ContainerInterface::OnPropertyChange(PROPERTY_ID id){
 }
 
 boost::python::object ContainerInterface::GetNext() const{
+	if(!pcontainer)
+		return boost::python::object();
 	WManager::Container *pnext = pcontainer->GetNext();
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pnext);
 	if(pcontainer1)
@@ -69,6 +71,18 @@ boost::python::object ContainerInterface::GetNext() const{
 }
 
 boost::python::object ContainerInterface::GetPrev() const{
+	if(!pcontainer)
+		return boost::python::object();
+	//TODO: do this in script?
+	/*if(pcontainer->mode == WManager::Container::MODE_FLOATING){
+		ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pcontainer);
+		const WManager::Container *ptreeFocus = pcontainer1->pbackend->GetRoot();
+		for(const WManager::Container *pcontainer = ptreeFocus; pcontainer; ptreeFocus = pcontainer, pcontainer = pcontainer->GetFocus());
+
+		pcontainer1 = dynamic_cast<ContainerConfig *>(ptreeFocus);
+		return ptreeFocus;
+	}*/
+	//if floating, ResetFocus(...) //pcontainer1->pbackend->GetRoot()
 	WManager::Container *pPrev = pcontainer->GetPrev();
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pPrev);
 	if(pcontainer1)
@@ -77,6 +91,8 @@ boost::python::object ContainerInterface::GetPrev() const{
 }
 
 boost::python::object ContainerInterface::GetParent() const{
+	if(!pcontainer)
+		return boost::python::object();
 	WManager::Container *pParent = pcontainer->GetParent();
 	if(!pParent)
 		return boost::python::object();
@@ -87,6 +103,8 @@ boost::python::object ContainerInterface::GetParent() const{
 }
 
 boost::python::object ContainerInterface::GetFocus() const{
+	if(!pcontainer)
+		return boost::python::object();
 	WManager::Container *pfocus = pcontainer->GetFocus();
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pfocus);
 	if(pcontainer1)
@@ -94,7 +112,28 @@ boost::python::object ContainerInterface::GetFocus() const{
 	return boost::python::object();
 }
 
+boost::python::object ContainerInterface::GetFloatFocus() const{
+	if(!pcontainer)
+		return boost::python::object();
+	auto m = std::find(BackendInterface::floatFocusQueue.begin(),BackendInterface::floatFocusQueue.end(),pcontainer);
+	if(m == BackendInterface::floatFocusQueue.begin() || m == BackendInterface::floatFocusQueue.end()){
+		if(BackendInterface::floatFocusQueue.size() == 0)
+			return boost::python::object();
+		ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(BackendInterface::floatFocusQueue.back());
+		if(pcontainer1)
+			return pcontainer1->pcontainerInt->self;
+		return boost::python::object();
+	}
+
+	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(*(m-1));
+	if(pcontainer1)
+		return pcontainer1->pcontainerInt->self;
+	return boost::python::object();
+}
+
 boost::python::object ContainerInterface::GetAdjacent(WManager::Container::ADJACENT a) const{
+	if(!pcontainer)
+		return boost::python::object();
 	WManager::Container *padj = pcontainer->GetAdjacent(a);
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(padj);
 	if(pcontainer1)
@@ -111,6 +150,8 @@ void ContainerInterface::Move(boost::python::object containerObject){
 	}
 
 	Config::ContainerInterface &containerInt = containerExtract();
+	if(!containerInt.pcontainer)
+		return;
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(containerInt.pcontainer);
 	if(pcontainer1)
 		pcontainer1->pbackend->MoveContainer(pcontainer,containerInt.pcontainer);
@@ -297,6 +338,10 @@ void BackendInterface::Bind(boost::python::object obj){
 void BackendInterface::SetFocus(WManager::Container *pcontainer){
 	if(!pcontainer)
 		return;
+	if(pcontainer->mode == WManager::Container::MODE_FLOATING){
+		floatFocusQueue.erase(std::remove(floatFocusQueue.begin(),floatFocusQueue.end(),pcontainer));
+		floatFocusQueue.push_back(pcontainer);
+	}
 	pfocus = pcontainer;
 	pcontainer->Focus();
 }
@@ -307,6 +352,16 @@ boost::python::object BackendInterface::GetFocus(){
 		return pcontainer1->pcontainerInt->self;
 	return boost::python::object();
 }
+
+/*void BackendInterface::ResetFocus(){
+	//
+	WManager::Container *pParent = pfocus;
+	for(WManager::Container *pcontainer = pfocus->pParent; pcontainer; pParent = pcontainer, pcontainer = pcontainer->pParent);
+
+	WManager::Container *pNewFocus = pParent;
+	for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():pcontainer->pch);
+	SetFocus(pNewFocus);
+}*/
 
 boost::python::object BackendInterface::GetRoot(){
 	WManager::Container *pParent = pfocus;
@@ -320,6 +375,7 @@ boost::python::object BackendInterface::GetRoot(){
 BackendInterface BackendInterface::defaultInt;
 BackendInterface *BackendInterface::pbackendInt = &BackendInterface::defaultInt;
 WManager::Container *BackendInterface::pfocus = 0; //initially set to root container as soon as it's created
+std::deque<WManager::Container *> BackendInterface::floatFocusQueue;
 
 BackendProxy::BackendProxy(){
 	//
@@ -454,6 +510,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("GetPrev",&ContainerInterface::GetPrev)
 		.def("GetParent",&ContainerInterface::GetParent)
 		.def("GetFocus",&ContainerInterface::GetFocus)
+		.def("GetFloatFocus",&ContainerInterface::GetFloatFocus)
 		.def("GetAdjacent",&ContainerInterface::GetAdjacent)
 		.def("MoveNext",boost::python::make_function(
 			[](ContainerInterface &container){
@@ -488,6 +545,10 @@ BOOST_PYTHON_MODULE(chamfer){
 			[](ContainerInterface &container){
 				return container.pcontainer->layout;
 			},boost::python::default_call_policies(),boost::mpl::vector<WManager::Container::LAYOUT, ContainerInterface &>()))
+		.add_property("mode",boost::python::make_function(
+			[](ContainerInterface &container){
+				return container.pcontainer->mode;
+			},boost::python::default_call_policies(),boost::mpl::vector<WManager::Container::MODE, ContainerInterface &>()))
 		;
 	
 	boost::python::enum_<WManager::Container::ADJACENT>("adjacent")
@@ -499,6 +560,10 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::enum_<WManager::Container::LAYOUT>("layout")
 		.value("VSPLIT",WManager::Container::LAYOUT_VSPLIT)
 		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT);
+
+	boost::python::enum_<WManager::Container::MODE>("mode")
+		.value("TILED",WManager::Container::MODE_TILED)
+		.value("FLOATING",WManager::Container::MODE_FLOATING);
 
 	boost::python::class_<BackendProxy,boost::noncopyable>("Backend")
 		.def("OnSetupKeys",&BackendInterface::OnSetupKeys)

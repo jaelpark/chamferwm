@@ -357,6 +357,7 @@ Default::Default() : X11Backend(){
 	clock_gettime(CLOCK_MONOTONIC,&eventTimer);
 	pollTimer.tv_sec = 0;
 	pollTimer.tv_nsec = 0;
+	//polling = false;
 }
 
 Default::~Default(){
@@ -476,7 +477,8 @@ sint Default::HandleEvent(){
 	struct timespec currentTime;
 	clock_gettime(CLOCK_MONOTONIC,&currentTime);
 	
-	/*if(timespec_diff(currentTime,pollTimer) >= 0.1f){
+	/*if(timespec_diff(currentTime,pollTimer) >= 0.04f){
+	//if(!polling){
 		sint fd = xcb_get_file_descriptor(pcon);
 
 		fd_set in;
@@ -520,9 +522,7 @@ sint Default::HandleEvent(){
 		}
 	}*/
 
-	//TODO: xcb_poll_for_event doesn't seem to cause stutter. select() on the other hand does.
-	//consider: if there has been an event during last five seconds, keep rendering. If not,
-	//switch to select() with some timeout.
+	//polling = false;
 
 	sint result = 0;
 
@@ -530,6 +530,7 @@ sint Default::HandleEvent(){
 	for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
 		//Event found, move to polling mode for some time.
 		clock_gettime(CLOCK_MONOTONIC,&pollTimer);
+		//polling = true;
 
 		lastTime = XCB_CURRENT_TIME;
 
@@ -650,7 +651,7 @@ sint Default::HandleEvent(){
 				= xcb_get_property_reply(pcon,propertyCookieTransientFor,0);
 
 			if(boolSizeHints){
-				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE &&
+				/*if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE &&
 				sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE &&
 				sizeHints.min_width == sizeHints.max_width &&
 				sizeHints.min_height == sizeHints.min_height){
@@ -661,7 +662,7 @@ sint Default::HandleEvent(){
 						});
 						prect = m != configCache.end()?&(*m).second:0;
 					}
-				}
+				}*/
 			}
 			if(propertyReplyWindowType){
 				//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
@@ -944,6 +945,7 @@ sint Default::HandleEvent(){
 					break;
 				}
 			}
+			result = 1;
 			}
 			break;
 		case XCB_KEY_RELEASE:{

@@ -43,6 +43,15 @@ class Key(Enum):
 	MONITOR_BRIGHTNESS_UP = auto()
 	MONITOR_BRIGHTNESS_DOWN = auto()
 
+def GetFocusTiled():
+	root = chamfer.GetRoot();
+	focusHead = root.GetFocus();
+	focusPrev = None;
+	while focusHead is not None:
+		focusPrev = focusHead;
+		focus1 = focus1.GetFocus();
+	return focusPrev;
+
 class Container(chamfer.Container):
 	def OnSetup(self):
 		self.borderWidth = (0.015,0.015);
@@ -113,7 +122,8 @@ class Backend(chamfer.Backend):
 
 			#alt+shift+a, select the top most base container under root
 
-			#alt+tab, cycle between floating containers?
+			#alt+tab, cycle between floating containers? switch focus to the most recent floating containter.
+			#using alt-hl moves focus back to the tiled containers.
 
 			#moving windows between containers: a cut/paste mechanism
 			#not only indivudal clients can be replaced, but whole container hierarchies
@@ -145,12 +155,14 @@ class Backend(chamfer.Backend):
 		parent = focus.GetParent();
 
 		if keyId == Key.FOCUS_RIGHT.value:
-			focus = focus.GetNext();
+			focus = GetFocusTiled() if focus.mode == chamfer.mode.FLOATING else focus.GetNext();
+			#focus = focus.GetNext();
 			#focus = focus.GetAdjacent(chamfer.adjacent.RIGHT);
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_LEFT.value:
-			focus = focus.GetPrev();
+			focus = GetFocusTiled() if focus.mode == chamfer.mode.FLOATING else focus.GetPrev();
+			#focus = focus.GetPrev();
 			#focus = focus.GetAdjacent(chamfer.adjacent.LEFT);
 			focus.Focus();
 

@@ -575,15 +575,15 @@ void CompositorInterface::InitializeRenderEngine(){
 	shaders.reserve(3);
 
 	//load compositor resources
-	Blob blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_vertex.spv");
+	Blob blob("frame_vertex.spv");
 	ShaderModule &pvertexShader = shaders.emplace_back(&blob,this);
 
 	blob.~Blob();
-	new(&blob) Blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_geometry.spv");
+	new(&blob) Blob("frame_geometry.spv");
 	ShaderModule &pgeometryShader = shaders.emplace_back(&blob,this);
 
 	blob.~Blob();
-	new(&blob) Blob("/mnt/data/Asiakirjat/projects/chamferwm/build/frame_fragment.spv");
+	new(&blob) Blob("frame_fragment.spv");
 	ShaderModule &pfragmentShader = shaders.emplace_back(&blob,this);
 
 	pipelines.reserve(1);

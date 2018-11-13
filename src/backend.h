@@ -65,13 +65,13 @@ public:
 	//virtual sint GetEventFileDescriptor() = 0;
 	virtual sint HandleEvent() = 0;
 	virtual void MoveContainer(WManager::Container *, WManager::Container *) = 0;
+	virtual const WManager::Container * GetRoot() const = 0;
+	virtual const std::vector<std::pair<const WManager::Container *, WManager::Client *>> * GetStackAppendix() const = 0;
 protected:
 	//Functions defined by the implementing backends.
 	virtual void DefineBindings(BackendKeyBinder *) = 0;
 	virtual void EventNotify(const BackendEvent *) = 0;
 	virtual void KeyPress(uint, bool) = 0;
-	virtual const WManager::Container * GetRoot() const = 0;
-	virtual const std::vector<std::pair<const WManager::Container *, WManager::Client *>> * GetStackAppendix() const = 0;
 };
 
 class X11Event : public BackendEvent{
@@ -168,6 +168,7 @@ protected:
 	xcb_timestamp_t lastTime;
 	struct timespec eventTimer;
 	struct timespec pollTimer;
+	//bool polling;
 	struct KeyBinding{
 		xcb_keycode_t keycode;
 		uint mask;

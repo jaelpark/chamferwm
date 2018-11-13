@@ -30,7 +30,7 @@ vk = [
 
 python = [
 	dependency('python3'),
-	dependency('boost',modules:['python3'])
+	dependency('boost',modules:['system','filesystem','python3'])
 ]
 
 glslc = find_program('glslc')

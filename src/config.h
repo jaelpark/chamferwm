@@ -33,9 +33,10 @@ public:
 	boost::python::object GetPrev() const;
 	boost::python::object GetParent() const;
 	boost::python::object GetFocus() const;
+	boost::python::object GetFloatFocus() const;
 	boost::python::object GetAdjacent(WManager::Container::ADJACENT) const;
 	void Move(boost::python::object);
-
+public:
 	boost::python::tuple borderWidth;
 	boost::python::tuple minSize;
 	boost::python::tuple maxSize;
@@ -103,10 +104,12 @@ public:
 	static void SetFocus(WManager::Container *);
 	static boost::python::object GetFocus();
 	static boost::python::object GetRoot();
+	//static void ResetFocus();
 
 	static BackendInterface defaultInt;
 	static BackendInterface *pbackendInt;
 	static WManager::Container *pfocus; //client focus, managed by Python
+	static std::deque<WManager::Container *> floatFocusQueue;
 };
 
 class BackendProxy : public BackendInterface, public boost::python::wrapper<BackendInterface>{

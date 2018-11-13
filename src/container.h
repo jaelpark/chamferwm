@@ -43,7 +43,7 @@ public:
 		/*enum INSERT{
 			INSERT_APPEND,
 			INSERT_REPARENT //always with client
-		} insert;*/
+		} insert = INSERT_APPEND;*/
 	};
 	Container(); //root container
 	Container(Container *, const Setup &);
@@ -54,9 +54,9 @@ public:
 	void Focus();
 	Container * GetNext();
 	Container * GetPrev();
-	Container * GetParent();
-	Container * GetFocus();
-	//Container * GetRoot();
+	Container * GetParent() const;
+	Container * GetFocus() const;
+	Container * GetRoot();
 	enum ADJACENT{
 		ADJACENT_LEFT,
 		ADJACENT_RIGHT,
