@@ -18,6 +18,7 @@ class Key(Enum):
 	FOCUS_DOWN = auto()
 	FOCUS_PARENT = auto()
 	FOCUS_CHILD = auto()
+	FOCUS_FLOAT = auto()
 
 	FOCUS_PARENT_RIGHT = auto()
 	FOCUS_PARENT_LEFT = auto()
@@ -49,7 +50,7 @@ def GetFocusTiled():
 	focusPrev = None;
 	while focusHead is not None:
 		focusPrev = focusHead;
-		focus1 = focus1.GetFocus();
+		focusHead = focusHead.GetFocus();
 	return focusPrev;
 
 class Container(chamfer.Container):
@@ -91,7 +92,7 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('j'),chamfer.MOD_MASK_1,Key.FOCUS_DOWN.value);
 			binder.BindKey(ord('a'),chamfer.MOD_MASK_1,Key.FOCUS_PARENT.value);
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
-			#binder.BindKey(ord('x'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
+			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1,Key.FOCUS_FLOAT.value);
 
 			binder.BindKey(ord('l'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_RIGHT.value);
 			binder.BindKey(ord('h'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_LEFT.value);
@@ -101,7 +102,7 @@ class Backend(chamfer.Backend):
 
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
 			binder.BindKey(ord('m'),chamfer.MOD_MASK_1,Key.MAXIMIZE.value);
-			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
+			binder.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
 			
 			binder.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
 			binder.BindKey(miscellany.XK_Return,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
@@ -137,13 +138,12 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('i'),chamfer.MOD_MASK_SHIFT,Key.MOVE_RIGHT.value);
 			binder.BindKey(ord('a'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_PARENT.value);
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_CHILD.value);
-			binder.BindKey(ord('x'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_CHILD.value);
 			binder.BindKey(ord('y'),chamfer.MOD_MASK_SHIFT,Key.YANK_CONTAINER.value);
 			binder.BindKey(ord('p'),chamfer.MOD_MASK_SHIFT,Key.PASTE_CONTAINER.value);
 
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
 			binder.BindKey(ord('m'),chamfer.MOD_MASK_SHIFT,Key.MAXIMIZE.value);
-			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
+			binder.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
 	
 	def OnCreateContainer(self):
 		print("OnCreateContainer()");
@@ -191,6 +191,14 @@ class Backend(chamfer.Backend):
 			focus = focus.GetFocus();
 			if focus is None:
 				return;
+			focus.Focus();
+
+		elif keyId == Key.FOCUS_FLOAT.value:
+			focus = focus.GetFloatFocus();
+			print("focusing float");
+			if focus is None:
+				return;
+			print("ok");
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_PARENT_RIGHT.value:
@@ -322,7 +330,7 @@ pcmdls = [a for p in [psutil.Process(pid).cmdline() for pid in pids] for a in p]
 if not "pulseaudio" in pnames:
 	print("starting pulseaudio...");
 	#need to wait some time before starting pulseaudio for it to initialize successfully
-	psutil.Popen(["sh","-c","sleep 5.0; pulseaudio --start"],stdout=None,stderr=None);
+	psutil.Popen(["sleep 5.0; pulseaudio --start"],shell=True,stdout=None,stderr=None);
 
 if not "dunst" in pnames:
 	print("starting dunst..."); #later on, we might have our own notification system

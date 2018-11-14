@@ -65,6 +65,7 @@ protected:
 	VkSurfaceKHR surface;
 	VkDebugReportCallbackEXT debugReportCb;
 	VkPhysicalDevice physicalDev;
+	VkPhysicalDeviceProperties physicalDevProps;
 	VkDevice logicalDev;
 	enum QUEUE_INDEX{
 		QUEUE_INDEX_GRAPHICS,
@@ -88,6 +89,9 @@ protected:
 	VkCommandPool commandPool;
 	VkCommandBuffer *pcommandBuffers;
 	VkCommandBuffer *pcopyCommandBuffers;
+
+	//std::deque<VkRect2D> scissors;
+	std::vector<VkRect2D> scissors;
 
 	//VkDescriptorPool descPool;
 	std::deque<VkDescriptorPool> descPoolArray;

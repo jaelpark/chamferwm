@@ -144,7 +144,7 @@ void X11KeyBinder::BindKey(uint symbol, uint mask, uint keyId){
 }
 
 X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend), flags(0){
-	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE|XCB_EVENT_MASK_PROPERTY_CHANGE};
+	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE|XCB_EVENT_MASK_PROPERTY_CHANGE|XCB_EVENT_MASK_FOCUS_CHANGE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
 	if(!pcreateInfo->prect)
@@ -564,8 +564,8 @@ sint Default::HandleEvent(){
 
 			//WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			WManager::Rectangle rect = {
-				pev->value_mask & XCB_CONFIG_WINDOW_X?pev->x:(pscr->width_in_pixels-pev->width)/2,
-				pev->value_mask & XCB_CONFIG_WINDOW_Y?pev->y:(pscr->height_in_pixels-pev->height)/2,
+				(pev->value_mask & XCB_CONFIG_WINDOW_X && pev->x != 0)?pev->x:(pscr->width_in_pixels-pev->width)/2,
+				(pev->value_mask & XCB_CONFIG_WINDOW_Y && pev->y != 0)?pev->y:(pscr->height_in_pixels-pev->height)/2,
 				std::max(pev->width,(uint16_t)100),std::max(pev->height,(uint16_t)100)};
 
 			//center the window to screen, otherwise it might end up to the left upper corner
@@ -958,6 +958,11 @@ sint Default::HandleEvent(){
 					break;
 				}
 			}
+			}
+			break;
+		case XCB_FOCUS_IN:{
+			xcb_focus_in_event_t *pev = (xcb_focus_in_event_t*)pevent;
+			printf("*** focus %x\n",pev->event);
 			}
 			break;
 		case XCB_ENTER_NOTIFY:{

@@ -339,7 +339,7 @@ void BackendInterface::SetFocus(WManager::Container *pcontainer){
 	if(!pcontainer)
 		return;
 	if(pcontainer->mode == WManager::Container::MODE_FLOATING){
-		floatFocusQueue.erase(std::remove(floatFocusQueue.begin(),floatFocusQueue.end(),pcontainer));
+		floatFocusQueue.erase(std::remove(floatFocusQueue.begin(),floatFocusQueue.end(),pcontainer),floatFocusQueue.end());
 		floatFocusQueue.push_back(pcontainer);
 	}
 	pfocus = pcontainer;
@@ -352,16 +352,6 @@ boost::python::object BackendInterface::GetFocus(){
 		return pcontainer1->pcontainerInt->self;
 	return boost::python::object();
 }
-
-/*void BackendInterface::ResetFocus(){
-	//
-	WManager::Container *pParent = pfocus;
-	for(WManager::Container *pcontainer = pfocus->pParent; pcontainer; pParent = pcontainer, pcontainer = pcontainer->pParent);
-
-	WManager::Container *pNewFocus = pParent;
-	for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():pcontainer->pch);
-	SetFocus(pNewFocus);
-}*/
 
 boost::python::object BackendInterface::GetRoot(){
 	WManager::Container *pParent = pfocus;
@@ -523,8 +513,9 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("Move",&ContainerInterface::Move)
 		.def("Focus",boost::python::make_function(
 			[](ContainerInterface &container){
-				Config::BackendInterface::pfocus = container.pcontainer;
-				container.pcontainer->Focus();
+				//Config::BackendInterface::pfocus = container.pcontainer;
+				//container.pcontainer->Focus();
+				Config::BackendInterface::SetFocus(container.pcontainer);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("Kill",boost::python::make_function(
 			[](ContainerInterface &container){

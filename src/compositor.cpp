@@ -26,9 +26,7 @@ ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_p
 }
 
 ClientFrame::~ClientFrame(){
-	//if(pcomp->updateQueue.size() > 0)
-		//pcomp->updateQueue.erase(std::remove(pcomp->updateQueue.begin(),pcomp->updateQueue.end(),this));
-	pcomp->updateQueue.clear();
+	pcomp->updateQueue.erase(std::remove(pcomp->updateQueue.begin(),pcomp->updateQueue.end(),this),pcomp->updateQueue.end());
 
 	pcomp->ReleaseTexture(ptexture);
 
@@ -258,16 +256,17 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkPhysicalDevice *pdevices = new VkPhysicalDevice[devCount];
 	vkEnumeratePhysicalDevices(instance,&devCount,pdevices);
 
+	VkPhysicalDeviceProperties *pdevProps = new VkPhysicalDeviceProperties[devCount];
 	for(uint i = 0; i < devCount; ++i){
-		VkPhysicalDeviceProperties devProps;
-		vkGetPhysicalDeviceProperties(pdevices[i],&devProps);
+		vkGetPhysicalDeviceProperties(pdevices[i],&pdevProps[i]);
 		VkPhysicalDeviceFeatures devFeatures;
 		vkGetPhysicalDeviceFeatures(pdevices[i],&devFeatures);
 
 		printf("%c %u: %s\n\t.deviceID: %u\n\t.vendorID: %u\n\t.deviceType: %u\n",
 			i == physicalDevIndex?'*':' ',
-			i,devProps.deviceName,devProps.deviceID,devProps.vendorID,devProps.deviceType);
-		printf("  max push constant size: %u\n  max bound desc sets: %u\n",devProps.limits.maxPushConstantsSize,devProps.limits.maxBoundDescriptorSets);
+			i,pdevProps[i].deviceName,pdevProps[i].deviceID,pdevProps[i].vendorID,pdevProps[i].deviceType);
+		printf("  max push constant size: %u\n  max bound desc sets: %u\n  max viewports: %u\n  multi viewport: %u\n",
+			pdevProps[i].limits.maxPushConstantsSize,pdevProps[i].limits.maxBoundDescriptorSets,pdevProps[i].limits.maxViewports,devFeatures.multiViewport);
 	}
 
 	if(physicalDevIndex >= devCount){
@@ -276,8 +275,10 @@ void CompositorInterface::InitializeRenderEngine(){
 	}
 
 	physicalDev = pdevices[physicalDevIndex];
+	physicalDevProps = pdevProps[physicalDevIndex];
 
 	delete []pdevices;
+	delete []pdevProps;
 
 	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDev,surface,&surfaceCapabilities);
@@ -347,6 +348,7 @@ void CompositorInterface::InitializeRenderEngine(){
 
 	VkPhysicalDeviceFeatures physicalDevFeatures = {};
 	physicalDevFeatures.geometryShader = VK_TRUE;
+	//physicalDevFeatures.multiViewport = VK_TRUE;
 	
 	uint devExtCount;
 	vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,0);
@@ -735,6 +737,15 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderQueue.push_back(renderObject);
 	}
 
+	//deque of scissors, pop_front
+	scissors.clear();
+	for(RenderObject &renderObject : renderQueue){
+		VkRect2D frame;
+		frame.offset = {renderObject.pclient->rect.x,renderObject.pclient->rect.y};
+		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
+		scissors.push_back(frame);
+	}
+
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	commandBufferBeginInfo.flags = 0;
@@ -752,7 +763,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	if(vkBeginCommandBuffer(pcommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
 
-	static const VkClearValue clearValue = {1.0f,1.0f,1.0f,1.0};
+	static const VkClearValue clearValue = {1.0f,1.0f,1.0f,1.0f};
 	VkRenderPassBeginInfo renderPassBeginInfo = {};
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassBeginInfo.renderPass = renderPass;
@@ -767,11 +778,46 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 	clock_gettime(CLOCK_MONOTONIC,&frameTime);
 
-	for(RenderObject &renderObject : renderQueue){
+	//for(RenderObject &renderObject : renderQueue){
+	for(uint i = 0; i < renderQueue.size(); ++i){
+		RenderObject &renderObject = renderQueue[i];
+
 		VkRect2D frame;
 		frame.offset = {renderObject.pclient->rect.x,renderObject.pclient->rect.y};
 		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
 
+		VkRect2D scissor = frame;
+		for(uint j = i+1; j < renderQueue.size(); ++j){
+			RenderObject &renderObject1 = renderQueue[j];
+
+			if(frame.offset.y >= renderObject1.pclient->rect.y-1 &&
+				frame.offset.y+frame.extent.height <= renderObject1.pclient->rect.y+renderObject1.pclient->rect.h+1){
+				if(scissor.offset.x+scissor.extent.width > renderObject1.pclient->rect.x &&
+					scissor.offset.x < renderObject1.pclient->rect.x)
+					scissor.extent.width = renderObject1.pclient->rect.x-scissor.offset.x;
+
+				if(renderObject1.pclient->rect.x+renderObject1.pclient->rect.w > scissor.offset.x &&
+					renderObject1.pclient->rect.x < scissor.offset.x){
+					sint oldOffset = scissor.offset.x;
+					scissor.offset.x = renderObject1.pclient->rect.x+renderObject1.pclient->rect.w;
+					scissor.extent.width -= scissor.offset.x-oldOffset;
+				}
+			}
+		}
+		//TODO: need five scissors, one for the content and 4 for the thin borders around it
+		glm::ivec2 borderWidth = 2*glm::ivec2(
+			renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
+			renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width); //due to aspect, this must be *width
+		/*scissor[1].offset.x = 0;////std::max(scissor.offset.x-2*borderWidth.x,0);
+		scissor[1].offset.y = 0;//std::max(scissor[1].offset.y-borderWidth.y,0);
+		scissor[1].extent.width = imageExtent.width;
+		scissor[1].extent.height = imageExtent.height;//borderWidth.y;*/
+		scissor.offset.x = std::max(scissor.offset.x-borderWidth.x,0);
+		scissor.extent.width += 2*borderWidth.x;
+		scissor.offset.y = std::max(scissor.offset.y-borderWidth.y,0);
+		scissor.extent.height += 2*borderWidth.y;
+
+		vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
 		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.flags,&pcommandBuffers[currentFrame]);
 	}
 
@@ -940,6 +986,9 @@ X11ClientFrame::~X11ClientFrame(){
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	if(!fullRegionUpdate && damageRegions.size() == 0)
 		return;
+	
+	/*struct timespec t1;
+	clock_gettime(CLOCK_MONOTONIC,&t1);*/
 
 	//TODO: can we acquire only the damaged regions?
 	xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,windowPixmap,0,0,rect.w,rect.h,~0);
@@ -948,6 +997,10 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		DebugPrintf(stderr,"Failed to receive image reply.\n");
 		return;
 	}
+
+	/*struct timespec t2;
+	clock_gettime(CLOCK_MONOTONIC,&t2);
+	float dt1 = timespec_diff(t2,t1);*/
 
 	//http://doc.qt.io/qt-5/qimage.html
 	//argb can be swizzled (image view)
@@ -982,6 +1035,14 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 			ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
 		}
 	}
+
+	/*struct timespec t3;
+	clock_gettime(CLOCK_MONOTONIC,&t3);
+	float dt2 = timespec_diff(t3,t2);
+
+	FILE *pf = fopen("/tmp/timelog","a+");
+	fprintf(pf,"%x (%ux%u): %f + %f = %f\n",this,rect.w,rect.h,dt1,dt2,dt1+dt2);
+	fclose(pf);*/
 
 	damageRegions.clear();
 

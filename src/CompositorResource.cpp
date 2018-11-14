@@ -274,16 +274,16 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 
-	VkRect2D scissor = {};
+	/*VkRect2D scissor = {};
 	scissor.offset = {0,0};
-	scissor.extent = pcomp->imageExtent;
+	scissor.extent = pcomp->imageExtent;*/
 
 	VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {};
 	viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	viewportStateCreateInfo.viewportCount = 1;
 	viewportStateCreateInfo.pViewports = &viewport;
 	viewportStateCreateInfo.scissorCount = 1;
-	viewportStateCreateInfo.pScissors = &scissor;
+	viewportStateCreateInfo.pScissors = 0;//&scissor;
 
 	VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = {};
 	rasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -355,6 +355,14 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	
 	delete []pcombinedSets;
 
+	VkDynamicState dynamicStates[1] = {VK_DYNAMIC_STATE_SCISSOR};
+
+	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
+	dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicStateCreateInfo.pNext = 0;
+	dynamicStateCreateInfo.pDynamicStates = dynamicStates;
+	dynamicStateCreateInfo.dynamicStateCount = 1;
+
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	graphicsPipelineCreateInfo.stageCount = sizeof(shaderStageCreateInfo)/sizeof(shaderStageCreateInfo[0]);
@@ -366,7 +374,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	graphicsPipelineCreateInfo.pMultisampleState = &multisampleStateCreateInfo;
 	graphicsPipelineCreateInfo.pDepthStencilState = 0;
 	graphicsPipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
-	graphicsPipelineCreateInfo.pDynamicState = 0;
+	graphicsPipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
 	graphicsPipelineCreateInfo.layout = pipelineLayout;
 	graphicsPipelineCreateInfo.renderPass = pcomp->renderPass;
 	graphicsPipelineCreateInfo.subpass = 0;
