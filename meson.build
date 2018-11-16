@@ -8,13 +8,16 @@ src = [
 	'src/compositor.cpp',
 	'src/CompositorResource.cpp',
 	'third/spirv_reflect/spirv_reflect.c'
+	'third/glad/src/gl.c',
+	'third/glad/src/glx.c'
 ]
 
 inc = [
 	include_directories('third/spirv_reflect'),
+	include_directories('third/glad/include'),
 	include_directories('third/args')
 ]
-	
+
 xcb = [
 	dependency('xcb'),
 	dependency('xcb-keysyms'),
@@ -33,8 +36,8 @@ vk = [
 gl = [
 	dependency('x11'),
 	dependency('x11-xcb'),
-	dependency('gl')
-	#dependency('glew')
+	dependency('gl'),
+	meson.get_compiler('c').find_library('dl',required:true)
 ]
 
 python = [
