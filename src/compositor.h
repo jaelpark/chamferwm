@@ -10,6 +10,7 @@
 
 struct __GLXcontextRec;
 typedef struct __GLXcontextRec *GLXContext;
+
 typedef unsigned long int XID;
 typedef XID GLXWindow;
 
@@ -50,6 +51,7 @@ protected:
 };
 
 class CompositorInterface{
+friend class TextureBase;
 friend class Texture;
 friend class ShaderModule;
 friend class Pipeline;
@@ -98,8 +100,9 @@ protected:
 	VkSemaphore (*psemaphore)[SEMAPHORE_INDEX_COUNT];
 	VkFence *pfence;
 	VkCommandPool commandPool;
-	VkCommandBuffer *pcommandBuffers;
-	VkCommandBuffer *pcopyCommandBuffers;
+	VkCommandBuffer *pcommandBuffers; //drawing
+	VkCommandBuffer *pcopyCommandBuffers; //staing to device memory
+	VkCommandBuffer *pglCommandBuffers; //gl interoperation
 
 	//VkDescriptorPool descPool;
 	std::deque<VkDescriptorPool> descPoolArray;
@@ -187,6 +190,7 @@ public:
 
 //Default compositor assumes XCB for its surface
 class X11Compositor : public CompositorInterface{
+friend class TexturePixmap;
 public:
 	//Derivatives of compositor classes should not point to their default corresponding backend classes (Backend::Default in this case). This is to allow the compositor to be independent of the backend implementation, as long as it's based on X11 here.
 	X11Compositor(uint, const Backend::X11Backend *);
@@ -200,9 +204,10 @@ public:
 	void SetBackgroundPixmap(const Backend::BackendPixmapProperty *);
 	VkExtent2D GetExtent() const;
 	const Backend::X11Backend *pbackend;
-	//X11Background *pbackground;
+	PFN_vkGetMemoryFdKHR vkGetMemoryFdKHR;
 	xcb_window_t overlay;
 	xcb_window_t glcontextwin;
+	GLXFBConfig *pfbconfig;
 	GLXContext context;
 	GLXWindow glxwindow;
 protected:

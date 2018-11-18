@@ -8,16 +8,31 @@
 
 #include "spirv_reflect.h"
 
+#include "glad/gl.h"
+#include "glad/glx.h"
+
 namespace Compositor{
 
-Texture::Texture(uint _w, uint _h, VkFormat format, const CompositorInterface *_pcomp) : pcomp(_pcomp), imageLayout(VK_IMAGE_LAYOUT_UNDEFINED), w(_w), h(_h){
+TextureBase::TextureBase(uint _w, uint _h) : w(_w), h(_h), imageLayout(VK_IMAGE_LAYOUT_UNDEFINED){
+	//
+}
+
+TextureBase::~TextureBase(){
+	//
+}
+
+const std::vector<std::pair<VkFormat, uint>> TextureBase::formatSizeMap = {
+	{VK_FORMAT_R8G8B8A8_UNORM,4}
+};
+
+Texture::Texture(uint _w, uint _h, VkFormat format, const CompositorInterface *_pcomp) : TextureBase(_w,_h), pcomp(_pcomp){
 	//
 	auto m = std::find_if(formatSizeMap.begin(),formatSizeMap.end(),[&](auto &r)->bool{
 		return r.first == format;
 	});
 	formatIndex = m-formatSizeMap.begin();
 
-	DebugPrintf(stdout,"*** creating texture: %u, (%ux%u)\n",(*m).second,w,h);
+	//DebugPrintf(stdout,"*** creating texture: %u, (%ux%u)\n",(*m).second,w,h);
 
 	//staging buffer
 	VkBufferCreateInfo bufferCreateInfo = {};
@@ -150,19 +165,6 @@ void Texture::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prect
 		bufferImageCopyBuffer[i].bufferImageHeight = h;
 	}
 	vkCmdCopyBufferToImage(*pcommandBuffer,stagingBuffer,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,rectCount,bufferImageCopyBuffer.data());
-	/*VkBufferImageCopy bufferImageCopy = {};
-	bufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	bufferImageCopy.imageSubresource.mipLevel = 0;
-	bufferImageCopy.imageSubresource.baseArrayLayer = 0;
-	bufferImageCopy.imageSubresource.layerCount = 1;
-	bufferImageCopy.imageExtent.width = w;//w/4; //w
-	bufferImageCopy.imageExtent.height = h;//h
-	bufferImageCopy.imageExtent.depth = 1;
-	bufferImageCopy.imageOffset = (VkOffset3D){0,0,0};//(VkOffset3D){w/4,0,0}; //x,y
-	bufferImageCopy.bufferOffset = 0;//w/4*4; //(w*y+x)*format
-	bufferImageCopy.bufferRowLength = w;
-	bufferImageCopy.bufferImageHeight = h;
-	vkCmdCopyBufferToImage(*pcommandBuffer,stagingBuffer,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&bufferImageCopy);*/
 
 	//create in transfer stage, use in fragment shader stage
 	imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -173,6 +175,127 @@ void Texture::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prect
 		0,0,0,0,1,&imageMemoryBarrier);
 	
 	imageLayout = imageMemoryBarrier.newLayout;
+}
+
+TexturePixmap::TexturePixmap(uint _w, uint _h, const X11Compositor *_pcomp) : TextureBase(_w,_h), pcomp(_pcomp){
+	//image
+	VkImageCreateInfo imageCreateInfo = {};
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.extent.width = w;
+	imageCreateInfo.extent.height = h;
+	imageCreateInfo.extent.depth = 1;
+	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.arrayLayers = 1;
+	imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageCreateInfo.flags = 0;
+	if(vkCreateImage(pcomp->logicalDev,&imageCreateInfo,0,&image) != VK_SUCCESS)
+		throw Exception("Failed to create an image.");
+
+	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProps;
+	vkGetPhysicalDeviceMemoryProperties(pcomp->physicalDev,&physicalDeviceMemoryProps);
+	
+	VkMemoryRequirements memoryRequirements;
+	vkGetImageMemoryRequirements(pcomp->logicalDev,image,&memoryRequirements);
+
+	VkMemoryAllocateInfo memoryAllocateInfo = {};
+	memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memoryAllocateInfo.allocationSize = memoryRequirements.size;
+	for(memoryAllocateInfo.memoryTypeIndex = 0; memoryAllocateInfo.memoryTypeIndex < physicalDeviceMemoryProps.memoryTypeCount; memoryAllocateInfo.memoryTypeIndex++){
+		if(memoryRequirements.memoryTypeBits & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+			break;
+	}
+	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&deviceMemory) != VK_SUCCESS)
+		throw Exception("Failed to allocate image memory.");
+	vkBindImageMemory(pcomp->logicalDev,image,deviceMemory,0);
+
+	VkImageViewCreateInfo imageViewCreateInfo = {};
+	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageViewCreateInfo.image = image;
+	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	imageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_B;//VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_G;//VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_R;//VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	imageViewCreateInfo.subresourceRange.levelCount = 1;
+	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	imageViewCreateInfo.subresourceRange.layerCount = 1;
+	if(vkCreateImageView(pcomp->logicalDev,&imageViewCreateInfo,0,&imageView) != VK_SUCCESS)
+		throw Exception("Failed to create texture image view.");
+
+	VkMemoryGetFdInfoKHR memoryfdInfo = {};
+	memoryfdInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+	memoryfdInfo.pNext = 0;
+	memoryfdInfo.memory = deviceMemory;
+	memoryfdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+	
+	sint memoryfd;
+	if(pcomp->vkGetMemoryFdKHR(pcomp->logicalDev,&memoryfdInfo,&memoryfd) != VK_SUCCESS)
+		throw Exception("Failed to get memory file descriptor.");
+
+	glCreateMemoryObjectsEXT(1,&memoryObject);
+	glImportMemoryFdEXT(memoryObject,memoryRequirements.size,GL_HANDLE_TYPE_OPAQUE_FD_EXT,memoryfd);
+
+	glCreateTextures(GL_TEXTURE_2D,1,&sharedTexture);
+	glTextureStorageMem2DEXT(sharedTexture,1,GL_RGBA8,w,h,memoryObject,0);
+
+	glGenTextures(1,&pixmapTexture);
+}
+
+TexturePixmap::~TexturePixmap(){
+	glDeleteTextures(1,&pixmapTexture);
+
+	glDeleteTextures(1,&sharedTexture);
+	vkFreeMemory(pcomp->logicalDev,deviceMemory,0);
+	vkDestroyImage(pcomp->logicalDev,image,0);
+}
+
+//only pixmaps that correspond to the created texture in size should be attached
+void TexturePixmap::Attach(xcb_pixmap_t pixmap){
+	static const sint pixmapAttribs[] = {
+		GLX_TEXTURE_TARGET_EXT,GLX_TEXTURE_2D_EXT,
+		GLX_TEXTURE_FORMAT_EXT,GLX_TEXTURE_FORMAT_RGBA_EXT,
+		None};
+	glxpixmap = glXCreatePixmap(pcomp->pbackend->pdisplay,pcomp->pfbconfig[0],pixmap,pixmapAttribs);
+}
+
+void TexturePixmap::Detach(){
+	glXDestroyPixmap(pcomp->pbackend->pdisplay,glxpixmap);
+}
+
+void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer){
+	VkImageSubresourceRange imageSubresourceRange = {};
+	imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageSubresourceRange.baseMipLevel = 0;
+	imageSubresourceRange.levelCount = 1;
+	imageSubresourceRange.layerCount = 1;
+
+	//create in host stage (map), use in transfer stage
+	VkImageMemoryBarrier imageMemoryBarrier = {};
+	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageMemoryBarrier.image = image;
+	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
+	imageMemoryBarrier.srcAccessMask = 0;
+	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
+		0,0,0,0,1,&imageMemoryBarrier);
+
+	glBindTexture(GL_TEXTURE_2D,pixmapTexture);
+
+	glXBindTexImageEXT(pcomp->pbackend->pdisplay,glxpixmap,GLX_FRONT_LEFT_EXT,0);
+	glCopyImageSubData(pixmapTexture,GL_TEXTURE_2D,0,0,0,0,
+		sharedTexture,GL_TEXTURE_2D,0,0,0,0,w,h,1); //TODO: damaged regions
+	glXReleaseTexImageEXT(pcomp->pbackend->pdisplay,glxpixmap,GLX_FRONT_LEFT_EXT);
 }
 
 ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const CompositorInterface *_pcomp) : pcomp(_pcomp), pname(mstrdup(_pname)){
@@ -237,10 +360,6 @@ ShaderModule::~ShaderModule(){
 	delete []pdescSetLayouts;
 	vkDestroyShaderModule(pcomp->logicalDev,shaderModule,0);
 }
-
-const std::vector<std::pair<VkFormat, uint>> Texture::formatSizeMap = {
-	{VK_FORMAT_R8G8B8A8_UNORM,4}
-};
 
 Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp){
 	//

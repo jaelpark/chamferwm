@@ -212,6 +212,7 @@ void CompositorInterface::InitializeRenderEngine(){
 
 	const char *pextensions[] = {
 		VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+		//"VK_KHR_swapchain",
 		"VK_KHR_surface",
 		"VK_KHR_xcb_surface",
 		"VK_KHR_get_physical_device_properties2",
@@ -546,28 +547,6 @@ void CompositorInterface::InitializeRenderEngine(){
 	if(vkCreateSampler(logicalDev,&samplerCreateInfo,0,&pointSampler) != VK_SUCCESS)
 		throw Exception("Failed to create a sampler.");
 
-	//descriptor pool
-	//descriptors of this pool
-	/*VkDescriptorPoolSize descPoolSizes[2];
-	descPoolSizes[0] = (VkDescriptorPoolSize){};
-	descPoolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLER;//VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descPoolSizes[0].descriptorCount = 16;
-
-	descPoolSizes[1] = (VkDescriptorPoolSize){};
-	descPoolSizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	descPoolSizes[1].descriptorCount = 16;
-
-	//TODO: pool memory management, probably a vector a pools
-	//- find_if, find the pool which still has sets available
-	VkDescriptorPoolCreateInfo descPoolCreateInfo = {};
-	descPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descPoolCreateInfo.poolSizeCount = sizeof(descPoolSizes)/sizeof(descPoolSizes[0]);
-	descPoolCreateInfo.pPoolSizes = descPoolSizes;
-	descPoolCreateInfo.maxSets = 16;
-	descPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-	if(vkCreateDescriptorPool(logicalDev,&descPoolCreateInfo,0,&descPool) != VK_SUCCESS)
-		throw Exception("Failed to create a descriptor pool.");*/
-
 	//command pool and buffers
 	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
 	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -578,6 +557,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	
 	pcommandBuffers = new VkCommandBuffer[swapChainImageCount];
 	pcopyCommandBuffers = new VkCommandBuffer[swapChainImageCount];
+	pglCommandBuffers = new VkCommandBuffer[swapChainImageCount];
 
 	VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
 	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -589,6 +569,9 @@ void CompositorInterface::InitializeRenderEngine(){
 	
 	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcopyCommandBuffers) != VK_SUCCESS)
 		throw Exception("Failed to allocate copy command buffer.");
+	
+	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pglCommandBuffers) != VK_SUCCESS)
+		throw Exception("Failed to allocate GL interoperation command buffer.");
 
 	shaders.reserve(1024);
 
@@ -606,12 +589,12 @@ void CompositorInterface::DestroyRenderEngine(){
 
 	delete []pcommandBuffers;
 	delete []pcopyCommandBuffers;
+	delete []pglCommandBuffers;
 	vkDestroyCommandPool(logicalDev,commandPool,0);
 
 	for(VkDescriptorPool &descPool : descPoolArray)
 		vkDestroyDescriptorPool(logicalDev,descPool,0);
 	descPoolArray.clear();
-	//vkDestroyDescriptorPool(logicalDev,descPool,0);
 
 	vkDestroySampler(logicalDev,pointSampler,0);
 
@@ -768,9 +751,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderQueue.push_back(renderObject);
 	}
 
-	printf("queue size: %u\n",renderQueue.size());
-
-	//deque of scissors, pop_front
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	commandBufferBeginInfo.flags = 0;
@@ -1277,35 +1257,43 @@ void X11Compositor::Start(){
 
 	InitializeRenderEngine();
 
+	if(!(vkGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetInstanceProcAddr(instance,"vkGetMemoryFdKHR")))
+		throw Exception("Unable to retrieve Vulkan extension procedure addresses.");
+
 	sint glxver = gladLoaderLoadGLX(pbackend->pdisplay,pbackend->defaultScreen);
 	if(glxver == 0)
 		throw Exception("Unable to load GLX.\n");
 	DebugPrintf(stdout,"Loaded GLX %d.%d\n",GLAD_VERSION_MAJOR(glxver),GLAD_VERSION_MINOR(glxver));
 
 	// Initialize GL interop, setup window to get the context
-	int visualAttributes[] = { 
-		GLX_X_RENDERABLE,True,
-		GLX_DRAWABLE_TYPE,GLX_WINDOW_BIT,
-		GLX_RENDER_TYPE,GLX_RGBA_BIT,
-		GLX_X_VISUAL_TYPE,GLX_TRUE_COLOR,
-		GLX_RED_SIZE,8,
-		GLX_GREEN_SIZE,8,
-		GLX_BLUE_SIZE,8,
-		GLX_ALPHA_SIZE,8,
-		GLX_DEPTH_SIZE,24,
-		GLX_STENCIL_SIZE,8,
-		GLX_DOUBLEBUFFER,True,
+	const sint visualAttributes[] = { 
+		GLX_DRAWABLE_TYPE,GLX_PIXMAP_BIT,
+		GLX_BIND_TO_TEXTURE_TARGETS_EXT,GLX_TEXTURE_2D_BIT_EXT,
+		GLX_BIND_TO_TEXTURE_RGBA_EXT,True,
+		GLX_BIND_TO_TEXTURE_RGB_EXT,True,
+		GLX_Y_INVERTED_EXT,True,
+		//GLX_X_RENDERABLE,True,
+		//GLX_DRAWABLE_TYPE,GLX_WINDOW_BIT,
+		//GLX_RENDER_TYPE,GLX_RGBA_BIT,
+		//GLX_X_VISUAL_TYPE,GLX_TRUE_COLOR,
+		//GLX_RED_SIZE,8,
+		//GLX_GREEN_SIZE,8,
+		//GLX_BLUE_SIZE,8,
+		//GLX_ALPHA_SIZE,8,
+		//GLX_DEPTH_SIZE,24,
+		//GLX_STENCIL_SIZE,8,
+		//GLX_DOUBLEBUFFER,True,
 		None
 	};
 	sint fbconfigCount;
-	GLXFBConfig *pfbconfig = glXChooseFBConfig(pbackend->pdisplay,pbackend->defaultScreen,visualAttributes,&fbconfigCount);
+	pfbconfig = glXChooseFBConfig(pbackend->pdisplay,pbackend->defaultScreen,visualAttributes,&fbconfigCount);
 	if(!pfbconfig || fbconfigCount == 0)
 		throw Exception("glXChooseFBConfig failed.\n");
 
 	int visualId;
-	glXGetFBConfigAttrib(pbackend->pdisplay,*pfbconfig,GLX_VISUAL_ID,&visualId);
+	glXGetFBConfigAttrib(pbackend->pdisplay,pfbconfig[0],GLX_VISUAL_ID,&visualId);
 	
-	context = glXCreateNewContext(pbackend->pdisplay,*pfbconfig,GLX_RGBA_TYPE,0,True);
+	context = glXCreateNewContext(pbackend->pdisplay,pfbconfig[0],GLX_RGBA_TYPE,0,True);
 
 	glcontextwin = xcb_generate_id(pbackend->pcon);
 	//mask and values from above
@@ -1316,19 +1304,14 @@ void X11Compositor::Start(){
 	values[0] = XCB_STACK_MODE_BELOW;
 	xcb_configure_window(pbackend->pcon,glcontextwin,XCB_CONFIG_WINDOW_STACK_MODE,values);
 
-	glxwindow = glXCreateWindow(pbackend->pdisplay,*pfbconfig,glcontextwin,0);
+	glxwindow = glXCreateWindow(pbackend->pdisplay,pfbconfig[0],glcontextwin,0);
 	if(!glXMakeContextCurrent(pbackend->pdisplay,glxwindow,glxwindow,context))
-		throw Exception("Failed to set current GLX context.\n");
+		throw Exception("Failed to set current GLX context.");
 	
 	sint glver = gladLoaderLoadGL();
 	if(glver == 0)
-		throw Exception("Unable to load GL.\n");
+		throw Exception("Unable to load GL.");
 	DebugPrintf(stdout,"Loaded GL %d.%d\n",GLAD_VERSION_MAJOR(glver),GLAD_VERSION_MINOR(glver));
-	
-	//if(!gladLoadGLX(pbackend->pdisplay,pbackend->defaultScreen))
-		//throw Exception("Failed to load GLX extensions.\n");
-	//if(!gladLoadGL())
-		//throw Exception("Failed to load GL extension.\n");
 	
 	DebugPrintf(stdout,"Checking GL(X) extensions\n");
 	if(GLAD_GLX_EXT_texture_from_pixmap)
