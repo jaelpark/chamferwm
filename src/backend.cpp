@@ -316,7 +316,7 @@ void X11Container::Fullscreen1(){
 	xcb_flush(pbackend->pcon);
 }
 
-X11Backend::X11Backend() : lastTime(XCB_CURRENT_TIME){
+X11Backend::X11Backend() : lastTime(XCB_CURRENT_TIME), pdisplay(0){
 	//
 }
 

@@ -14,24 +14,27 @@ namespace Compositor{
 
 class TextureBase{
 public:
-	TextureBase(uint, uint);
-	~TextureBase();
+	TextureBase(uint, uint, VkFormat, const class CompositorInterface *);
+	virtual ~TextureBase();
 	//
 	uint w, h;
+	uint formatIndex;
 	VkImageLayout imageLayout;
 
 	VkImage image;
 	VkImageView imageView;
 	VkDeviceMemory deviceMemory;
 
+	const class CompositorInterface *pcomp;
+
 	static const std::vector<std::pair<VkFormat, uint>> formatSizeMap;
 };
 
 //texture class for shader reads
-class Texture : public TextureBase{
+class TextureStaged : virtual public TextureBase{
 public:
-	Texture(uint, uint, VkFormat, const class CompositorInterface *);
-	~Texture();
+	TextureStaged(uint, uint, VkFormat, const class CompositorInterface *);
+	virtual ~TextureStaged();
 	const void * Map() const;
 	void Unmap(const VkCommandBuffer *, const VkRect2D *, uint);
 
@@ -39,17 +42,16 @@ public:
 	VkDeviceMemory stagingMemory;
 
 	uint stagingMemorySize;
-	uint formatIndex;
 
 	std::vector<VkBufferImageCopy> bufferImageCopyBuffer; //to avoid dynamic allocations each time texture is updated in multiple regions
 
-	const class CompositorInterface *pcomp;
+	//const class CompositorInterface *pcomp;
 };
 
-class TexturePixmap : public TextureBase{
+class TexturePixmap : virtual public TextureBase{
 public:
-	TexturePixmap(uint, uint, const class X11Compositor *);
-	~TexturePixmap();
+	TexturePixmap(uint, uint, const class CompositorInterface *);
+	virtual ~TexturePixmap();
 	void Attach(xcb_pixmap_t);
 	void Detach();
 	void Update(const VkCommandBuffer *);
@@ -60,8 +62,15 @@ public:
 	uint memoryObject;
 	uint sharedTexture;
 
-	const class X11Compositor *pcomp;
+	const class X11Compositor *pcomp11;
 };
+
+class Texture : public TextureStaged, public TexturePixmap{
+public:
+	Texture(uint, uint, const class CompositorInterface *);
+	~Texture();
+};
+
 
 class ShaderModule{
 public:

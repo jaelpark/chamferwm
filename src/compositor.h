@@ -52,6 +52,8 @@ protected:
 
 class CompositorInterface{
 friend class TextureBase;
+friend class TextureStaged;
+friend class TexturePixmap;
 friend class Texture;
 friend class ShaderModule;
 friend class Pipeline;
@@ -63,8 +65,10 @@ public:
 	virtual void Stop() = 0;
 protected:
 	void InitializeRenderEngine();
+	void InitializeGLInterop();
 	void DestroyRenderEngine();
 	void AddShader(const char *, const Blob *);
+	void DestroyGLInterop();
 	void WaitIdle();
 	void CreateRenderQueueAppendix(const WManager::Client *, const WManager::Container *);
 	void CreateRenderQueue(const WManager::Container *, const WManager::Container *);
@@ -105,6 +109,16 @@ protected:
 	VkCommandBuffer *pcommandBuffers; //drawing
 	VkCommandBuffer *pcopyCommandBuffers; //staing to device memory
 	VkCommandBuffer *pglCommandBuffers; //gl interoperation
+
+	PFN_vkGetMemoryFdKHR vkGetMemoryFdKHR;
+	PFN_vkGetSemaphoreFdKHR vkGetSemaphoreFdKHR;
+
+	enum GL_SEMAPHORE_INDEX_COUNT{
+		GL_SEMAPHORE_INDEX_READY,
+		GL_SEMAPHORE_INDEX_FINISHED,
+		GL_SEMAPHORE_INDEX_COUNT
+	};
+	uint (*pglSemaphore)[GL_SEMAPHORE_INDEX_COUNT];
 
 	//VkDescriptorPool descPool;
 	std::deque<VkDescriptorPool> descPoolArray;
@@ -206,19 +220,11 @@ public:
 	void SetBackgroundPixmap(const Backend::BackendPixmapProperty *);
 	VkExtent2D GetExtent() const;
 	const Backend::X11Backend *pbackend;
-	PFN_vkGetMemoryFdKHR vkGetMemoryFdKHR;
-	PFN_vkGetSemaphoreFdKHR vkGetSemaphoreFdKHR;
 	xcb_window_t overlay;
 	xcb_window_t glcontextwin;
 	GLXFBConfig *pfbconfig;
 	GLXContext context;
 	GLXWindow glxwindow;
-	enum GL_SEMAPHORE_INDEX_COUNT{
-		GL_SEMAPHORE_INDEX_READY,
-		GL_SEMAPHORE_INDEX_FINISHED,
-		GL_SEMAPHORE_INDEX_COUNT
-	};
-	uint (*pglSemaphore)[GL_SEMAPHORE_INDEX_COUNT];
 protected:
 	sint compEventOffset;
 	sint compErrorOffset;
