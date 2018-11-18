@@ -286,8 +286,8 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer){
 	imageMemoryBarrier.srcAccessMask = 0;
 	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
-	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,0,
 		0,0,0,0,1,&imageMemoryBarrier);
 
 	glBindTexture(GL_TEXTURE_2D,pixmapTexture);
@@ -296,6 +296,8 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer){
 	glCopyImageSubData(pixmapTexture,GL_TEXTURE_2D,0,0,0,0,
 		sharedTexture,GL_TEXTURE_2D,0,0,0,0,w,h,1); //TODO: damaged regions
 	glXReleaseTexImageEXT(pcomp->pbackend->pdisplay,glxpixmap,GLX_FRONT_LEFT_EXT);
+
+	//semaphore mandatory
 }
 
 ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const CompositorInterface *_pcomp) : pcomp(_pcomp), pname(mstrdup(_pname)){

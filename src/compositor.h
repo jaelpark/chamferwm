@@ -95,6 +95,8 @@ protected:
 	enum SEMAPHORE_INDEX{
 		SEMAPHORE_INDEX_IMAGE_AVAILABLE,
 		SEMAPHORE_INDEX_RENDER_FINISHED,
+		SEMAPHORE_INDEX_GL_READY,
+		SEMAPHORE_INDEX_GL_FINISHED,
 		SEMAPHORE_INDEX_COUNT
 	};
 	VkSemaphore (*psemaphore)[SEMAPHORE_INDEX_COUNT];
@@ -205,11 +207,18 @@ public:
 	VkExtent2D GetExtent() const;
 	const Backend::X11Backend *pbackend;
 	PFN_vkGetMemoryFdKHR vkGetMemoryFdKHR;
+	PFN_vkGetSemaphoreFdKHR vkGetSemaphoreFdKHR;
 	xcb_window_t overlay;
 	xcb_window_t glcontextwin;
 	GLXFBConfig *pfbconfig;
 	GLXContext context;
 	GLXWindow glxwindow;
+	enum GL_SEMAPHORE_INDEX_COUNT{
+		GL_SEMAPHORE_INDEX_READY,
+		GL_SEMAPHORE_INDEX_FINISHED,
+		GL_SEMAPHORE_INDEX_COUNT
+	};
+	uint (*pglSemaphore)[GL_SEMAPHORE_INDEX_COUNT];
 protected:
 	sint compEventOffset;
 	sint compErrorOffset;

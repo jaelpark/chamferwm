@@ -754,6 +754,22 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	commandBufferBeginInfo.flags = 0;
+	if(vkBeginCommandBuffer(pglCommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
+		throw Exception("Failed to begin command buffer recording.");
+
+	/*std::vector<uint> semaphoreTextures;
+	for(ClientFrame *pclientFrame : updateQueue){
+		pclientFrame->UpdateContents(&pglCommandBuffers[currentFrame]);
+		semaphoreTextures.push_back(&);
+	}
+	glWaitSemaphoreEXT(pglSemaphore[currentFrame][GL_SEMAPHORE_INDEX_READY],0,0,0,0,&src*/
+	//render
+	//glSignalSemaphoreEXT(pglSemaphore[currentFrame][GL_SEMAPHORE_INDEX_FINISHED,0,0,
+
+	if(vkEndCommandBuffer(pglCommandBuffers[currentFrame]) != VK_SUCCESS)
+		throw Exception("Failed to end command buffer recording.");
+
+	//copy host memory to device
 	if(vkBeginCommandBuffer(pcopyCommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
 	
@@ -767,6 +783,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to end command buffer recording.");
 
+	//draw the primitives
 	commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 	if(vkBeginCommandBuffer(pcommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
@@ -869,17 +886,28 @@ void CompositorInterface::Present(){
 	
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = &psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE]; //TODO: earlier
+	submitInfo.pWaitDstStageMask = pipelineStageFlags;
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = &psemaphore[currentFrame][SEMAPHORE_INDEX_GL_READY];
 	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &pcopyCommandBuffers[currentFrame];
+	/*if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,0) != VK_SUCCESS)
+		throw Exception("Failed to submit a queue.");*/
+
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.signalSemaphoreCount = 0;
 	submitInfo.pCommandBuffers = &pcopyCommandBuffers[currentFrame];
 	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,0) != VK_SUCCESS)
 		throw Exception("Failed to submit a queue.");
-
+	
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = &psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE];
+	//submitInfo.pWaitSemaphores = &psemaphore[currentFrame][SEMAPHORE_INDEX_GL_FINISHED];
 	submitInfo.pWaitDstStageMask = pipelineStageFlags;
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = &psemaphore[currentFrame][SEMAPHORE_INDEX_RENDER_FINISHED];
-	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &pcommandBuffers[currentFrame];
 	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,pfence[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to submit a queue.");
@@ -1257,7 +1285,8 @@ void X11Compositor::Start(){
 
 	InitializeRenderEngine();
 
-	if(!(vkGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetInstanceProcAddr(instance,"vkGetMemoryFdKHR")))
+	if(!(vkGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetInstanceProcAddr(instance,"vkGetMemoryFdKHR")) ||
+		!(vkGetSemaphoreFdKHR = (PFN_vkGetSemaphoreFdKHR)vkGetInstanceProcAddr(instance,"vkGetSemaphoreFdKHR")))
 		throw Exception("Unable to retrieve Vulkan extension procedure addresses.");
 
 	sint glxver = gladLoaderLoadGLX(pbackend->pdisplay,pbackend->defaultScreen);
@@ -1325,6 +1354,28 @@ void X11Compositor::Start(){
 	if(GLAD_GL_EXT_semaphore_fd)
 		printf("EXT_semaphore_fd\n");
 	
+	pglSemaphore = new uint[swapChainImageCount][GL_SEMAPHORE_INDEX_COUNT];
+
+	//TODO: combine
+	for(uint i = 0; i < swapChainImageCount; ++i){
+		glGenSemaphoresEXT(GL_SEMAPHORE_INDEX_COUNT,pglSemaphore[i]);
+
+		VkSemaphoreGetFdInfoKHR semaphoreFdInfo = {};
+		semaphoreFdInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
+		semaphoreFdInfo.pNext = 0;
+		semaphoreFdInfo.semaphore = psemaphore[i][SEMAPHORE_INDEX_GL_READY];
+		semaphoreFdInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+		sint semaphorefd;
+		vkGetSemaphoreFdKHR(logicalDev,&semaphoreFdInfo,&semaphorefd);
+		glImportSemaphoreFdEXT(pglSemaphore[i][GL_SEMAPHORE_INDEX_READY],GL_HANDLE_TYPE_OPAQUE_FD_EXT,semaphorefd);
+		//
+		semaphoreFdInfo.semaphore = psemaphore[i][SEMAPHORE_INDEX_GL_FINISHED];
+
+		vkGetSemaphoreFdKHR(logicalDev,&semaphoreFdInfo,&semaphorefd);
+		glImportSemaphoreFdEXT(pglSemaphore[i][GL_SEMAPHORE_INDEX_FINISHED],GL_HANDLE_TYPE_OPAQUE_FD_EXT,semaphorefd);
+	}
+		
 	DebugPrintf(stdout,"GL interop initialized.\n");
 	printf("* %s, OpenGL %s\n",glGetString(GL_RENDERER),glGetString(GL_VERSION));
 }
@@ -1333,6 +1384,10 @@ void X11Compositor::Stop(){
 	if(pbackground)
 		delete pbackground;
 	
+	for(uint i = 0; i < swapChainImageCount; ++i)
+		glDeleteSemaphoresEXT(GL_SEMAPHORE_INDEX_COUNT,pglSemaphore[i]);
+	delete []pglSemaphore;
+
 	glXDestroyWindow(pbackend->pdisplay,glxwindow);
 	xcb_destroy_window(pbackend->pcon,glcontextwin);
 
