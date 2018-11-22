@@ -103,6 +103,8 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
 			binder.BindKey(ord('m'),chamfer.MOD_MASK_1,Key.MAXIMIZE.value);
 			binder.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
+			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.SPLIT_V.value);
+			binder.BindKey(ord('s'),chamfer.MOD_MASK_4,Key.SPLIT_V.value);
 			
 			binder.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
 			binder.BindKey(miscellany.XK_Return,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);

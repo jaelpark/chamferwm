@@ -92,6 +92,14 @@ BackendContainerProperty::~BackendContainerProperty(){
 	//
 }
 
+BackendPixmapProperty::BackendPixmapProperty(xcb_pixmap_t _pixmap) : BackendProperty(PROPERTY_TYPE_PIXMAP), pixmap(_pixmap){
+	//
+}
+
+BackendPixmapProperty::~BackendPixmapProperty(){
+	//
+}
+
 BackendEvent::BackendEvent(){
 	//
 }
@@ -144,14 +152,15 @@ void X11KeyBinder::BindKey(uint symbol, uint mask, uint keyId){
 }
 
 X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend), flags(0){
-	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_EXPOSURE|XCB_EVENT_MASK_PROPERTY_CHANGE|XCB_EVENT_MASK_FOCUS_CHANGE};
+	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_PROPERTY_CHANGE|XCB_EVENT_MASK_FOCUS_CHANGE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
 	if(!pcreateInfo->prect)
 		UpdateTranslation();
 	else rect = *pcreateInfo->prect; //floating client without its own container: assume that xcb_configure_window was already called
 
-	xcb_map_window(pbackend->pcon,window);
+	if(pcreateInfo->mode != CreateInfo::CREATE_AUTOMATIC)
+		xcb_map_window(pbackend->pcon,window);
 }
 
 X11Client::~X11Client(){
@@ -349,7 +358,7 @@ void X11Backend::StackClients(){
 
 const char *X11Backend::patomStrs[ATOM_COUNT] = {
 	//"CHAMFER_ALARM",
-	"WM_PROTOCOLS","WM_DELETE_WINDOW"
+	"WM_PROTOCOLS","WM_DELETE_WINDOW","ESETROOT_PMAP_ID","_X_ROOTPMAP_ID"
 };
 
 Default::Default() : X11Backend(){
@@ -402,18 +411,18 @@ void Default::Start(){
 
 	xcb_key_symbols_free(psymbols);
 
-	uint mask = XCB_CW_EVENT_MASK;
 	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
-		|XCB_EVENT_MASK_EXPOSURE};
-
-	xcb_void_cookie_t cookie = xcb_change_window_attributes_checked(pcon,pscr->root,mask,values);
+		|XCB_EVENT_MASK_EXPOSURE
+		|XCB_EVENT_MASK_PROPERTY_CHANGE};
+	xcb_void_cookie_t cookie = xcb_change_window_attributes_checked(pcon,pscr->root,XCB_CW_EVENT_MASK,values);
 	xcb_generic_error_t *perr = xcb_request_check(pcon,cookie);
 
 	xcb_flush(pcon);
 
 	window = pscr->root;
+	DebugPrintf(stdout,"Root id: %x\n",window);
 
 	if(perr != 0){
 		snprintf(Exception::buffer,sizeof(Exception::buffer),"Substructure redirection failed (%d). WM already present.\n",perr->error_code);
@@ -651,7 +660,7 @@ sint Default::HandleEvent(){
 				= xcb_get_property_reply(pcon,propertyCookieTransientFor,0);
 
 			if(boolSizeHints){
-				/*if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE &&
+				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE &&
 				sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE &&
 				sizeHints.min_width == sizeHints.max_width &&
 				sizeHints.min_height == sizeHints.min_height){
@@ -662,7 +671,7 @@ sint Default::HandleEvent(){
 						});
 						prect = m != configCache.end()?&(*m).second:0;
 					}
-				}*/
+				}
 			}
 			if(propertyReplyWindowType){
 				//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
@@ -871,6 +880,21 @@ sint Default::HandleEvent(){
 			lastTime = pev->time;
 			if(pev->state == XCB_PROPERTY_DELETE)
 				break;
+
+			if(pev->window == pscr->root){
+				if(pev->atom == atoms[ATOM_ESETROOT_PMAP_ID]){
+					xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,atoms[ATOM_ESETROOT_PMAP_ID],XCB_GET_PROPERTY_TYPE_ANY,0,128);
+					xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
+					if(!propertyReply)
+						break;
+
+					BackendPixmapProperty prop(*(xcb_pixmap_t*)xcb_get_property_value(propertyReply));
+					PropertyChange(0,PROPERTY_ID_PIXMAP,&prop);
+
+					free(propertyReply);
+				}
+				break;
+			}
 
 			result = 1;
 
@@ -1121,12 +1145,10 @@ void Debug::Start(){
 
 	window = xcb_generate_id(pcon);
 
-	uint mask = XCB_CW_EVENT_MASK;
 	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
-	
-	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,window,pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pscr->root_visual,mask,values);
+	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,window,pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pscr->root_visual,XCB_CW_EVENT_MASK,values);
 	const char title[] = "chamferwm compositor debug mode";
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,window,XCB_ATOM_WM_NAME,XCB_ATOM_STRING,8,strlen(title),title);
 	xcb_map_window(pcon,window);

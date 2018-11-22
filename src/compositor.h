@@ -60,6 +60,7 @@ protected:
 	void Present();
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;
+	virtual void UpdateBackground(const VkCommandBuffer *) = 0;
 	virtual VkExtent2D GetExtent() const = 0;
 	VkInstance instance;
 	VkSurfaceKHR surface;
@@ -90,9 +91,6 @@ protected:
 	VkCommandBuffer *pcommandBuffers;
 	VkCommandBuffer *pcopyCommandBuffers;
 
-	//std::deque<VkRect2D> scissors;
-	std::vector<VkRect2D> scissors;
-
 	//VkDescriptorPool descPool;
 	std::deque<VkDescriptorPool> descPoolArray;
 	std::vector<std::pair<VkDescriptorSet *, VkDescriptorPool>> descPoolReference;
@@ -107,6 +105,12 @@ protected:
 	std::vector<Pipeline> pipelines;
 
 	std::vector<ClientFrame *> updateQueue;
+
+	enum BACKGROUND{
+		BACKGROUND_NONE,
+		BACKGROUND_SET,
+		BACKGROUND_DIRTY
+	} background;
 
 	//placeholder variables
 public:
@@ -178,9 +182,12 @@ public:
 	bool FilterEvent(const Backend::X11Event *);
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
+	void UpdateBackground(const VkCommandBuffer *);
+	void SetBackgroundPixmap(const Backend::BackendPixmapProperty *);
 	VkExtent2D GetExtent() const;
 	const Backend::X11Backend *pbackend;
 	xcb_window_t overlay;
+	xcb_pixmap_t backgroundPixmap;
 protected:
 	sint compEventOffset;
 	sint compErrorOffset;
@@ -214,6 +221,7 @@ public:
 	void Stop();
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
+	void UpdateBackground(const VkCommandBuffer *);
 	VkExtent2D GetExtent() const;
 };
 

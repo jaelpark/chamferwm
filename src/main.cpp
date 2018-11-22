@@ -368,6 +368,14 @@ public:
 	}
 
 	void PropertyChange(Backend::X11Client *pclient, PROPERTY_ID id, const Backend::BackendProperty *pProperty){
+		if(!pclient){
+			//root window
+			const Backend::BackendPixmapProperty *pPixmapProperty = dynamic_cast<const Backend::BackendPixmapProperty *>(pProperty);
+			Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
+			if(pcomp11)
+				pcomp11->SetBackgroundPixmap(pPixmapProperty);
+			printf("background!\n");
+		}
 		if(pclient->pcontainer == proot)
 			return;
 		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
@@ -685,6 +693,7 @@ int main(sint argc, const char **pargv){
 		if(debugBackend.Get())
 			pcomp = new DebugCompositor(gpuIndex.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11);
 		else pcomp = new DefaultCompositor(gpuIndex.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11);
+
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		delete pbackend;

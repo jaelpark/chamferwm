@@ -24,6 +24,7 @@ public:
 	enum PROPERTY_TYPE{
 		PROPERTY_TYPE_STRING,
 		PROPERTY_TYPE_CLIENT,
+		PROPERTY_TYPE_PIXMAP
 	};
 	BackendProperty(PROPERTY_TYPE);
 	virtual ~BackendProperty();
@@ -42,6 +43,13 @@ public:
 	BackendContainerProperty(WManager::Container *);
 	~BackendContainerProperty();
 	WManager::Container *pcontainer;
+};
+
+class BackendPixmapProperty : public BackendProperty{
+public:
+	BackendPixmapProperty(xcb_pixmap_t);
+	~BackendPixmapProperty();
+	xcb_pixmap_t pixmap;
 };
 
 class BackendEvent{
@@ -184,6 +192,8 @@ protected:
 		//ATOM_CHAMFER_ALARM,
 		ATOM_WM_PROTOCOLS,
 		ATOM_WM_DELETE_WINDOW,
+		ATOM_ESETROOT_PMAP_ID,
+		ATOM_X_ROOTPMAP_ID,
 		ATOM_COUNT
 	};
 	xcb_atom_t atoms[ATOM_COUNT];
@@ -201,6 +211,7 @@ public:
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
 	enum PROPERTY_ID{
+		PROPERTY_ID_PIXMAP,
 		PROPERTY_ID_WM_NAME,
 		PROPERTY_ID_WM_CLASS,
 		PROPERTY_ID_TRANSIENT_FOR,

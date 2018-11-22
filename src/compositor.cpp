@@ -170,7 +170,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0){
+CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0), background(BACKGROUND_NONE){
 	//
 }
 
@@ -738,19 +738,14 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	}
 
 	//deque of scissors, pop_front
-	scissors.clear();
-	for(RenderObject &renderObject : renderQueue){
-		VkRect2D frame;
-		frame.offset = {renderObject.pclient->rect.x,renderObject.pclient->rect.y};
-		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
-		scissors.push_back(frame);
-	}
-
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	commandBufferBeginInfo.flags = 0;
 	if(vkBeginCommandBuffer(pcopyCommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
+	
+	if(background == BACKGROUND_DIRTY)
+		UpdateBackground(&pcopyCommandBuffers[currentFrame]);
 
 	for(ClientFrame *pclientFrame : updateQueue)
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
@@ -1056,8 +1051,8 @@ void X11ClientFrame::AdjustSurface1(){
 	AdjustSurface(rect.w,rect.h);
 }
 
-X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : CompositorInterface(physicalDevIndex){
-	this->pbackend = pbackend;
+X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *_pbackend) : CompositorInterface(physicalDevIndex), pbackend(_pbackend){
+	//
 }
 
 X11Compositor::~X11Compositor(){
@@ -1158,7 +1153,7 @@ bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 		rect.offset = {pev->area.x,pev->area.y};
 		rect.extent = {pev->area.width,pev->area.height};
 		pclientFrame->damageRegions.push_back(rect);
-		//DebugPrintf(stdout,"DAMAGE_EVENT, (%hd,%hd), (%hux%hu)\n",pev->area.x,pev->area.y,pev->area.width,pev->area.height);
+		//DebugPrintf(stdout,"DAMAGE_EVENT, %x, (%hd,%hd), (%hux%hu)\n",pev->drawable,pev->area.x,pev->area.y,pev->area.width,pev->area.height);
 		
 		return true;
 	}
@@ -1180,6 +1175,20 @@ void X11Compositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
 	//if(((PFN_vkCreateXcbSurfaceKHR)vkGetInstanceProcAddr(instance,"vkCreateXcbSurfaceKHR"))(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS)
 	if(vkCreateXcbSurfaceKHR(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS)
 		throw("Failed to create KHR surface.");
+}
+
+void X11Compositor::UpdateBackground(const VkCommandBuffer *pcommandBuffer){
+	//NOTE: background can possibly be implemented with ClientFrame
+	background = BACKGROUND_SET;
+}
+
+void X11Compositor::SetBackgroundPixmap(const Backend::BackendPixmapProperty *pPixmapProperty){
+	if(pPixmapProperty->pixmap == 0){
+		background = BACKGROUND_NONE;
+		return;
+	}
+	backgroundPixmap = pPixmapProperty->pixmap;
+	background = BACKGROUND_DIRTY;
 }
 
 VkExtent2D X11Compositor::GetExtent() const{
@@ -1264,6 +1273,10 @@ bool NullCompositor::CheckPresentQueueCompatibility(VkPhysicalDevice physicalDev
 }
 
 void NullCompositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
+	//
+}
+
+void NullCompositor::UpdateBackground(const VkCommandBuffer *pcommandBuffer){
 	//
 }
 
