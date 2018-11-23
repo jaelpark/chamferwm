@@ -112,7 +112,8 @@ public:
 		} mode;
 		enum{
 			HINT_DESKTOP = 0x1,
-			HINT_ABOVE = 0x2
+			HINT_ABOVE = 0x2,
+			HINT_NO_INPUT = 0x4
 		};
 		uint hints;
 		const BackendStringProperty *pwmName;

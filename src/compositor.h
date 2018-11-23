@@ -187,7 +187,7 @@ public:
 	VkExtent2D GetExtent() const;
 	const Backend::X11Backend *pbackend;
 	xcb_window_t overlay;
-	xcb_pixmap_t backgroundPixmap;
+	//X11ClientFrame backgroundFrame;
 protected:
 	sint compEventOffset;
 	sint compErrorOffset;

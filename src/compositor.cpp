@@ -1187,7 +1187,7 @@ void X11Compositor::SetBackgroundPixmap(const Backend::BackendPixmapProperty *pP
 		background = BACKGROUND_NONE;
 		return;
 	}
-	backgroundPixmap = pPixmapProperty->pixmap;
+	//backgroundFrame.windowPixmap = pPixmapProperty->pixmap;
 	background = BACKGROUND_DIRTY;
 }
 

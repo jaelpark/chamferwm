@@ -411,11 +411,11 @@ void Default::Start(){
 
 	xcb_key_symbols_free(psymbols);
 
-	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
+	uint values[2] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_EXPOSURE
-		|XCB_EVENT_MASK_PROPERTY_CHANGE};
+		|XCB_EVENT_MASK_PROPERTY_CHANGE,0}; //[2] for later use
 	xcb_void_cookie_t cookie = xcb_change_window_attributes_checked(pcon,pscr->root,XCB_CW_EVENT_MASK,values);
 	xcb_generic_error_t *perr = xcb_request_check(pcon,cookie);
 
@@ -559,7 +559,7 @@ sint Default::HandleEvent(){
 
 			}else (*m).second = rect;
 
-			DebugPrintf(stdout,"create %d,%d %ux%u, %x\n",pev->x,pev->y,pev->width,pev->height,pev->window);
+			DebugPrintf(stdout,"create %x | %d,%d %ux%u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
 			}
 			break;
 		case XCB_CONFIGURE_REQUEST:{
@@ -571,14 +571,31 @@ sint Default::HandleEvent(){
 			if(pclient1 && pclient1->pcontainer->mode != WManager::Container::MODE_FLOATING)
 				break;
 
+			//TODO: allow x,y configuration if dock or desktop feature
+			xcb_get_property_cookie_t propertyCookieWindowType
+				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
+
+			xcb_get_property_reply_t *propertyReplyWindowType
+				= xcb_get_property_reply(pcon,propertyCookieWindowType,0);
+
+			bool allowPositionConfig = false;
+			if(propertyReplyWindowType){
+				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowType);
+				allowPositionConfig = (*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP || *patom == ewmh._NET_WM_WINDOW_TYPE_DOCK);
+				free(propertyReplyWindowType);
+			}
+
 			//WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			WManager::Rectangle rect = {
-				(pev->value_mask & XCB_CONFIG_WINDOW_X && pev->x != 0)?pev->x:(pscr->width_in_pixels-pev->width)/2,
-				(pev->value_mask & XCB_CONFIG_WINDOW_Y && pev->y != 0)?pev->y:(pscr->height_in_pixels-pev->height)/2,
+				pev->x,pev->y,
 				std::max(pev->width,(uint16_t)100),std::max(pev->height,(uint16_t)100)};
 
 			//center the window to screen, otherwise it might end up to the left upper corner
-			pev->value_mask |= XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y;
+			if(!allowPositionConfig){
+				rect.x = (pscr->width_in_pixels-pev->width)/2;
+				rect.y = (pscr->height_in_pixels-pev->height)/2;
+				pev->value_mask |= XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y;
+			}
 			
 			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return pev->window == p.first;
@@ -618,7 +635,7 @@ sint Default::HandleEvent(){
 			if(pclient1)
 				pclient1->UpdateTranslation(&rect);
 
-			DebugPrintf(stdout,"configure request: %u | %u, %u, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
+			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
 			}
 			break;
 		case XCB_MAP_REQUEST:{
@@ -640,15 +657,21 @@ sint Default::HandleEvent(){
 
 			WManager::Rectangle *prect = 0;
 			X11Client *pbaseClient = 0;
-			uint hints = 0;
+			uint hintFlags = 0;
 
+			xcb_get_property_cookie_t propertyCookieHints = xcb_icccm_get_wm_hints(pcon,pev->window);
 			xcb_get_property_cookie_t propertyCookieNormalHints = xcb_icccm_get_wm_normal_hints(pcon,pev->window);
 			xcb_get_property_cookie_t propertyCookieWindowType
 				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
 			xcb_get_property_cookie_t propertyCookieWindowState
 				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_STATE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
+			xcb_get_property_cookie_t propertyCookieStrut
+				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_STRUT_PARTIAL,XCB_ATOM_CARDINAL,0,std::numeric_limits<uint32_t>::max());
 			xcb_get_property_cookie_t propertyCookieTransientFor
 				= xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
+
+			xcb_icccm_wm_hints_t hints;
+			bool boolHints = xcb_icccm_get_wm_hints_reply(pcon,propertyCookieHints,&hints,0);
 
 			xcb_size_hints_t sizeHints;
 			bool boolSizeHints = xcb_icccm_get_wm_size_hints_reply(pcon,propertyCookieNormalHints,&sizeHints,0);
@@ -656,14 +679,20 @@ sint Default::HandleEvent(){
 				= xcb_get_property_reply(pcon,propertyCookieWindowType,0);
 			xcb_get_property_reply_t *propertyReplyWindowState
 				= xcb_get_property_reply(pcon,propertyCookieWindowState,0);
+			xcb_get_property_reply_t *propertyReplyStrut
+				= xcb_get_property_reply(pcon,propertyCookieStrut,0);
 			xcb_get_property_reply_t *propertyReplyTransientFor
 				= xcb_get_property_reply(pcon,propertyCookieTransientFor,0);
 
+			if(boolHints){
+				if(hints.flags & XCB_ICCCM_WM_HINT_INPUT && hints.input)
+					hintFlags |= X11Client::CreateInfo::HINT_NO_INPUT;
+			}
 			if(boolSizeHints){
 				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE &&
 				sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE &&
 				sizeHints.min_width == sizeHints.max_width &&
-				sizeHints.min_height == sizeHints.min_height){
+				sizeHints.min_height == sizeHints.max_height){
 					//
 					{
 						auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
@@ -690,16 +719,16 @@ sint Default::HandleEvent(){
 						prect = m != configCache.end()?&(*m).second:0;
 					}
 
-					hints |= 
+					hintFlags |= 
 						(*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP?X11Client::CreateInfo::HINT_DESKTOP:0)|
-						(*patom == ewmh._NET_WM_WINDOW_TYPE_DOCK?X11Client::CreateInfo::HINT_ABOVE:0);
+						(*patom == ewmh._NET_WM_WINDOW_TYPE_DOCK?X11Client::CreateInfo::HINT_ABOVE:0); //TODO: could be overriden with BELOW hint
 				}
 				free(propertyReplyWindowType);
 			}
 			if(propertyReplyWindowState){
 				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowState);
 				if(*patom == ewmh._NET_WM_STATE_MODAL ||
-					*patom == ewmh._NET_WM_STATE_ABOVE ||
+					//*patom == ewmh._NET_WM_STATE_ABOVE ||
 					*patom == ewmh._NET_WM_STATE_SKIP_TASKBAR){
 					if(!prect){
 						auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
@@ -708,9 +737,21 @@ sint Default::HandleEvent(){
 						prect = m != configCache.end()?&(*m).second:0;
 					}
 
-					hints |= (*patom == ewmh._NET_WM_STATE_ABOVE?X11Client::CreateInfo::HINT_ABOVE:0);
+					hintFlags |= 
+						(*patom == ewmh._NET_WM_STATE_ABOVE?X11Client::CreateInfo::HINT_ABOVE:0)|
+						(*patom == ewmh._NET_WM_STATE_BELOW?X11Client::CreateInfo::HINT_DESKTOP:0);
 				}
 				free(propertyReplyWindowState);
+			}
+			if(hintFlags & X11Client::CreateInfo::HINT_DESKTOP){
+				//TODO: get strut
+				//uint32_t *pstrut = (uint32_t*)xcb_get_property_value(propertyReplyStrut);
+				//TODO: set window x,y
+				/*if(pstrut[2] > 0 && pstrut[3] == 0)
+					; //place top of the desktop, y = 0
+				else
+				if(pstrut[3] > 0 && pstrut[2] == 0)
+					; //place bottom of the desktop, y = max-h*/
 			}
 			if(propertyReplyTransientFor){
 				xcb_window_t *pbaseWindow = (xcb_window_t*)xcb_get_property_value(propertyReplyTransientFor);
@@ -732,14 +773,14 @@ sint Default::HandleEvent(){
 			createInfo.window = pev->window;
 			createInfo.prect = prect;
 			createInfo.pstackContainer =
-				!(hints & X11Client::CreateInfo::HINT_DESKTOP)?
-					((pbaseClient && !(hints & X11Client::CreateInfo::HINT_ABOVE))?
+				!(hintFlags & X11Client::CreateInfo::HINT_DESKTOP)?
+					((pbaseClient && !(hintFlags & X11Client::CreateInfo::HINT_ABOVE))?
 						pbaseClient->pcontainer
 					:GetRoot())
 				:0;
 			createInfo.pbackend = this;
 			createInfo.mode = X11Client::CreateInfo::CREATE_CONTAINED;
-			createInfo.hints = hints;
+			createInfo.hints = hintFlags;
 			createInfo.pwmName = &wmName;
 			createInfo.pwmClass = &wmClass;
 			X11Client *pclient = SetupClient(&createInfo);
