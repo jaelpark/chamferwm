@@ -691,8 +691,8 @@ sint Default::HandleEvent(){
 			if(boolSizeHints){
 				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE &&
 				sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE &&
-				sizeHints.min_width == sizeHints.max_width &&
-				sizeHints.min_height == sizeHints.max_height){
+				(sizeHints.min_width == sizeHints.max_width ||
+				sizeHints.min_height == sizeHints.max_height)){
 					//
 					{
 						auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
