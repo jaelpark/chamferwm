@@ -54,12 +54,20 @@ def GetFocusTiled():
 	return focusPrev;
 
 class Container(chamfer.Container):
-	def OnSetup(self):
+	#setup the container before it's created (dimensions)
+	def OnSetupContainer(self):
 		self.borderWidth = (0.015,0.015);
 		self.minSize = (0.4,0.3);
 
 		self.splitArmed = False;
 
+	#setup the client before it's created (shaders)
+	def OnSetupClient(self):
+		self.vertexShader = "frame_vertex.spv";
+		self.geometryShader = "frame_geometry.spv";
+		self.fragmentShader = "frame_fragment.spv";
+
+	#select and assign a parent container
 	def OnParent(self):
 		focus = chamfer.GetFocus();
 		if hasattr(focus,'splitArmed') and focus.splitArmed:
@@ -71,11 +79,16 @@ class Container(chamfer.Container):
 			return focus; #root container
 
 		return parent;
-	
+
+	#called once client has been created and mapped to display
 	def OnCreate(self):
-		print("created client, {} ({})".format(self.wm_name,self.wm_class));
+		try:
+			print("created client, {} ({})".format(self.wm_name,self.wm_class));
+		except UnicodeDecodeError:
+			pass;
 		self.Focus();
-	
+
+	#called every time a client property has changed (title etc.)
 	def OnPropertyChange(self, propId):
 		print(self.wm_name);
 		
@@ -312,15 +325,9 @@ class Backend(chamfer.Backend):
 			self.batteryAlarmLevel = 0;
 
 class Compositor(chamfer.Compositor):
-	def __init__(self):
-		#self.shaderPath = "../";
-		print(self.shaderPath);
-	
-	#def SetupGraphics(self):
-	#	shader = self.LoadShader("frame_vertex.spv");
-
-	def OnPropertyChange(self, prop):
-		pass;
+	def OnLoadShaders(self):
+		#TODO: instead of this, take paths which to glob for shaders (command line)
+		return ["frame_vertex.spv","frame_geometry.spv","frame_fragment.spv"];
 
 backend = Backend();
 chamfer.bind_Backend(backend);

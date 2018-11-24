@@ -21,7 +21,8 @@ public:
 	virtual ~ContainerInterface();
 	void CopySettingsSetup(WManager::Container::Setup &);
 	void CopySettingsContainer();
-	virtual void OnSetup();
+	virtual void OnSetupContainer();
+	virtual void OnSetupClient();
 	virtual boost::python::object OnParent();
 	virtual void OnCreate();
 	enum PROPERTY_ID{
@@ -45,6 +46,10 @@ public:
 	std::string wm_class;
 	//bool floating;
 
+	std::string vertexShader;
+	std::string geometryShader;
+	std::string fragmentShader;
+
 	WManager::Container *pcontainer;
 	boost::python::object self;
 };
@@ -53,7 +58,8 @@ class ContainerProxy : public ContainerInterface, public boost::python::wrapper<
 public:
 	ContainerProxy();
 	~ContainerProxy();
-	void OnSetup();
+	void OnSetupContainer();
+	void OnSetupClient();
 	boost::python::object OnParent();
 	void OnCreate();
 	void OnPropertyChange(PROPERTY_ID);

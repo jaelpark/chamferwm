@@ -34,10 +34,11 @@ public:
 
 class ShaderModule{
 public:
-	ShaderModule(const Blob *, const class CompositorInterface *);
+	ShaderModule(const char *, const Blob *, const class CompositorInterface *);
 	~ShaderModule();
 
 	const class CompositorInterface *pcomp;
+	const char *pname;
 	VkShaderModule shaderModule;
 	VkDescriptorSetLayout *pdescSetLayouts;
 	uint setCount;

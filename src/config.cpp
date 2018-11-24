@@ -10,7 +10,10 @@ namespace Config{
 ContainerInterface::ContainerInterface() :
 borderWidth(boost::python::make_tuple(0.0f,0.0f)),
 minSize(boost::python::make_tuple(0.0f,0.0f)),
-maxSize(boost::python::make_tuple(1.0f,1.0f)){
+maxSize(boost::python::make_tuple(1.0f,1.0f)){//,
+//vertexShader("frame_vertex.spv"),
+//geometryShader("frame_geometry.spv"),
+//fragmentShader("frame_fragment.spv"){
 	//
 }
 
@@ -43,7 +46,11 @@ void ContainerInterface::CopySettingsContainer(){
 	}
 }
 
-void ContainerInterface::OnSetup(){
+void ContainerInterface::OnSetupContainer(){
+	//
+}
+
+void ContainerInterface::OnSetupClient(){
 	//
 }
 
@@ -165,8 +172,8 @@ ContainerProxy::~ContainerProxy(){
 	//
 }
 
-void ContainerProxy::OnSetup(){
-	boost::python::override ovr = this->get_override("OnSetup");
+void ContainerProxy::OnSetupContainer(){
+	boost::python::override ovr = this->get_override("OnSetupContainer");
 	if(ovr){
 		try{
 			ovr();
@@ -176,7 +183,21 @@ void ContainerProxy::OnSetup(){
 			boost::python::handle_exception();
 			PyErr_Clear();
 		}
-	}else ContainerInterface::OnSetup();
+	}else ContainerInterface::OnSetupContainer();
+}
+
+void ContainerProxy::OnSetupClient(){
+	boost::python::override ovr = this->get_override("OnSetupClient");
+	if(ovr){
+		try{
+			ovr();
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else ContainerInterface::OnSetupClient();
 }
 
 boost::python::object ContainerProxy::OnParent(){
@@ -494,7 +515,8 @@ BOOST_PYTHON_MODULE(chamfer){
 		.value("CLASS",ContainerInterface::PROPERTY_ID_CLASS);
 
 	boost::python::class_<ContainerProxy,boost::noncopyable>("Container")
-		.def("OnSetup",&ContainerInterface::OnSetup)
+		.def("OnSetupContainer",&ContainerInterface::OnSetupContainer)
+		.def("OnSetupClient",&ContainerInterface::OnSetupClient)
 		.def("OnParent",&ContainerInterface::OnParent)
 		.def("OnCreate",&ContainerInterface::OnCreate)
 		.def("OnProperty",&ContainerInterface::OnPropertyChange)
@@ -534,6 +556,9 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("maxSize",&ContainerInterface::maxSize)
 		.def_readonly("wm_name",&ContainerInterface::wm_name)
 		.def_readonly("wm_class",&ContainerInterface::wm_class)
+		.def_readwrite("vertexShader",&ContainerInterface::vertexShader)
+		.def_readwrite("geometryShader",&ContainerInterface::geometryShader)
+		.def_readwrite("fragmentShader",&ContainerInterface::fragmentShader)
 		.add_property("layout",boost::python::make_function(
 			[](ContainerInterface &container){
 				return container.pcontainer->layout;

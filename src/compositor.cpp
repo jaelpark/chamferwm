@@ -11,12 +11,39 @@
 
 namespace Compositor{
 
-ClientFrame::ClientFrame(uint w, uint h, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), fullRegionUpdate(false){
+ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), fullRegionUpdate(false){
 	pcomp->updateQueue.push_back(this);
 	fullRegionUpdate = true;
 
 	ptexture = pcomp->CreateTexture(w,h);
-	if(!AssignPipeline(pcomp->pdefaultPipeline))
+	auto m = std::find_if(pcomp->pipelines.begin(),pcomp->pipelines.end(),[&](auto &r)->bool{
+		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+			if(strcmp(r.pshaderModule[i]->pname,pshaderName[i]) != 0)
+				return false;
+		return true;
+	});
+	Pipeline *pPipeline;
+	if(m != pcomp->pipelines.end())
+		pPipeline = &(*m);
+	else{
+		ShaderModule *pshader[Pipeline::SHADER_MODULE_COUNT];
+		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+			auto n = std::find_if(pcomp->shaders.begin(),pcomp->shaders.end(),[&](auto &r)->bool{
+				return strcmp(r.pname,pshaderName[i]) == 0;
+			});
+			if(n == pcomp->shaders.end()){
+				snprintf(Exception::buffer,sizeof(Exception::buffer),"Shader not found: %s.",pshaderName[i]);
+				throw Exception();
+			}
+			pshader[i] = &(*n);
+		}
+		pcomp->pipelines.reserve(pcomp->pipelines.size());
+		pPipeline = &pcomp->pipelines.emplace_back(
+			pshader[Pipeline::SHADER_MODULE_VERTEX],
+			pshader[Pipeline::SHADER_MODULE_GEOMETRY],
+			pshader[Pipeline::SHADER_MODULE_FRAGMENT],pcomp);
+	}
+	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
 	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
 
@@ -574,24 +601,9 @@ void CompositorInterface::InitializeRenderEngine(){
 	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcopyCommandBuffers) != VK_SUCCESS)
 		throw Exception("Failed to allocate copy command buffer.");
 
-	shaders.reserve(3);
+	shaders.reserve(1024);
 
-	//load compositor resources
-	Blob blob("frame_vertex.spv");
-	ShaderModule &pvertexShader = shaders.emplace_back(&blob,this);
-
-	blob.~Blob();
-	new(&blob) Blob("frame_geometry.spv");
-	ShaderModule &pgeometryShader = shaders.emplace_back(&blob,this);
-
-	blob.~Blob();
-	new(&blob) Blob("frame_fragment.spv");
-	ShaderModule &pfragmentShader = shaders.emplace_back(&blob,this);
-
-	pipelines.reserve(1);
-	
-	pdefaultPipeline = &pipelines.emplace_back(&pvertexShader,&pgeometryShader,&pfragmentShader,this);
-
+	pipelines.reserve(1024);
 }
 
 void CompositorInterface::DestroyRenderEngine(){
@@ -636,6 +648,10 @@ void CompositorInterface::DestroyRenderEngine(){
 
 	vkDestroySurfaceKHR(instance,surface,0);
 	vkDestroyInstance(instance,0);
+}
+
+void CompositorInterface::AddShader(const char *pname, const Blob *pblob){
+	shaders.emplace_back(pname,pblob,this);
 }
 
 void CompositorInterface::WaitIdle(){
@@ -769,8 +785,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	renderPassBeginInfo.pClearValues = &clearValue;
 	vkCmdBeginRenderPass(pcommandBuffers[currentFrame],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pdefaultPipeline->pipeline);
-
 	clock_gettime(CLOCK_MONOTONIC,&frameTime);
 
 	//for(RenderObject &renderObject : renderQueue){
@@ -811,6 +825,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		scissor.extent.width += 2*borderWidth.x;
 		scissor.offset.y = std::max(scissor.offset.y-borderWidth.y,0);
 		scissor.extent.height += 2*borderWidth.y;
+
+		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
 		vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
 		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.flags,&pcommandBuffers[currentFrame]);
@@ -956,7 +972,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){// : ClientFrame(_pcomp), X11Client(_pcreateInfo){
+X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pshaderName,_pcomp){// : ClientFrame(_pcomp), X11Client(_pcreateInfo){
 	//
 	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	//xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
@@ -1201,7 +1217,7 @@ VkExtent2D X11Compositor::GetExtent() const{
 	return e;
 }
 
-X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, CompositorInterface *_pcomp) : DebugClient(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pcomp){
+X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : DebugClient(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pshaderName,_pcomp){
 	//
 }
 

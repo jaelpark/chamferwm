@@ -175,7 +175,7 @@ void Texture::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prect
 	imageLayout = imageMemoryBarrier.newLayout;
 }
 
-ShaderModule::ShaderModule(const Blob *pblob, const CompositorInterface *_pcomp) : pcomp(_pcomp){
+ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const CompositorInterface *_pcomp) : pcomp(_pcomp), pname(mstrdup(_pname)){
 	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(pblob->GetBufferPointer());
@@ -229,6 +229,7 @@ ShaderModule::ShaderModule(const Blob *pblob, const CompositorInterface *_pcomp)
 }
 
 ShaderModule::~ShaderModule(){
+	mstrfree(pname);
 	for(Binding &b : bindings)
 		mstrfree(b.pname);
 	for(uint i = 0; i < setCount; ++i)

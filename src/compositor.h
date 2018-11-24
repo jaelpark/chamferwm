@@ -17,7 +17,7 @@ class ClientFrame{
 friend class CompositorInterface;
 //friend class FrameObject;
 public:
-	ClientFrame(uint, uint, class CompositorInterface *);
+	ClientFrame(uint, uint, const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	void Draw(const VkRect2D &, const glm::vec2 &, uint, const VkCommandBuffer *);
@@ -53,6 +53,7 @@ public:
 protected:
 	void InitializeRenderEngine();
 	void DestroyRenderEngine();
+	void AddShader(const char *, const Blob *);
 	void WaitIdle();
 	void CreateRenderQueue(const WManager::Container *, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *, const WManager::Container *);
 	bool PollFrameFence();
@@ -112,19 +113,11 @@ protected:
 		BACKGROUND_DIRTY
 	} background;
 
-	//placeholder variables
-public:
-	Pipeline *pdefaultPipeline; //temp?
-private:
-
 	VkSampler pointSampler;
-	//const char *pshaderPath;
 
 	struct timespec frameTime;
 	uint64 frameTag;
 
-	//std::vector<renderObject *> renderQueue;
-	//std::vector<FrameObject> frameObjectPool;
 	struct RenderObject{
 		WManager::Client *pclient;
 		ClientFrame *pclientFrame;
@@ -161,7 +154,7 @@ private:
 
 class X11ClientFrame : public Backend::X11Client, public ClientFrame{
 public:
-	X11ClientFrame(WManager::Container *, const Backend::X11Client::CreateInfo *, CompositorInterface *);
+	X11ClientFrame(WManager::Container *, const Backend::X11Client::CreateInfo *, const char *[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *);
 	~X11ClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	void AdjustSurface1();
@@ -199,7 +192,7 @@ protected:
 
 class X11DebugClientFrame : public Backend::DebugClient, public ClientFrame{
 public:
-	X11DebugClientFrame(WManager::Container *, const Backend::DebugClient::CreateInfo *, CompositorInterface *);
+	X11DebugClientFrame(WManager::Container *, const Backend::DebugClient::CreateInfo *, const char *[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *);
 	~X11DebugClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	void AdjustSurface1();

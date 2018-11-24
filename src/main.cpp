@@ -42,7 +42,7 @@ Blob::Blob(const char *pfileName){
 
 		//search in the binary directory
 		char path[256];
-		size_t len = readlink("/proc/self/exe",path,sizeof(path));
+		ssize_t len = readlink("/proc/self/exe",path,sizeof(path));
 		if(len == -1)
 			throw Exception("readlink() failed for /proc/self/exe.\n");
 		path[len] = 0;
@@ -124,7 +124,7 @@ public:
 		Config::ContainerInterface &containerInt = containerExtract();
 		containerInt.self = containerObject;
 
-		containerInt.OnSetup();
+		containerInt.OnSetupContainer();
 
 		WManager::Container::Setup setup;
 		setup.mode = WManager::Container::MODE_TILED;
@@ -163,7 +163,7 @@ public:
 		Config::ContainerInterface &containerInt = containerExtract();
 		containerInt.self = containerObject;
 
-		containerInt.OnSetup();
+		containerInt.OnSetupContainer();
 
 		WManager::Container::Setup setup;
 		setup.mode = WManager::Container::MODE_FLOATING;
@@ -323,9 +323,11 @@ public:
 		//Containers should be created always under the parent of the current focus.
 		//config script should manage this (point to container which should be the parent of the
 		//new one), while also setting some of the parameters like border width and such.
-		//under the menus
+		static const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
+			"frame_vertex.spv","frame_geometry.spv","frame_fragment.spv"
+		};
 		if(pcreateInfo->mode == Backend::X11Client::CreateInfo::CREATE_AUTOMATIC){
-			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo);
+			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo,pshaderName);
 			if(pclient11)
 				stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
 			return pclient11;
@@ -335,20 +337,29 @@ public:
 				SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0):
 				SetupFloating<Config::X11ContainerConfig,DefaultBackend>();
 
-			Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo);
+			containerInt.wm_name = pcreateInfo->pwmName->pstr;
+			containerInt.wm_class = pcreateInfo->pwmClass->pstr;
+			containerInt.vertexShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX];
+			containerInt.geometryShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY];
+			containerInt.fragmentShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT];
+			containerInt.OnSetupClient();
+
+			//defaults in config constructor
+			const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
+				containerInt.vertexShader.c_str(),containerInt.geometryShader.c_str(),containerInt.fragmentShader.c_str()
+			};
+			Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo,pshaderName);
 			containerInt.pcontainer->pclient = pclient11;
 			if(pcreateInfo->prect && (pcreateInfo->pstackContainer || pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_DESKTOP))
 				stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
 
-			containerInt.wm_name = pcreateInfo->pwmName->pstr;
-			containerInt.wm_class = pcreateInfo->pwmClass->pstr;
 			containerInt.OnCreate();
 
 			return pclient11;
 		}
 	}
 
-	Backend::X11Client * SetupClient(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *pcreateInfo){
+	Backend::X11Client * SetupClient(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *pcreateInfo, const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT]){
 		Backend::X11Client *pclient11;
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 		if(!pcomp11)
@@ -356,7 +367,7 @@ public:
 		else{
 			if(pcreateInfo->window == pcomp11->overlay)
 				return 0;
-			pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pcomp11);
+			pclient11 = new Compositor::X11ClientFrame(pcontainer,pcreateInfo,pshaderName,pcomp11);
 		}
 
 		return pclient11;
@@ -374,7 +385,6 @@ public:
 			Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 			if(pcomp11)
 				pcomp11->SetBackgroundPixmap(pPixmapProperty);
-			printf("background!\n");
 		}
 		if(pclient->pcontainer == proot)
 			return;
@@ -495,11 +505,15 @@ public:
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
 		Config::ContainerInterface &containerInt = SetupContainer<Config::DebugContainerConfig,DebugBackend>(0);
 
+		static const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
+			"frame_vertex.spv","frame_geometry.spv","frame_fragment.spv"
+		};
+
 		Backend::DebugClient *pclient;
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
 		if(!pcomp11)
 			pclient = new Backend::DebugClient(containerInt.pcontainer,pcreateInfo);
-		else pclient = new Compositor::X11DebugClientFrame(containerInt.pcontainer,pcreateInfo,pcomp11);
+		else pclient = new Compositor::X11DebugClientFrame(containerInt.pcontainer,pcreateInfo,pshaderName,pcomp11);
 		containerInt.pcontainer->pclient = pclient;
 
 		containerInt.OnCreate();
@@ -578,8 +592,20 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Container *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend) : X11Compositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
+	DefaultCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Container *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11Compositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
 		Start();
+
+		for(auto &m : args::get(shaderPaths)){
+			boost::filesystem::directory_iterator end;
+			for(boost::filesystem::directory_iterator di(m); di != end; ++di){
+				if(boost::filesystem::is_regular_file(di->status()) &&
+					boost::filesystem::extension(di->path()) == ".spv"){
+					Blob blob(di->path().string().c_str());
+					AddShader(di->path().filename().string().c_str(),&blob);
+				}
+			}
+		}
+
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
 
@@ -601,8 +627,20 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Container *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend) : X11DebugCompositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
+	DebugCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Container *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11DebugCompositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
 		Compositor::X11DebugCompositor::Start();
+
+		for(auto &m : args::get(shaderPaths)){
+			boost::filesystem::directory_iterator end;
+			for(boost::filesystem::directory_iterator di(m); di != end; ++di){
+				if(boost::filesystem::is_regular_file(di->status()) &&
+					boost::filesystem::extension(di->path()) == ".spv"){
+					Blob blob(di->path().string().c_str());
+					AddShader(di->path().filename().string().c_str(),&blob);
+				}
+			}
+		}
+
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
 
@@ -648,11 +686,12 @@ int main(sint argc, const char **pargv){
 	args::ValueFlag<std::string> configPath(parser,"path","Configuration Python script",{"config",'c'},"config.py");
 
 	args::Group group_backend(parser,"Backend",args::Group::Validators::DontCare);
-	args::Flag debugBackend(group_backend,"debugBackend","Create a test environment for the compositor engine without redirection. The application will not as a window manager.",{'d',"debug-backend"});
+	args::Flag debugBackend(group_backend,"debugBackend","Create a test environment for the compositor engine without redirection. The application will not act as a window manager.",{'d',"debug-backend"});
 
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
 	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
 	args::ValueFlag<uint> gpuIndex(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"},0);
+	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension.",{"shader-path"});
 	//args::ValueFlag<std::string> shaderPath(group_comp,"path","Path to SPIR-V shader binary blobs",{"shader-path"},".");
 
 	try{
@@ -691,8 +730,8 @@ int main(sint argc, const char **pargv){
 			pcomp = new NullCompositor();
 		else
 		if(debugBackend.Get())
-			pcomp = new DebugCompositor(gpuIndex.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11);
-		else pcomp = new DefaultCompositor(gpuIndex.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11);
+			pcomp = new DebugCompositor(gpuIndex.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
+		else pcomp = new DefaultCompositor(gpuIndex.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
 
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());

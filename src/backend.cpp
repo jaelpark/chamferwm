@@ -614,10 +614,6 @@ sint Default::HandleEvent(){
 				{XCB_CONFIG_WINDOW_Y,rect.y},
 				{XCB_CONFIG_WINDOW_WIDTH,rect.w},
 				{XCB_CONFIG_WINDOW_HEIGHT,rect.h},
-				//{XCB_CONFIG_WINDOW_X,pev->x},
-				//{XCB_CONFIG_WINDOW_Y,pev->y},
-				//{XCB_CONFIG_WINDOW_WIDTH,pev->width},
-				//{XCB_CONFIG_WINDOW_HEIGHT,pev->height},
 				{XCB_CONFIG_WINDOW_BORDER_WIDTH,pev->border_width},
 				{XCB_CONFIG_WINDOW_SIBLING,pev->sibling},
 				{XCB_CONFIG_WINDOW_STACK_MODE,pev->stack_mode}
