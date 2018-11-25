@@ -80,16 +80,6 @@ boost::python::object ContainerInterface::GetNext() const{
 boost::python::object ContainerInterface::GetPrev() const{
 	if(!pcontainer)
 		return boost::python::object();
-	//TODO: do this in script?
-	/*if(pcontainer->mode == WManager::Container::MODE_FLOATING){
-		ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pcontainer);
-		const WManager::Container *ptreeFocus = pcontainer1->pbackend->GetRoot();
-		for(const WManager::Container *pcontainer = ptreeFocus; pcontainer; ptreeFocus = pcontainer, pcontainer = pcontainer->GetFocus());
-
-		pcontainer1 = dynamic_cast<ContainerConfig *>(ptreeFocus);
-		return ptreeFocus;
-	}*/
-	//if floating, ResetFocus(...) //pcontainer1->pbackend->GetRoot()
 	WManager::Container *pPrev = pcontainer->GetPrev();
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pPrev);
 	if(pcontainer1)
@@ -357,11 +347,9 @@ void BackendInterface::Bind(boost::python::object obj){
 }
 
 void BackendInterface::SetFocus(WManager::Container *pcontainer){
-	if(!pcontainer)
+	if(!pcontainer || pcontainer->flags & WManager::Container::FLAG_NO_FOCUS)
 		return;
-	//if(pcontainer->pclient && noInput)
-		//return;
-	if(pcontainer->mode == WManager::Container::MODE_FLOATING){
+	if(pcontainer->flags & WManager::Container::FLAG_FLOATING){
 		floatFocusQueue.erase(std::remove(floatFocusQueue.begin(),floatFocusQueue.end(),pcontainer),floatFocusQueue.end());
 		floatFocusQueue.push_back(pcontainer);
 	}
@@ -551,6 +539,10 @@ BOOST_PYTHON_MODULE(chamfer){
 				container.CopySettingsContainer();
 				container.pcontainer->SetLayout(layout);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, WManager::Container::LAYOUT>()))
+		.def("IsFloating",boost::python::make_function(
+			[](ContainerInterface &container){
+				return container.pcontainer->flags & WManager::Container::FLAG_FLOATING;
+			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
 		.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
 		.def_readwrite("minSize",&ContainerInterface::minSize)
 		.def_readwrite("maxSize",&ContainerInterface::maxSize)
@@ -563,10 +555,6 @@ BOOST_PYTHON_MODULE(chamfer){
 			[](ContainerInterface &container){
 				return container.pcontainer->layout;
 			},boost::python::default_call_policies(),boost::mpl::vector<WManager::Container::LAYOUT, ContainerInterface &>()))
-		.add_property("mode",boost::python::make_function(
-			[](ContainerInterface &container){
-				return container.pcontainer->mode;
-			},boost::python::default_call_policies(),boost::mpl::vector<WManager::Container::MODE, ContainerInterface &>()))
 		;
 	
 	boost::python::enum_<WManager::Container::ADJACENT>("adjacent")
@@ -578,10 +566,6 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::enum_<WManager::Container::LAYOUT>("layout")
 		.value("VSPLIT",WManager::Container::LAYOUT_VSPLIT)
 		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT);
-
-	boost::python::enum_<WManager::Container::MODE>("mode")
-		.value("TILED",WManager::Container::MODE_TILED)
-		.value("FLOATING",WManager::Container::MODE_FLOATING);
 
 	boost::python::class_<BackendProxy,boost::noncopyable>("Backend")
 		.def("OnSetupKeys",&BackendInterface::OnSetupKeys)

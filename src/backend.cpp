@@ -568,7 +568,7 @@ sint Default::HandleEvent(){
 			//check if window already exists
 			//further configuration should be blocked (for example Firefox on restore session)
 			X11Client *pclient1 = FindClient(pev->window,MODE_MANUAL);
-			if(pclient1 && pclient1->pcontainer->mode != WManager::Container::MODE_FLOATING)
+			if(pclient1 && !(pclient1->pcontainer->flags & WManager::Container::FLAG_FLOATING))
 				break;
 
 			//TODO: allow x,y configuration if dock or desktop feature

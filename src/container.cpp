@@ -16,18 +16,18 @@ Client::~Client(){
 Container::Container() : pParent(0), pch(0), pnext(0),
 	pclient(0),
 	//scale(1.0f), p(0.0f), e(1.0f), borderWidth(0.0f), minSize(0.0f), maxSize(1.0f), mode(MODE_TILED),
-	scale(1.0f), p(0.0f), e(1.0f), borderWidth(0.015f), minSize(0.015f), maxSize(1.0f), mode(MODE_TILED),
-	layout(LAYOUT_VSPLIT){//, flags(0){
+	scale(1.0f), p(0.0f), e(1.0f), borderWidth(0.015f), minSize(0.015f), maxSize(1.0f),
+	flags(0), layout(LAYOUT_VSPLIT){//, flags(0){
 	//
 }
 
 Container::Container(Container *_pParent, const Setup &setup) :
 	pParent(_pParent), pch(0), pnext(0),
 	pclient(0),
-	scale(1.0f), borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize), mode(setup.mode),
-	layout(LAYOUT_VSPLIT){//, flags(setup.flags){
+	scale(1.0f), borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
+	flags(setup.flags), layout(LAYOUT_VSPLIT){//, flags(setup.flags){
 
-	if(mode == MODE_FLOATING)
+	if(flags & FLAG_FLOATING)
 		return;
 
 	//TODO: allow reparenting containers without client
@@ -96,7 +96,7 @@ Container::~Container(){
 
 void Container::Place(Container *pParent1){
 	//TODO: reparent the floating container
-	if(mode == MODE_FLOATING)
+	if(flags & FLAG_FLOATING)
 		return;
 	pParent = pParent1;
 	if(pParent->focusQueue.size() > 0){
@@ -117,7 +117,7 @@ void Container::Place(Container *pParent1){
 }
 
 Container * Container::Remove(){
-	if(mode == MODE_FLOATING)
+	if(flags & FLAG_FLOATING)
 		return this;
 	Container *pbase = pParent, *pch1 = this; //remove all the split containers (although there should be only one)
 	for(; pbase->pParent; pch1 = pbase, pbase = pbase->pParent){
@@ -140,7 +140,7 @@ Container * Container::Remove(){
 }
 
 Container * Container::Collapse(){
-	if(mode == MODE_FLOATING)
+	if(flags & FLAG_FLOATING)
 		return 0;
 	if(!pParent || !pch)
 		return 0;
@@ -195,7 +195,7 @@ Container * Container::Collapse(){
 }
 
 void Container::Focus(){
-	if(mode == MODE_FLOATING){
+	if(flags & FLAG_FLOATING){
 		Stack1();
 		Focus1();
 		return;
@@ -211,7 +211,7 @@ void Container::Focus(){
 }
 
 Container * Container::GetNext(){
-	if(mode == MODE_FLOATING)
+	if(flags & FLAG_FLOATING)
 		return this;
 	if(!pParent)
 		return this; //root container
@@ -221,7 +221,7 @@ Container * Container::GetNext(){
 }
 
 Container * Container::GetPrev(){
-	if(mode == MODE_FLOATING)
+	if(flags & FLAG_FLOATING)
 		return this;
 	if(!pParent)
 		return this; //root container
@@ -333,7 +333,7 @@ Container * Container::GetAdjacent(ADJACENT d){
 }
 
 void Container::MoveNext(){
-	if(mode == MODE_FLOATING)
+	if(flags & FLAG_FLOATING)
 		return;
 	if(!pParent)
 		return;

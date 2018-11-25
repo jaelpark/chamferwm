@@ -19,6 +19,7 @@ class Key(Enum):
 	FOCUS_PARENT = auto()
 	FOCUS_CHILD = auto()
 	FOCUS_FLOAT = auto()
+	FOCUS_FLOAT_PREV = auto()
 
 	FOCUS_PARENT_RIGHT = auto()
 	FOCUS_PARENT_LEFT = auto()
@@ -106,6 +107,7 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('a'),chamfer.MOD_MASK_1,Key.FOCUS_PARENT.value);
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
 			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1,Key.FOCUS_FLOAT.value);
+			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.FOCUS_FLOAT_PREV.value);
 
 			binder.BindKey(ord('l'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_RIGHT.value);
 			binder.BindKey(ord('h'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_LEFT.value);
@@ -170,13 +172,13 @@ class Backend(chamfer.Backend):
 		parent = focus.GetParent();
 
 		if keyId == Key.FOCUS_RIGHT.value:
-			focus = GetFocusTiled() if focus.mode == chamfer.mode.FLOATING else focus.GetNext();
+			focus = GetFocusTiled() if focus.IsFloating() else focus.GetNext();
 			#focus = focus.GetNext();
 			#focus = focus.GetAdjacent(chamfer.adjacent.RIGHT);
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_LEFT.value:
-			focus = GetFocusTiled() if focus.mode == chamfer.mode.FLOATING else focus.GetPrev();
+			focus = GetFocusTiled() if focus.IsFloating() else focus.GetPrev();
 			#focus = focus.GetPrev();
 			#focus = focus.GetAdjacent(chamfer.adjacent.LEFT);
 			focus.Focus();
@@ -210,11 +212,13 @@ class Backend(chamfer.Backend):
 
 		elif keyId == Key.FOCUS_FLOAT.value:
 			focus = focus.GetFloatFocus();
-			print("focusing float");
 			if focus is None:
 				return;
-			print("ok");
 			focus.Focus();
+
+		elif keyId == Key.FOCUS_FLOAT_PREV.value:
+			#TODO, get previous from the focus history
+			pass;
 
 		elif keyId == Key.FOCUS_PARENT_RIGHT.value:
 			if parent is None:

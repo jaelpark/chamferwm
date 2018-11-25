@@ -19,19 +19,15 @@ public:
 	//virtual functions for the backend implementation
 	virtual void UpdateTranslation() = 0;
 	virtual void Kill() = 0;
-	//Resize
-	//SetLayer
-	//virtual Rectangle GetRect() const = 0;
 	Rectangle rect; //pixel coordinates of the client
-	//TODO: scale; //scaling of the client inside the container
 	class Container *pcontainer;
 };
 
 class Container{
 public:
-	enum MODE{
-		MODE_TILED,
-		MODE_FLOATING,
+	enum FLAG{
+		FLAG_FLOATING = 0x1,
+		FLAG_NO_FOCUS = 0x2
 	};
 	struct Setup{
 		//Border width can be set anytime before the client creation
@@ -39,7 +35,7 @@ public:
 		//For performance reasons, the min/maxSize has to be known before the container is created.
 		glm::vec2 minSize = glm::vec2(0.0f);
 		glm::vec2 maxSize = glm::vec2(1.0f);
-		MODE mode;
+		uint flags;
 		/*enum INSERT{
 			INSERT_APPEND,
 			INSERT_REPARENT //always with client
@@ -107,15 +103,8 @@ public:
 	glm::vec2 minSize;
 	glm::vec2 maxSize;
 
-	MODE mode;
+	uint flags;
 	LAYOUT layout;
-
-	/*enum FLAG{
-		FLAG_FLOATING = 0x1,
-		FLAG_HIDDEN = 0x2
-	};
-	uint flags;*/
-
 };
 
 }

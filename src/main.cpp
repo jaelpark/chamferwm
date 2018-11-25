@@ -127,7 +127,6 @@ public:
 		containerInt.OnSetupContainer();
 
 		WManager::Container::Setup setup;
-		setup.mode = WManager::Container::MODE_TILED;
 		containerInt.CopySettingsSetup(setup);
 	
 		if(!pParent){
@@ -166,7 +165,7 @@ public:
 		containerInt.OnSetupContainer();
 
 		WManager::Container::Setup setup;
-		setup.mode = WManager::Container::MODE_FLOATING;
+		setup.flags = WManager::Container::FLAG_FLOATING;
 		containerInt.CopySettingsSetup(setup);
 	
 		T *pcontainer = new T(&containerInt,proot,setup,static_cast<U*>(this));
@@ -339,12 +338,16 @@ public:
 
 			containerInt.wm_name = pcreateInfo->pwmName->pstr;
 			containerInt.wm_class = pcreateInfo->pwmClass->pstr;
+
 			containerInt.vertexShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX];
 			containerInt.geometryShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY];
 			containerInt.fragmentShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT];
+
+			if(pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_NO_INPUT)
+				containerInt.pcontainer->flags |= WManager::Container::FLAG_NO_FOCUS;
+
 			containerInt.OnSetupClient();
 
-			//defaults in config constructor
 			const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
 				containerInt.vertexShader.c_str(),containerInt.geometryShader.c_str(),containerInt.fragmentShader.c_str()
 			};
