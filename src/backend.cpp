@@ -302,8 +302,10 @@ void X11Backend::StackRecursive(const WManager::Container *pcontainer){
 		StackRecursive(pcont);
 	}
 
+	if(!pcontainer->pclient)
+		return;
 	auto s = [&](auto &p)->bool{
-		return pcontainer == p.first;
+		return pcontainer->pclient == p.first;
 	};
 	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
 		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
@@ -319,7 +321,7 @@ void X11Backend::StackRecursive(const WManager::Container *pcontainer){
 
 void X11Backend::StackClients(){
 	const WManager::Container *proot = GetRoot();
-	const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix = GetStackAppendix();
+	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix = GetStackAppendix();
 
 	appendixQueue.clear();
 	for(auto &p : *pstackAppendix){
@@ -616,11 +618,11 @@ sint Default::HandleEvent(){
 				{XCB_CONFIG_WINDOW_HEIGHT,rect.h},
 				{XCB_CONFIG_WINDOW_BORDER_WIDTH,pev->border_width},
 				{XCB_CONFIG_WINDOW_SIBLING,pev->sibling},
-				{XCB_CONFIG_WINDOW_STACK_MODE,pev->stack_mode}
+				//{XCB_CONFIG_WINDOW_STACK_MODE,pev->stack_mode} //floating clients may request configuration, including stack mode, which ruins the stacking order we've already set
 			};
-			uint values[7];
+			uint values[6];
 			uint mask = 0;
-			for(uint j = 0, mi = 0; j < 7; ++j)
+			for(uint j = 0, mi = 0; j < 6; ++j)
 				if(maskm[j].m & pev->value_mask){
 					mask |= maskm[j].m;
 					values[mi++] = maskm[j].v;
@@ -681,7 +683,7 @@ sint Default::HandleEvent(){
 				= xcb_get_property_reply(pcon,propertyCookieTransientFor,0);
 
 			if(boolHints){
-				if(hints.flags & XCB_ICCCM_WM_HINT_INPUT && hints.input)
+				if(hints.flags & XCB_ICCCM_WM_HINT_INPUT && !hints.input)
 					hintFlags |= X11Client::CreateInfo::HINT_NO_INPUT;
 			}
 			if(boolSizeHints){
@@ -765,14 +767,16 @@ sint Default::HandleEvent(){
 			BackendStringProperty wmName((const char *)xcb_get_property_value(propertyReply1[0]));
 			BackendStringProperty wmClass((const char *)xcb_get_property_value(propertyReply1[1]));
 
+			static WManager::Client dummyClient(0); //base client being unavailable means that the client is stacked on top of everything else
+
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
 			createInfo.prect = prect;
-			createInfo.pstackContainer =
+			createInfo.pstackClient =
 				!(hintFlags & X11Client::CreateInfo::HINT_DESKTOP)?
 					((pbaseClient && !(hintFlags & X11Client::CreateInfo::HINT_ABOVE))?
-						pbaseClient->pcontainer
-					:GetRoot())
+						pbaseClient
+					:&dummyClient)
 				:0;
 			createInfo.pbackend = this;
 			createInfo.mode = X11Client::CreateInfo::CREATE_CONTAINED;
@@ -864,10 +868,12 @@ sint Default::HandleEvent(){
 			if(prect->x+prect->w <= 1 || prect->y+prect->h <= 1)
 				break; //hack: don't manage, this will mess the compositor
 
+			static WManager::Client dummyClient(0);
+
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
 			createInfo.prect = prect;
-			createInfo.pstackContainer = pbaseClient?pbaseClient->pcontainer:GetRoot();
+			createInfo.pstackClient = pbaseClient?pbaseClient:&dummyClient;
 			createInfo.pbackend = this;
 			createInfo.mode = X11Client::CreateInfo::CREATE_AUTOMATIC;
 			createInfo.hints = 0;

@@ -347,7 +347,7 @@ void BackendInterface::Bind(boost::python::object obj){
 }
 
 void BackendInterface::SetFocus(WManager::Container *pcontainer){
-	if(!pcontainer || pcontainer->flags & WManager::Container::FLAG_NO_FOCUS)
+	if(!pcontainer)// || pcontainer->flags & WManager::Container::FLAG_NO_FOCUS)
 		return;
 	if(pcontainer->flags & WManager::Container::FLAG_FLOATING){
 		floatFocusQueue.erase(std::remove(floatFocusQueue.begin(),floatFocusQueue.end(),pcontainer),floatFocusQueue.end());

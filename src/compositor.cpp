@@ -658,7 +658,7 @@ void CompositorInterface::WaitIdle(){
 	vkDeviceWaitIdle(logicalDev);
 }
 
-void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
+void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
 	//glm::uvec2 edge(0.0f); //(right) edge of the previous container
 	for(const WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
@@ -676,8 +676,10 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 		}else CreateRenderQueue(pcont,pstackAppendix,pfocus);
 	}
 
+	if(!pcontainer->pclient)
+		return;
 	auto s = [&](auto &p)->bool{
-		return pcontainer == p.first;
+		return pcontainer->pclient == p.first;
 	};
 	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
 		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
@@ -723,7 +725,7 @@ bool CompositorInterface::PollFrameFence(){
 	return true;
 }
 
-void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot, const std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
+void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
 	if(!proot)
 		return;
 	

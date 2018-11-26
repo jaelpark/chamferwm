@@ -74,7 +74,7 @@ public:
 	virtual sint HandleEvent() = 0;
 	virtual void MoveContainer(WManager::Container *, WManager::Container *) = 0;
 	virtual const WManager::Container * GetRoot() const = 0;
-	virtual const std::vector<std::pair<const WManager::Container *, WManager::Client *>> * GetStackAppendix() const = 0;
+	virtual const std::vector<std::pair<const WManager::Client *, WManager::Client *>> * GetStackAppendix() const = 0;
 protected:
 	//Functions defined by the implementing backends.
 	virtual void DefineBindings(BackendKeyBinder *) = 0;
@@ -104,7 +104,7 @@ public:
 	struct CreateInfo{
 		xcb_window_t window;
 		const WManager::Rectangle *prect;
-		const WManager::Container *pstackContainer;
+		const WManager::Client *pstackClient; //TODO: -> client
 		const class X11Backend *pbackend;
 		enum{
 			CREATE_CONTAINED,
@@ -187,7 +187,7 @@ protected:
 	xcb_ewmh_connection_t ewmh;
 	xcb_window_t ewmh_window;
 	
-	std::deque<std::pair<const WManager::Container *, WManager::Client *>> appendixQueue;
+	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue;
 
 	enum ATOM{
 		//ATOM_CHAMFER_ALARM,

@@ -17,8 +17,8 @@ public:
 	virtual ~Client();
 	//
 	//virtual functions for the backend implementation
-	virtual void UpdateTranslation() = 0;
-	virtual void Kill() = 0;
+	virtual void UpdateTranslation(){}// = 0;
+	virtual void Kill(){}// = 0;
 	Rectangle rect; //pixel coordinates of the client
 	class Container *pcontainer;
 };

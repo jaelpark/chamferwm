@@ -280,20 +280,20 @@ public:
 
 //protected:
 	WManager::Container *proot;
-	std::vector<std::pair<const WManager::Container *, WManager::Client *>> stackAppendix;
+	std::vector<std::pair<const WManager::Client *, WManager::Client *>> stackAppendix;
 	//std::vector<WManager::Client *> desktopStack;
 	class RunCompositor *pcomp;
 };
 
 class RunCompositor{
 public:
-	RunCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Container *, WManager::Client *>> *_pstackAppendix) : proot(_proot), pstackAppendix(_pstackAppendix){}
+	RunCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix) : proot(_proot), pstackAppendix(_pstackAppendix){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
 	virtual void WaitIdle() = 0;
 protected:
 	WManager::Container *proot;
-	std::vector<std::pair<const WManager::Container *, WManager::Client *>> *pstackAppendix;
+	std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix;
 };
 
 class DefaultBackend : public Backend::Default, public RunBackend{
@@ -327,8 +327,8 @@ public:
 		};
 		if(pcreateInfo->mode == Backend::X11Client::CreateInfo::CREATE_AUTOMATIC){
 			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo,pshaderName);
-			if(pclient11)
-				stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
+			if(pclient11) //in some cases the window is found to be unmanageable
+				stackAppendix.push_back(std::pair<const WManager::Client *, WManager::Client *>(pcreateInfo->pstackClient,pclient11));
 			return pclient11;
 
 		}else{
@@ -353,8 +353,9 @@ public:
 			};
 			Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo,pshaderName);
 			containerInt.pcontainer->pclient = pclient11;
-			if(pcreateInfo->prect && (pcreateInfo->pstackContainer || pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_DESKTOP))
-				stackAppendix.push_back(std::pair<const WManager::Container *, WManager::Client *>(pcreateInfo->pstackContainer,pclient11));
+			//if(pcreateInfo->prect && (pcreateInfo->pstackClient || pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_DESKTOP))
+			if(pcreateInfo->prect)
+				stackAppendix.push_back(std::pair<const WManager::Client *, WManager::Client *>(pcreateInfo->pstackClient,pclient11));
 
 			containerInt.OnCreate();
 
@@ -402,12 +403,13 @@ public:
 		}else
 		if(id == PROPERTY_ID_TRANSIENT_FOR){
 			//
-			WManager::Container *pstackContainer = dynamic_cast<const Backend::BackendContainerProperty *>(pProperty)->pcontainer;
+			//TODO!!
+			/*WManager::Container *pstackContainer = dynamic_cast<const Backend::BackendContainerProperty *>(pProperty)->pcontainer;
 			auto m = std::find_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
 				return pclient == p.second;
 			});
 			if(m != stackAppendix.end())
-				(*m).first = pstackContainer;
+				(*m).first = pstackContainer;*/
 			//else: TODO: should we remove it from the tiling tree and make it floating according to its rect?
 		}
 	}
@@ -482,7 +484,7 @@ public:
 		return proot;
 	}
 
-	const std::vector<std::pair<const WManager::Container *, WManager::Client *>> * GetStackAppendix() const{
+	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> * GetStackAppendix() const{
 		return &stackAppendix;
 	}
 
@@ -584,7 +586,7 @@ public:
 		return proot;
 	}
 
-	const std::vector<std::pair<const WManager::Container *, WManager::Client *>> * GetStackAppendix() const{
+	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> * GetStackAppendix() const{
 		return &stackAppendix;
 	}
 
@@ -595,7 +597,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Container *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11Compositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
+	DefaultCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11Compositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
 		Start();
 
 		for(auto &m : args::get(shaderPaths)){
@@ -630,7 +632,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Container *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11DebugCompositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
+	DebugCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11DebugCompositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
 		Compositor::X11DebugCompositor::Start();
 
 		for(auto &m : args::get(shaderPaths)){
