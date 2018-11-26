@@ -291,6 +291,23 @@ xcb_atom_t X11Backend::GetAtom(const char *pstr) const{
 	return atom;
 }
 
+void X11Backend::StackRecursiveAppendix(const WManager::Client *pclient){
+	auto s = [&](auto &p)->bool{
+		return pclient == p.first;
+	};
+	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
+		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
+		StackRecursiveAppendix((*m).second);
+
+		X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
+
+		uint values[1] = {XCB_STACK_MODE_ABOVE};
+		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+
+		m = appendixQueue.erase(m);
+	}
+}
+
 void X11Backend::StackRecursive(const WManager::Container *pcontainer){
 	for(WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
@@ -304,19 +321,7 @@ void X11Backend::StackRecursive(const WManager::Container *pcontainer){
 
 	if(!pcontainer->pclient)
 		return;
-	auto s = [&](auto &p)->bool{
-		return pcontainer->pclient == p.first;
-	};
-	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
-		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
-
-		X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
-
-		uint values[1] = {XCB_STACK_MODE_ABOVE};
-		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
-
-		m = appendixQueue.erase(m);
-	}
+	StackRecursiveAppendix(pcontainer->pclient);
 }
 
 void X11Backend::StackClients(){

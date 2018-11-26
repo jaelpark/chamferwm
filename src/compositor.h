@@ -55,6 +55,7 @@ protected:
 	void DestroyRenderEngine();
 	void AddShader(const char *, const Blob *);
 	void WaitIdle();
+	void CreateRenderQueueAppendix(const WManager::Client *, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *, const WManager::Container *);
 	void CreateRenderQueue(const WManager::Container *, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *, const WManager::Container *);
 	bool PollFrameFence();
 	void GenerateCommandBuffers(const WManager::Container *, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *, const WManager::Container *);

@@ -158,6 +158,7 @@ public:
 	virtual ~X11Backend();
 	bool QueryExtension(const char *, sint *, sint *) const;
 	xcb_atom_t GetAtom(const char *) const;
+	void StackRecursiveAppendix(const WManager::Client *);
 	void StackRecursive(const WManager::Container *);
 	void StackClients();
 	//void HandleTimer() const;

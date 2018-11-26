@@ -658,6 +658,24 @@ void CompositorInterface::WaitIdle(){
 	vkDeviceWaitIdle(logicalDev);
 }
 
+void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pclient, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
+	auto s = [&](auto &p)->bool{
+		return pclient == p.first;
+	};
+	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
+		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
+		CreateRenderQueueAppendix((*m).second,pstackAppendix,pfocus);
+
+		RenderObject renderObject;
+		renderObject.pclient = (*m).second;
+		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
+		renderObject.flags = renderObject.pclient->pcontainer == pfocus?0x1:0;
+		renderQueue.push_back(renderObject);
+
+		m = appendixQueue.erase(m);
+	}
+}
+
 void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
 	//glm::uvec2 edge(0.0f); //(right) edge of the previous container
 	for(const WManager::Container *pcont : pcontainer->stackQueue){
@@ -678,20 +696,7 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 
 	if(!pcontainer->pclient)
 		return;
-	auto s = [&](auto &p)->bool{
-		return pcontainer->pclient == p.first;
-	};
-	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
-		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
-
-		RenderObject renderObject;
-		renderObject.pclient = (*m).second;
-		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
-		renderObject.flags = renderObject.pclient->pcontainer == pfocus?0x1:0;
-		renderQueue.push_back(renderObject);
-
-		m = appendixQueue.erase(m);
-	}
+	CreateRenderQueueAppendix(pcontainer->pclient,pstackAppendix,pfocus);
 }
 
 bool CompositorInterface::PollFrameFence(){
