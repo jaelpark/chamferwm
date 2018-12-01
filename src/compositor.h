@@ -15,7 +15,6 @@ namespace Compositor{
 
 class ClientFrame{
 friend class CompositorInterface;
-//friend class FrameObject;
 public:
 	ClientFrame(uint, uint, const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
 	virtual ~ClientFrame();

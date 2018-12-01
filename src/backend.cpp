@@ -579,9 +579,12 @@ sint Default::HandleEvent(){
 				break;
 
 			//TODO: allow x,y configuration if dock or desktop feature
+			xcb_get_property_cookie_t propertyCookieNormalHints = xcb_icccm_get_wm_normal_hints(pcon,pev->window);
 			xcb_get_property_cookie_t propertyCookieWindowType
 				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
 
+			xcb_size_hints_t sizeHints;
+			bool boolSizeHints = xcb_icccm_get_wm_size_hints_reply(pcon,propertyCookieNormalHints,&sizeHints,0);
 			xcb_get_property_reply_t *propertyReplyWindowType
 				= xcb_get_property_reply(pcon,propertyCookieWindowType,0);
 
@@ -594,13 +597,20 @@ sint Default::HandleEvent(){
 
 			//WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			WManager::Rectangle rect = {
-				pev->x,pev->y,
-				std::max(pev->width,(uint16_t)100),std::max(pev->height,(uint16_t)100)};
+				pev->x,pev->y,pev->width,pev->height
+			};
+
+			if(boolSizeHints && sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE){
+				if(sizeHints.min_width > rect.w)
+					rect.w = sizeHints.min_width;
+				if(sizeHints.min_height > rect.h)
+					rect.h = sizeHints.min_height;
+			}
 
 			//center the window to screen, otherwise it might end up to the left upper corner
 			if(!allowPositionConfig){
-				rect.x = (pscr->width_in_pixels-pev->width)/2;
-				rect.y = (pscr->height_in_pixels-pev->height)/2;
+				rect.x = (pscr->width_in_pixels-rect.w)/2;
+				rect.y = (pscr->height_in_pixels-rect.h)/2;
 				pev->value_mask |= XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y;
 			}
 			
@@ -1205,11 +1215,6 @@ void Debug::Start(){
 
 	xcb_key_symbols_free(psymbols);
 }
-
-/*sint Debug::GetEventFileDescriptor(){
-	sint fd = xcb_get_file_descriptor(pcon);
-	return fd;
-}*/
 
 sint Debug::HandleEvent(){
 	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
