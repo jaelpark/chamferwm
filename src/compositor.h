@@ -61,7 +61,6 @@ protected:
 	void Present();
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;
-	virtual void UpdateBackground(const VkCommandBuffer *) = 0;
 	virtual VkExtent2D GetExtent() const = 0;
 	VkInstance instance;
 	VkSurfaceKHR surface;
@@ -107,11 +106,7 @@ protected:
 
 	std::vector<ClientFrame *> updateQueue;
 
-	enum BACKGROUND{
-		BACKGROUND_NONE,
-		BACKGROUND_SET,
-		BACKGROUND_DIRTY
-	} background;
+	ClientFrame *pbackground;
 
 	VkSampler pointSampler;
 
@@ -163,6 +158,17 @@ public:
 	std::vector<VkRect2D> damageRegions;
 };
 
+class X11Background : public ClientFrame{
+public:
+	X11Background(xcb_pixmap_t, const char *[Pipeline::SHADER_MODULE_COUNT], X11Compositor *);
+	~X11Background();
+	void UpdateContents(const VkCommandBuffer *);
+	
+	X11Compositor *pcomp11;
+	xcb_pixmap_t pixmap;
+	uint w, h;
+};
+
 //Default compositor assumes XCB for its surface
 class X11Compositor : public CompositorInterface{
 public:
@@ -175,12 +181,11 @@ public:
 	bool FilterEvent(const Backend::X11Event *);
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
-	void UpdateBackground(const VkCommandBuffer *);
 	void SetBackgroundPixmap(const Backend::BackendPixmapProperty *);
 	VkExtent2D GetExtent() const;
 	const Backend::X11Backend *pbackend;
+	//X11Background *pbackground;
 	xcb_window_t overlay;
-	//X11ClientFrame backgroundFrame;
 protected:
 	sint compEventOffset;
 	sint compErrorOffset;
@@ -214,7 +219,6 @@ public:
 	void Stop();
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
-	void UpdateBackground(const VkCommandBuffer *);
 	VkExtent2D GetExtent() const;
 };
 

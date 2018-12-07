@@ -8,6 +8,7 @@
 namespace Compositor{
 //declarations for friend classes
 class X11ClientFrame;
+class X11Background;
 class X11Compositor;
 class X11DebugCompositor;
 }
@@ -71,6 +72,7 @@ public:
 	virtual ~BackendInterface();
 	virtual void Start() = 0;
 	//virtual sint GetEventFileDescriptor() = 0;
+	//virtual void SetupEnvironment() = 0;
 	virtual sint HandleEvent() = 0;
 	virtual void MoveContainer(WManager::Container *, WManager::Container *) = 0;
 	virtual const WManager::Container * GetRoot() const = 0;
@@ -151,6 +153,7 @@ friend class X11Client;
 friend class X11Container;
 friend class DebugClient;
 friend class Compositor::X11ClientFrame;
+friend class Compositor::X11Background;
 friend class Compositor::X11Compositor;
 friend class Compositor::X11DebugCompositor;
 public:
@@ -208,7 +211,7 @@ public:
 	Default();
 	virtual ~Default();
 	void Start();
-	//sint GetEventFileDescriptor();
+	//void SetupEnvironment();
 	sint HandleEvent();
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
@@ -257,7 +260,7 @@ public:
 	Debug();
 	virtual ~Debug();
 	void Start();
-	//sint GetEventFileDescriptor();
+	//void SetupEnvironment();
 	sint HandleEvent();
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:

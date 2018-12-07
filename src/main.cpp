@@ -106,10 +106,6 @@ public:
 	RunBackend(WManager::Container *_proot) : proot(_proot), pcomp(0){}
 	virtual ~RunBackend(){}
 
-	virtual void SetupEnvironment(){
-		//
-	}
-
 	void SetCompositor(class RunCompositor *pcomp){
 		this->pcomp = pcomp;
 	}
@@ -307,12 +303,6 @@ public:
 		delete proot;
 	}
 
-	void SetupEnvironment(){
-		//
-		//TODO: setup client for root window here? (for wallpaper etc)
-		//-need a desktop level stack (needed anyway for widgets and stuff)
-	}
-
 	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
 		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
 		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,false);
@@ -389,6 +379,7 @@ public:
 			Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 			if(pcomp11)
 				pcomp11->SetBackgroundPixmap(pPixmapProperty);
+			return;
 		}
 		if(pclient->pcontainer == proot)
 			return;
@@ -745,7 +736,8 @@ int main(sint argc, const char **pargv){
 	}
 
 	pbackend->SetCompositor(pcomp);
-	pbackend->SetupEnvironment();
+	//if(pbackend11)
+		//pbackend11->SetupEnvironment();
 
 	for(;;){
 		//TODO: can we wait for vsync before handling the event? Might help with the stuttering

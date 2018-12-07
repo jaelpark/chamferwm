@@ -11,9 +11,8 @@
 
 namespace Compositor{
 
-ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), fullRegionUpdate(false){
+ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), fullRegionUpdate(true){
 	pcomp->updateQueue.push_back(this);
-	fullRegionUpdate = true;
 
 	ptexture = pcomp->CreateTexture(w,h);
 	auto m = std::find_if(pcomp->pipelines.begin(),pcomp->pipelines.end(),[&](auto &r)->bool{
@@ -197,7 +196,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0), background(BACKGROUND_NONE){
+CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0), pbackground(0){
 	//
 }
 
@@ -767,8 +766,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	if(vkBeginCommandBuffer(pcopyCommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
 	
-	if(background == BACKGROUND_DIRTY)
-		UpdateBackground(&pcopyCommandBuffers[currentFrame]);
+	if(pbackground)
+		pbackground->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 
 	for(ClientFrame *pclientFrame : updateQueue)
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
@@ -793,6 +792,17 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	vkCmdBeginRenderPass(pcommandBuffers[currentFrame],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
 	clock_gettime(CLOCK_MONOTONIC,&frameTime);
+
+	if(pbackground){
+		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pbackground->passignedSet->p->pipeline);
+		//
+		VkRect2D frame;
+		frame.offset = {0,0};
+		frame.extent = imageExtent;
+
+		vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&frame);
+		pbackground->Draw(frame,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
+	}
 
 	//for(RenderObject &renderObject : renderQueue){
 	for(uint i = 0; i < renderQueue.size(); ++i){
@@ -1074,7 +1084,41 @@ void X11ClientFrame::AdjustSurface1(){
 	AdjustSurface(rect.w,rect.h);
 }
 
-X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *_pbackend) : CompositorInterface(physicalDevIndex), pbackend(_pbackend){
+X11Background::X11Background(xcb_pixmap_t _pixmap, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(3840), h(2160), ClientFrame(3840,2160,_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
+	//
+}
+
+X11Background::~X11Background(){
+	//
+}
+
+void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
+	if(!fullRegionUpdate)
+		return;
+	//
+	xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pcomp11->pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,pixmap,0,0,w,h,~0);
+	xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
+	if(!pimageReply){
+		DebugPrintf(stderr,"Failed to receive image reply.\n");
+		return;
+	}
+
+	unsigned char *pchpixels = xcb_get_image_data(pimageReply);
+	unsigned char *pdata = (unsigned char *)ptexture->Map();
+
+	memcpy(pdata,pchpixels,w*h*4);
+	if(pimageReply->depth != 32)
+		for(uint i = 0; i < w*h; ++i)
+			pdata[4*i+3] = 255;
+	fullRegionUpdate = false;
+	
+	VkRect2D rect1 = {0,0,w,h};
+	ptexture->Unmap(pcommandBuffer,&rect1,1);
+
+	free(pimageReply);
+}
+
+X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *_pbackend) : CompositorInterface(physicalDevIndex), pbackend(_pbackend){//, pbackground(0){
 	//
 }
 
@@ -1145,6 +1189,8 @@ void X11Compositor::Start(){
 }
 
 void X11Compositor::Stop(){
+	if(pbackground)
+		delete pbackground;
 	DestroyRenderEngine();
 
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
@@ -1200,18 +1246,21 @@ void X11Compositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
 		throw("Failed to create KHR surface.");
 }
 
-void X11Compositor::UpdateBackground(const VkCommandBuffer *pcommandBuffer){
-	//NOTE: background can possibly be implemented with ClientFrame
-	background = BACKGROUND_SET;
-}
-
 void X11Compositor::SetBackgroundPixmap(const Backend::BackendPixmapProperty *pPixmapProperty){
 	if(pPixmapProperty->pixmap == 0){
-		background = BACKGROUND_NONE;
+		if(pbackground){
+			delete pbackground;
+			pbackground = 0;
+		}
 		return;
 	}
-	//backgroundFrame.windowPixmap = pPixmapProperty->pixmap;
-	background = BACKGROUND_DIRTY;
+	if(!pbackground){
+		static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
+			"default_vertex.spv","default_geometry.spv","default_fragment.spv"
+		};
+		pbackground = new X11Background(pPixmapProperty->pixmap,pshaderName,this);
+		printf("background set!\n");
+	}
 }
 
 VkExtent2D X11Compositor::GetExtent() const{
@@ -1296,10 +1345,6 @@ bool NullCompositor::CheckPresentQueueCompatibility(VkPhysicalDevice physicalDev
 }
 
 void NullCompositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
-	//
-}
-
-void NullCompositor::UpdateBackground(const VkCommandBuffer *pcommandBuffer){
 	//
 }
 

@@ -340,6 +340,8 @@ pids = psutil.pids();
 pnames = [psutil.Process(pid).name() for pid in pids];
 pcmdls = [a for p in [psutil.Process(pid).cmdline() for pid in pids] for a in p];
 
+psutil.Popen(["feh","--no-fehbg","--image-bg","black","--bg-center","/mnt/data/Kuvat/nasa_1.png"]);
+
 if not "pulseaudio" in pnames:
 	print("starting pulseaudio...");
 	#need to wait some time before starting pulseaudio for it to initialize successfully

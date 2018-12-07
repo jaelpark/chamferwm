@@ -692,8 +692,8 @@ sint Default::HandleEvent(){
 				= xcb_get_property_reply(pcon,propertyCookieWindowType,0);
 			xcb_get_property_reply_t *propertyReplyWindowState
 				= xcb_get_property_reply(pcon,propertyCookieWindowState,0);
-			xcb_get_property_reply_t *propertyReplyStrut
-				= xcb_get_property_reply(pcon,propertyCookieStrut,0);
+			//xcb_get_property_reply_t *propertyReplyStrut
+				//= xcb_get_property_reply(pcon,propertyCookieStrut,0);
 			xcb_get_property_reply_t *propertyReplyTransientFor
 				= xcb_get_property_reply(pcon,propertyCookieTransientFor,0);
 
@@ -939,6 +939,8 @@ sint Default::HandleEvent(){
 			if(pev->state == XCB_PROPERTY_DELETE)
 				break;
 
+			result = 1;
+
 			if(pev->window == pscr->root){
 				if(pev->atom == atoms[ATOM_ESETROOT_PMAP_ID]){
 					xcb_get_property_cookie_t propertyCookie = xcb_get_property(pcon,0,pev->window,atoms[ATOM_ESETROOT_PMAP_ID],XCB_GET_PROPERTY_TYPE_ANY,0,128);
@@ -953,8 +955,6 @@ sint Default::HandleEvent(){
 				}
 				break;
 			}
-
-			result = 1;
 
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
 			if(!pclient1)
