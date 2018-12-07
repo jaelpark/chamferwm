@@ -155,9 +155,11 @@ X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateI
 	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_PROPERTY_CHANGE|XCB_EVENT_MASK_FOCUS_CHANGE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
-	if(!pcreateInfo->prect)
+	//if(!(pcontainer->flags & WManager::Container::FLAG_FLOATING))
+	if((pcreateInfo->mode == CreateInfo::CREATE_CONTAINED && !(pcontainer->flags & WManager::Container::FLAG_FLOATING)) ||
+		(pcreateInfo->mode == CreateInfo::CREATE_AUTOMATIC && !pcreateInfo->prect))
 		UpdateTranslation();
-	else rect = *pcreateInfo->prect; //floating client without its own container: assume that xcb_configure_window was already called
+	else rect = *pcreateInfo->prect;
 
 	if(pcreateInfo->mode != CreateInfo::CREATE_AUTOMATIC)
 		xcb_map_window(pbackend->pcon,window);

@@ -110,8 +110,14 @@ public:
 		this->pcomp = pcomp;
 	}
 
+	struct ContainerCreateInfo{
+		std::string wm_name;
+		std::string wm_class;
+		bool floating;
+	};
+
 	template<class T, class U>
-	Config::ContainerInterface & SetupContainer(WManager::Container *pParent){
+	Config::ContainerInterface & SetupContainer(WManager::Container *pParent, ContainerCreateInfo *pcreateInfo){
 		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
 		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
 		if(!containerExtract.check())
@@ -120,35 +126,48 @@ public:
 		Config::ContainerInterface &containerInt = containerExtract();
 		containerInt.self = containerObject;
 
+		if(pcreateInfo){
+			containerInt.wm_name = pcreateInfo->wm_name;
+			containerInt.wm_class = pcreateInfo->wm_class;
+		}
 		containerInt.OnSetupContainer();
 
 		WManager::Container::Setup setup;
+		if(containerInt.floatingMode == Config::ContainerInterface::FLOAT_ALWAYS ||
+			(containerInt.floatingMode != Config::ContainerInterface::FLOAT_NEVER && pcreateInfo->floating))
+			setup.flags = WManager::Container::FLAG_FLOATING;
 		containerInt.CopySettingsSetup(setup);
-	
-		if(!pParent){
-			boost::python::object parentObject = containerInt.OnParent();
-			boost::python::extract<Config::ContainerInterface &> parentExtract(parentObject);
-			if(!parentExtract.check())
-				throw Exception("OnParent(): Invalid parent container object returned.\n");
 
-			Config::ContainerInterface &parentInt = parentExtract();
-			if(parentInt.pcontainer == containerInt.pcontainer)
-				throw Exception("OnParent(): Cannot parent to itself.\n");
+		if(!(setup.flags & WManager::Container::FLAG_FLOATING)){
+			if(!pParent){
+				boost::python::object parentObject = containerInt.OnParent();
+				boost::python::extract<Config::ContainerInterface &> parentExtract(parentObject);
+				if(!parentExtract.check())
+					throw Exception("OnParent(): Invalid parent container object returned.\n");
 
-			if(parentInt.pcontainer->pclient){
-				Config::ContainerInterface &parentInt1 = SetupContainer<T,U>(parentInt.pcontainer);
-				pParent = parentInt1.pcontainer;
+				Config::ContainerInterface &parentInt = parentExtract();
+				if(parentInt.pcontainer == containerInt.pcontainer)
+					throw Exception("OnParent(): Cannot parent to itself.\n");
 
-			}else pParent = parentInt.pcontainer;
+				if(parentInt.pcontainer->pclient){
+					Config::ContainerInterface &parentInt1 = SetupContainer<T,U>(parentInt.pcontainer,0);
+					pParent = parentInt1.pcontainer;
+
+				}else pParent = parentInt.pcontainer;
+			}
+
+			T *pcontainer = new T(&containerInt,pParent,setup,static_cast<U*>(this));
+			containerInt.pcontainer = pcontainer;
+
+		}else{
+			T *pcontainer = new T(&containerInt,proot,setup,static_cast<U*>(this));
+			containerInt.pcontainer = pcontainer;
 		}
-
-		T *pcontainer = new T(&containerInt,pParent,setup,static_cast<U*>(this));
-		containerInt.pcontainer = pcontainer;
 
 		return containerInt;
 	}
 
-	template<class T, class U>
+	/*template<class T, class U>
 	Config::ContainerInterface & SetupFloating(){
 		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
 		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
@@ -168,7 +187,7 @@ public:
 		containerInt.pcontainer = pcontainer;
 
 		return containerInt;
-	}
+	}*/
 
 	template<class T, class U>
 	void MoveContainer(WManager::Container *pcontainer, WManager::Container *pdst){
@@ -180,7 +199,7 @@ public:
 		WManager::Container *pOrigParent = premoved->pParent;
 
 		if(pdst->pclient){
-			Config::ContainerInterface &parentInt1 = SetupContainer<T,U>(pdst);
+			Config::ContainerInterface &parentInt1 = SetupContainer<T,U>(pdst,0);
 			pdst = parentInt1.pcontainer;
 		}
 		pcontainer->Place(pdst);
@@ -322,12 +341,11 @@ public:
 			return pclient11;
 
 		}else{
-			Config::ContainerInterface &containerInt = !pcreateInfo->prect?
-				SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0):
-				SetupFloating<Config::X11ContainerConfig,DefaultBackend>();
-
-			containerInt.wm_name = pcreateInfo->pwmName->pstr;
-			containerInt.wm_class = pcreateInfo->pwmClass->pstr;
+			ContainerCreateInfo containerCreateInfo;
+			containerCreateInfo.wm_name = pcreateInfo->pwmName->pstr;
+			containerCreateInfo.wm_class = pcreateInfo->pwmClass->pstr;
+			containerCreateInfo.floating = pcreateInfo->prect != 0;
+			Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0,&containerCreateInfo);
 
 			containerInt.vertexShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX];
 			containerInt.geometryShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY];
@@ -343,8 +361,7 @@ public:
 			};
 			Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo,pshaderName);
 			containerInt.pcontainer->pclient = pclient11;
-			//if(pcreateInfo->prect && (pcreateInfo->pstackClient || pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_DESKTOP))
-			if(pcreateInfo->prect)
+			if(containerInt.pcontainer->flags & WManager::Container::FLAG_FLOATING)
 				stackAppendix.push_back(std::pair<const WManager::Client *, WManager::Client *>(pcreateInfo->pstackClient,pclient11));
 
 			containerInt.OnCreate();
@@ -499,7 +516,7 @@ public:
 	}
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
-		Config::ContainerInterface &containerInt = SetupContainer<Config::DebugContainerConfig,DebugBackend>(0);
+		Config::ContainerInterface &containerInt = SetupContainer<Config::DebugContainerConfig,DebugBackend>(0,0);
 
 		static const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
 			"frame_vertex.spv","frame_geometry.spv","frame_fragment.spv"

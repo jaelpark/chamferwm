@@ -10,7 +10,9 @@ namespace Config{
 ContainerInterface::ContainerInterface() :
 borderWidth(boost::python::make_tuple(0.0f,0.0f)),
 minSize(boost::python::make_tuple(0.0f,0.0f)),
-maxSize(boost::python::make_tuple(1.0f,1.0f)){//,
+maxSize(boost::python::make_tuple(1.0f,1.0f)),
+floatingMode(FLOAT_AUTOMATIC),
+pcontainer(0){//,
 //vertexShader("frame_vertex.spv"),
 //geometryShader("frame_geometry.spv"),
 //fragmentShader("frame_fragment.spv"){
@@ -28,6 +30,7 @@ void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 	setup.minSize.y = boost::python::extract<float>(minSize[1])();
 	setup.maxSize.x = boost::python::extract<float>(maxSize[0])();
 	setup.maxSize.y = boost::python::extract<float>(maxSize[1])();
+	//setup.floatingMode = boost
 }
 
 void ContainerInterface::CopySettingsContainer(){
@@ -498,6 +501,11 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("BindKey",&Backend::X11KeyBinder::BindKey)
 		;
 	
+	boost::python::enum_<ContainerInterface::FLOAT>("floatingMode")
+		.value("AUTOMATIC",ContainerInterface::FLOAT_AUTOMATIC)
+		.value("ALWAYS",ContainerInterface::FLOAT_ALWAYS)
+		.value("NEVER",ContainerInterface::FLOAT_NEVER);
+
 	boost::python::enum_<ContainerInterface::PROPERTY_ID>("property")
 		.value("NAME",ContainerInterface::PROPERTY_ID_NAME)
 		.value("CLASS",ContainerInterface::PROPERTY_ID_CLASS);
@@ -516,32 +524,44 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("GetAdjacent",&ContainerInterface::GetAdjacent)
 		.def("MoveNext",boost::python::make_function(
 			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return;
 				container.pcontainer->MoveNext();
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("MovePrev",boost::python::make_function(
 			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return;
 				container.pcontainer->MovePrev();
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("Move",&ContainerInterface::Move)
 		.def("Focus",boost::python::make_function(
 			[](ContainerInterface &container){
-				//Config::BackendInterface::pfocus = container.pcontainer;
-				//container.pcontainer->Focus();
+				if(!container.pcontainer)
+					return;
 				Config::BackendInterface::SetFocus(container.pcontainer);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("Kill",boost::python::make_function(
 			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return;
 				if(container.pcontainer->pclient)
 					container.pcontainer->pclient->Kill();
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("ShiftLayout",boost::python::make_function(
 			[](ContainerInterface &container, WManager::Container::LAYOUT layout){
+				if(!container.pcontainer)
+					return;
 				container.CopySettingsContainer();
 				container.pcontainer->SetLayout(layout);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, WManager::Container::LAYOUT>()))
 		.def("IsFloating",boost::python::make_function(
 			[](ContainerInterface &container){
-				return container.pcontainer->flags & WManager::Container::FLAG_FLOATING;
+				if(!container.pcontainer){
+					PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
+					return false;
+				}
+				return (container.pcontainer->flags & WManager::Container::FLAG_FLOATING) != 0;
 			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
 		.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
 		.def_readwrite("minSize",&ContainerInterface::minSize)
@@ -555,6 +575,7 @@ BOOST_PYTHON_MODULE(chamfer){
 			[](ContainerInterface &container){
 				return container.pcontainer->layout;
 			},boost::python::default_call_policies(),boost::mpl::vector<WManager::Container::LAYOUT, ContainerInterface &>()))
+		.def_readwrite("floatingMode",&ContainerInterface::floatingMode)
 		;
 	
 	boost::python::enum_<WManager::Container::ADJACENT>("adjacent")

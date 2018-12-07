@@ -37,14 +37,18 @@ public:
 	boost::python::object GetFloatFocus() const;
 	boost::python::object GetAdjacent(WManager::Container::ADJACENT) const;
 	void Move(boost::python::object);
-public:
+//public:
 	boost::python::tuple borderWidth;
 	boost::python::tuple minSize;
 	boost::python::tuple maxSize;
+	enum FLOAT{
+		FLOAT_AUTOMATIC,
+		FLOAT_ALWAYS,
+		FLOAT_NEVER
+	} floatingMode;
 
 	std::string wm_name;
 	std::string wm_class;
-	//bool floating;
 
 	std::string vertexShader;
 	std::string geometryShader;

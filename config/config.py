@@ -62,11 +62,19 @@ class Container(chamfer.Container):
 
 		self.splitArmed = False;
 
+		if self.wm_class == "skype":
+			self.floatingMode = chamfer.floatingMode.NEVER;
+
 	#setup the client before it's created (shaders)
 	def OnSetupClient(self):
-		self.vertexShader = "frame_vertex.spv";
-		self.geometryShader = "frame_geometry.spv";
-		self.fragmentShader = "frame_fragment.spv";
+		if self.wm_class == "Conky": #TODO: check undecorated hint
+			self.vertexShader = "default_vertex.spv";
+			self.geometryShader = "default_geometry.spv";
+			self.fragmentShader = "default_fragment.spv";
+		else:
+			self.vertexShader = "frame_vertex.spv";
+			self.geometryShader = "frame_geometry.spv";
+			self.fragmentShader = "frame_fragment.spv";
 
 	#select and assign a parent container
 	def OnParent(self):
