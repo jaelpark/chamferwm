@@ -134,7 +134,7 @@ public:
 
 		WManager::Container::Setup setup;
 		if(containerInt.floatingMode == Config::ContainerInterface::FLOAT_ALWAYS ||
-			(containerInt.floatingMode != Config::ContainerInterface::FLOAT_NEVER && pcreateInfo->floating))
+			(containerInt.floatingMode != Config::ContainerInterface::FLOAT_NEVER && pcreateInfo && pcreateInfo->floating))
 			setup.flags = WManager::Container::FLAG_FLOATING;
 		containerInt.CopySettingsSetup(setup);
 
