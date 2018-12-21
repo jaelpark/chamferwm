@@ -1052,6 +1052,11 @@ sint Default::HandleEvent(){
 		case XCB_ENTER_NOTIFY:{
 			xcb_enter_notify_event_t *pev = (xcb_enter_notify_event_t*)pevent;
 			lastTime = pev->time;
+
+			/*X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
+			if(!pclient1)
+				break;*/
+
 			DebugPrintf(stdout,"enter\n");
 			}
 			break;

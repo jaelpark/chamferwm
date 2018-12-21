@@ -100,6 +100,11 @@ class Container(chamfer.Container):
 	#called every time a client property has changed (title etc.)
 	def OnPropertyChange(self, propId):
 		print(self.wm_name);
+
+	#called whenever cursor enters the window
+	def OnEnter(self):
+		#self.focus();
+		pass;
 		
 class Backend(chamfer.Backend):
 	def OnSetupKeys(self, binder, debug):

@@ -35,7 +35,7 @@ public:
 		//For performance reasons, the min/maxSize has to be known before the container is created.
 		glm::vec2 minSize = glm::vec2(0.0f);
 		glm::vec2 maxSize = glm::vec2(1.0f);
-		uint flags;
+		uint flags = 0;
 		/*enum INSERT{
 			INSERT_APPEND,
 			INSERT_REPARENT //always with client
