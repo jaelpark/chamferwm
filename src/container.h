@@ -30,6 +30,8 @@ public:
 		FLAG_NO_FOCUS = 0x2
 	};
 	struct Setup{
+		glm::vec2 canvasOffset = glm::vec2(0.0f);
+		glm::vec2 canvasExtent = glm::vec2(0.0f);
 		//Border width can be set anytime before the client creation
 		glm::vec2 borderWidth = glm::vec2(0.0f);
 		//For performance reasons, the min/maxSize has to be known before the container is created.
@@ -65,7 +67,7 @@ public:
 	void MovePrev();
 
 	glm::vec2 GetMinSize() const;
-	void TranslateRecursive(glm::vec2, glm::vec2);
+	void TranslateRecursive(glm::vec2, glm::vec2, glm::vec2, glm::vec2);
 	void Translate();
 	void StackRecursive();
 	void Stack();
@@ -86,14 +88,18 @@ public:
 
 	Client *pclient;
 
-	glm::vec2 scale;
+	//glm::vec2 scale;
 	// = 1.0f: default size, scale with the number of containers
 	// < 1.0f: smaller than default, leaving the unscaled parallel containers more space
 	//glm::vec2 adjustScale;
 
 	//absolute normalized coordinates
 	glm::vec2 p;
+	glm::vec2 posFullCanvas;
 	glm::vec2 e;
+	glm::vec2 extFullCanvas;
+	glm::vec2 canvasOffset; //should be multiplied by e?
+	glm::vec2 canvasExtent;
 
 	//glm::vec2 c1; //iteration center
 	glm::vec2 e1; //iteration e

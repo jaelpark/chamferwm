@@ -8,6 +8,8 @@
 namespace Config{
 
 ContainerInterface::ContainerInterface() :
+canvasOffset(boost::python::make_tuple(0.0f,0.0f)),
+canvasExtent(boost::python::make_tuple(0.0f,0.0f)),
 borderWidth(boost::python::make_tuple(0.0f,0.0f)),
 minSize(boost::python::make_tuple(0.0f,0.0f)),
 maxSize(boost::python::make_tuple(1.0f,1.0f)),
@@ -24,6 +26,10 @@ ContainerInterface::~ContainerInterface(){
 }
 
 void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
+	setup.canvasOffset.x = boost::python::extract<float>(canvasOffset[0])();
+	setup.canvasOffset.y = boost::python::extract<float>(canvasOffset[1])();
+	setup.canvasExtent.x = boost::python::extract<float>(canvasExtent[0])();
+	setup.canvasExtent.y = boost::python::extract<float>(canvasExtent[1])();
 	setup.borderWidth.x = boost::python::extract<float>(borderWidth[0])();
 	setup.borderWidth.y = boost::python::extract<float>(borderWidth[1])();
 	setup.minSize.x = boost::python::extract<float>(minSize[0])();
@@ -34,6 +40,10 @@ void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 }
 
 void ContainerInterface::CopySettingsContainer(){
+	pcontainer->canvasOffset.x = boost::python::extract<float>(canvasOffset[0])();
+	pcontainer->canvasOffset.y = boost::python::extract<float>(canvasOffset[1])();
+	pcontainer->canvasExtent.x = boost::python::extract<float>(canvasExtent[0])();
+	pcontainer->canvasExtent.y = boost::python::extract<float>(canvasExtent[1])();
 	pcontainer->borderWidth.x = boost::python::extract<float>(borderWidth[0])();
 	pcontainer->borderWidth.y = boost::python::extract<float>(borderWidth[1])();
 	pcontainer->minSize.x = boost::python::extract<float>(minSize[0])();
@@ -563,6 +573,8 @@ BOOST_PYTHON_MODULE(chamfer){
 				}
 				return (container.pcontainer->flags & WManager::Container::FLAG_FLOATING) != 0;
 			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
+		.def_readwrite("canvasOffset",&ContainerInterface::canvasOffset)
+		.def_readwrite("canvasExtent",&ContainerInterface::canvasExtent)
 		.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
 		.def_readwrite("minSize",&ContainerInterface::minSize)
 		.def_readwrite("maxSize",&ContainerInterface::maxSize)

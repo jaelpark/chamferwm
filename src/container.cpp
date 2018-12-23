@@ -16,7 +16,8 @@ Client::~Client(){
 Container::Container() : pParent(0), pch(0), pnext(0),
 	pclient(0),
 	//scale(1.0f), p(0.0f), e(1.0f), borderWidth(0.0f), minSize(0.0f), maxSize(1.0f), mode(MODE_TILED),
-	scale(1.0f), p(0.0f), e(1.0f), borderWidth(0.015f), minSize(0.015f), maxSize(1.0f),
+	p(0.0f), posFullCanvas(0.0f), e(1.0f), extFullCanvas(1.0f), canvasOffset(0.0f), canvasExtent(0.0f),
+	borderWidth(0.015f), minSize(0.015f), maxSize(1.0f),
 	flags(0), layout(LAYOUT_VSPLIT){//, flags(0){
 	//
 }
@@ -24,7 +25,8 @@ Container::Container() : pParent(0), pch(0), pnext(0),
 Container::Container(Container *_pParent, const Setup &setup) :
 	pParent(_pParent), pch(0), pnext(0),
 	pclient(0),
-	scale(1.0f), borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
+	canvasOffset(setup.canvasOffset), canvasExtent(setup.canvasExtent),
+	borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
 	flags(setup.flags), layout(LAYOUT_VSPLIT){//, flags(setup.flags){
 
 	if(flags & FLAG_FLOATING)
@@ -149,7 +151,7 @@ Container * Container::Collapse(){
 		if(pch->pnext)
 			return 0; //todo: combine the expressions
 		//only one container to collapse
-		printf("** type 1 collapse\n");
+		//printf("** type 1 collapse\n");
 		std::replace(pParent->focusQueue.begin(),pParent->focusQueue.end(),this,pch);
 
 		pch->pParent = pParent;
@@ -174,7 +176,7 @@ Container * Container::Collapse(){
 		if(pParent->pch->pnext) //and there's a container next to this one
 			return 0; //should not collapse
 		//more than one container to deal with
-		printf("** type 2 collapse\n");
+		//printf("** type 2 collapse\n");
 		Container *pfocus = focusQueue.size() > 0?focusQueue.back():pch;
 		std::replace(pParent->focusQueue.begin(),pParent->focusQueue.end(),this,pfocus);
 
@@ -369,7 +371,7 @@ glm::vec2 Container::GetMinSize() const{
 	return glm::max(chSize,minSize);
 }
 
-void Container::TranslateRecursive(glm::vec2 p, glm::vec2 e){
+void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCanvas, glm::vec2 p, glm::vec2 e){
 	uint count = 0;
 
 	glm::vec2 minSizeSum(0.0f);
@@ -450,7 +452,7 @@ void Container::TranslateRecursive(glm::vec2 p, glm::vec2 e){
 
 				//position.x += e1.x-(minSizeSum.x-e.x)/(float)(count-1);
 				position.x += e1.x-((float)count*maxMinSize.x-e.x)/(float)(count-1);
-				pcontainer->TranslateRecursive(p1,e1);
+				pcontainer->TranslateRecursive(p1,e1,p1+pcontainer->canvasOffset,e1-pcontainer->canvasExtent);
 			}
 
 		}else{
@@ -460,7 +462,7 @@ void Container::TranslateRecursive(glm::vec2 p, glm::vec2 e){
 				glm::vec2 p1 = position;
 
 				position.x += e1.x;
-				pcontainer->TranslateRecursive(p1,e1);
+				pcontainer->TranslateRecursive(p1,e1,p1+pcontainer->canvasOffset,e1-pcontainer->canvasExtent);
 			}
 		}
 		break;
@@ -472,7 +474,7 @@ void Container::TranslateRecursive(glm::vec2 p, glm::vec2 e){
 				glm::vec2 p1 = position;
 
 				position.y += e1.y-(minSizeSum.y-e.y)/(float)(count-1);
-				pcontainer->TranslateRecursive(p1,e1);
+				pcontainer->TranslateRecursive(p1,e1,p1+pcontainer->canvasOffset,e1-pcontainer->canvasExtent);
 			}
 
 		}else{
@@ -482,13 +484,15 @@ void Container::TranslateRecursive(glm::vec2 p, glm::vec2 e){
 				glm::vec2 p1 = position;
 
 				position.y += e1.y;
-				pcontainer->TranslateRecursive(p1,e1);
+				pcontainer->TranslateRecursive(p1,e1,p1+pcontainer->canvasOffset,e1-pcontainer->canvasExtent);
 			}
 		}
 		//
 		break;
 	}
 
+	this->posFullCanvas = posFullCanvas;
+	this->extFullCanvas = extFullCanvas;
 	this->p = p;
 	this->e = e;
 	if(pclient)
@@ -505,7 +509,10 @@ void Container::Translate(){
 	if(!pcontainer)
 		pcontainer = this; //reached the root
 
-	pcontainer->TranslateRecursive(pcontainer->p,pcontainer->e);
+	//pcontainer->posFullCanvas-canvasOffset,e,posFullCanvas,extFullCanvas
+	//pcontainer->TranslateRecursive(pcontainer->p,pcontainer->e);
+	pcontainer->TranslateRecursive(pcontainer->posFullCanvas,pcontainer->extFullCanvas,
+		pcontainer->posFullCanvas+pcontainer->canvasOffset,pcontainer->extFullCanvas-pcontainer->canvasExtent);
 }
 
 void Container::StackRecursive(){

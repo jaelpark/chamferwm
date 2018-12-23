@@ -34,6 +34,22 @@ class Key(Enum):
 	MAXIMIZE = auto()
 	SPLIT_V = auto()
 
+	CONTRACT_ROOT_RESET = auto()
+	CONTRACT_ROOT_LEFT = auto() #contract left side
+	CONTRACT_ROOT_RIGHT = auto() #contract right side
+	EXPAND_ROOT_LEFT = auto()
+	EXPAND_ROOT_RIGHT = auto() #right side
+
+	CONTRACT_RESET = auto()
+	CONTRACT_LEFT = auto()
+	CONTRACT_RIGHT = auto()
+	CONTRACT_UP = auto()
+	CONTRACT_DOWN = auto()
+	EXPAND_LEFT = auto()
+	EXPAND_RIGHT = auto()
+	EXPAND_UP = auto()
+	EXPAND_DOWN = auto()
+
 	KILL = auto()
 	LAUNCH_TERMINAL = auto()
 	LAUNCH_BROWSER = auto()
@@ -133,6 +149,23 @@ class Backend(chamfer.Backend):
 			binder.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
 			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.SPLIT_V.value);
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_4,Key.SPLIT_V.value);
+
+			#binder.BindKey(latin1.XK_bracketleft,chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RIGHT.value);
+			binder.BindKey(ord('r'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RESET.value);
+			binder.BindKey(ord('u'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_LEFT.value);
+			binder.BindKey(ord('i'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RIGHT.value);
+			binder.BindKey(ord('u'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_ROOT_LEFT.value);
+			binder.BindKey(ord('i'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_ROOT_RIGHT.value);
+
+			binder.BindKey(ord('r'),chamfer.MOD_MASK_1,Key.CONTRACT_RESET.value);
+			binder.BindKey(ord('u'),chamfer.MOD_MASK_1,Key.CONTRACT_LEFT.value);
+			binder.BindKey(ord('i'),chamfer.MOD_MASK_1,Key.CONTRACT_RIGHT.value);
+			binder.BindKey(ord('u'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL,Key.CONTRACT_DOWN.value);
+			binder.BindKey(ord('i'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL,Key.CONTRACT_UP.value);
+			binder.BindKey(ord('u'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.EXPAND_LEFT.value);
+			binder.BindKey(ord('i'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.EXPAND_RIGHT.value);
+			binder.BindKey(ord('u'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL|chamfer.MOD_MASK_SHIFT,Key.EXPAND_DOWN.value);
+			binder.BindKey(ord('i'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL|chamfer.MOD_MASK_SHIFT,Key.EXPAND_UP.value);
 			
 			binder.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
 			binder.BindKey(miscellany.XK_Return,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
@@ -280,6 +313,75 @@ class Backend(chamfer.Backend):
 			#TODO: add render flags property, bitwise or them
 			print("split armed.");
 			focus.splitArmed = not focus.splitArmed;
+		
+		elif keyId == Key.CONTRACT_ROOT_RESET.value:
+			root = chamfer.GetRoot();
+			root.canvasOffset = (0.0,0.0);
+			root.canvasExtent = (0.0,0.0);
+			root.ShiftLayout(root.layout);
+
+		elif keyId == Key.CONTRACT_ROOT_LEFT.value:
+			root = chamfer.GetRoot();
+			root.canvasOffset = (root.canvasOffset[0]+0.1,root.canvasOffset[1]);
+			root.canvasExtent = (root.canvasExtent[0]+0.1,root.canvasExtent[1]);#root.canvasOffset;
+			root.ShiftLayout(root.layout);
+
+		elif keyId == Key.CONTRACT_ROOT_RIGHT.value:
+			root = chamfer.GetRoot();
+			root.canvasExtent = (root.canvasExtent[0]+0.1,root.canvasExtent[1]);
+			root.ShiftLayout(root.layout);
+
+		elif keyId == Key.EXPAND_ROOT_LEFT.value:
+			root = chamfer.GetRoot();
+			root.canvasOffset = (root.canvasOffset[0]-0.1,root.canvasOffset[1]);
+			root.canvasExtent = (root.canvasExtent[0]-0.1,root.canvasExtent[1]);
+			root.ShiftLayout(root.layout);
+
+		elif keyId == Key.EXPAND_ROOT_RIGHT.value:
+			root = chamfer.GetRoot();
+			root.canvasExtent = (root.canvasExtent[0]-0.1,root.canvasExtent[1]);
+			root.ShiftLayout(root.layout);
+
+		elif keyId == Key.CONTRACT_RESET.value:
+			focus.canvasOffset = (0.0,0.0);
+			focus.canvasExtent = (0.0,0.0);
+			focus.ShiftLayout(focus.layout);
+
+		elif keyId == Key.CONTRACT_LEFT.value:
+			focus.canvasOffset = (focus.canvasOffset[0]+0.1,focus.canvasOffset[1]);
+			focus.canvasExtent = (focus.canvasExtent[0]+0.1,focus.canvasExtent[1]);
+			focus.ShiftLayout(focus.layout);
+
+		elif keyId == Key.CONTRACT_RIGHT.value:
+			focus.canvasExtent = (focus.canvasExtent[0]+0.1,focus.canvasExtent[1]);
+			focus.ShiftLayout(focus.layout);
+
+		elif keyId == Key.CONTRACT_UP.value:
+			focus.canvasOffset = (focus.canvasOffset[0],focus.canvasOffset[1]+0.1);
+			focus.canvasExtent = (focus.canvasExtent[0],focus.canvasExtent[1]+0.1);
+			focus.ShiftLayout(focus.layout);
+
+		elif keyId == Key.CONTRACT_DOWN.value:
+			focus.canvasExtent = (focus.canvasExtent[0],focus.canvasExtent[1]+0.1);
+			focus.ShiftLayout(focus.layout);
+
+		elif keyId == Key.EXPAND_LEFT.value:
+			focus.canvasOffset = (focus.canvasOffset[0]-0.1,focus.canvasOffset[1]);
+			focus.canvasExtent = (focus.canvasExtent[0]-0.1,focus.canvasExtent[1]);
+			focus.ShiftLayout(focus.layout);
+
+		elif keyId == Key.EXPAND_RIGHT.value:
+			focus.canvasExtent = (focus.canvasExtent[0]-0.1,focus.canvasExtent[1]);
+			focus.ShiftLayout(focus.layout);
+
+		elif keyId == Key.EXPAND_UP.value:
+			focus.canvasOffset = (focus.canvasOffset[0],focus.canvasOffset[1]-0.1);
+			focus.canvasExtent = (focus.canvasExtent[0],focus.canvasExtent[1]-0.1);
+			focus.ShiftLayout(focus.layout);
+
+		elif keyId == Key.EXPAND_DOWN.value:
+			focus.canvasExtent = (focus.canvasExtent[0],focus.canvasExtent[1]-0.1);
+			focus.ShiftLayout(focus.layout);
 
 		elif keyId == Key.KILL.value:
 			print("killing client...");

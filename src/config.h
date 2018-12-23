@@ -38,6 +38,8 @@ public:
 	boost::python::object GetAdjacent(WManager::Container::ADJACENT) const;
 	void Move(boost::python::object);
 //public:
+	boost::python::tuple canvasOffset;
+	boost::python::tuple canvasExtent;
 	boost::python::tuple borderWidth;
 	boost::python::tuple minSize;
 	boost::python::tuple maxSize;
