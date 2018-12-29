@@ -812,7 +812,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		frame.offset = {renderObject.pclient->rect.x,renderObject.pclient->rect.y};
 		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
 
-		VkRect2D scissor = frame;
+		/*VkRect2D scissor = frame;
 		for(uint j = i+1; j < renderQueue.size(); ++j){
 			RenderObject &renderObject1 = renderQueue[j];
 
@@ -834,18 +834,14 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		glm::ivec2 borderWidth = 2*glm::ivec2(
 			renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
 			renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width); //due to aspect, this must be *width
-		/*scissor[1].offset.x = 0;////std::max(scissor.offset.x-2*borderWidth.x,0);
-		scissor[1].offset.y = 0;//std::max(scissor[1].offset.y-borderWidth.y,0);
-		scissor[1].extent.width = imageExtent.width;
-		scissor[1].extent.height = imageExtent.height;//borderWidth.y;*/
 		scissor.offset.x = std::max(scissor.offset.x-borderWidth.x,0);
 		scissor.extent.width += 2*borderWidth.x;
 		scissor.offset.y = std::max(scissor.offset.y-borderWidth.y,0);
-		scissor.extent.height += 2*borderWidth.y;
+		scissor.extent.height += 2*borderWidth.y;*/
 
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
-		vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
+		//vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
 		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.flags,&pcommandBuffers[currentFrame]);
 	}
 

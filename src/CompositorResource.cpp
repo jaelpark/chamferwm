@@ -275,16 +275,17 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 
-	/*VkRect2D scissor = {};
+	VkRect2D scissor = {};
 	scissor.offset = {0,0};
-	scissor.extent = pcomp->imageExtent;*/
+	scissor.extent = pcomp->imageExtent;
 
 	VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {};
 	viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	viewportStateCreateInfo.viewportCount = 1;
 	viewportStateCreateInfo.pViewports = &viewport;
 	viewportStateCreateInfo.scissorCount = 1;
-	viewportStateCreateInfo.pScissors = 0;//&scissor;
+	viewportStateCreateInfo.pScissors = &scissor;
+	//viewportStateCreateInfo.pScissors = 0;//&scissor;
 
 	VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = {};
 	rasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
