@@ -285,7 +285,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	viewportStateCreateInfo.pViewports = &viewport;
 	viewportStateCreateInfo.scissorCount = 1;
 	viewportStateCreateInfo.pScissors = &scissor;
-	//viewportStateCreateInfo.pScissors = 0;//&scissor;
+	//viewportStateCreateInfo.pScissors = 0;//&scissor; //+ dynamic states below!
 
 	VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = {};
 	rasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -357,13 +357,13 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	
 	delete []pcombinedSets;
 
-	VkDynamicState dynamicStates[1] = {VK_DYNAMIC_STATE_SCISSOR};
+	//VkDynamicState dynamicStates[1] = {VK_DYNAMIC_STATE_SCISSOR};
 
 	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
 	dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamicStateCreateInfo.pNext = 0;
-	dynamicStateCreateInfo.pDynamicStates = dynamicStates;
-	dynamicStateCreateInfo.dynamicStateCount = 1;
+	dynamicStateCreateInfo.pDynamicStates = 0;//dynamicStates;
+	dynamicStateCreateInfo.dynamicStateCount = 0;
 
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
