@@ -125,6 +125,7 @@ public:
 	X11Client(WManager::Container *, const CreateInfo *);
 	~X11Client();
 	virtual void AdjustSurface1(){};
+	//virtual void SetFullscreen1(bool){};
 	void UpdateTranslation(); //manual mode update
 	void UpdateTranslation(const WManager::Rectangle *); //automatic mode update
 	bool ProtocolSupport(xcb_atom_t);

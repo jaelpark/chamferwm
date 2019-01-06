@@ -84,7 +84,7 @@ class Container(chamfer.Container):
 
 	#setup the client before it's created (shaders)
 	def OnSetupClient(self):
-		if self.wm_class == "Conky": #TODO: check undecorated hint
+		if self.wm_class == "Conky":
 			self.vertexShader = "default_vertex.spv";
 			self.geometryShader = "default_geometry.spv";
 			self.fragmentShader = "default_fragment.spv";
@@ -114,9 +114,19 @@ class Container(chamfer.Container):
 			pass;
 		self.Focus();
 
-	#called if client wants has requested fullscreen mode
+	#called to evaluate if client has permission to toggle between fullscreen modes
 	def OnFullscreen(self, toggle):
-		self.SetFullscreen(toggle);
+		if toggle:
+			self.vertexShader = "default_vertex.spv";
+			self.geometryShader = "default_geometry.spv";
+			self.fragmentShader = "default_fragment.spv";
+		else:
+			self.vertexShader = "frame_vertex.spv";
+			self.geometryShader = "frame_geometry.spv";
+			self.fragmentShader = "frame_fragment.spv";
+		self.ResetShaders();
+
+		return True;
 
 	#called every time a client property has changed (title etc.)
 	def OnPropertyChange(self, propId):

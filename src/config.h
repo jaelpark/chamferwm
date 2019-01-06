@@ -29,7 +29,7 @@ public:
 		PROPERTY_ID_NAME,
 		PROPERTY_ID_CLASS
 	};
-	virtual void OnFullscreen(bool);
+	virtual bool OnFullscreen(bool);
 	virtual void OnPropertyChange(PROPERTY_ID);
 	boost::python::object GetNext() const;
 	boost::python::object GetPrev() const;
@@ -70,7 +70,7 @@ public:
 	void OnSetupClient();
 	boost::python::object OnParent();
 	void OnCreate();
-	void OnFullscreen(bool);
+	bool OnFullscreen(bool);
 	void OnPropertyChange(PROPERTY_ID);
 };
 

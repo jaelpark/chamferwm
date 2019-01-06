@@ -15,33 +15,7 @@ ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADE
 	pcomp->updateQueue.push_back(this);
 
 	ptexture = pcomp->CreateTexture(w,h);
-	auto m = std::find_if(pcomp->pipelines.begin(),pcomp->pipelines.end(),[&](auto &r)->bool{
-		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-			if(strcmp(r.pshaderModule[i]->pname,pshaderName[i]) != 0)
-				return false;
-		return true;
-	});
-	Pipeline *pPipeline;
-	if(m != pcomp->pipelines.end())
-		pPipeline = &(*m);
-	else{
-		ShaderModule *pshader[Pipeline::SHADER_MODULE_COUNT];
-		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
-			auto n = std::find_if(pcomp->shaders.begin(),pcomp->shaders.end(),[&](auto &r)->bool{
-				return strcmp(r.pname,pshaderName[i]) == 0;
-			});
-			if(n == pcomp->shaders.end()){
-				snprintf(Exception::buffer,sizeof(Exception::buffer),"Shader not found: %s.",pshaderName[i]);
-				throw Exception();
-			}
-			pshader[i] = &(*n);
-		}
-		pcomp->pipelines.reserve(pcomp->pipelines.size());
-		pPipeline = &pcomp->pipelines.emplace_back(
-			pshader[Pipeline::SHADER_MODULE_VERTEX],
-			pshader[Pipeline::SHADER_MODULE_GEOMETRY],
-			pshader[Pipeline::SHADER_MODULE_FRAGMENT],pcomp);
-	}
+	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
 	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
 	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
@@ -63,6 +37,12 @@ ClientFrame::~ClientFrame(){
 				delete []pipelineDescSet.pdescSets[i];*/
 				pcomp->ReleaseDescSets(pipelineDescSet.p->pshaderModule[i],pipelineDescSet.pdescSets[i]);
 			}
+}
+
+void ClientFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
+	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
+	if(!AssignPipeline(pPipeline))
+		throw Exception("Failed to assign a pipeline.");
 }
 
 void ClientFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, uint flags, const VkCommandBuffer *pcommandBuffer){
@@ -889,6 +869,37 @@ void CompositorInterface::Present(){
 	currentFrame = (currentFrame+1)%swapChainImageCount;
 
 	frameTag++;
+}
+
+Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
+	auto m = std::find_if(pipelines.begin(),pipelines.end(),[&](auto &r)->bool{
+		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+			if(strcmp(r.pshaderModule[i]->pname,pshaderName[i]) != 0)
+				return false;
+		return true;
+	});
+	Pipeline *pPipeline;
+	if(m != pipelines.end())
+		pPipeline = &(*m);
+	else{
+		ShaderModule *pshader[Pipeline::SHADER_MODULE_COUNT];
+		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+			auto n = std::find_if(shaders.begin(),shaders.end(),[&](auto &r)->bool{
+				return strcmp(r.pname,pshaderName[i]) == 0;
+			});
+			if(n == shaders.end()){
+				snprintf(Exception::buffer,sizeof(Exception::buffer),"Shader not found: %s.",pshaderName[i]);
+				throw Exception();
+			}
+			pshader[i] = &(*n);
+		}
+		pipelines.reserve(pipelines.size());
+		pPipeline = &pipelines.emplace_back(
+			pshader[Pipeline::SHADER_MODULE_VERTEX],
+			pshader[Pipeline::SHADER_MODULE_GEOMETRY],
+			pshader[Pipeline::SHADER_MODULE_FRAGMENT],this);
+	}
+	return pPipeline;
 }
 
 Texture * CompositorInterface::CreateTexture(uint w, uint h){

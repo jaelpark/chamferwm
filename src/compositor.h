@@ -19,6 +19,7 @@ public:
 	ClientFrame(uint, uint, const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
+	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
 	void Draw(const VkRect2D &, const glm::vec2 &, uint, const VkCommandBuffer *);
 	void AdjustSurface(uint, uint);
 	bool AssignPipeline(const Pipeline *);
@@ -99,6 +100,8 @@ protected:
 	uint physicalDevIndex;
 	uint swapChainImageCount;
 	uint currentFrame;
+
+	Pipeline * LoadPipeline(const char *[Pipeline::SHADER_MODULE_COUNT]);
 
 	//all the resources are preloaded for now
 	std::vector<ShaderModule> shaders;

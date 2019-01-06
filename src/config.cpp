@@ -1,6 +1,8 @@
 #include "main.h"
 #include "container.h"
 #include "backend.h"
+#include "CompositorResource.h"
+#include "compositor.h"
 #include "config.h"
 #include <xcb/xcb_keysyms.h> //todo: should not depend on xcb here
 #include <X11/keysym.h>
@@ -75,8 +77,9 @@ void ContainerInterface::OnCreate(){
 	//TODO: focus on this
 }
 
-void ContainerInterface::OnFullscreen(bool toggle){
+bool ContainerInterface::OnFullscreen(bool toggle){
 	//
+	return true;
 }
 
 void ContainerInterface::OnPropertyChange(PROPERTY_ID id){
@@ -235,18 +238,19 @@ void ContainerProxy::OnCreate(){
 	}else ContainerInterface::OnCreate();
 }
 
-void ContainerProxy::OnFullscreen(bool toggle){
+bool ContainerProxy::OnFullscreen(bool toggle){
 	boost::python::override ovr = this->get_override("OnFullscreen");
 	if(ovr){
 		try{
-			ovr(toggle);
+			return ovr(toggle);
 		}catch(boost::python::error_already_set &){
 			PyErr_Print();
 			//
 			boost::python::handle_exception();
 			PyErr_Clear();
 		}
-	}else return ContainerInterface::OnFullscreen(toggle);
+	}
+	return ContainerInterface::OnFullscreen(toggle);
 }
 
 void ContainerProxy::OnPropertyChange(PROPERTY_ID id){
@@ -587,8 +591,21 @@ BOOST_PYTHON_MODULE(chamfer){
 			[](ContainerInterface &container, bool toggle){
 				if(!container.pcontainer)
 					return;
-				container.pcontainer->SetFullscreen(toggle);
+				if(container.OnFullscreen(toggle))
+					container.pcontainer->SetFullscreen(toggle);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, bool>()))
+		.def("ResetShaders",boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer || !container.pcontainer->pclient)
+					return;
+				Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>(container.pcontainer->pclient);
+				if(!pclientFrame)
+					return;
+				const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
+					container.vertexShader.c_str(),container.geometryShader.c_str(),container.fragmentShader.c_str()
+				};
+				pclientFrame->SetShaders(pshaderName);
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("IsFloating",boost::python::make_function(
 			[](ContainerInterface &container){
 				if(!container.pcontainer){
