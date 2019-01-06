@@ -212,6 +212,15 @@ void Container::Focus(){
 	Focus1();
 }
 
+void Container::SetFullscreen(bool toggle){
+	if(toggle)
+		flags |= FLAG_FULLSCREEN;
+	else flags &= ~FLAG_FULLSCREEN;
+
+	Fullscreen1();
+	Translate();
+}
+
 Container * Container::GetNext(){
 	if(flags & FLAG_FLOATING)
 		return this;
@@ -372,6 +381,10 @@ glm::vec2 Container::GetMinSize() const{
 }
 
 void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCanvas, glm::vec2 p, glm::vec2 e){
+	if(flags & FLAG_FULLSCREEN){
+		p = glm::vec2(0.0f);
+		e = glm::vec2(1.0f);
+	}
 	uint count = 0;
 
 	glm::vec2 minSizeSum(0.0f);
@@ -427,11 +440,8 @@ void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCan
 		if(e.x-minSizeSum.x < 0.0f){
 			//overlap required, everything has been minimized to the limit
 			for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
-				//glm::vec2 e1 = glm::vec2(pcontainer->e1.x,e.y);
 				glm::vec2 e1 = glm::vec2(maxMinSize.x,e.y);
-				//glm::vec2 p1 = glm::vec2(position.x,p.y);//position;
 				glm::vec2 p1 = glm::vec2(position.x,p.y);//position;
-				//glm::vec2 p1 = glm::vec2((p+pcontainer->c1-0.5f*e1).x,p.y);//position;
 
 				/*if(pcontainer->pnext){
 					if(p1.x+e1.x+pcontainer->pnext->e1.x > 1.0f)

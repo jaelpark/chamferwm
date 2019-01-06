@@ -389,6 +389,15 @@ public:
 		RunBackend::MoveContainer<Config::X11ContainerConfig,DefaultBackend>(pcontainer,pdst);
 	}
 
+	void SetFullscreen(Backend::X11Client *pclient, bool toggle){
+		//
+		//
+		if(!pclient || pclient->pcontainer == proot)
+			return;
+		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
+		pcontainer1->pcontainerInt->OnFullscreen(toggle);
+	}
+
 	void PropertyChange(Backend::X11Client *pclient, PROPERTY_ID id, const Backend::BackendProperty *pProperty){
 		if(!pclient){
 			//root window

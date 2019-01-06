@@ -174,7 +174,10 @@ void X11Client::UpdateTranslation(){
 		return; //if the window is about to be destroyed, do not attempt to adjust the surface of anything
 	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
 	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
-	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
+	//glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
+	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
+	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN))
+		coord += glm::vec4(pcontainer->borderWidth*aspect,-2.0f*pcontainer->borderWidth*aspect)*screen;
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
 
 	uint values[4] = {rect.x,rect.y,rect.w,rect.h};
@@ -260,6 +263,43 @@ void X11Container::Focus1(){
 
 void X11Container::Stack1(){
 	((X11Backend*)pbackend)->StackClients(); //hack, bypass const qualifier
+}
+
+void X11Container::Fullscreen1(){
+	if(!pclient)
+		return;
+	X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
+	if(flags & FLAG_FULLSCREEN)
+		xcb_change_property(pbackend->pcon,XCB_PROP_MODE_APPEND,pclient11->window,pbackend->ewmh._NET_WM_STATE,XCB_ATOM_ATOM,32,1,&pbackend->ewmh._NET_WM_STATE_FULLSCREEN);
+	else{
+		xcb_grab_server(pbackend->pcon);
+		xcb_get_property_cookie_t propertyCookie = xcb_get_property(pbackend->pcon,false,pclient11->window,pbackend->ewmh._NET_WM_STATE,XCB_GET_PROPERTY_TYPE_ANY,0,4096);
+		xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pbackend->pcon,propertyCookie,0);
+		if(!propertyReply){
+			xcb_ungrab_server(pbackend->pcon);
+			return;
+		}
+		uint l = xcb_get_property_value_length(propertyReply);
+		if(l == 0){
+			xcb_ungrab_server(pbackend->pcon);
+			return;
+		}
+		uint s = 8*l/propertyReply->format;
+		xcb_atom_t *patoms = (xcb_atom_t*)xcb_get_property_value(propertyReply);
+		xcb_atom_t *pNewAtoms = new xcb_atom_t[s];
+		uint n = 0;
+		for(uint i = 0; i < s; ++i){
+			if(patoms[i] != pbackend->ewmh._NET_WM_STATE_FULLSCREEN)
+				pNewAtoms[n++] = patoms[i];
+		}
+		xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pclient11->window,pbackend->ewmh._NET_WM_STATE,XCB_ATOM_ATOM,32,n,pNewAtoms);
+
+		delete []pNewAtoms;
+		free(propertyReply);
+		xcb_ungrab_server(pbackend->pcon);
+	}
+
+	xcb_flush(pbackend->pcon);
 }
 
 X11Backend::X11Backend() : lastTime(XCB_CURRENT_TIME){
@@ -719,42 +759,50 @@ sint Default::HandleEvent(){
 			}
 			if(propertyReplyWindowType){
 				//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
-				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowType);
-				if(*patom == ewmh._NET_WM_WINDOW_TYPE_DIALOG ||
-					*patom == ewmh._NET_WM_WINDOW_TYPE_DOCK ||
-					*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP ||
-					*patom == ewmh._NET_WM_WINDOW_TYPE_TOOLBAR ||
-					*patom == ewmh._NET_WM_WINDOW_TYPE_MENU ||
-					*patom == ewmh._NET_WM_WINDOW_TYPE_UTILITY ||
-					*patom == ewmh._NET_WM_WINDOW_TYPE_SPLASH){
-					if(!prect){
-						auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-							return pev->window == p.first;
-						});
-						prect = m != configCache.end()?&(*m).second:0;
-					}
+				uint l = xcb_get_property_value_length(propertyReplyWindowType);
+				if(l > 0){
+					uint n = 8*l/propertyReplyWindowType->format;
+					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowType);
+					if(l > 0 && (patom[0] == ewmh._NET_WM_WINDOW_TYPE_DIALOG ||
+						patom[0] == ewmh._NET_WM_WINDOW_TYPE_DOCK ||
+						patom[0] == ewmh._NET_WM_WINDOW_TYPE_DESKTOP ||
+						patom[0] == ewmh._NET_WM_WINDOW_TYPE_TOOLBAR ||
+						patom[0] == ewmh._NET_WM_WINDOW_TYPE_MENU ||
+						patom[0] == ewmh._NET_WM_WINDOW_TYPE_UTILITY ||
+						patom[0] == ewmh._NET_WM_WINDOW_TYPE_SPLASH)){
+						if(!prect){
+							auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+								return pev->window == p.first;
+							});
+							prect = m != configCache.end()?&(*m).second:0;
+						}
 
-					hintFlags |= 
-						(*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP?X11Client::CreateInfo::HINT_DESKTOP:0)|
-						(*patom == ewmh._NET_WM_WINDOW_TYPE_DOCK?X11Client::CreateInfo::HINT_ABOVE:0); //TODO: could be overriden with BELOW hint
+						hintFlags |= 
+							(patom[0] == ewmh._NET_WM_WINDOW_TYPE_DESKTOP?X11Client::CreateInfo::HINT_DESKTOP:0)|
+							(patom[0] == ewmh._NET_WM_WINDOW_TYPE_DOCK?X11Client::CreateInfo::HINT_ABOVE:0);
+					}
 				}
 				free(propertyReplyWindowType);
 			}
 			if(propertyReplyWindowState){
-				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowState);
-				if(*patom == ewmh._NET_WM_STATE_MODAL ||
-					//*patom == ewmh._NET_WM_STATE_ABOVE ||
-					*patom == ewmh._NET_WM_STATE_SKIP_TASKBAR){
-					if(!prect){
-						auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-							return pev->window == p.first;
-						});
-						prect = m != configCache.end()?&(*m).second:0;
-					}
+				uint l = xcb_get_property_value_length(propertyReplyWindowState);
+				if(l > 0){
+					uint n = 8*l/propertyReplyWindowState->format;
+					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowState);
 
-					hintFlags |= 
-						(*patom == ewmh._NET_WM_STATE_ABOVE?X11Client::CreateInfo::HINT_ABOVE:0)|
-						(*patom == ewmh._NET_WM_STATE_BELOW?X11Client::CreateInfo::HINT_DESKTOP:0);
+					if(any(ewmh._NET_WM_STATE_MODAL,patom,n) || any(ewmh._NET_WM_STATE_SKIP_TASKBAR,patom,n)){
+						if(!prect){
+							auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+								return pev->window == p.first;
+							});
+							prect = m != configCache.end()?&(*m).second:0;
+						}
+
+						hintFlags |= 
+							(any(ewmh._NET_WM_STATE_ABOVE,patom,n)?X11Client::CreateInfo::HINT_ABOVE:0)|
+							(any(ewmh._NET_WM_STATE_BELOW,patom,n)?X11Client::CreateInfo::HINT_DESKTOP:0)|
+							(any(ewmh._NET_WM_STATE_FULLSCREEN,patom,n)?X11Client::CreateInfo::HINT_FULLSCREEN:0);
+					}
 				}
 				free(propertyReplyWindowState);
 			}
@@ -805,6 +853,9 @@ sint Default::HandleEvent(){
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_MANUAL));
 
+			if(hintFlags & X11Client::CreateInfo::HINT_FULLSCREEN)
+				SetFullscreen(pclient,true);
+
 			for(uint i = 0; i < 2; ++i)
 				free(propertyReply1[i]);
 
@@ -812,6 +863,8 @@ sint Default::HandleEvent(){
 			for(auto &p : clients)
 				netClientList.push_back(p.first->window);
 			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
+
+			//check fullscreen
 		
 			DebugPrintf(stdout,"map request, %x\n",pev->window);
 			}
@@ -1009,7 +1062,30 @@ sint Default::HandleEvent(){
 					TimerEvent();
 				break;
 			}*/
-			//if(pev->data.data32[0] == wmD
+			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
+			if(!pclient1)
+				break;
+
+			if(pev->type == ewmh._NET_WM_STATE){
+				if(pev->data.data32[1] == ewmh._NET_WM_STATE_FULLSCREEN){
+					printf("fullscreen!\n");
+					switch(pev->data.data32[0]){
+					case 2://ewmh._NET_WM_STATE_TOGGLE)
+						SetFullscreen(pclient1,(pclient1->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) == 0);
+						break;
+					case 1://ewmh._NET_WM_STATE_ADD)
+						SetFullscreen(pclient1,true);
+						break;
+					case 0://ewmh._NET_WM_STATE_REMOVE)
+						SetFullscreen(pclient1,false);
+						break;
+					}
+
+				}else
+				if(pev->data.data32[1] == ewmh._NET_WM_STATE_DEMANDS_ATTENTION){
+					printf("urgency!\n");
+				}
+			}
 			//_NET_WM_STATE
 			//_NET_WM_STATE_FULLSCREEN, _NET_WM_STATE_DEMANDS_ATTENTION
 			result = 1;

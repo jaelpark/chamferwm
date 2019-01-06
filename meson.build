@@ -7,11 +7,11 @@ src = [
 	'src/backend.cpp',
 	'src/compositor.cpp',
 	'src/CompositorResource.cpp',
-	'third/spirv_reflect.c'
+	'third/spirv_reflect/spirv_reflect.c'
 ]
 
 inc = [
-	include_directories('third')
+	include_directories('third/spirv_reflect')
 ]
 	
 xcb = [

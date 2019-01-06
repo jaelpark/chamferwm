@@ -32,6 +32,14 @@ static inline void timespec_diff_ptr(struct timespec &b, struct timespec &a, str
 	}
 }
 
+template<class T>
+static inline bool any(T t, T *parray, uint n){
+	for(uint i = 0; i < n; ++i)
+		if(t == parray[i])
+			return true;
+	return false;
+}
+
 class Exception{
 public:
 	Exception();

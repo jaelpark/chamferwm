@@ -115,7 +115,8 @@ public:
 		enum{
 			HINT_DESKTOP = 0x1,
 			HINT_ABOVE = 0x2,
-			HINT_NO_INPUT = 0x4
+			HINT_NO_INPUT = 0x4,
+			HINT_FULLSCREEN = 0x8
 		};
 		uint hints;
 		const BackendStringProperty *pwmName;
@@ -143,6 +144,7 @@ public:
 	virtual ~X11Container();
 	void Focus1();
 	void Stack1();
+	void Fullscreen1();
 	const X11Backend *pbackend;
 };
 
@@ -222,6 +224,7 @@ protected:
 		PROPERTY_ID_TRANSIENT_FOR,
 	};
 	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
+	virtual void SetFullscreen(X11Client *, bool) = 0;
 	virtual void PropertyChange(X11Client *, PROPERTY_ID, const BackendProperty *) = 0;
 	virtual void DestroyClient(X11Client *) = 0;
 private:
@@ -252,6 +255,7 @@ public:
 	virtual ~DebugContainer();
 	void Focus1();
 	void Stack1();
+	//void Fullscreen1();
 	const X11Backend *pbackend;
 };
 

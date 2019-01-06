@@ -27,7 +27,8 @@ class Container{
 public:
 	enum FLAG{
 		FLAG_FLOATING = 0x1,
-		FLAG_NO_FOCUS = 0x2
+		FLAG_NO_FOCUS = 0x2,
+		FLAG_FULLSCREEN = 0x4
 	};
 	struct Setup{
 		glm::vec2 canvasOffset = glm::vec2(0.0f);
@@ -50,6 +51,7 @@ public:
 	Container * Remove();
 	Container * Collapse();
 	void Focus();
+	void SetFullscreen(bool);
 	Container * GetNext();
 	Container * GetPrev();
 	Container * GetParent() const;
@@ -79,6 +81,7 @@ public:
 
 	virtual void Focus1(){}// = 0;
 	virtual void Stack1(){}// = 0;
+	virtual void Fullscreen1(){}
 
 	Container *pParent;
 	Container *pch; //First children

@@ -29,6 +29,7 @@ public:
 		PROPERTY_ID_NAME,
 		PROPERTY_ID_CLASS
 	};
+	virtual void OnFullscreen(bool);
 	virtual void OnPropertyChange(PROPERTY_ID);
 	boost::python::object GetNext() const;
 	boost::python::object GetPrev() const;
@@ -48,6 +49,7 @@ public:
 		FLOAT_ALWAYS,
 		FLOAT_NEVER
 	} floatingMode;
+	//bool fullscreen;
 
 	std::string wm_name;
 	std::string wm_class;
@@ -68,6 +70,7 @@ public:
 	void OnSetupClient();
 	boost::python::object OnParent();
 	void OnCreate();
+	void OnFullscreen(bool);
 	void OnPropertyChange(PROPERTY_ID);
 };
 

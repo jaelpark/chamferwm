@@ -36,7 +36,6 @@ void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 	setup.minSize.y = boost::python::extract<float>(minSize[1])();
 	setup.maxSize.x = boost::python::extract<float>(maxSize[0])();
 	setup.maxSize.y = boost::python::extract<float>(maxSize[1])();
-	//setup.floatingMode = boost
 }
 
 void ContainerInterface::CopySettingsContainer(){
@@ -74,6 +73,10 @@ boost::python::object ContainerInterface::OnParent(){
 
 void ContainerInterface::OnCreate(){
 	//TODO: focus on this
+}
+
+void ContainerInterface::OnFullscreen(bool toggle){
+	//
 }
 
 void ContainerInterface::OnPropertyChange(PROPERTY_ID id){
@@ -230,6 +233,20 @@ void ContainerProxy::OnCreate(){
 			PyErr_Clear();
 		}
 	}else ContainerInterface::OnCreate();
+}
+
+void ContainerProxy::OnFullscreen(bool toggle){
+	boost::python::override ovr = this->get_override("OnFullscreen");
+	if(ovr){
+		try{
+			ovr(toggle);
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else return ContainerInterface::OnFullscreen(toggle);
 }
 
 void ContainerProxy::OnPropertyChange(PROPERTY_ID id){
@@ -525,6 +542,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("OnSetupClient",&ContainerInterface::OnSetupClient)
 		.def("OnParent",&ContainerInterface::OnParent)
 		.def("OnCreate",&ContainerInterface::OnCreate)
+		.def("OnFullscreen",&ContainerInterface::OnFullscreen)
 		.def("OnProperty",&ContainerInterface::OnPropertyChange)
 		.def("GetNext",&ContainerInterface::GetNext)
 		.def("GetPrev",&ContainerInterface::GetPrev)
@@ -565,6 +583,12 @@ BOOST_PYTHON_MODULE(chamfer){
 				container.CopySettingsContainer();
 				container.pcontainer->SetLayout(layout);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, WManager::Container::LAYOUT>()))
+		.def("SetFullscreen",boost::python::make_function(
+			[](ContainerInterface &container, bool toggle){
+				if(!container.pcontainer)
+					return;
+				container.pcontainer->SetFullscreen(toggle);
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, bool>()))
 		.def("IsFloating",boost::python::make_function(
 			[](ContainerInterface &container){
 				if(!container.pcontainer){
@@ -578,6 +602,14 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
 		.def_readwrite("minSize",&ContainerInterface::minSize)
 		.def_readwrite("maxSize",&ContainerInterface::maxSize)
+		.add_property("fullscreen",boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer){
+					PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
+					return false;
+				}
+				return (container.pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) != 0;
+			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
 		.def_readonly("wm_name",&ContainerInterface::wm_name)
 		.def_readonly("wm_class",&ContainerInterface::wm_class)
 		.def_readwrite("vertexShader",&ContainerInterface::vertexShader)
@@ -585,6 +617,10 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("fragmentShader",&ContainerInterface::fragmentShader)
 		.add_property("layout",boost::python::make_function(
 			[](ContainerInterface &container){
+				if(!container.pcontainer){
+					PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
+					return WManager::Container::LAYOUT_VSPLIT;
+				}
 				return container.pcontainer->layout;
 			},boost::python::default_call_policies(),boost::mpl::vector<WManager::Container::LAYOUT, ContainerInterface &>()))
 		.def_readwrite("floatingMode",&ContainerInterface::floatingMode)

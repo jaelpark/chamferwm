@@ -33,6 +33,7 @@ class Key(Enum):
 	LAYOUT = auto()
 	MAXIMIZE = auto()
 	SPLIT_V = auto()
+	FULLSCREEN = auto()
 
 	CONTRACT_ROOT_RESET = auto()
 	CONTRACT_ROOT_LEFT = auto() #contract left side
@@ -113,6 +114,10 @@ class Container(chamfer.Container):
 			pass;
 		self.Focus();
 
+	#called if client wants has requested fullscreen mode
+	def OnFullscreen(self, toggle):
+		self.SetFullscreen(toggle);
+
 	#called every time a client property has changed (title etc.)
 	def OnPropertyChange(self, propId):
 		print(self.wm_name);
@@ -149,6 +154,7 @@ class Backend(chamfer.Backend):
 			binder.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
 			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.SPLIT_V.value);
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_4,Key.SPLIT_V.value);
+			binder.BindKey(ord('f'),chamfer.MOD_MASK_1,Key.FULLSCREEN.value);
 
 			#binder.BindKey(latin1.XK_bracketleft,chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RIGHT.value);
 			binder.BindKey(ord('r'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RESET.value);
@@ -166,6 +172,7 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('i'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.EXPAND_RIGHT.value);
 			binder.BindKey(ord('u'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL|chamfer.MOD_MASK_SHIFT,Key.EXPAND_DOWN.value);
 			binder.BindKey(ord('i'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL|chamfer.MOD_MASK_SHIFT,Key.EXPAND_UP.value);
+			#TODO: resize multiple containers simultaneously - expanding one contracts the rest
 			
 			binder.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
 			binder.BindKey(miscellany.XK_Return,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
@@ -186,11 +193,6 @@ class Backend(chamfer.Backend):
 
 			#alt+shift+a, select the top most base container under root
 
-			#alt+tab, cycle between floating containers? switch focus to the most recent floating containter.
-			#using alt-hl moves focus back to the tiled containers.
-
-			#moving windows between containers: a cut/paste mechanism
-			#not only indivudal clients can be replaced, but whole container hierarchies
 		else:
 			#debug only
 			binder.BindKey(ord('h'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_LEFT.value);
@@ -313,6 +315,10 @@ class Backend(chamfer.Backend):
 			#TODO: add render flags property, bitwise or them
 			print("split armed.");
 			focus.splitArmed = not focus.splitArmed;
+
+		elif keyId == Key.FULLSCREEN.value:
+			print("setting fullscreen");
+			focus.SetFullscreen(not focus.fullscreen);
 		
 		elif keyId == Key.CONTRACT_ROOT_RESET.value:
 			root = chamfer.GetRoot();
@@ -473,7 +479,4 @@ if not any(["clipster" in p for p in pcmdls]):
 if not any(["libinput-gestures" in p for p in pcmdls]):
 	print("starting libinput-gestures..."); #touchpad gestures
 	psutil.Popen(["libinput-gestures-setup","start"],stdout=None,stderr=None);
-
-#compositor = Compositor();
-#chamfer.bind_Compositor(compositor);
 
