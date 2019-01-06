@@ -281,14 +281,14 @@ public:
 	void PrintTree(WManager::Container *pcontainer, uint level){
 		for(uint i = 0; i < level; ++i)
 			printf(" ");
-		printf("%x: ",pcontainer);
+		printf("%p: ",pcontainer);
 		if(pcontainer->pclient)
 			printf("(client), ");
 		if(pcontainer->pParent)
-			printf("(parent: %x), ",pcontainer->pParent);
+			printf("(parent: %p), ",pcontainer->pParent);
 		if(Config::BackendInterface::pfocus == pcontainer)
 			printf("(focus), ");
-		printf("focusQueue: %u (%x)\n",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0);
+		printf("focusQueue: %lu (%p)\n",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0);
 		for(WManager::Container *pcontainer1 = pcontainer->pch; pcontainer1; pcontainer1 = pcontainer1->pnext)
 			PrintTree(pcontainer1,level+1);
 	}
@@ -442,7 +442,7 @@ public:
 		WManager::Container *premoved = pclient->pcontainer->Remove();
 		WManager::Container *pOrigParent = premoved->pParent;
 
-		printf("----------- removed %x\n",premoved);
+		printf("----------- removed %p\n",premoved);
 		PrintTree(proot,0);
 
 		WManager::Container *pcollapsed = 0;
@@ -469,9 +469,9 @@ public:
 			delete pcollapsed;
 		}
 
-		printf("----------- collapsed %x\n",pcollapsed);
+		printf("----------- collapsed %p\n",pcollapsed);
 		PrintTree(proot,0);
-		printf("stackAppendix: %u\n",stackAppendix.size());
+		printf("stackAppendix: %lu\n",stackAppendix.size());
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){
