@@ -234,6 +234,8 @@ private:
 	std::vector<std::pair<xcb_window_t, WManager::Rectangle>> configCache;
 	std::vector<X11Client *> unmappingQueue;
 	std::vector<xcb_window_t> netClientList; //used only to update the property - not maintained
+	X11Client *pdragClient;
+	sint dragClientX, dragClientY;
 };
 
 class DebugClient : public WManager::Client{

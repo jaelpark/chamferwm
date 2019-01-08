@@ -414,7 +414,7 @@ const char *X11Backend::patomStrs[ATOM_COUNT] = {
 	"WM_PROTOCOLS","WM_DELETE_WINDOW","ESETROOT_PMAP_ID","_X_ROOTPMAP_ID"
 };
 
-Default::Default() : X11Backend(){
+Default::Default() : X11Backend(), pdragClient(0){
 	//
 	clock_gettime(CLOCK_MONOTONIC,&eventTimer);
 	pollTimer.tv_sec = 0;
@@ -765,7 +765,7 @@ sint Default::HandleEvent(){
 				//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
 				uint l = xcb_get_property_value_length(propertyReplyWindowType);
 				if(l > 0){
-					uint n = 8*l/propertyReplyWindowType->format;
+					//uint n = 8*l/propertyReplyWindowType->format;
 					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowType);
 					if(l > 0 && (patom[0] == ewmh._NET_WM_WINDOW_TYPE_DIALOG ||
 						patom[0] == ewmh._NET_WM_WINDOW_TYPE_DOCK ||
@@ -1130,9 +1130,13 @@ sint Default::HandleEvent(){
 		case XCB_BUTTON_PRESS:{
 			xcb_button_press_event_t *pev = (xcb_button_press_event_t*)pevent;
 			//
-			X11Client *pclient1 = FindClient(pev->event,MODE_UNDEFINED);
-			if(!pclient1)
+			X11Client *pclient11 = FindClient(pev->event,MODE_UNDEFINED);
+			if(!pclient11 || !(pclient11->pcontainer->flags & WManager::Container::FLAG_FLOATING))
 				break;
+
+			pdragClient = pclient11;
+			dragClientX = pev->event_x;
+			dragClientY = pev->event_y;
 
 			xcb_grab_pointer(pcon,0,pscr->root,XCB_EVENT_MASK_BUTTON_RELEASE|XCB_EVENT_MASK_POINTER_MOTION,
 				XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,XCB_CURRENT_TIME);
@@ -1140,13 +1144,21 @@ sint Default::HandleEvent(){
 			break;
 		case XCB_BUTTON_RELEASE:{
 			//xcb_button_release_event_t *pev = (xcb_button_release_event_t*)pevent;
+
+			pdragClient = 0;
 			xcb_ungrab_pointer(pcon,XCB_CURRENT_TIME);
 			}
 			break;
 		case XCB_MOTION_NOTIFY:{
 			xcb_motion_notify_event_t *pev = (xcb_motion_notify_event_t*)pevent;
 
-			printf("*** motion %d,%d\n",pev->event_x,pev->event_y);
+			sint values[2] = {pev->event_x-dragClientX,pev->event_y-dragClientY};
+			xcb_configure_window(pcon,pdragClient->window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y,values);
+
+			WManager::Rectangle rect = {values[0],values[1],pdragClient->rect.w,pdragClient->rect.h};
+			pdragClient->UpdateTranslation(&rect);
+
+			//printf("*** motion %d,%d\n",pev->event_x,pev->event_y);
 			}
 			break;
 		case XCB_FOCUS_IN:{
