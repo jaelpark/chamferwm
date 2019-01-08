@@ -868,6 +868,9 @@ sint Default::HandleEvent(){
 				netClientList.push_back(p.first->window);
 			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
 
+			xcb_grab_button(pcon,0,pev->window,XCB_EVENT_MASK_BUTTON_PRESS,//|XCB_EVENT_MASK_BUTTON_RELEASE,
+				XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,1,XCB_MOD_MASK_1);
+	
 			//check fullscreen
 		
 			DebugPrintf(stdout,"map request, %x\n",pev->window);
@@ -1124,6 +1127,28 @@ sint Default::HandleEvent(){
 			}
 			}
 			break;
+		case XCB_BUTTON_PRESS:{
+			xcb_button_press_event_t *pev = (xcb_button_press_event_t*)pevent;
+			//
+			X11Client *pclient1 = FindClient(pev->event,MODE_UNDEFINED);
+			if(!pclient1)
+				break;
+
+			xcb_grab_pointer(pcon,0,pscr->root,XCB_EVENT_MASK_BUTTON_RELEASE|XCB_EVENT_MASK_POINTER_MOTION,
+				XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,XCB_CURRENT_TIME);
+			}
+			break;
+		case XCB_BUTTON_RELEASE:{
+			//xcb_button_release_event_t *pev = (xcb_button_release_event_t*)pevent;
+			xcb_ungrab_pointer(pcon,XCB_CURRENT_TIME);
+			}
+			break;
+		case XCB_MOTION_NOTIFY:{
+			xcb_motion_notify_event_t *pev = (xcb_motion_notify_event_t*)pevent;
+
+			printf("*** motion %d,%d\n",pev->event_x,pev->event_y);
+			}
+			break;
 		case XCB_FOCUS_IN:{
 			xcb_focus_in_event_t *pev = (xcb_focus_in_event_t*)pevent;
 			printf("*** focus %x\n",pev->event);
@@ -1133,11 +1158,11 @@ sint Default::HandleEvent(){
 			xcb_enter_notify_event_t *pev = (xcb_enter_notify_event_t*)pevent;
 			lastTime = pev->time;
 
-			/*X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
+			/*X11Client *pclient1 = FindClient(pev->event,MODE_UNDEFINED);
 			if(!pclient1)
 				break;*/
 
-			DebugPrintf(stdout,"enter\n");
+			DebugPrintf(stdout,"enter %x\n",pev->event);
 			}
 			break;
 		case XCB_MAPPING_NOTIFY:
