@@ -507,6 +507,18 @@ public:
 		return &stackAppendix;
 	}
 
+	void SortStackAppendix(){
+		std::sort(stackAppendix.begin(),stackAppendix.end(),[&](std::pair<const WManager::Client *, WManager::Client *> &a, std::pair<const WManager::Client *, WManager::Client *> &b)->bool{
+			for(auto *p : Config::BackendInterface::floatFocusQueue){
+				if(p == a.second->pcontainer)
+					return true;
+				if(p == b.second->pcontainer)
+					return false;
+			}
+			return true;
+		});
+	}
+
 	void TimerEvent(){
 		//
 		Config::BackendInterface::pbackendInt->OnTimer();
@@ -607,6 +619,10 @@ public:
 
 	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> * GetStackAppendix() const{
 		return &stackAppendix;
+	}
+
+	void SortStackAppendix(){
+		//
 	}
 
 	void TimerEvent(){

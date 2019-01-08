@@ -371,6 +371,8 @@ void X11Backend::StackRecursive(const WManager::Container *pcontainer){
 }
 
 void X11Backend::StackClients(){
+	SortStackAppendix();
+
 	const WManager::Container *proot = GetRoot();
 	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix = GetStackAppendix();
 

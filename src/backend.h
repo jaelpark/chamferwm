@@ -77,6 +77,7 @@ public:
 	virtual void MoveContainer(WManager::Container *, WManager::Container *) = 0;
 	virtual const WManager::Container * GetRoot() const = 0;
 	virtual const std::vector<std::pair<const WManager::Client *, WManager::Client *>> * GetStackAppendix() const = 0;
+	virtual void SortStackAppendix() = 0;
 protected:
 	//Functions defined by the implementing backends.
 	virtual void DefineBindings(BackendKeyBinder *) = 0;
