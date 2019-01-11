@@ -8,7 +8,6 @@ A tiling window manager with Vulkan based compositor.
  - XCB libraries
  - Vulkan SDK
  - Python 3.6+ and boost modules
- - [args Argument parsing library](https://github.com/Taywee/args)
  - [shaderc Shader compiler](https://github.com/google/shaderc)
 
 ## Features

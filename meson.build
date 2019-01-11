@@ -11,7 +11,8 @@ src = [
 ]
 
 inc = [
-	include_directories('third/spirv_reflect')
+	include_directories('third/spirv_reflect'),
+	include_directories('third/args')
 ]
 	
 xcb = [
