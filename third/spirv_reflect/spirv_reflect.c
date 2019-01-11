@@ -124,29 +124,38 @@ typedef struct Node {
   Decorations*          member_decorations;
 } Node;
 
+typedef struct String {
+  uint32_t              result_id;
+  const char*           string;
+} String;
+
 typedef struct Function {
-  uint32_t          id;
-  size_t            callee_count;
-  uint32_t*         callees;
-  struct Function** callee_ptrs;
-  size_t            accessed_ptr_count;
-  uint32_t*         accessed_ptrs;
+  uint32_t              id;
+  uint32_t              callee_count;
+  uint32_t*             callees;
+  struct Function**     callee_ptrs;
+  uint32_t              accessed_ptr_count;
+  uint32_t*             accessed_ptrs;
 } Function;
 
 typedef struct Parser {
   size_t                spirv_word_count;
   uint32_t*             spirv_code;
+  uint32_t              string_count;
+  String*               strings;
   SpvSourceLanguage     source_language;
   uint32_t              source_language_version;
+  uint32_t              source_file_id;
+  String                source_embedded;
   size_t                node_count;
   Node*                 nodes;
-  size_t                entry_point_count;
-  size_t                function_count;
+  uint32_t              entry_point_count;
+  uint32_t              function_count;
   Function*             functions;
 
-  size_t                type_count;
-  size_t                descriptor_count;
-  size_t                push_constant_count;
+  uint32_t              type_count;
+  uint32_t              descriptor_count;
+  uint32_t              push_constant_count;
 } Parser;
 
 //static uint32_t Min(uint32_t a, uint32_t b)
@@ -199,9 +208,13 @@ static int SortCompareUint32(const void* a, const void* b)
   return (int)*p_a - (int)*p_b;
 }
 
-// Deduplicates a sorted array and returns the new size.  Note: The array
-// doesn't actually need to be sorted, just arranged into "runs" so that all the
-// entries with one value are adjacent.
+//
+// De-duplicates a sorted array and returns the new size.
+//
+// Note: The array doesn't actually need to be sorted, just
+// arranged into "runs" so that all the entries with one
+// value are adjacent.
+//
 static size_t DedupSortedUint32(uint32_t* arr, size_t size)
 {
   if (size == 0) {
@@ -303,39 +316,39 @@ static SpvReflectResult ReadU32(Parser* p_parser, uint32_t word_offset, uint32_t
   return result;
 }
 
-#define CHECKED_READU32(parser, word_offset, value)                       \
-  {                                                                       \
-    SpvReflectResult checked_readu32_result = ReadU32(parser,             \
+#define CHECKED_READU32(parser, word_offset, value)                                      \
+  {                                                                                      \
+    SpvReflectResult checked_readu32_result = ReadU32(parser,                            \
                                                       word_offset, (uint32_t*)&(value)); \
-    if (checked_readu32_result != SPV_REFLECT_RESULT_SUCCESS) {           \
-      return checked_readu32_result;                                      \
-    }                                                                     \
+    if (checked_readu32_result != SPV_REFLECT_RESULT_SUCCESS) {                          \
+      return checked_readu32_result;                                                     \
+    }                                                                                    \
   }
 
-#define CHECKED_READU32_CAST(parser, word_offset, cast_to_type, value)    \
-  {                                                                       \
-    uint32_t checked_readu32_cast_u32 = UINT32_MAX;                       \
-    SpvReflectResult checked_readu32_cast_result = ReadU32(parser,        \
-                                      word_offset,                        \
+#define CHECKED_READU32_CAST(parser, word_offset, cast_to_type, value)         \
+  {                                                                            \
+    uint32_t checked_readu32_cast_u32 = UINT32_MAX;                            \
+    SpvReflectResult checked_readu32_cast_result = ReadU32(parser,             \
+                                      word_offset,                             \
                                       (uint32_t*)&(checked_readu32_cast_u32)); \
-    if (checked_readu32_cast_result != SPV_REFLECT_RESULT_SUCCESS) {      \
-      return checked_readu32_cast_result;                                 \
-    }                                                                     \
-    value = (cast_to_type)checked_readu32_cast_u32;                       \
+    if (checked_readu32_cast_result != SPV_REFLECT_RESULT_SUCCESS) {           \
+      return checked_readu32_cast_result;                                      \
+    }                                                                          \
+    value = (cast_to_type)checked_readu32_cast_u32;                            \
   }
 
-#define IF_READU32(result, parser, word_offset, value)      \
-  if ((result) == SPV_REFLECT_RESULT_SUCCESS) {               \
+#define IF_READU32(result, parser, word_offset, value)          \
+  if ((result) == SPV_REFLECT_RESULT_SUCCESS) {                 \
     result = ReadU32(parser, word_offset, (uint32_t*)&(value)); \
   }
 
 #define IF_READU32_CAST(result, parser, word_offset, cast_to_type, value) \
-  if ((result) == SPV_REFLECT_RESULT_SUCCESS) {             \
-    uint32_t if_readu32_cast_u32 = UINT32_MAX;              \
-    result = ReadU32(parser, word_offset, &if_readu32_cast_u32); \
-    if ((result) == SPV_REFLECT_RESULT_SUCCESS) {           \
-      value = (cast_to_type)if_readu32_cast_u32;            \
-    }                                                       \
+  if ((result) == SPV_REFLECT_RESULT_SUCCESS) {                           \
+    uint32_t if_readu32_cast_u32 = UINT32_MAX;                            \
+    result = ReadU32(parser, word_offset, &if_readu32_cast_u32);          \
+    if ((result) == SPV_REFLECT_RESULT_SUCCESS) {                         \
+      value = (cast_to_type)if_readu32_cast_u32;                          \
+    }                                                                     \
   }
 
 static SpvReflectResult ReadStr(Parser* p_parser, uint32_t word_offset, uint32_t word_index, uint32_t word_count, uint32_t* p_buf_size, char *p_buf)
@@ -470,6 +483,7 @@ static SpvReflectResult CreateParser(size_t size, void* p_code, Parser* p_parser
 static void DestroyParser(Parser* p_parser)
 {
   if (!IsNull(p_parser->nodes)) {
+    // Free nodes
     for (size_t i = 0; i < p_parser->node_count; ++i) {
       Node* p_node = &(p_parser->nodes[i]);
       if (IsNotNull(p_node->member_names)) {
@@ -480,6 +494,7 @@ static void DestroyParser(Parser* p_parser)
       }
     }
 
+    // Free functions
     for (size_t i = 0; i < p_parser->function_count; ++i) {
       SafeFree(p_parser->functions[i].callees);
       SafeFree(p_parser->functions[i].callee_ptrs);
@@ -487,6 +502,7 @@ static void DestroyParser(Parser* p_parser)
     }
 
     SafeFree(p_parser->nodes);
+    SafeFree(p_parser->strings);
     SafeFree(p_parser->functions);
     p_parser->node_count = 0;
   }
@@ -530,6 +546,8 @@ static SpvReflectResult ParseNodes(Parser* p_parser)
     p_parser->nodes[i].decorations.uav_counter_buffer.value = (uint32_t)INVALID_VALUE;
     p_parser->nodes[i].decorations.built_in = (SpvBuiltIn)INVALID_VALUE;
   }
+  // Mark source file id node
+  p_parser->source_file_id = (uint32_t)INVALID_VALUE;
 
   uint32_t function_node = (uint32_t)INVALID_VALUE;
 
@@ -549,9 +567,17 @@ static SpvReflectResult ParseNodes(Parser* p_parser)
     switch (p_node->op) {
       default: break;
 
+      case SpvOpString: {
+        ++(p_parser->string_count);
+      }
+      break;
+
       case SpvOpSource: {
         CHECKED_READU32_CAST(p_parser, p_node->word_offset + 1, SpvSourceLanguage, p_parser->source_language);
         CHECKED_READU32(p_parser, p_node->word_offset + 2, p_parser->source_language_version);
+        if (p_node->word_count >= 4) {
+          CHECKED_READU32(p_parser, p_node->word_offset + 3, p_parser->source_file_id);
+        }
       }
       break;
 
@@ -572,7 +598,7 @@ static SpvReflectResult ParseNodes(Parser* p_parser)
       case SpvOpTypeStruct:
       {
         p_node->member_count = p_node->word_count - 2;
-      } // fallthrough
+      } // Fall through
       case SpvOpTypeVoid:
       case SpvOpTypeBool:
       case SpvOpTypeInt:
@@ -689,7 +715,7 @@ static SpvReflectResult ParseNodes(Parser* p_parser)
           CHECKED_READU32(p_parser, p_func_node->word_offset + 2, p_func_node->result_id);
           ++(p_parser->function_count);
         }
-      } // fallthrough
+      } // Fall through
 
       case SpvOpFunctionEnd:
       {
@@ -709,8 +735,72 @@ static SpvReflectResult ParseNodes(Parser* p_parser)
   return SPV_REFLECT_RESULT_SUCCESS;
 }
 
-static SpvReflectResult ParseFunction(Parser* p_parser, Node* p_func_node,
-                                      Function* p_func, size_t first_label_index)
+static SpvReflectResult ParseStrings(Parser* p_parser)
+{
+  assert(IsNotNull(p_parser));
+  assert(IsNotNull(p_parser->spirv_code));
+  assert(IsNotNull(p_parser->nodes));
+
+  // Early out
+  if (p_parser->string_count == 0) {
+    return SPV_REFLECT_RESULT_SUCCESS;
+  }
+
+  if (IsNotNull(p_parser) && IsNotNull(p_parser->spirv_code) && IsNotNull(p_parser->nodes)) {
+    // Allocate string storage
+    p_parser->strings = (String*)calloc(p_parser->string_count, sizeof(*(p_parser->strings)));  
+
+    uint32_t string_index = 0;
+    for (size_t i = 0; i < p_parser->node_count; ++i) {
+      Node* p_node = &(p_parser->nodes[i]);
+      if (p_node->op != SpvOpString) {
+        continue;
+      }
+
+      // Paranoid check against string count
+      assert(string_index < p_parser->string_count);
+      if (string_index >= p_parser->string_count) {
+        return SPV_REFLECT_RESULT_ERROR_COUNT_MISMATCH;
+      }
+
+      // Result id
+      String* p_string = &(p_parser->strings[string_index]);
+      CHECKED_READU32(p_parser, p_node->word_offset + 1, p_string->result_id);
+
+      // String
+      uint32_t string_start = p_node->word_offset + 2;
+      p_string->string = (const char*)(p_parser->spirv_code + string_start);
+
+      // Increment string index
+      ++string_index;
+    }
+  }
+
+  return SPV_REFLECT_RESULT_SUCCESS;
+}
+
+static SpvReflectResult ParseSource(Parser* p_parser, SpvReflectShaderModule* p_module)
+{
+  assert(IsNotNull(p_parser));
+  assert(IsNotNull(p_parser->spirv_code));
+
+  if (IsNotNull(p_parser) && IsNotNull(p_parser->spirv_code)) {
+    // Source file
+    if (IsNotNull(p_parser->strings)) {
+      for (uint32_t i = 0; i < p_parser->string_count; ++i) {
+        String* p_string = &(p_parser->strings[i]);
+        if (p_string->result_id == p_parser->source_file_id) {
+          p_module->source_file = p_string->string;
+          break;
+        }
+      }
+    }
+  }
+
+  return SPV_REFLECT_RESULT_SUCCESS;
+}
+
+static SpvReflectResult ParseFunction(Parser* p_parser, Node* p_func_node, Function* p_func, size_t first_label_index)
 {
   p_func->id = p_func_node->result_id;
 
@@ -818,15 +908,15 @@ static SpvReflectResult ParseFunction(Parser* p_parser, Node* p_func_node,
     qsort(p_func->callees, p_func->callee_count,
           sizeof(*(p_func->callees)), SortCompareUint32);
   }
-  p_func->callee_count = DedupSortedUint32(p_func->callees,
-                                           p_func->callee_count);
+  p_func->callee_count = (uint32_t)DedupSortedUint32(p_func->callees,
+                                                     p_func->callee_count);
 
   if (p_func->accessed_ptr_count > 0) {
     qsort(p_func->accessed_ptrs, p_func->accessed_ptr_count,
           sizeof(*(p_func->accessed_ptrs)), SortCompareUint32);
   }
-  p_func->accessed_ptr_count = DedupSortedUint32(p_func->accessed_ptrs,
-                                                 p_func->accessed_ptr_count);
+  p_func->accessed_ptr_count = (uint32_t)DedupSortedUint32(p_func->accessed_ptrs,
+                                                           p_func->accessed_ptr_count);
 
   return SPV_REFLECT_RESULT_SUCCESS;
 }
@@ -1563,6 +1653,7 @@ static SpvReflectResult ParseDescriptorBindings(Parser* p_parser, SpvReflectShad
     p_descriptor->binding = p_node->decorations.binding.value;
     p_descriptor->input_attachment_index = p_node->decorations.input_attachment_index.value;
     p_descriptor->set = p_node->decorations.set.value;
+    p_descriptor->count = 1;
     p_descriptor->uav_counter_id = p_node->decorations.uav_counter_buffer.value;
     p_descriptor->type_description = p_type;
 
@@ -1583,9 +1674,14 @@ static SpvReflectResult ParseDescriptorBindings(Parser* p_parser, SpvReflectShad
     if (p_type->traits.array.dims_count > 0) {
       p_descriptor->array.dims_count = p_type->traits.array.dims_count;
       for (uint32_t dim_index = 0; dim_index < p_type->traits.array.dims_count; ++dim_index) {
-        p_descriptor->array.dims[dim_index] = p_type->traits.array.dims[dim_index];
+        uint32_t dim_value = p_type->traits.array.dims[dim_index];
+        p_descriptor->array.dims[dim_index] = dim_value;
+        p_descriptor->count *= dim_value;
       }
     }
+
+    // Count
+
 
     p_descriptor->word_offset.binding = p_node->decorations.binding.word_offset;
     p_descriptor->word_offset.set = p_node->decorations.set.word_offset;
@@ -1719,7 +1815,7 @@ static SpvReflectResult ParseUAVCounterBindings(SpvReflectShaderModule* p_module
     }
     // ...otherwise use old @count convention.
     else {
-      const size_t descriptor_name_length = strlen(p_descriptor->name);
+      const size_t descriptor_name_length = p_descriptor->name? strlen(p_descriptor->name): 0;
 
       memset(name, 0, MAX_NODE_NAME_LENGTH);    
       memcpy(name, p_descriptor->name, descriptor_name_length);
@@ -1734,7 +1830,7 @@ static SpvReflectResult ParseUAVCounterBindings(SpvReflectShaderModule* p_module
         if (p_test_counter_descriptor->descriptor_type != SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
           continue;
         }
-        if (strcmp(name, p_test_counter_descriptor->name) == 0) {
+        if (p_test_counter_descriptor->name && strcmp(name, p_test_counter_descriptor->name) == 0) {
           p_counter_descriptor = p_test_counter_descriptor;
           break;
         }
@@ -2084,9 +2180,13 @@ static SpvReflectResult ParseInterfaceVariable(Parser*                      p_pa
   return SPV_REFLECT_RESULT_SUCCESS;
 }
 
-static SpvReflectResult ParseInterfaceVariables(Parser* p_parser, SpvReflectShaderModule* p_module,
-                                                SpvReflectEntryPoint* p_entry, size_t io_var_count,
-                                                uint32_t* io_vars)
+static SpvReflectResult ParseInterfaceVariables(
+  Parser*                 p_parser,
+  SpvReflectShaderModule* p_module,
+  SpvReflectEntryPoint*   p_entry,
+  size_t                  io_var_count,
+  uint32_t*               io_vars
+)
 {
   if (io_var_count == 0) {
     return SPV_REFLECT_RESULT_SUCCESS;
@@ -2259,6 +2359,7 @@ static SpvReflectResult TraverseCallGraph(Parser* p_parser,
 }
 
 static SpvReflectResult ParseStaticallyUsedResources(Parser* p_parser,
+                                                     SpvReflectShaderModule *p_module,
                                                      SpvReflectEntryPoint *p_entry,
                                                      size_t uniform_count,
                                                      uint32_t* uniforms,
@@ -2348,7 +2449,8 @@ static SpvReflectResult ParseStaticallyUsedResources(Parser* p_parser,
     qsort(used_variables, used_variable_count, sizeof(*used_variables),
           SortCompareUint32);
   }
-  used_variable_count = DedupSortedUint32(used_variables, used_variable_count);
+  used_variable_count = (uint32_t)DedupSortedUint32(used_variables, 
+                                                    used_variable_count);
 
   // Do set intersection to find the used uniform and push constants
   size_t used_uniform_count = 0, used_push_constant_count = 0;
@@ -2360,6 +2462,16 @@ static SpvReflectResult ParseStaticallyUsedResources(Parser* p_parser,
                                                    push_constants, push_constant_count,
                                                    &p_entry->used_push_constants,
                                                    &used_push_constant_count);
+
+  for (uint32_t j = 0; j < p_module->descriptor_binding_count; ++j) {
+    SpvReflectDescriptorBinding* p_binding = &p_module->descriptor_bindings[j];
+    if (SearchSortedUint32(used_variables,
+                           used_variable_count,
+                           p_binding->spirv_id)) {
+      p_binding->accessed = 1;
+    }
+  }
+
   SafeFree(used_variables);
   if (result0 != SPV_REFLECT_RESULT_SUCCESS) {
     return result0;
@@ -2368,8 +2480,8 @@ static SpvReflectResult ParseStaticallyUsedResources(Parser* p_parser,
     return result1;
   }
 
-  p_entry->used_uniform_count = used_uniform_count;
-  p_entry->used_push_constant_count = used_push_constant_count;
+  p_entry->used_uniform_count = (uint32_t)used_uniform_count;
+  p_entry->used_push_constant_count = (uint32_t)used_push_constant_count;
 
   return SPV_REFLECT_RESULT_SUCCESS;
 }
@@ -2461,6 +2573,7 @@ static SpvReflectResult ParseEntryPoints(Parser* p_parser, SpvReflectShaderModul
     SafeFree(interface_variables);
 
     result = ParseStaticallyUsedResources(p_parser,
+                                          p_module,
                                           p_entry_point,
                                           uniform_count,
                                           uniforms,
@@ -2780,9 +2893,14 @@ SpvReflectResult spvReflectCreateShaderModule(
     p_module->generator = (SpvReflectGenerator)((*(p_ptr + 2) & 0xFFFF0000) >> 16);
   }
 
-
   if (result == SPV_REFLECT_RESULT_SUCCESS) {
     result = ParseNodes(&parser);
+  }
+  if (result == SPV_REFLECT_RESULT_SUCCESS) {
+    result = ParseStrings(&parser);
+  }
+  if (result == SPV_REFLECT_RESULT_SUCCESS) {
+    result = ParseSource(&parser, p_module);
   }
   if (result == SPV_REFLECT_RESULT_SUCCESS) {
     result = ParseFunctions(&parser);

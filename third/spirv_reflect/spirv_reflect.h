@@ -30,23 +30,23 @@ VERSION HISTORY
 #ifndef SPIRV_REFLECT_H
 #define SPIRV_REFLECT_H
 
-#include <spirv/unified1/spirv.h>
+#include "./include/spirv/unified1/spirv.h"
 
 #include <stdint.h>
 #include <string.h>
 
 #ifdef _MSC_VER
-#define SPV_REFLECT_DEPRECATED(msg_str) __declspec(deprecated("This symbol is deprecated. Details: " msg_str))
+  #define SPV_REFLECT_DEPRECATED(msg_str) __declspec(deprecated("This symbol is deprecated. Details: " msg_str))
 #elif defined(__clang__)
-#define SPV_REFLECT_DEPRECATED(msg_str) __attribute__((deprecated(msg_str)))
+  #define SPV_REFLECT_DEPRECATED(msg_str) __attribute__((deprecated(msg_str)))
 #elif defined(__GNUC__)
-#if GCC_VERSION >= 40500
-#define SPV_REFLECT_DEPRECATED(msg_str) __attribute__((deprecated(msg_str)))
+  #if GCC_VERSION >= 40500
+    #define SPV_REFLECT_DEPRECATED(msg_str) __attribute__((deprecated(msg_str)))
+  #else
+    #define SPV_REFLECT_DEPRECATED(msg_str) __attribute__((deprecated))
+  #endif
 #else
-#define SPV_REFLECT_DEPRECATED(msg_str) __attribute__((deprecated))
-#endif
-#else
-#define SPV_REFLECT_DEPRECATED(msg_str)
+  #define SPV_REFLECT_DEPRECATED(msg_str)
 #endif
 
 /*! @enum SpvReflectResult
@@ -317,6 +317,8 @@ typedef struct SpvReflectDescriptorBinding {
   SpvReflectImageTraits               image;
   SpvReflectBlockVariable             block;
   SpvReflectBindingArrayTraits        array;
+  uint32_t                            count;
+  uint32_t                            accessed;
   uint32_t                            uav_counter_id;
   struct SpvReflectDescriptorBinding* uav_counter_binding;
 
@@ -372,6 +374,8 @@ typedef struct SpvReflectShaderModule {
   SpvReflectEntryPoint*             entry_points;
   SpvSourceLanguage                 source_language;
   uint32_t                          source_language_version;
+  const char*                       source_file;
+  const char*                       source_source;
   SpvExecutionModel                 spirv_execution_model;
   SpvReflectShaderStageFlagBits     shader_stage;
   uint32_t                          descriptor_binding_count;
@@ -1262,6 +1266,8 @@ class ShaderModule {
 public:
   ShaderModule();
   ShaderModule(size_t size, const void* p_code);
+  ShaderModule(const std::vector<uint8_t>& code);
+  ShaderModule(const std::vector<uint32_t>& code);
   ~ShaderModule();
 
   SpvReflectResult GetResult() const;
@@ -1272,6 +1278,8 @@ public:
   const uint32_t* GetCode() const;
 
   const char*           GetEntryPointName() const;
+
+  const char*           GetSourceFile() const;
 
   uint32_t              GetEntryPointCount() const;
   const char*           GetEntryPointName(uint32_t index) const;
@@ -1360,10 +1368,31 @@ inline ShaderModule::ShaderModule() {}
 */
 inline ShaderModule::ShaderModule(size_t size, const void* p_code) {
   m_result = spvReflectCreateShaderModule(size,
-                                        p_code,
-                                        &m_module);
+                                          p_code,
+                                          &m_module);
 }
 
+/*! @fn ShaderModule
+
+  @param  code
+  
+*/
+inline ShaderModule::ShaderModule(const std::vector<uint8_t>& code) {
+  m_result = spvReflectCreateShaderModule(code.size(),
+                                          code.data(),
+                                          &m_module);
+}
+
+/*! @fn ShaderModule
+
+  @param  code
+  
+*/
+inline ShaderModule::ShaderModule(const std::vector<uint32_t>& code) {
+  m_result = spvReflectCreateShaderModule(code.size() * sizeof(uint32_t),
+                                          code.data(),
+                                          &m_module);
+}
 
 /*! @fn  ~ShaderModule
 
@@ -1420,6 +1449,15 @@ inline const uint32_t* ShaderModule::GetCode() const {
 */
 inline const char* ShaderModule::GetEntryPointName() const {
   return this->GetEntryPointName(0);
+}
+
+/*! @fn GetEntryPoint
+
+  @return Returns entry point
+
+*/
+inline const char* ShaderModule::GetSourceFile() const {
+  return m_module.source_file;
 }
 
 /*! @fn GetEntryPointCount
