@@ -637,13 +637,13 @@ void CompositorInterface::WaitIdle(){
 	vkDeviceWaitIdle(logicalDev);
 }
 
-void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pclient, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
+void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pclient, const WManager::Container *pfocus){
 	auto s = [&](auto &p)->bool{
 		return pclient == p.first;
 	};
 	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
 		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
-		CreateRenderQueueAppendix((*m).second,pstackAppendix,pfocus);
+		CreateRenderQueueAppendix((*m).second,pfocus);
 
 		RenderObject renderObject;
 		renderObject.pclient = (*m).second;
@@ -655,7 +655,7 @@ void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pcli
 	}
 }
 
-void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
+void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const WManager::Container *pfocus){
 	//glm::uvec2 edge(0.0f); //(right) edge of the previous container
 	for(const WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
@@ -669,13 +669,13 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			renderObject.flags =
 				pcont == pfocus || pcontainer == pfocus?0x1:0;
 			renderQueue.push_back(renderObject);
-
-		}else CreateRenderQueue(pcont,pstackAppendix,pfocus);
+		}
+		CreateRenderQueue(pcont,pfocus);
 	}
 
 	if(!pcontainer->pclient)
 		return;
-	CreateRenderQueueAppendix(pcontainer->pclient,pstackAppendix,pfocus);
+	CreateRenderQueueAppendix(pcontainer->pclient,pfocus);
 }
 
 bool CompositorInterface::PollFrameFence(){
@@ -729,8 +729,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderQueue.push_back(renderObject);
 	}
 
-	//TODO: render desktop stack
-	CreateRenderQueue(proot,pstackAppendix,pfocus);
+	CreateRenderQueue(proot,pfocus);
 	for(auto &p : appendixQueue){ //push the remaining (untransient) windows to the end of the queue
 		RenderObject renderObject;
 		renderObject.pclient = p.second;

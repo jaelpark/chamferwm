@@ -88,7 +88,7 @@ Container::Container(Container *_pParent, const Setup &setup) :
 		}
 	}
 
-	GetRoot()->Stack();
+	//GetRoot()->Stack();
 	pParent->Translate();
 }
 
@@ -185,7 +185,7 @@ Container * Container::Collapse(){
 
 		pParent->pch = pch;
 
-		pch = 0; //deference the leftover container
+		pch = 0; //dereference the leftover container
 		focusQueue.clear();
 
 		return this;

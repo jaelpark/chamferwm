@@ -859,6 +859,8 @@ sint Default::HandleEvent(){
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_MANUAL));
 
+			StackClients();
+
 			if(hintFlags & X11Client::CreateInfo::HINT_FULLSCREEN)
 				SetFullscreen(pclient,true);
 
@@ -962,6 +964,8 @@ sint Default::HandleEvent(){
 			if(!pclient)
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
+
+			StackClients();
 
 			netClientList.clear();
 			for(auto &p : clients)
