@@ -1,11 +1,18 @@
 
 import chamfer
+import sys
 from enum import Enum,auto
 
-import psutil
-from Xlib.keysymdef import latin1,miscellany,xf86
+try:
+	import psutil
+except ModuleNotFoundError:
+	print("No psutil module.");
 
-import sys
+try:
+	from Xlib.keysymdef import latin1,miscellany,xf86
+except ModuleNotFoundError:
+	print("No Xlib module.");
+
 try:
 	import pulsectl
 except ModuleNotFoundError:
@@ -31,7 +38,6 @@ class Key(Enum):
 	MOVE_RIGHT = auto()
 
 	LAYOUT = auto()
-	MAXIMIZE = auto()
 	SPLIT_V = auto()
 	FULLSCREEN = auto()
 
@@ -84,6 +90,8 @@ class Container(chamfer.Container):
 
 	#setup the client before it's created (shaders)
 	def OnSetupClient(self):
+		#Panels, docks etc. should be rendered with no decorations. Later, it should be possible to check
+		#this by looking at the window type property, not just the class name.
 		if self.wm_class == "Conky":
 			self.vertexShader = "default_vertex.spv";
 			self.geometryShader = "default_geometry.spv";
@@ -116,6 +124,7 @@ class Container(chamfer.Container):
 
 	#called to evaluate if client has permission to toggle between fullscreen modes
 	def OnFullscreen(self, toggle):
+		#In fullscreen mode, no decorations
 		if toggle:
 			self.vertexShader = "default_vertex.spv";
 			self.geometryShader = "default_geometry.spv";
@@ -124,7 +133,7 @@ class Container(chamfer.Container):
 			self.vertexShader = "frame_vertex.spv";
 			self.geometryShader = "frame_geometry.spv";
 			self.fragmentShader = "frame_fragment.spv";
-		self.ResetShaders();
+		self.ResetShaders(); #outside OnSetupClient, ResetShaders should be called to bind the new shaders
 
 		return True;
 
@@ -139,9 +148,9 @@ class Container(chamfer.Container):
 		
 class Backend(chamfer.Backend):
 	def OnSetupKeys(self, binder, debug):
-		print("setting up keys...");
-
 		if not debug:
+			#setup key bindings
+			#focusing clients
 			binder.BindKey(ord('l'),chamfer.MOD_MASK_1,Key.FOCUS_RIGHT.value);
 			binder.BindKey(ord('l'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.MOVE_RIGHT.value);
 			binder.BindKey(ord('h'),chamfer.MOD_MASK_1,Key.FOCUS_LEFT.value);
@@ -152,20 +161,23 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
 			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1,Key.FOCUS_FLOAT.value);
 			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.FOCUS_FLOAT_PREV.value);
-
+			
+			#reserved
 			binder.BindKey(ord('l'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_RIGHT.value);
 			binder.BindKey(ord('h'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_LEFT.value);
 
+			#yanking and pasting containers
 			binder.BindKey(ord('y'),chamfer.MOD_MASK_1,Key.YANK_CONTAINER.value);
 			binder.BindKey(ord('p'),chamfer.MOD_MASK_1,Key.PASTE_CONTAINER.value);
 
+			#layout, splits and fullscreen
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
-			binder.BindKey(ord('m'),chamfer.MOD_MASK_1,Key.MAXIMIZE.value);
 			binder.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
 			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.SPLIT_V.value);
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_4,Key.SPLIT_V.value);
 			binder.BindKey(ord('f'),chamfer.MOD_MASK_1,Key.FULLSCREEN.value);
 
+			#workspace dimensions
 			#binder.BindKey(latin1.XK_bracketleft,chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RIGHT.value);
 			binder.BindKey(ord('r'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RESET.value);
 			binder.BindKey(ord('u'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_LEFT.value);
@@ -173,6 +185,7 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('u'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_ROOT_LEFT.value);
 			binder.BindKey(ord('i'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_ROOT_RIGHT.value);
 
+			#client dimensions
 			binder.BindKey(ord('r'),chamfer.MOD_MASK_1,Key.CONTRACT_RESET.value);
 			binder.BindKey(ord('u'),chamfer.MOD_MASK_1,Key.CONTRACT_LEFT.value);
 			binder.BindKey(ord('i'),chamfer.MOD_MASK_1,Key.CONTRACT_RIGHT.value);
@@ -184,24 +197,19 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('i'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL|chamfer.MOD_MASK_SHIFT,Key.EXPAND_UP.value);
 			#TODO: resize multiple containers simultaneously - expanding one contracts the rest
 			
+			#kill + launching applications
 			binder.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
 			binder.BindKey(miscellany.XK_Return,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
 			binder.BindKey(ord('1'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER.value);
 			binder.BindKey(ord('2'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER_PRIVATE.value);
 
+			#volume
 			binder.BindKey(xf86.XK_XF86_AudioRaiseVolume,0,Key.AUDIO_VOLUME_UP.value);
 			binder.BindKey(xf86.XK_XF86_AudioLowerVolume,0,Key.AUDIO_VOLUME_DOWN.value);
 
+			#monitor brightness
 			binder.BindKey(xf86.XK_XF86_MonBrightnessUp,0,Key.MONITOR_BRIGHTNESS_UP.value);
 			binder.BindKey(xf86.XK_XF86_MonBrightnessDown,0,Key.MONITOR_BRIGHTNESS_DOWN.value);
-			#/ - search for a window
-			#n - next match
-			#N - previous match
-			#[num] m - set window min size to [num]0%
-			#... M - set max
-			#f - highlight GTK buttons etc to be activated with keyboard
-
-			#alt+shift+a, select the top most base container under root
 
 		else:
 			#debug only
@@ -217,7 +225,6 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('p'),chamfer.MOD_MASK_SHIFT,Key.PASTE_CONTAINER.value);
 
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
-			binder.BindKey(ord('m'),chamfer.MOD_MASK_SHIFT,Key.MAXIMIZE.value);
 			binder.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
 	
 	def OnCreateContainer(self):
@@ -231,13 +238,11 @@ class Backend(chamfer.Backend):
 
 		if keyId == Key.FOCUS_RIGHT.value:
 			focus = GetFocusTiled() if focus.IsFloating() else focus.GetNext();
-			#focus = focus.GetNext();
 			#focus = focus.GetAdjacent(chamfer.adjacent.RIGHT);
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_LEFT.value:
 			focus = GetFocusTiled() if focus.IsFloating() else focus.GetPrev();
-			#focus = focus.GetPrev();
 			#focus = focus.GetAdjacent(chamfer.adjacent.LEFT);
 			focus.Focus();
 
@@ -316,13 +321,8 @@ class Backend(chamfer.Backend):
 			}[parent.layout];
 			parent.ShiftLayout(layout);
 
-		elif keyId == Key.MAXIMIZE.value:
-			focus.minSize = (0.98,0.98);
-			focus.ShiftLayout(focus.layout);
-		
 		elif keyId == Key.SPLIT_V.value:
-			#arm the container split
-			#TODO: add render flags property, bitwise or them
+			#TODO: add render flags property, bitwise OR them
 			print("split armed.");
 			focus.splitArmed = not focus.splitArmed;
 
@@ -400,7 +400,6 @@ class Backend(chamfer.Backend):
 			focus.ShiftLayout(focus.layout);
 
 		elif keyId == Key.KILL.value:
-			print("killing client...");
 			focus.Kill();
 
 		elif keyId == Key.LAUNCH_TERMINAL.value:
@@ -432,7 +431,6 @@ class Backend(chamfer.Backend):
 			psutil.Popen(["xbacklight","-dec","20"]);
 			pass;
 
-	
 	def OnKeyRelease(self, keyId):
 		print("key release: {}".format(keyId));
 	
@@ -460,9 +458,7 @@ class Backend(chamfer.Backend):
 			self.batteryAlarmLevel = 0;
 
 class Compositor(chamfer.Compositor):
-	def OnLoadShaders(self):
-		#TODO: instead of this, take paths which to glob for shaders (command line)
-		return ["frame_vertex.spv","frame_geometry.spv","frame_fragment.spv"];
+	pass
 
 backend = Backend();
 chamfer.bind_Backend(backend);
@@ -471,22 +467,22 @@ pids = psutil.pids();
 pnames = [psutil.Process(pid).name() for pid in pids];
 pcmdls = [a for p in [psutil.Process(pid).cmdline() for pid in pids] for a in p];
 
-psutil.Popen(["feh","--no-fehbg","--image-bg","black","--bg-center","/mnt/data/Kuvat/nasa_1.png"]);
+#set wallpaper with feh
+#psutil.Popen(["feh","--no-fehbg","--image-bg","black","--bg-center","background.png"]);
 
-if not "pulseaudio" in pnames:
-	print("starting pulseaudio...");
-	#need to wait some time before starting pulseaudio for it to initialize successfully
-	psutil.Popen(["sleep 5.0; pulseaudio --start"],shell=True,stdout=None,stderr=None);
-
-if not "dunst" in pnames:
-	print("starting dunst..."); #later on, we might have our own notification system
-	psutil.Popen(["dunst"],stdout=None,stderr=None);
-
-if not any(["clipster" in p for p in pcmdls]):
-	print("starting clipster..."); #clipboard manager
-	psutil.Popen(["clipster","-d"],stdout=None,stderr=None);
-
-if not any(["libinput-gestures" in p for p in pcmdls]):
-	print("starting libinput-gestures..."); #touchpad gestures
-	psutil.Popen(["libinput-gestures-setup","start"],stdout=None,stderr=None);
+#if not "pulseaudio" in pnames:
+#	print("starting pulseaudio...");
+#	psutil.Popen(["sleep 1.0; pulseaudio --start"],shell=True,stdout=None,stderr=None);
+#
+#if not "dunst" in pnames:
+#	print("starting dunst...");
+#	psutil.Popen(["dunst"],stdout=None,stderr=None);
+#
+#if not any(["clipster" in p for p in pcmdls]):
+#	print("starting clipster..."); #clipboard manager
+#	psutil.Popen(["clipster","-d"],stdout=None,stderr=None);
+#
+#if not any(["libinput-gestures" in p for p in pcmdls]):
+#	print("starting libinput-gestures..."); #touchpad gestures
+#	psutil.Popen(["libinput-gestures-setup","start"],stdout=None,stderr=None);
 
