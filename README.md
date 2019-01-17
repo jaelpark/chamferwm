@@ -28,3 +28,12 @@ Compositor:
  - Per-client materials
  - Optional, alternatively use any other external compositor
 
+## Installing
+Currently a PKGBUILD is available for testing purposes. Install from [AUR](https://aur.archlinux.org/packages/chamfer-git/), or run meson to build manually. The package from AUR will install a default configuration and the precompiled shaders to /usr/share/chamfer/. Copy the configuration to another location to make modifications. Once ready, put the following line to your .xinitrc:
+
+```sh
+exec chamfer --config=/usr/share/chamfer/config/config.py --shader-path=/usr/share/chamfer/shaders/
+```
+
+When multiple rendering devices are available, make the choice with `--device-index=n`, where `n` is the zero-based index of the device (default = 0). Launch Xorg with `startx`.
+
