@@ -37,3 +37,10 @@ exec chamfer --config=/usr/share/chamfer/config/config.py --shader-path=/usr/sha
 
 When multiple rendering devices are available, make the choice with `--device-index=n`, where `n` is the zero-based index of the device (default = 0). Launch Xorg with `startx`.
 
+To run the WM without the integrated compositor, use
+
+```sh
+exec chamfer --config=/usr/share/chamfer/config/config.py -n
+```
+
+In this case, any other external compositor may be used.
