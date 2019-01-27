@@ -55,8 +55,6 @@ Blob::Blob(const char *pfileName){
 		if(pf)
 			break;
 
-		//TODO: config directory
-
 		snprintf(Exception::buffer,sizeof(Exception::buffer),"Unable to open file: %s\n",pfileName);
 		throw Exception();
 	}while(0);
@@ -167,28 +165,6 @@ public:
 		return containerInt;
 	}
 
-	/*template<class T, class U>
-	Config::ContainerInterface & SetupFloating(){
-		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
-		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
-		if(!containerExtract.check())
-			throw Exception("OnCreateContainer(): Invalid container object returned.\n"); //TODO: create default
-
-		Config::ContainerInterface &containerInt = containerExtract();
-		containerInt.self = containerObject;
-
-		containerInt.OnSetupContainer();
-
-		WManager::Container::Setup setup;
-		setup.flags = WManager::Container::FLAG_FLOATING;
-		containerInt.CopySettingsSetup(setup);
-	
-		T *pcontainer = new T(&containerInt,proot,setup,static_cast<U*>(this));
-		containerInt.pcontainer = pcontainer;
-
-		return containerInt;
-	}*/
-
 	template<class T, class U>
 	void MoveContainer(WManager::Container *pcontainer, WManager::Container *pdst){
 		//
@@ -204,6 +180,7 @@ public:
 		}
 		pcontainer->Place(pdst);
 
+		printf("----------- removed %p\n",premoved);
 		PrintTree(proot,0);
 		printf("-----------\n");
 
@@ -239,9 +216,9 @@ public:
 		PrintTree(proot,0);
 		printf("-----------\n");
 
-		if(premoved->pch)
-			ReleaseContainersRecursive(premoved->pch); //should this be here??? once container trees can be moved
-		PrintTree(proot,0);
+		//if(premoved->pch)
+			//ReleaseContainersRecursive(premoved->pch); //should this be here??? once container trees can be moved
+		//PrintTree(proot,0);
 	}
 
 	void ReleaseContainersRecursive(const WManager::Container *pcontainer){
@@ -278,7 +255,7 @@ public:
 		stackAppendix.clear();
 	}
 
-	void PrintTree(WManager::Container *pcontainer, uint level){
+	void PrintTree(WManager::Container *pcontainer, uint level) const{
 		for(uint i = 0; i < level; ++i)
 			printf(" ");
 		printf("%p: ",pcontainer);
@@ -288,6 +265,8 @@ public:
 			printf("(parent: %p), ",pcontainer->pParent);
 		if(Config::BackendInterface::pfocus == pcontainer)
 			printf("(focus), ");
+		Config::ContainerConfig *pcontainerConfig = dynamic_cast<Config::ContainerConfig *>(pcontainer);
+		printf("[ContainerConfig: %p, (->container: %p)], ",pcontainerConfig,pcontainerConfig->pcontainerInt->pcontainer);
 		printf("focusQueue: %lu (%p)\n",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0);
 		for(WManager::Container *pcontainer1 = pcontainer->pch; pcontainer1; pcontainer1 = pcontainer1->pnext)
 			PrintTree(pcontainer1,level+1);
