@@ -7,7 +7,7 @@ src = [
 	'src/backend.cpp',
 	'src/compositor.cpp',
 	'src/CompositorResource.cpp',
-	'third/spirv_reflect/spirv_reflect.c'
+	'third/spirv_reflect/spirv_reflect.c',
 	#'third/glad/src/vulkan.c',
 	'third/glad/src/gl.c',
 	'third/glad/src/glx.c'
