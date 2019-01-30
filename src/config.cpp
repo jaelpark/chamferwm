@@ -627,6 +627,29 @@ BOOST_PYTHON_MODULE(chamfer){
 				}
 				return (container.pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) != 0;
 			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
+		.add_property("shaderFlags",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer){
+					PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
+					return 0u;
+				}
+				Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>(container.pcontainer->pclient);
+				if(!pclientFrame)
+					return 0u;
+				return pclientFrame->shaderUserFlags;
+			},boost::python::default_call_policies(),boost::mpl::vector<uint, ContainerInterface &>()),
+				boost::python::make_function(
+			[](ContainerInterface &container, uint flags){
+				if(!container.pcontainer){
+					PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
+					return;
+				}
+				Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>(container.pcontainer->pclient);
+				if(!pclientFrame)
+					return;
+				pclientFrame->shaderUserFlags = flags;
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, uint>()))
 		.def_readonly("wm_name",&ContainerInterface::wm_name)
 		.def_readonly("wm_class",&ContainerInterface::wm_class)
 		.def_readwrite("vertexShader",&ContainerInterface::vertexShader)

@@ -11,7 +11,7 @@
 
 namespace Compositor{
 
-ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), fullRegionUpdate(true){
+ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), shaderUserFlags(0), fullRegionUpdate(true){
 	pcomp->updateQueue.push_back(this);
 
 	ptexture = pcomp->CreateTexture(w,h);
@@ -648,7 +648,7 @@ void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pcli
 		RenderObject renderObject;
 		renderObject.pclient = (*m).second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
-		renderObject.flags = renderObject.pclient->pcontainer == pfocus?0x1:0;
+		renderObject.flags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 
 		m = appendixQueue.erase(m);
@@ -656,7 +656,6 @@ void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pcli
 }
 
 void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const WManager::Container *pfocus){
-	//glm::uvec2 edge(0.0f); //(right) edge of the previous container
 	for(const WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
 			ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
@@ -667,7 +666,7 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			renderObject.pclient = pcont->pclient;
 			renderObject.pclientFrame = pclientFrame;
 			renderObject.flags =
-				pcont == pfocus || pcontainer == pfocus?0x1:0;
+				(pcont == pfocus || pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
 			renderQueue.push_back(renderObject);
 		}
 		CreateRenderQueue(pcont,pfocus);
