@@ -166,7 +166,7 @@ public:
 
 class X11Background : public ClientFrame{
 public:
-	X11Background(xcb_pixmap_t, const char *[Pipeline::SHADER_MODULE_COUNT], X11Compositor *);
+	X11Background(xcb_pixmap_t, uint, uint, const char *[Pipeline::SHADER_MODULE_COUNT], X11Compositor *);
 	~X11Background();
 	void UpdateContents(const VkCommandBuffer *);
 	

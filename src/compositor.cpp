@@ -1089,7 +1089,7 @@ void X11ClientFrame::AdjustSurface1(){
 	AdjustSurface(rect.w,rect.h);
 }
 
-X11Background::X11Background(xcb_pixmap_t _pixmap, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(3840), h(2160), ClientFrame(3840,2160,_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
+X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_w,_h,_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
 	//
 }
 
@@ -1260,10 +1260,15 @@ void X11Compositor::SetBackgroundPixmap(const Backend::BackendPixmapProperty *pP
 		return;
 	}
 	if(!pbackground){
+		xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,pPixmapProperty->pixmap);
+		xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
+		if(!pgeometryReply)
+			throw("Invalid geometry size - unable to retrieve.");
+
 		static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
 			"default_vertex.spv","default_geometry.spv","default_fragment.spv"
 		};
-		pbackground = new X11Background(pPixmapProperty->pixmap,pshaderName,this);
+		pbackground = new X11Background(pPixmapProperty->pixmap,pgeometryReply->width,pgeometryReply->height,pshaderName,this);
 		printf("background set!\n");
 	}
 }
