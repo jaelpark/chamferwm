@@ -1252,14 +1252,11 @@ void X11Compositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
 }
 
 void X11Compositor::SetBackgroundPixmap(const Backend::BackendPixmapProperty *pPixmapProperty){
-	if(pPixmapProperty->pixmap == 0){
-		if(pbackground){
-			delete pbackground;
-			pbackground = 0;
-		}
-		return;
+	if(pbackground){
+		delete pbackground;
+		pbackground = 0;
 	}
-	if(!pbackground){
+	if(pPixmapProperty->pixmap != 0){
 		xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,pPixmapProperty->pixmap);
 		xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 		if(!pgeometryReply)
