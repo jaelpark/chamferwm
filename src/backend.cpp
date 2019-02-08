@@ -611,7 +611,6 @@ sint Default::HandleEvent(){
 			if(m == configCache.end()){
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
 				m = configCache.end()-1;
-
 			}else (*m).second = rect;
 
 			DebugPrintf(stdout,"create %x | %d,%d %ux%u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
@@ -626,33 +625,43 @@ sint Default::HandleEvent(){
 			if(pclient1 && !(pclient1->pcontainer->flags & WManager::Container::FLAG_FLOATING))
 				break;
 
+			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+				return pev->window == p.first;
+			});
+
 			//TODO: allow x,y configuration if dock or desktop feature
 			xcb_get_property_cookie_t propertyCookieNormalHints = xcb_icccm_get_wm_normal_hints(pcon,pev->window);
 			xcb_get_property_cookie_t propertyCookieWindowType
 				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
+			xcb_get_property_cookie_t propertyCookieWindowState
+				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_STATE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
 
-			xcb_size_hints_t sizeHints;
-			bool boolSizeHints = xcb_icccm_get_wm_size_hints_reply(pcon,propertyCookieNormalHints,&sizeHints,0);
 			xcb_get_property_reply_t *propertyReplyWindowType
 				= xcb_get_property_reply(pcon,propertyCookieWindowType,0);
+			xcb_get_property_reply_t *propertyReplyWindowState
+				= xcb_get_property_reply(pcon,propertyCookieWindowState,0);
 
-			bool allowPositionConfig = false;
-			if(propertyReplyWindowType){
-				xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowType);
-				allowPositionConfig = (*patom == ewmh._NET_WM_WINDOW_TYPE_DESKTOP || *patom == ewmh._NET_WM_WINDOW_TYPE_DOCK);
-				free(propertyReplyWindowType);
-			}
-
-			//WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			WManager::Rectangle rect = {
 				pev->x,pev->y,pev->width,pev->height
 			};
 
-			if(boolSizeHints && sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE){
-				if(sizeHints.min_width > rect.w)
-					rect.w = sizeHints.min_width;
-				if(sizeHints.min_height > rect.h)
-					rect.h = sizeHints.min_height;
+			bool allowPositionConfig = false;
+			if(propertyReplyWindowType){
+				uint l = xcb_get_property_value_length(propertyReplyWindowType);
+				if(l > 0){
+					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowType);
+					allowPositionConfig = (patom[0] == ewmh._NET_WM_WINDOW_TYPE_DESKTOP || patom[0] == ewmh._NET_WM_WINDOW_TYPE_DOCK);
+				}
+				free(propertyReplyWindowType);
+			}
+			if(propertyReplyWindowState){
+				uint l = xcb_get_property_value_length(propertyReplyWindowState);
+				if(l > 0 && !allowPositionConfig){
+					uint n = 8*l/propertyReplyWindowState->format;
+					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowState);
+					allowPositionConfig = any(ewmh._NET_WM_STATE_SKIP_TASKBAR,patom,n);
+				}
+				free(propertyReplyWindowState);
 			}
 
 			//center the window to screen, otherwise it might end up to the left upper corner
@@ -662,14 +671,10 @@ sint Default::HandleEvent(){
 				pev->value_mask |= XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y;
 			}
 			
-			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
-			});
-			if(m == configCache.end()){
+			if(mrect == configCache.end()){
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
-				m = configCache.end()-1;
-
-			}else (*m).second = rect;
+				mrect = configCache.end()-1;
+			}else (*mrect).second = rect;
 
 			struct{
 				uint16_t m;
@@ -745,22 +750,57 @@ sint Default::HandleEvent(){
 			xcb_get_property_reply_t *propertyReplyTransientFor
 				= xcb_get_property_reply(pcon,propertyCookieTransientFor,0);
 
+			bool allowPositionConfig = false;
+			if(propertyReplyWindowType){
+				uint l = xcb_get_property_value_length(propertyReplyWindowType);
+				if(l > 0){
+					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowType);
+					allowPositionConfig = (patom[0] == ewmh._NET_WM_WINDOW_TYPE_DESKTOP || patom[0] == ewmh._NET_WM_WINDOW_TYPE_DOCK);
+				}
+			}
+			if(propertyReplyWindowState){
+				uint l = xcb_get_property_value_length(propertyReplyWindowState);
+				if(l > 0 && !allowPositionConfig){
+					uint n = 8*l/propertyReplyWindowState->format;
+					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowState);
+					allowPositionConfig = any(ewmh._NET_WM_STATE_SKIP_TASKBAR,patom,n);
+				}
+			}
+
+			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+				return pev->window == p.first;
+			});
+
 			if(boolHints){
 				if(hints.flags & XCB_ICCCM_WM_HINT_INPUT && !hints.input)
 					hintFlags |= X11Client::CreateInfo::HINT_NO_INPUT;
 			}
 			if(boolSizeHints){
+				WManager::Rectangle rect;
+				if(mrect == configCache.end()){
+					configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+					mrect = configCache.end()-1;
+				}
+
 				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE &&
 				sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE &&
 				(sizeHints.min_width == sizeHints.max_width ||
 				sizeHints.min_height == sizeHints.max_height)){
 					//
-					{
-						auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-							return pev->window == p.first;
-						});
-						prect = m != configCache.end()?&(*m).second:0;
-					}
+					(*mrect).second.w = sizeHints.min_width;
+					(*mrect).second.h = sizeHints.min_height;
+					prect = &(*mrect).second;
+				}else
+				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_US_SIZE || sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_SIZE){
+					(*mrect).second.w = sizeHints.width;
+					(*mrect).second.h = sizeHints.height;
+				}
+
+				rect.x = (pscr->width_in_pixels-rect.w)/2;
+				rect.y = (pscr->height_in_pixels-rect.h)/2;
+				if((sizeHints.flags & XCB_ICCCM_SIZE_HINT_US_POSITION || sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_POSITION) && allowPositionConfig){
+					(*mrect).second.x = sizeHints.x;
+					(*mrect).second.y = sizeHints.y;
 				}
 			}
 			if(propertyReplyWindowType){
@@ -769,19 +809,15 @@ sint Default::HandleEvent(){
 				if(l > 0){
 					//uint n = 8*l/propertyReplyWindowType->format;
 					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowType);
-					if(l > 0 && (patom[0] == ewmh._NET_WM_WINDOW_TYPE_DIALOG ||
+					if(patom[0] == ewmh._NET_WM_WINDOW_TYPE_DIALOG ||
 						patom[0] == ewmh._NET_WM_WINDOW_TYPE_DOCK ||
 						patom[0] == ewmh._NET_WM_WINDOW_TYPE_DESKTOP ||
 						patom[0] == ewmh._NET_WM_WINDOW_TYPE_TOOLBAR ||
 						patom[0] == ewmh._NET_WM_WINDOW_TYPE_MENU ||
 						patom[0] == ewmh._NET_WM_WINDOW_TYPE_UTILITY ||
-						patom[0] == ewmh._NET_WM_WINDOW_TYPE_SPLASH)){
-						if(!prect){
-							auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-								return pev->window == p.first;
-							});
-							prect = m != configCache.end()?&(*m).second:0;
-						}
+						patom[0] == ewmh._NET_WM_WINDOW_TYPE_SPLASH){
+						if(!prect)
+							prect = mrect != configCache.end()?&(*mrect).second:0;
 
 						hintFlags |= 
 							(patom[0] == ewmh._NET_WM_WINDOW_TYPE_DESKTOP?X11Client::CreateInfo::HINT_DESKTOP:0)|
@@ -797,12 +833,8 @@ sint Default::HandleEvent(){
 					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowState);
 
 					if(any(ewmh._NET_WM_STATE_MODAL,patom,n) || any(ewmh._NET_WM_STATE_SKIP_TASKBAR,patom,n)){
-						if(!prect){
-							auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-								return pev->window == p.first;
-							});
-							prect = m != configCache.end()?&(*m).second:0;
-						}
+						if(!prect)
+							prect = mrect != configCache.end()?&(*mrect).second:0;
 
 						hintFlags |= 
 							(any(ewmh._NET_WM_STATE_ABOVE,patom,n)?X11Client::CreateInfo::HINT_ABOVE:0)|
@@ -891,7 +923,6 @@ sint Default::HandleEvent(){
 			if(m == configCache.end()){
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
 				m = configCache.end()-1;
-
 			}else (*m).second = rect;
 
 			X11Client *pclient1 = FindClient(pev->window,MODE_AUTOMATIC);
@@ -1081,7 +1112,6 @@ sint Default::HandleEvent(){
 
 			if(pev->type == ewmh._NET_WM_STATE){
 				if(pev->data.data32[1] == ewmh._NET_WM_STATE_FULLSCREEN){
-					printf("fullscreen!\n");
 					switch(pev->data.data32[0]){
 					case 2://ewmh._NET_WM_STATE_TOGGLE)
 						SetFullscreen(pclient1,(pclient1->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) == 0);
