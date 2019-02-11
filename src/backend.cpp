@@ -156,8 +156,9 @@ X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateI
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
 	//if(!(pcontainer->flags & WManager::Container::FLAG_FLOATING))
-	if((pcreateInfo->mode == CreateInfo::CREATE_CONTAINED && !(pcontainer->flags & WManager::Container::FLAG_FLOATING)) ||
-		(pcreateInfo->mode == CreateInfo::CREATE_AUTOMATIC && !pcreateInfo->prect))
+	if(pcreateInfo->mode == CreateInfo::CREATE_CONTAINED && !(pcontainer->flags & WManager::Container::FLAG_FLOATING))// ||
+		//(pcreateInfo->mode == CreateInfo::CREATE_AUTOMATIC && !pcreateInfo->prect))
+		//(pcreateInfo->mode == CreateInfo::CREATE_AUTOMATIC && !pcreateInfo->prect))
 		UpdateTranslation();
 	else rect = *pcreateInfo->prect;
 
@@ -721,7 +722,7 @@ sint Default::HandleEvent(){
 				break;
 			}
 
-			WManager::Rectangle *prect = 0;
+			//WManager::Rectangle *prect = 0;
 			X11Client *pbaseClient = 0;
 			uint hintFlags = 0;
 
@@ -770,18 +771,18 @@ sint Default::HandleEvent(){
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return pev->window == p.first;
 			});
+			if(mrect == configCache.end()){
+				//an entry should always be present, since CREATE_NOTIFY creates one
+				WManager::Rectangle rect;
+				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				mrect = configCache.end()-1;
+			}
 
 			if(boolHints){
 				if(hints.flags & XCB_ICCCM_WM_HINT_INPUT && !hints.input)
 					hintFlags |= X11Client::CreateInfo::HINT_NO_INPUT;
 			}
 			if(boolSizeHints){
-				WManager::Rectangle rect;
-				if(mrect == configCache.end()){
-					configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
-					mrect = configCache.end()-1;
-				}
-
 				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE &&
 				sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE &&
 				(sizeHints.min_width == sizeHints.max_width ||
@@ -789,15 +790,15 @@ sint Default::HandleEvent(){
 					//
 					(*mrect).second.w = sizeHints.min_width;
 					(*mrect).second.h = sizeHints.min_height;
-					prect = &(*mrect).second;
+					hintFlags |= X11Client::CreateInfo::HINT_FLOATING;
 				}else
 				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_US_SIZE || sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_SIZE){
 					(*mrect).second.w = sizeHints.width;
 					(*mrect).second.h = sizeHints.height;
 				}
 
-				rect.x = (pscr->width_in_pixels-rect.w)/2;
-				rect.y = (pscr->height_in_pixels-rect.h)/2;
+				(*mrect).second.x = (pscr->width_in_pixels-(*mrect).second.w)/2;
+				(*mrect).second.y = (pscr->height_in_pixels-(*mrect).second.h)/2;
 				if((sizeHints.flags & XCB_ICCCM_SIZE_HINT_US_POSITION || sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_POSITION) && allowPositionConfig){
 					(*mrect).second.x = sizeHints.x;
 					(*mrect).second.y = sizeHints.y;
@@ -816,10 +817,8 @@ sint Default::HandleEvent(){
 						patom[0] == ewmh._NET_WM_WINDOW_TYPE_MENU ||
 						patom[0] == ewmh._NET_WM_WINDOW_TYPE_UTILITY ||
 						patom[0] == ewmh._NET_WM_WINDOW_TYPE_SPLASH){
-						if(!prect)
-							prect = mrect != configCache.end()?&(*mrect).second:0;
 
-						hintFlags |= 
+						hintFlags |= X11Client::CreateInfo::HINT_FLOATING|
 							(patom[0] == ewmh._NET_WM_WINDOW_TYPE_DESKTOP?X11Client::CreateInfo::HINT_DESKTOP:0)|
 							(patom[0] == ewmh._NET_WM_WINDOW_TYPE_DOCK?X11Client::CreateInfo::HINT_ABOVE:0);
 					}
@@ -833,10 +832,7 @@ sint Default::HandleEvent(){
 					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowState);
 
 					if(any(ewmh._NET_WM_STATE_MODAL,patom,n) || any(ewmh._NET_WM_STATE_SKIP_TASKBAR,patom,n)){
-						if(!prect)
-							prect = mrect != configCache.end()?&(*mrect).second:0;
-
-						hintFlags |= 
+						hintFlags |= X11Client::CreateInfo::HINT_FLOATING|
 							(any(ewmh._NET_WM_STATE_ABOVE,patom,n)?X11Client::CreateInfo::HINT_ABOVE:0)|
 							(any(ewmh._NET_WM_STATE_BELOW,patom,n)?X11Client::CreateInfo::HINT_DESKTOP:0)|
 							(any(ewmh._NET_WM_STATE_FULLSCREEN,patom,n)?X11Client::CreateInfo::HINT_FULLSCREEN:0);
@@ -874,7 +870,7 @@ sint Default::HandleEvent(){
 
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
-			createInfo.prect = prect;
+			createInfo.prect = &(*mrect).second;
 			createInfo.pstackClient =
 				!(hintFlags & X11Client::CreateInfo::HINT_DESKTOP)?
 					((pbaseClient && !(hintFlags & X11Client::CreateInfo::HINT_ABOVE))?

@@ -323,7 +323,7 @@ public:
 			ContainerCreateInfo containerCreateInfo;
 			containerCreateInfo.wm_name = pcreateInfo->pwmName->pstr;
 			containerCreateInfo.wm_class = pcreateInfo->pwmClass->pstr;
-			containerCreateInfo.floating = pcreateInfo->prect != 0;
+			containerCreateInfo.floating = (pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_FLOATING) != 0;
 			Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0,&containerCreateInfo);
 
 			containerInt.vertexShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX];

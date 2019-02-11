@@ -117,7 +117,8 @@ public:
 			HINT_DESKTOP = 0x1,
 			HINT_ABOVE = 0x2,
 			HINT_NO_INPUT = 0x4,
-			HINT_FULLSCREEN = 0x8
+			HINT_FULLSCREEN = 0x8,
+			HINT_FLOATING = 0x10
 		};
 		uint hints;
 		const BackendStringProperty *pwmName;
