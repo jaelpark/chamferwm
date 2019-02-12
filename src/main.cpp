@@ -171,6 +171,9 @@ public:
 		PrintTree(proot,0);
 		printf("-----------\n");
 
+		if(pcontainer == pdst)
+			return;
+
 		WManager::Container *premoved = pcontainer->Remove();
 		WManager::Container *pOrigParent = premoved->pParent;
 
