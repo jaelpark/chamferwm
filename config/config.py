@@ -37,6 +37,8 @@ class Key(Enum):
 	MOVE_LEFT = auto()
 	MOVE_RIGHT = auto()
 
+	LIFT_CONTAINER = auto()
+
 	LAYOUT = auto()
 	SPLIT_V = auto()
 	FULLSCREEN = auto()
@@ -145,6 +147,23 @@ class Container(chamfer.Container):
 	def OnEnter(self):
 		#self.focus();
 		pass;
+	
+	#Place container under another so that its structure remains intact.
+	#Return the container at the original targets place.
+	def Place(self, target):
+		focus = target.GetFocus();
+		if focus is not None:
+			peers = [focus.GetNext()];
+			while peers[-1] is not focus:
+				peers.append(peers[-1].GetNext());
+
+		self.Move(target);
+		if focus is not None:
+			for peer in peers[1:]:
+				peer.Place(peers[0]);
+			return target;
+		else:
+			return target.GetParent();
 		
 class Backend(chamfer.Backend):
 	def OnSetupKeys(self, binder, debug):
@@ -169,6 +188,9 @@ class Backend(chamfer.Backend):
 			#yanking and pasting containers
 			binder.BindKey(ord('y'),chamfer.MOD_MASK_1,Key.YANK_CONTAINER.value);
 			binder.BindKey(ord('p'),chamfer.MOD_MASK_1,Key.PASTE_CONTAINER.value);
+
+			#misc grouping and parenting operations
+			binder.BindKey(ord('w'),chamfer.MOD_MASK_1,Key.LIFT_CONTAINER.value);
 
 			#layout, splits and fullscreen
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
@@ -223,7 +245,7 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_CHILD.value);
 			binder.BindKey(ord('y'),chamfer.MOD_MASK_SHIFT,Key.YANK_CONTAINER.value);
 			binder.BindKey(ord('p'),chamfer.MOD_MASK_SHIFT,Key.PASTE_CONTAINER.value);
-
+			binder.BindKey(ord('w'),chamfer.MOD_MASK_SHIFT,Key.LIFT_CONTAINER.value);
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
 			binder.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
 	
@@ -311,6 +333,18 @@ class Backend(chamfer.Backend):
 				self.yank.Move(focus); #warning! need to know wether yank is still alive
 			except AttributeError:
 				pass;
+
+		elif keyId == Key.LIFT_CONTAINER.value:
+			sibling = focus.GetNext();
+			peer = sibling.GetNext();
+			if peer is not focus:
+				sibling = peer.Place(sibling);
+				
+				peer = sibling.GetNext();
+				while peer is not focus:
+					peer1 = peer.GetNext();
+					peer.Move(sibling);
+					peer = peer1;
 
 		elif keyId == Key.LAYOUT.value:
 			if parent is None:
