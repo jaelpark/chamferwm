@@ -32,6 +32,7 @@ class Key(Enum):
 	FOCUS_PARENT_LEFT = auto()
 
 	YANK_CONTAINER = auto()
+	YANK_APPEND_CONTAINER = auto()
 	PASTE_CONTAINER = auto()
 
 	MOVE_LEFT = auto()
@@ -187,6 +188,7 @@ class Backend(chamfer.Backend):
 
 			#yanking and pasting containers
 			binder.BindKey(ord('y'),chamfer.MOD_MASK_1,Key.YANK_CONTAINER.value);
+			binder.BindKey(ord('y'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL,Key.YANK_APPEND_CONTAINER.value);
 			binder.BindKey(ord('p'),chamfer.MOD_MASK_1,Key.PASTE_CONTAINER.value);
 
 			#misc grouping and parenting operations
@@ -244,6 +246,7 @@ class Backend(chamfer.Backend):
 			binder.BindKey(ord('a'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_PARENT.value);
 			binder.BindKey(ord('s'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_CHILD.value);
 			binder.BindKey(ord('y'),chamfer.MOD_MASK_SHIFT,Key.YANK_CONTAINER.value);
+			binder.BindKey(ord('y'),chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.YANK_APPEND_CONTAINER.value);
 			binder.BindKey(ord('p'),chamfer.MOD_MASK_SHIFT,Key.PASTE_CONTAINER.value);
 			binder.BindKey(ord('w'),chamfer.MOD_MASK_SHIFT,Key.LIFT_CONTAINER.value);
 			binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
@@ -325,14 +328,33 @@ class Backend(chamfer.Backend):
 			
 		elif keyId == Key.YANK_CONTAINER.value:
 			print("yanking container...");
-			self.yank = focus;
+			self.yank = {focus};
+
+		elif keyId == Key.YANK_APPEND_CONTAINER.value:
+			print("yanking container (append)...");
+			try:
+				self.yank.add(focus);
+			except AttributeError:
+				self.yank = {focus};
 
 		elif keyId == Key.PASTE_CONTAINER.value:
 			print("pasting container...");
 			try:
-				self.yank.Move(focus); #warning! need to know wether yank is still alive
-			except AttributeError:
-				pass;
+				if focus in self.yank:
+					print("cannot paste on selection (one of the yanked containers).");
+					self.yank.remove(focus);
+				peers = list(self.yank);
+
+				focus1 = focus.GetFocus();
+				peers[0].Move(focus); #warning! need to know wether yank is still alive
+				
+				if focus1 is None:
+					focus = focus.GetParent();
+				for peer in peers[1:]:
+					peer.Move(focus);
+					
+			except (AttributeError,IndexError):
+				print("no containers to paste.");
 
 		elif keyId == Key.LIFT_CONTAINER.value:
 			sibling = focus.GetNext();
