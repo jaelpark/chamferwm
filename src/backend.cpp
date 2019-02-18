@@ -666,7 +666,7 @@ sint Default::HandleEvent(){
 			}
 
 			//center the window to screen, otherwise it might end up to the left upper corner
-			if(!allowPositionConfig){
+			if(!allowPositionConfig || (rect.x == 0 && rect.y == 0)){
 				rect.x = (pscr->width_in_pixels-rect.w)/2;
 				rect.y = (pscr->height_in_pixels-rect.h)/2;
 				pev->value_mask |= XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y;
@@ -799,7 +799,7 @@ sint Default::HandleEvent(){
 
 				(*mrect).second.x = (pscr->width_in_pixels-(*mrect).second.w)/2;
 				(*mrect).second.y = (pscr->height_in_pixels-(*mrect).second.h)/2;
-				if((sizeHints.flags & XCB_ICCCM_SIZE_HINT_US_POSITION || sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_POSITION) && allowPositionConfig){
+				if((sizeHints.flags & XCB_ICCCM_SIZE_HINT_US_POSITION || sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_POSITION) && allowPositionConfig && (sizeHints.x != 0 && sizeHints.y != 0)){
 					(*mrect).second.x = sizeHints.x;
 					(*mrect).second.y = sizeHints.y;
 				}
