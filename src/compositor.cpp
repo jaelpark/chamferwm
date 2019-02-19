@@ -104,8 +104,6 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 		return true;
 	}
 
-	uint totalSetCount = 0;
-
 	PipelineDescriptorSet pipelineDescSet;
 	pipelineDescSet.fenceTag = pcomp->frameTag;
 	pipelineDescSet.p = prenderPipeline;
@@ -125,8 +123,6 @@ bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
 		pipelineDescSet.pdescSets[i] = pcomp->CreateDescSets(prenderPipeline->pshaderModule[i]);
 		if(!pipelineDescSet.pdescSets[i])
 			return false;
-
-		totalSetCount += prenderPipeline->pshaderModule[i]->setCount;
 	}
 	descSets.push_back(pipelineDescSet);
 	passignedSet = &descSets.back();
