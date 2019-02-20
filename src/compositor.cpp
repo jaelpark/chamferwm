@@ -774,7 +774,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		frame.offset = {0,0};
 		frame.extent = imageExtent;
 
-		vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&frame);
+		//vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&frame);
 		pbackground->Draw(frame,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
 	}
 
