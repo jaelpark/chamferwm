@@ -71,6 +71,8 @@ class Key(Enum):
 	MONITOR_BRIGHTNESS_UP = auto()
 	MONITOR_BRIGHTNESS_DOWN = auto()
 
+	NOOP = auto()
+
 def GetFocusTiled():
 	root = chamfer.GetRoot();
 	focusHead = root.GetFocus();
@@ -234,6 +236,9 @@ class Backend(chamfer.Backend):
 			#monitor brightness
 			binder.BindKey(xf86.XK_XF86_MonBrightnessUp,0,Key.MONITOR_BRIGHTNESS_UP.value);
 			binder.BindKey(xf86.XK_XF86_MonBrightnessDown,0,Key.MONITOR_BRIGHTNESS_DOWN.value);
+
+			#hacks
+			binder.BindKey(ord('q'),chamfer.MOD_MASK_CONTROL,Key.NOOP.value); #prevent madness while browsing the web 
 
 		else:
 			#debug only
@@ -481,11 +486,9 @@ class Backend(chamfer.Backend):
 
 		elif keyId == Key.MONITOR_BRIGHTNESS_UP.value:
 			psutil.Popen(["xbacklight","-inc","20"]);
-			pass;
 
 		elif keyId == Key.MONITOR_BRIGHTNESS_DOWN.value:
 			psutil.Popen(["xbacklight","-dec","20"]);
-			pass;
 
 	def OnKeyRelease(self, keyId):
 		print("key release: {}".format(keyId));
