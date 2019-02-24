@@ -20,6 +20,7 @@ xcb = [
 	dependency('xcb-keysyms'),
 	dependency('xcb-xfixes'),
 	dependency('xcb-damage'),
+	dependency('xcb-shm'),
 	dependency('xcb-composite'),
 	dependency('xcb-icccm'),
 	dependency('xcb-ewmh')

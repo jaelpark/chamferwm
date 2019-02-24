@@ -6,6 +6,7 @@
 
 #include <xcb/composite.h>
 #include <xcb/damage.h>
+#include <xcb/shm.h>
 
 namespace Backend{
 class X11Backend;
@@ -160,6 +161,7 @@ public:
 	void UpdateContents(const VkCommandBuffer *);
 	void AdjustSurface1();
 	xcb_pixmap_t windowPixmap;
+	xcb_shm_seg_t segment;
 	xcb_damage_damage_t damage;
 	std::vector<VkRect2D> damageRegions;
 };

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <limits>
+#include <sys/shm.h>
 
 namespace Compositor{
 
@@ -994,11 +995,12 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	//
 	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	//xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
-	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
+	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_AUTOMATIC);
 
 	windowPixmap = xcb_generate_id(pbackend->pcon);
 	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
-	//DebugPrintf(stdout,"Created pixmap (%x)\n",windowPixmap);
+
+	segment = xcb_generate_id(pbackend->pcon);
 
 	damage = xcb_generate_id(pbackend->pcon);
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
@@ -1019,13 +1021,27 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	/*struct timespec t1;
 	clock_gettime(CLOCK_MONOTONIC,&t1);*/
 
-	//TODO: can we acquire only the damaged regions?
-	xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,windowPixmap,0,0,rect.w,rect.h,~0);
-	xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pbackend->pcon,imageCookie,0);
-	if(!pimageReply){
-		DebugPrintf(stderr,"Failed to receive image reply.\n");
+	sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
+	if(shmid == -1){
+		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
 		return;
 	}
+	
+	xcb_shm_attach(pbackend->pcon,segment,shmid,0);
+	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,rect.w,rect.h,~0,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+	xcb_shm_detach(pbackend->pcon,segment);
+
+	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
+	xcb_flush(pbackend->pcon);
+
+	if(!pimageReply){
+		shmctl(shmid,IPC_RMID,0);
+		DebugPrintf(stderr,"No shared memory.\n");
+		return;
+	}
+
+	uint depth = pimageReply->depth;
+	free(pimageReply);
 
 	/*struct timespec t2;
 	clock_gettime(CLOCK_MONOTONIC,&t2);
@@ -1034,13 +1050,21 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//http://doc.qt.io/qt-5/qimage.html
 	//argb can be swizzled (image view)
 
-	unsigned char *pchpixels = xcb_get_image_data(pimageReply);
+	//unsigned char *pchpixels = xcb_get_image_data(pimageReply);
+	unsigned char *pchpixels = (unsigned char*)shmat(shmid,0,0);
+	shmctl(shmid,IPC_RMID,0);
+
+	if((intptr_t)pchpixels == -1){
+		DebugPrintf(stderr,"Shared memory attachment error.\n");
+		return;
+	}
+
 	if(fullRegionUpdate){
 		{
 			unsigned char *pdata = (unsigned char *)ptexture->Map();
 
 			memcpy(pdata,pchpixels,rect.w*rect.h*4);
-			if(pimageReply->depth != 32)
+			if(depth != 32)
 				for(uint i = 0; i < rect.w*rect.h; ++i)
 					pdata[4*i+3] = 255;
 			fullRegionUpdate = false;
@@ -1056,7 +1080,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 			for(uint y = rect1.offset.y, Y = y+rect1.extent.height; y < Y; ++y){
 				uint offset = 4*(rect.w*y+rect1.offset.x);
 				memcpy(pdata+offset,pchpixels+offset,4*rect1.extent.width);
-				if(pimageReply->depth != 32)
+				if(depth != 32)
 					for(uint i = 0; i < rect1.extent.width; ++i)
 						pdata[offset+4*i+3] = 255;
 			}
@@ -1075,7 +1099,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 
 	damageRegions.clear();
 
-	free(pimageReply);
+	shmdt(pchpixels);
 }
 
 void X11ClientFrame::AdjustSurface1(){
@@ -1177,12 +1201,21 @@ void X11Compositor::Start(){
 
 	//damage
 	if(!pbackend->QueryExtension("DAMAGE",&damageEventOffset,&damageErrorOffset))
-		throw Exception("Damage extension unavailable.");
+		throw Exception("Damage extension unavailable.\n");
 
 	xcb_damage_query_version_cookie_t damageCookie = xcb_damage_query_version(pbackend->pcon,XCB_DAMAGE_MAJOR_VERSION,XCB_DAMAGE_MINOR_VERSION);
 	xcb_damage_query_version_reply_t *pdamageReply = xcb_damage_query_version_reply(pbackend->pcon,damageCookie,0);
+	if(!pdamageReply)
+		throw Exception("Damage extension unavailable.\n");
 	DebugPrintf(stdout,"Damage %u.%u\n",pdamageReply->major_version,pdamageReply->minor_version);
 	free(pdamageReply);
+
+	xcb_shm_query_version_cookie_t shmCookie = xcb_shm_query_version(pbackend->pcon);
+	xcb_shm_query_version_reply_t *pshmReply = xcb_shm_query_version_reply(pbackend->pcon,shmCookie,0);
+	if(!pshmReply || !pshmReply->shared_pixmaps)
+		throw Exception("SHM unavailable.\n");
+	DebugPrintf(stdout,"SHM %u.%u\n",pshmReply->major_version,pshmReply->minor_version);
+	free(pshmReply);
 
 	xcb_flush(pbackend->pcon);
 
