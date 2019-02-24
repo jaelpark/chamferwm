@@ -1013,7 +1013,7 @@ X11ClientFrame::~X11ClientFrame(){
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	if(!fullRegionUpdate && damageRegions.size() == 0)
 		return;
-	
+#if 0	
 	/*struct timespec t1;
 	clock_gettime(CLOCK_MONOTONIC,&t1);*/
 
@@ -1030,6 +1030,10 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
 	xcb_flush(pbackend->pcon);
 
+	/*struct timespec t2;
+	clock_gettime(CLOCK_MONOTONIC,&t2);
+	float dt1 = timespec_diff(t2,t1);*/
+
 	if(!pimageReply){
 		shmctl(shmid,IPC_RMID,0);
 		DebugPrintf(stderr,"No shared memory.\n");
@@ -1039,14 +1043,6 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	uint depth = pimageReply->depth;
 	free(pimageReply);
 
-	/*struct timespec t2;
-	clock_gettime(CLOCK_MONOTONIC,&t2);
-	float dt1 = timespec_diff(t2,t1);*/
-
-	//http://doc.qt.io/qt-5/qimage.html
-	//argb can be swizzled (image view)
-
-	//unsigned char *pchpixels = xcb_get_image_data(pimageReply);
 	unsigned char *pchpixels = (unsigned char*)shmat(shmid,0,0);
 	shmctl(shmid,IPC_RMID,0);
 
@@ -1054,36 +1050,58 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		DebugPrintf(stderr,"Shared memory attachment error.\n");
 		return;
 	}
+#endif
 
 	if(fullRegionUpdate){
-		{
-			unsigned char *pdata = (unsigned char *)ptexture->Map();
+		damageRegions.clear();
 
-			memcpy(pdata,pchpixels,rect.w*rect.h*4);
-			if(depth != 32)
-				for(uint i = 0; i < rect.w*rect.h; ++i)
-					pdata[4*i+3] = 255;
-			fullRegionUpdate = false;
-			
-			VkRect2D rect1 = {0,0,rect.w,rect.h};
-			ptexture->Unmap(pcommandBuffer,&rect1,1);
-		}
-
-	}else{
-		for(VkRect2D &rect1 : damageRegions){
-			unsigned char *pdata = (unsigned char *)ptexture->Map();
-
-			for(uint y = rect1.offset.y, Y = y+rect1.extent.height; y < Y; ++y){
-				uint offset = 4*(rect.w*y+rect1.offset.x);
-				memcpy(pdata+offset,pchpixels+offset,4*rect1.extent.width);
-				if(depth != 32)
-					for(uint i = 0; i < rect1.extent.width; ++i)
-						pdata[offset+4*i+3] = 255;
-			}
-
-			ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
-		}
+		VkRect2D rect1;
+		rect1.offset = {0,0};
+		rect1.extent = {rect.w,rect.h};
+		damageRegions.push_back(rect1);
 	}
+
+	unsigned char *pdata = (unsigned char *)ptexture->Map();
+
+	for(VkRect2D &rect1 : damageRegions){
+		sint shmid = shmget(IPC_PRIVATE,rect1.extent.width*rect1.extent.height*4,IPC_CREAT|0777);
+		if(shmid == -1){
+			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
+			return;
+		}
+		
+		xcb_shm_attach(pbackend->pcon,segment,shmid,0);
+		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+		xcb_shm_detach(pbackend->pcon,segment);
+
+		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
+		xcb_flush(pbackend->pcon);
+
+		if(!pimageReply){
+			shmctl(shmid,IPC_RMID,0);
+			DebugPrintf(stderr,"No shared memory.\n");
+			return;
+		}
+
+		uint depth = pimageReply->depth;
+		free(pimageReply);
+
+		unsigned char *pchpixels = (unsigned char*)shmat(shmid,0,0);
+		shmctl(shmid,IPC_RMID,0);
+
+		for(uint y = 0; y < rect1.extent.height; ++y){
+			uint offsetDst = 4*(rect.w*(y+rect1.offset.y)+rect1.offset.x);
+			uint offsetSrc = 4*(rect1.extent.width*y);
+			memcpy(pdata+offsetDst,pchpixels+offsetSrc,4*rect1.extent.width);
+			if(depth != 32)
+				for(uint i = 0; i < rect1.extent.width; ++i)
+					pdata[offsetDst+4*i+3] = 255;
+		}
+
+		shmdt(pchpixels);
+	}
+	
+	ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
 
 	/*struct timespec t3;
 	clock_gettime(CLOCK_MONOTONIC,&t3);
@@ -1094,8 +1112,6 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	fclose(pf);*/
 
 	damageRegions.clear();
-
-	shmdt(pchpixels);
 }
 
 void X11ClientFrame::AdjustSurface1(){
