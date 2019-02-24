@@ -1013,44 +1013,6 @@ X11ClientFrame::~X11ClientFrame(){
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	if(!fullRegionUpdate && damageRegions.size() == 0)
 		return;
-#if 0	
-	/*struct timespec t1;
-	clock_gettime(CLOCK_MONOTONIC,&t1);*/
-
-	sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
-	if(shmid == -1){
-		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
-		return;
-	}
-	
-	xcb_shm_attach(pbackend->pcon,segment,shmid,0);
-	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,rect.w,rect.h,~0,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
-	xcb_shm_detach(pbackend->pcon,segment);
-
-	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
-	xcb_flush(pbackend->pcon);
-
-	/*struct timespec t2;
-	clock_gettime(CLOCK_MONOTONIC,&t2);
-	float dt1 = timespec_diff(t2,t1);*/
-
-	if(!pimageReply){
-		shmctl(shmid,IPC_RMID,0);
-		DebugPrintf(stderr,"No shared memory.\n");
-		return;
-	}
-
-	uint depth = pimageReply->depth;
-	free(pimageReply);
-
-	unsigned char *pchpixels = (unsigned char*)shmat(shmid,0,0);
-	shmctl(shmid,IPC_RMID,0);
-
-	if((intptr_t)pchpixels == -1){
-		DebugPrintf(stderr,"Shared memory attachment error.\n");
-		return;
-	}
-#endif
 
 	if(fullRegionUpdate){
 		damageRegions.clear();
@@ -1062,6 +1024,9 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	}
 
 	unsigned char *pdata = (unsigned char *)ptexture->Map();
+
+	/*struct timespec t1;
+	clock_gettime(CLOCK_MONOTONIC,&t1);*/
 
 	for(VkRect2D &rect1 : damageRegions){
 		sint shmid = shmget(IPC_PRIVATE,rect1.extent.width*rect1.extent.height*4,IPC_CREAT|0777);
@@ -1092,6 +1057,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		for(uint y = 0; y < rect1.extent.height; ++y){
 			uint offsetDst = 4*(rect.w*(y+rect1.offset.y)+rect1.offset.x);
 			uint offsetSrc = 4*(rect1.extent.width*y);
+			//uint offsetSrc = offsetDst;
 			memcpy(pdata+offsetDst,pchpixels+offsetSrc,4*rect1.extent.width);
 			if(depth != 32)
 				for(uint i = 0; i < rect1.extent.width; ++i)
@@ -1100,7 +1066,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 
 		shmdt(pchpixels);
 	}
-	
+
 	ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
 
 	/*struct timespec t3;
