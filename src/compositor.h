@@ -174,6 +174,7 @@ public:
 	
 	X11Compositor *pcomp11;
 	xcb_pixmap_t pixmap;
+	xcb_shm_seg_t segment;
 	uint w, h;
 };
 

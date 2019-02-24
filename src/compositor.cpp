@@ -991,10 +991,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pshaderName,_pcomp){// : ClientFrame(_pcomp), X11Client(_pcreateInfo){
-	//
-	//xcb_composite_redirect_subwindows(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
-	//xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
+X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pshaderName,_pcomp){
 	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_AUTOMATIC);
 
 	windowPixmap = xcb_generate_id(pbackend->pcon);
@@ -1004,7 +1001,6 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 
 	damage = xcb_generate_id(pbackend->pcon);
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
-	//xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_NON_EMPTY);
 }
 
 X11ClientFrame::~X11ClientFrame(){
@@ -1111,6 +1107,7 @@ void X11ClientFrame::AdjustSurface1(){
 
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_w,_h,_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
 	//
+	segment = xcb_generate_id(pcomp11->pbackend->pcon);
 }
 
 X11Background::~X11Background(){
@@ -1121,18 +1118,43 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	if(!fullRegionUpdate)
 		return;
 	//
-	xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pcomp11->pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,pixmap,0,0,w,h,~0);
+	/*xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pcomp11->pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,pixmap,0,0,w,h,~0);
 	xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
 	if(!pimageReply){
 		DebugPrintf(stderr,"Failed to receive image reply.\n");
 		return;
 	}
 
-	unsigned char *pchpixels = xcb_get_image_data(pimageReply);
-	unsigned char *pdata = (unsigned char *)ptexture->Map();
+	unsigned char *pchpixels = xcb_get_image_data(pimageReply);*/
 
+	sint shmid = shmget(IPC_PRIVATE,w*h*4,IPC_CREAT|0777);
+	if(shmid == -1){
+		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
+		return;
+	}
+	
+	xcb_shm_attach(pcomp11->pbackend->pcon,segment,shmid,0);
+	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pcomp11->pbackend->pcon,pixmap,0,0,w,h,~0,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+	xcb_shm_detach(pcomp11->pbackend->pcon,segment);
+
+	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
+	xcb_flush(pcomp11->pbackend->pcon);
+
+	if(!pimageReply){
+		shmctl(shmid,IPC_RMID,0);
+		DebugPrintf(stderr,"No shared memory.\n");
+		return;
+	}
+
+	uint depth = pimageReply->depth;
+	free(pimageReply);
+
+	unsigned char *pchpixels = (unsigned char*)shmat(shmid,0,0);
+	shmctl(shmid,IPC_RMID,0);
+
+	unsigned char *pdata = (unsigned char *)ptexture->Map();
 	memcpy(pdata,pchpixels,w*h*4);
-	if(pimageReply->depth != 32)
+	if(depth != 32)
 		for(uint i = 0; i < w*h; ++i)
 			pdata[4*i+3] = 255;
 	fullRegionUpdate = false;
@@ -1140,7 +1162,7 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	VkRect2D rect1 = {0,0,w,h};
 	ptexture->Unmap(pcommandBuffer,&rect1,1);
 
-	free(pimageReply);
+	shmdt(pchpixels);
 }
 
 X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *_pbackend) : CompositorInterface(physicalDevIndex), pbackend(_pbackend){//, pbackground(0){
