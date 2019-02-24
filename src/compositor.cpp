@@ -640,13 +640,13 @@ void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pcli
 	};
 	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
 		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
-		CreateRenderQueueAppendix((*m).second,pfocus);
-
 		RenderObject renderObject;
 		renderObject.pclient = (*m).second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
 		renderObject.flags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
+
+		CreateRenderQueueAppendix((*m).second,pfocus);
 
 		m = appendixQueue.erase(m);
 	}

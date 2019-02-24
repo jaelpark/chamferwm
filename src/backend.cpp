@@ -344,12 +344,12 @@ void X11Backend::StackRecursiveAppendix(const WManager::Client *pclient){
 	};
 	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
 		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
-		StackRecursiveAppendix((*m).second);
-
 		X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
 
 		uint values[1] = {XCB_STACK_MODE_ABOVE};
 		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+
+		StackRecursiveAppendix((*m).second);
 
 		m = appendixQueue.erase(m);
 	}
