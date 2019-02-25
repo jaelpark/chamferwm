@@ -16,6 +16,7 @@ borderWidth(boost::python::make_tuple(0.0f,0.0f)),
 minSize(boost::python::make_tuple(0.0f,0.0f)),
 maxSize(boost::python::make_tuple(1.0f,1.0f)),
 floatingMode(FLOAT_AUTOMATIC),
+deferredShaderUserFlags(0),
 pcontainer(0){//,
 	//
 }
