@@ -83,7 +83,6 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 [[vk::binding(0)]] Texture2D<float4> content;
 //[[vk::binding(1)]] SamplerState sm;
 
-//TODO: create chamfer with ndc coords and sdf transformation
 float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID0) : SV_Target{
 	float2 aspect = float2(1.0f,screen.x/screen.y);
 	float2 borderWidth = border*aspect; //this results in borders half the gap size

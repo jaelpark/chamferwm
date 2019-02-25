@@ -111,6 +111,7 @@ public:
 	struct ContainerCreateInfo{
 		std::string wm_name;
 		std::string wm_class;
+		std::string shaderName[Compositor::Pipeline::SHADER_MODULE_COUNT];
 		bool floating;
 	};
 
@@ -127,6 +128,9 @@ public:
 		if(pcreateInfo){
 			containerInt.wm_name = pcreateInfo->wm_name;
 			containerInt.wm_class = pcreateInfo->wm_class;
+			containerInt.vertexShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX]; //too late! needs to be done as soon as containerInt is instanced
+			containerInt.geometryShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY];
+			containerInt.fragmentShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT];
 		}
 		containerInt.OnSetupContainer();
 
@@ -326,12 +330,11 @@ public:
 			ContainerCreateInfo containerCreateInfo;
 			containerCreateInfo.wm_name = pcreateInfo->pwmName->pstr;
 			containerCreateInfo.wm_class = pcreateInfo->pwmClass->pstr;
+			containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX] = pshaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX];
+			containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY] = pshaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY];
+			containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT] = pshaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT];
 			containerCreateInfo.floating = (pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_FLOATING) != 0;
 			Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0,&containerCreateInfo);
-
-			containerInt.vertexShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX];
-			containerInt.geometryShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY];
-			containerInt.fragmentShader = pshaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT];
 
 			if(pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_NO_INPUT)
 				containerInt.pcontainer->flags |= WManager::Container::FLAG_NO_FOCUS;
@@ -346,6 +349,7 @@ public:
 			if(containerInt.pcontainer->flags & WManager::Container::FLAG_FLOATING)
 				stackAppendix.push_back(std::pair<const WManager::Client *, WManager::Client *>(pcreateInfo->pstackClient,pclient11));
 
+			containerInt.DeferredPropertyTransfer();
 			containerInt.OnCreate();
 
 			return pclient11;
@@ -713,8 +717,8 @@ int main(sint argc, const char **pargv){
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
 	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
 	args::ValueFlag<uint> gpuIndex(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"},0);
-	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension.",{"shader-path"});
-	//args::ValueFlag<std::string> shaderPath(group_comp,"path","Path to SPIR-V shader binary blobs",{"shader-path"},".");
+	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified.",{"shader-path"});
+	//args::ValueFlag<std::string> defaultVertexShader(group_comp,"path","Default vertex shader file name.",{"default-vertex-shader"});
 
 	try{
 		parser.ParseCLI(argc,pargv);
@@ -762,8 +766,6 @@ int main(sint argc, const char **pargv){
 	}
 
 	pbackend->SetCompositor(pcomp);
-	//if(pbackend11)
-		//pbackend11->SetupEnvironment();
 
 	for(;;){
 		//TODO: can we wait for vsync before handling the event? Might help with the stuttering

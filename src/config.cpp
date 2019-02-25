@@ -17,9 +17,6 @@ minSize(boost::python::make_tuple(0.0f,0.0f)),
 maxSize(boost::python::make_tuple(1.0f,1.0f)),
 floatingMode(FLOAT_AUTOMATIC),
 pcontainer(0){//,
-//vertexShader("frame_vertex.spv"),
-//geometryShader("frame_geometry.spv"),
-//fragmentShader("frame_fragment.spv"){
 	//
 }
 
@@ -58,6 +55,14 @@ void ContainerInterface::CopySettingsContainer(){
 			break;
 		pcontainerConfig->pcontainerInt->CopySettingsContainer();
 	}
+}
+
+void ContainerInterface::DeferredPropertyTransfer(){
+	Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>(pcontainer->pclient);
+	if(!pclientFrame)
+		return;
+	pclientFrame->shaderUserFlags = deferredShaderUserFlags;
+	printf("----------- deferred, %u\n",deferredShaderUserFlags);
 }
 
 void ContainerInterface::OnSetupContainer(){
@@ -630,24 +635,24 @@ BOOST_PYTHON_MODULE(chamfer){
 		.add_property("shaderFlags",
 			boost::python::make_function(
 			[](ContainerInterface &container){
-				if(!container.pcontainer){
-					PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
-					return 0u;
-				}
+				if(!container.pcontainer)
+					return container.deferredShaderUserFlags;
 				Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>(container.pcontainer->pclient);
 				if(!pclientFrame)
-					return 0u;
+					return container.deferredShaderUserFlags;
 				return pclientFrame->shaderUserFlags;
 			},boost::python::default_call_policies(),boost::mpl::vector<uint, ContainerInterface &>()),
 				boost::python::make_function(
 			[](ContainerInterface &container, uint flags){
 				if(!container.pcontainer){
-					PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
+					container.deferredShaderUserFlags = flags;
 					return;
 				}
 				Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>(container.pcontainer->pclient);
-				if(!pclientFrame)
+				if(!pclientFrame){
+					container.deferredShaderUserFlags = flags;
 					return;
+				}
 				pclientFrame->shaderUserFlags = flags;
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, uint>()))
 		.def_readonly("wm_name",&ContainerInterface::wm_name)

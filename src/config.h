@@ -21,6 +21,7 @@ public:
 	virtual ~ContainerInterface();
 	void CopySettingsSetup(WManager::Container::Setup &);
 	void CopySettingsContainer();
+	void DeferredPropertyTransfer();
 	virtual void OnSetupContainer();
 	virtual void OnSetupClient();
 	virtual boost::python::object OnParent();
@@ -49,7 +50,6 @@ public:
 		FLOAT_ALWAYS,
 		FLOAT_NEVER
 	} floatingMode;
-	//bool fullscreen;
 
 	std::string wm_name;
 	std::string wm_class;
@@ -57,6 +57,9 @@ public:
 	std::string vertexShader;
 	std::string geometryShader;
 	std::string fragmentShader;
+
+	//cached until compositor frame is created
+	uint deferredShaderUserFlags;
 
 	WManager::Container *pcontainer;
 	boost::python::object self;
