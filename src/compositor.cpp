@@ -992,7 +992,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 }
 
 X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pshaderName,_pcomp){
-	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_AUTOMATIC);
+	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 
 	windowPixmap = xcb_generate_id(pbackend->pcon);
 	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
