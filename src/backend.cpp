@@ -973,8 +973,8 @@ sint Default::HandleEvent(){
 
 			}
 			WManager::Rectangle *prect = &(*m).second;
-			if(prect->x+prect->w <= 1 || prect->y+prect->h <= 1)
-				break; //hack: don't manage, this will mess the compositor
+			//if(prect->x+prect->w <= 1 || prect->y+prect->h <= 1)
+				//break; //hack: don't manage, this will mess the compositor
 
 			static WManager::Client dummyClient(0);
 

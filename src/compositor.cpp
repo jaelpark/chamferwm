@@ -783,6 +783,10 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	for(uint i = 0; i < renderQueue.size(); ++i){
 		RenderObject &renderObject = renderQueue[i];
 
+		if(renderObject.pclient->rect.x+renderObject.pclient->rect.w <= 1 || renderObject.pclient->rect.y+renderObject.pclient->rect.h <= 1
+			|| renderObject.pclient->rect.x > imageExtent.width || renderObject.pclient->rect.y > imageExtent.height)
+			continue;
+
 		VkRect2D frame;
 		frame.offset = {renderObject.pclient->rect.x,renderObject.pclient->rect.y};
 		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
