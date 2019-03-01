@@ -90,8 +90,10 @@ class Container(chamfer.Container):
 
 		self.splitArmed = False;
 
-		if self.wm_class == "skype":
-			self.floatingMode = chamfer.floatingMode.NEVER;
+		#if self.wm_class == "skype":
+		#	self.floatingMode = chamfer.floatingMode.NEVER;
+		if self.wm_class == "matplotlib":
+			self.floatingMode = chamfer.floatingMode.ALWAYS;
 
 	#setup the client before it's created (shaders)
 	def OnSetupClient(self):
