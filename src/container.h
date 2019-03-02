@@ -20,6 +20,8 @@ public:
 	virtual void UpdateTranslation(){}// = 0;
 	virtual void Kill(){}// = 0;
 	Rectangle rect; //pixel coordinates of the client
+	Rectangle oldRect; //to animate the transitions
+	struct timespec translationTime;
 	class Container *pcontainer;
 };
 

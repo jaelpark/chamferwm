@@ -173,7 +173,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0), pbackground(0){
+CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0), pbackground(0), playingAnimation(false){
 	//
 }
 
@@ -766,6 +766,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	renderPassBeginInfo.pClearValues = &clearValue;
 	vkCmdBeginRenderPass(pcommandBuffers[currentFrame],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
+	playingAnimation = false;
 	clock_gettime(CLOCK_MONOTONIC,&frameTime);
 
 	if(pbackground){
@@ -787,9 +788,21 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			|| renderObject.pclient->rect.x > imageExtent.width || renderObject.pclient->rect.y > imageExtent.height)
 			continue;
 
+		float t = timespec_diff(frameTime,renderObject.pclient->translationTime);
+		float s = std::clamp(t/0.3f,0.0f,1.0f);
+		s = 1.0f/(1.0f+expf(-10.0f*s+5.0f));
+
+		glm::vec2 oldRect1 = glm::vec2(renderObject.pclient->oldRect.x,renderObject.pclient->oldRect.y);
+		glm::vec2 position = oldRect1+s*(glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y)-oldRect1);
+		if(s < 0.99f)
+			playingAnimation = true;
+		else position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
+
 		VkRect2D frame;
-		frame.offset = {renderObject.pclient->rect.x,renderObject.pclient->rect.y};
+		frame.offset = {(sint)position.x,(sint)position.y};
 		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
+		//frame.offset = {renderObject.pclient->rect.x,renderObject.pclient->rect.y};
+		//frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
 
 		/*VkRect2D scissor = frame;
 		for(uint j = i+1; j < renderQueue.size(); ++j){

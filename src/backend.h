@@ -73,7 +73,7 @@ public:
 	virtual void Start() = 0;
 	//virtual sint GetEventFileDescriptor() = 0;
 	//virtual void SetupEnvironment() = 0;
-	virtual sint HandleEvent() = 0;
+	virtual sint HandleEvent(bool) = 0;
 	virtual void MoveContainer(WManager::Container *, WManager::Container *) = 0;
 	virtual const WManager::Container * GetRoot() const = 0;
 	virtual const std::vector<std::pair<const WManager::Client *, WManager::Client *>> * GetStackAppendix() const = 0;
@@ -217,7 +217,7 @@ public:
 	virtual ~Default();
 	void Start();
 	//void SetupEnvironment();
-	sint HandleEvent();
+	sint HandleEvent(bool);
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
 	enum PROPERTY_ID{
@@ -270,7 +270,7 @@ public:
 	virtual ~Debug();
 	void Start();
 	//void SetupEnvironment();
-	sint HandleEvent();
+	sint HandleEvent(bool);
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
 	virtual DebugClient * SetupClient(const DebugClient::CreateInfo *) = 0;

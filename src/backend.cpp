@@ -156,11 +156,14 @@ X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateI
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
 	//if(!(pcontainer->flags & WManager::Container::FLAG_FLOATING))
-	if(pcreateInfo->mode == CreateInfo::CREATE_CONTAINED && !(pcontainer->flags & WManager::Container::FLAG_FLOATING))// ||
-		//(pcreateInfo->mode == CreateInfo::CREATE_AUTOMATIC && !pcreateInfo->prect))
-		//(pcreateInfo->mode == CreateInfo::CREATE_AUTOMATIC && !pcreateInfo->prect))
+	if(pcreateInfo->mode == CreateInfo::CREATE_CONTAINED && !(pcontainer->flags & WManager::Container::FLAG_FLOATING)){
 		UpdateTranslation();
-	else rect = *pcreateInfo->prect;
+		oldRect = rect;
+	}else{
+		rect = *pcreateInfo->prect;
+		oldRect = rect;
+		translationTime = std::numeric_limits<timespec>::lowest(); //make sure we don't render when nothing is moving
+	}
 
 	if(pcreateInfo->mode != CreateInfo::CREATE_AUTOMATIC)
 		xcb_map_window(pbackend->pcon,window);
@@ -179,6 +182,8 @@ void X11Client::UpdateTranslation(){
 	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN))
 		coord += glm::vec4(pcontainer->borderWidth*aspect,-2.0f*pcontainer->borderWidth*aspect)*screen;
+	oldRect = rect;
+	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
 
 	uint values[4] = {rect.x,rect.y,rect.w,rect.h};
@@ -193,6 +198,8 @@ void X11Client::UpdateTranslation(){
 }
 
 void X11Client::UpdateTranslation(const WManager::Rectangle *prect){
+	oldRect = rect; //should be animated at all in this case?
+	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	if(prect->w != rect.w || prect->h != rect.h){
 		rect = *prect;
 		AdjustSurface1();
@@ -538,7 +545,7 @@ void Default::Start(){
 	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 }
 
-sint Default::HandleEvent(){
+sint Default::HandleEvent(bool forcePoll){
 	struct timespec currentTime;
 	clock_gettime(CLOCK_MONOTONIC,&currentTime);
 	
@@ -591,8 +598,8 @@ sint Default::HandleEvent(){
 
 	sint result = 0;
 
-	//for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
-	for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
+	for(xcb_generic_event_t *pevent = forcePoll?xcb_poll_for_event(pcon):xcb_wait_for_event(pcon);
+		pevent; pevent = xcb_poll_for_event(pcon)){
 		//Event found, move to polling mode for some time.
 		clock_gettime(CLOCK_MONOTONIC,&pollTimer);
 		//polling = true;
@@ -1265,6 +1272,7 @@ X11Client * Default::FindClient(xcb_window_t window, MODE mode) const{
 
 DebugClient::DebugClient(WManager::Container *pcontainer, const DebugClient::CreateInfo *pcreateInfo) : Client(pcontainer), pbackend(pcreateInfo->pbackend){
 	UpdateTranslation();
+	oldRect = rect;
 }
 
 DebugClient::~DebugClient(){
@@ -1282,6 +1290,8 @@ void DebugClient::UpdateTranslation(){
 	glm::vec4 screen(se.x,se.y,se.x,se.y);
 	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
 	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
+	oldRect = rect;
+	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
 
 	AdjustSurface1();
@@ -1372,10 +1382,9 @@ void Debug::Start(){
 	xcb_key_symbols_free(psymbols);
 }
 
-sint Debug::HandleEvent(){
-	//xcb_generic_event_t *pevent = xcb_poll_for_event(pcon);
-	//for(xcb_generic_event_t *pevent = xcb_poll_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
-	for(xcb_generic_event_t *pevent = xcb_wait_for_event(pcon); pevent; pevent = xcb_poll_for_event(pcon)){
+sint Debug::HandleEvent(bool forcePoll){
+	for(xcb_generic_event_t *pevent = forcePoll?xcb_poll_for_event(pcon):xcb_wait_for_event(pcon);
+		pevent; pevent = xcb_poll_for_event(pcon)){
 		//switch(pevent->response_type & ~0x80){
 		switch(pevent->response_type & 0x7f){
 		/*case XCB_EXPOSE:{
@@ -1385,7 +1394,6 @@ sint Debug::HandleEvent(){
 		case XCB_CLIENT_MESSAGE:{
 			DebugPrintf(stdout,"message\n");
 			//xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
-			//if(pev->data.data32[0] == wmD
 			}
 			break;
 		case XCB_KEY_PRESS:{

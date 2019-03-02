@@ -118,7 +118,7 @@ protected:
 	VkSampler pointSampler;
 
 	struct timespec frameTime;
-	uint64 frameTag;
+	uint64 frameTag; //frame counter, to prevent releasing resources still in use
 
 	struct RenderObject{
 		WManager::Client *pclient;
@@ -150,6 +150,8 @@ protected:
 		uint64 releaseTag;
 	};
 	std::vector<DescSetCacheEntry> descSetCache;
+
+	bool playingAnimation;
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };

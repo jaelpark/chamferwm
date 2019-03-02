@@ -291,6 +291,7 @@ public:
 	RunCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix) : proot(_proot), pstackAppendix(_pstackAppendix){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
+	virtual bool IsAnimating() const = 0;
 	virtual void WaitIdle() = 0;
 protected:
 	WManager::Container *proot;
@@ -646,6 +647,10 @@ public:
 		Compositor::X11Compositor::Present();
 	}
 
+	bool IsAnimating() const{
+		return playingAnimation;
+	}
+
 	void WaitIdle(){
 		Compositor::X11Compositor::WaitIdle();
 	}
@@ -681,6 +686,10 @@ public:
 		Compositor::X11DebugCompositor::Present();
 	}
 
+	bool IsAnimating() const{
+		return playingAnimation;
+	}
+
 	void WaitIdle(){
 		Compositor::X11DebugCompositor::WaitIdle();
 	}
@@ -698,6 +707,10 @@ public:
 
 	void Present(){
 		//
+	}
+
+	bool IsAnimating() const{
+		return false;
 	}
 
 	void WaitIdle(){
@@ -769,11 +782,11 @@ int main(sint argc, const char **pargv){
 
 	for(;;){
 		//TODO: can we wait for vsync before handling the event? Might help with the stuttering
-		sint result = pbackend11->HandleEvent();
+		sint result = pbackend11->HandleEvent(pcomp->IsAnimating());
 		if(result == -1)
 			break;
 		else
-		if(result == 0)
+		if(result == 0 && !pcomp->IsAnimating()) //&& !pcomp->Animated()
 			continue;
 
 		try{
