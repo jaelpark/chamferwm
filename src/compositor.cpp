@@ -785,7 +785,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		RenderObject &renderObject = renderQueue[i];
 
 		if(renderObject.pclient->rect.x+renderObject.pclient->rect.w <= 1 || renderObject.pclient->rect.y+renderObject.pclient->rect.h <= 1
-			|| renderObject.pclient->rect.x > imageExtent.width || renderObject.pclient->rect.y > imageExtent.height)
+			|| renderObject.pclient->rect.x > (sint)imageExtent.width || renderObject.pclient->rect.y > (sint)imageExtent.height)
 			continue;
 
 		float t = timespec_diff(frameTime,renderObject.pclient->translationTime);
