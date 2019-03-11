@@ -7,7 +7,9 @@ A tiling window manager with Vulkan based compositor.
 
  - XCB libraries
  - Vulkan SDK
+ - glm
  - Python 3.6+ and boost modules
+ - python-xlib
  - [shaderc Shader compiler](https://github.com/google/shaderc)
 
 ## Features
