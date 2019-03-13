@@ -734,6 +734,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderQueue.push_back(renderObject);
 	}
 
+	printf("queue size: %u\n",renderQueue.size());
+
 	//deque of scissors, pop_front
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1234,7 +1236,7 @@ void X11Compositor::Start(){
 	xcb_shm_query_version_cookie_t shmCookie = xcb_shm_query_version(pbackend->pcon);
 	xcb_shm_query_version_reply_t *pshmReply = xcb_shm_query_version_reply(pbackend->pcon,shmCookie,0);
 	if(!pshmReply || !pshmReply->shared_pixmaps)
-		throw Exception("SHM unavailable.\n");
+		throw Exception("SHM extension unavailable.\n");
 	DebugPrintf(stdout,"SHM %u.%u\n",pshmReply->major_version,pshmReply->minor_version);
 	free(pshmReply);
 

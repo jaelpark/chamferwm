@@ -729,7 +729,6 @@ sint Default::HandleEvent(bool forcePoll){
 				break;
 			}
 
-			//WManager::Rectangle *prect = 0;
 			X11Client *pbaseClient = 0;
 			uint hintFlags = 0;
 
@@ -980,15 +979,23 @@ sint Default::HandleEvent(bool forcePoll){
 
 			}
 			WManager::Rectangle *prect = &(*m).second;
-			//if(prect->x+prect->w <= 1 || prect->y+prect->h <= 1)
-				//break; //hack: don't manage, this will mess the compositor
 
 			static WManager::Client dummyClient(0);
+
+			const WManager::Client *pstackClient = &dummyClient;
+			if(pbaseClient){
+				auto n = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
+					return p.first->window == pbaseClient->window;
+				});
+				//if the transient window was manually created, place the new automatic window on top of everything
+				if(n != clients.end() && (*n).second == MODE_AUTOMATIC)
+					pstackClient = pbaseClient;
+			}
 
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
 			createInfo.prect = prect;
-			createInfo.pstackClient = pbaseClient?pbaseClient:&dummyClient;
+			createInfo.pstackClient = pstackClient;//pbaseClient?pbaseClient:&dummyClient;
 			createInfo.pbackend = this;
 			createInfo.mode = X11Client::CreateInfo::CREATE_AUTOMATIC;
 			createInfo.hints = 0;
@@ -1010,7 +1017,6 @@ sint Default::HandleEvent(bool forcePoll){
 			}
 			break;
 		case XCB_UNMAP_NOTIFY:{
-			//
 			xcb_unmap_notify_event_t *pev = (xcb_unmap_notify_event_t*)pevent;
 
 			auto m = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{

@@ -377,8 +377,6 @@ public:
 	}
 
 	void SetFullscreen(Backend::X11Client *pclient, bool toggle){
-		//
-		//
 		if(!pclient || pclient->pcontainer == proot)
 			return;
 		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
