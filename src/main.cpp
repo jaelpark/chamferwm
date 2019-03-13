@@ -500,7 +500,7 @@ public:
 				if(p == b.second->pcontainer)
 					return false;
 			}
-			return true;
+			return false;
 		});
 	}
 

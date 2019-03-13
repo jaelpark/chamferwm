@@ -726,6 +726,27 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	}
 
 	CreateRenderQueue(proot,pfocus);
+
+	for(auto m = appendixQueue.begin(); m != appendixQueue.end();){
+		auto k = std::find_if(appendixQueue.begin(),appendixQueue.end(),[&](auto &p)->bool{
+			return (*m).first == p.second;
+		});
+		if(k != appendixQueue.end()){
+			++m;
+			continue;
+		}
+			
+		RenderObject renderObject;
+		renderObject.pclient = (*m).second;
+		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
+		renderObject.flags = renderObject.pclient->pcontainer == pfocus?0x1:0;
+		renderQueue.push_back(renderObject);
+
+		CreateRenderQueueAppendix((*m).second,pfocus);
+
+		m = appendixQueue.erase(m);
+	}
+
 	for(auto &p : appendixQueue){ //push the remaining (untransient) windows to the end of the queue
 		RenderObject renderObject;
 		renderObject.pclient = p.second;

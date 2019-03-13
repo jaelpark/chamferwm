@@ -349,6 +349,7 @@ void X11Backend::StackRecursiveAppendix(const WManager::Client *pclient){
 	auto s = [&](auto &p)->bool{
 		return pclient == p.first;
 	};
+	//TODO: recursively check that none of the base clients will be untransient, and thus placed wrongly on top of everything
 	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
 		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
 		X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
@@ -396,7 +397,29 @@ void X11Backend::StackClients(){
 		uint values[1] = {XCB_STACK_MODE_ABOVE};
 		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 	}
+
 	StackRecursive(proot);
+
+	for(auto m = appendixQueue.begin(); m != appendixQueue.end();){
+		auto k = std::find_if(appendixQueue.begin(),appendixQueue.end(),[&](auto &p)->bool{
+			return (*m).first == p.second;
+		});
+		if(k != appendixQueue.end()){
+			++m;
+			continue;
+		}
+			
+		X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
+
+		uint values[1] = {XCB_STACK_MODE_ABOVE};
+		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		printf("stack: %x\n",pclient11->window);
+
+		StackRecursiveAppendix((*m).second);
+
+		m = appendixQueue.erase(m);
+	}
+
 	for(auto &p : appendixQueue){ //stack the remaining (untransient) windows
 		X11Client *pclient11 = dynamic_cast<X11Client *>(p.second);
 
@@ -984,11 +1007,12 @@ sint Default::HandleEvent(bool forcePoll){
 
 			const WManager::Client *pstackClient = &dummyClient;
 			if(pbaseClient){
-				auto n = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
+				auto k = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
 					return p.first->window == pbaseClient->window;
 				});
 				//if the transient window was manually created, place the new automatic window on top of everything
-				if(n != clients.end() && (*n).second == MODE_AUTOMATIC)
+				//printf("transient for %x\n",pbaseClient->window);
+				if(k != clients.end() && (*k).second == MODE_AUTOMATIC)
 					pstackClient = pbaseClient;
 			}
 
