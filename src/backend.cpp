@@ -696,7 +696,7 @@ sint Default::HandleEvent(bool forcePoll){
 			}
 
 			//center the window to screen, otherwise it might end up to the left upper corner
-			if(!allowPositionConfig || (rect.x == 0 && rect.y == 0)){
+			if(!allowPositionConfig || (rect.x == 0 && rect.y == 0 && pev->value_mask & XCB_CONFIG_WINDOW_X && pev->value_mask & XCB_CONFIG_WINDOW_Y)){
 				rect.x = (pscr->width_in_pixels-rect.w)/2;
 				rect.y = (pscr->height_in_pixels-rect.h)/2;
 				pev->value_mask |= XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y;
@@ -705,7 +705,16 @@ sint Default::HandleEvent(bool forcePoll){
 			if(mrect == configCache.end()){
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
 				mrect = configCache.end()-1;
-			}else (*mrect).second = rect;
+			}else{
+				if(pev->value_mask & XCB_CONFIG_WINDOW_X)
+					(*mrect).second.x = rect.x;
+				if(pev->value_mask & XCB_CONFIG_WINDOW_Y)
+					(*mrect).second.y = rect.y;
+				if(pev->value_mask & XCB_CONFIG_WINDOW_WIDTH)
+					(*mrect).second.w = rect.w;
+				if(pev->value_mask & XCB_CONFIG_WINDOW_HEIGHT)
+					(*mrect).second.h = rect.h;
+			}
 
 			struct{
 				uint16_t m;
@@ -730,9 +739,10 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_configure_window(pcon,pev->window,mask,values);
 
 			if(pclient1)
-				pclient1->UpdateTranslation(&rect);
+				pclient1->UpdateTranslation(&(*mrect).second);
+				//pclient1->UpdateTranslation(&rect);
 
-			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
+			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u (mask: %x)\n",pev->window,pev->x,pev->y,pev->width,pev->height,pev->value_mask);
 			}
 			break;
 		case XCB_MAP_REQUEST:{
@@ -942,19 +952,18 @@ sint Default::HandleEvent(bool forcePoll){
 
 			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			
-			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return pev->window == p.first;
 			});
-			if(m == configCache.end()){
+			if(mrect == configCache.end()){
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
-				m = configCache.end()-1;
-			}else (*m).second = rect;
+				mrect = configCache.end()-1;
+			}else (*mrect).second = rect;
 
 			X11Client *pclient1 = FindClient(pev->window,MODE_AUTOMATIC);
-			if(!pclient1)
-				break;
 
-			pclient1->UpdateTranslation(&rect);
+			if(pclient1)
+				pclient1->UpdateTranslation(&(*mrect).second);
 
 			DebugPrintf(stdout,"configure to %d,%d %ux%u, %x\n",pev->x,pev->y,pev->width,pev->height,pev->window);
 			}
