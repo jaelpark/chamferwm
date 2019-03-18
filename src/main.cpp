@@ -382,7 +382,13 @@ public:
 		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
 		if(pcontainer1->pcontainerInt->OnFullscreen(toggle))
 			pcontainer1->SetFullscreen(toggle);
-		//TODO: eval true/false, toggle based on that
+	}
+
+	void SetFocus(Backend::X11Client *pclient){
+		if(!pclient || pclient->pcontainer == proot)
+			return;
+		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
+		pcontainer1->pcontainerInt->OnFocus();
 	}
 
 	void PropertyChange(Backend::X11Client *pclient, PROPERTY_ID id, const Backend::BackendProperty *pProperty){

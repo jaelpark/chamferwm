@@ -143,6 +143,10 @@ class Container(chamfer.Container):
 		self.ResetShaders(); #outside OnSetupClient, ResetShaders should be called to bind the new shaders
 
 		return True;
+	
+	#called to request focus (set by a client message)
+	def OnFocus(self):
+		self.Focus();
 
 	#called every time a client property has changed (title etc.)
 	def OnPropertyChange(self, propId):

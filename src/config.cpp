@@ -63,7 +63,6 @@ void ContainerInterface::DeferredPropertyTransfer(){
 	if(!pclientFrame)
 		return;
 	pclientFrame->shaderUserFlags = deferredShaderUserFlags;
-	printf("----------- deferred, %u\n",deferredShaderUserFlags);
 }
 
 void ContainerInterface::OnSetupContainer(){
@@ -86,6 +85,10 @@ void ContainerInterface::OnCreate(){
 bool ContainerInterface::OnFullscreen(bool toggle){
 	//
 	return true;
+}
+
+void ContainerInterface::OnFocus(){
+	//
 }
 
 void ContainerInterface::OnPropertyChange(PROPERTY_ID id){
@@ -257,6 +260,20 @@ bool ContainerProxy::OnFullscreen(bool toggle){
 		}
 	}
 	return ContainerInterface::OnFullscreen(toggle);
+}
+
+void ContainerProxy::OnFocus(){
+	boost::python::override ovr = this->get_override("OnFocus");
+	if(ovr){
+		try{
+			ovr();
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else ContainerInterface::OnFocus();
 }
 
 void ContainerProxy::OnPropertyChange(PROPERTY_ID id){
@@ -553,6 +570,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("OnParent",&ContainerInterface::OnParent)
 		.def("OnCreate",&ContainerInterface::OnCreate)
 		.def("OnFullscreen",&ContainerInterface::OnFullscreen)
+		.def("OnFocus",&ContainerInterface::OnFocus)
 		.def("OnProperty",&ContainerInterface::OnPropertyChange)
 		.def("GetNext",&ContainerInterface::GetNext)
 		.def("GetPrev",&ContainerInterface::GetPrev)

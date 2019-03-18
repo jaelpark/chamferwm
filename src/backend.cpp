@@ -1170,6 +1170,18 @@ sint Default::HandleEvent(bool forcePoll){
 				if(pev->data.data32[1] == ewmh._NET_WM_STATE_DEMANDS_ATTENTION){
 					printf("urgency!\n");
 				}
+			}else
+			if(pev->type == ewmh._NET_ACTIVE_WINDOW){
+				SetFocus(pclient1);
+			}else
+			if(pev->type == ewmh._NET_CLOSE_WINDOW){
+				pclient1->Kill();
+			}else
+			if(pev->type == ewmh._NET_WM_MOVERESIZE){
+				//---
+			}else
+			if(pev->type == ewmh._NET_MOVERESIZE_WINDOW){
+				//TODO: create configure request
 			}
 			//_NET_WM_STATE
 			//_NET_WM_STATE_FULLSCREEN, _NET_WM_STATE_DEMANDS_ATTENTION
