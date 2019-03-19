@@ -129,7 +129,7 @@ class Container(chamfer.Container):
 			pass;
 		self.Focus();
 
-	#called to evaluate if client has permission to toggle between fullscreen modes
+	#called to request fullscreen mode - either by calling SetFullscreen or by client message
 	def OnFullscreen(self, toggle):
 		#In fullscreen mode, no decorations
 		if toggle:
@@ -144,9 +144,9 @@ class Container(chamfer.Container):
 
 		return True;
 	
-	#called to request focus (set by a client message)
+	#called to request focus - either by calling container.Focus or by client message
 	def OnFocus(self):
-		self.Focus();
+		return True;
 
 	#called every time a client property has changed (title etc.)
 	def OnPropertyChange(self, propId):

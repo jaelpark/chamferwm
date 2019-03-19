@@ -388,7 +388,8 @@ public:
 		if(!pclient || pclient->pcontainer == proot)
 			return;
 		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
-		pcontainer1->pcontainerInt->OnFocus();
+		if(pcontainer1->pcontainerInt->OnFocus())
+			Config::BackendInterface::SetFocus(pcontainer1);
 	}
 
 	void PropertyChange(Backend::X11Client *pclient, PROPERTY_ID id, const Backend::BackendProperty *pProperty){

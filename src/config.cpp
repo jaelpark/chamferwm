@@ -87,8 +87,9 @@ bool ContainerInterface::OnFullscreen(bool toggle){
 	return true;
 }
 
-void ContainerInterface::OnFocus(){
+bool ContainerInterface::OnFocus(){
 	//
+	return true;
 }
 
 void ContainerInterface::OnPropertyChange(PROPERTY_ID id){
@@ -262,18 +263,19 @@ bool ContainerProxy::OnFullscreen(bool toggle){
 	return ContainerInterface::OnFullscreen(toggle);
 }
 
-void ContainerProxy::OnFocus(){
+bool ContainerProxy::OnFocus(){
 	boost::python::override ovr = this->get_override("OnFocus");
 	if(ovr){
 		try{
-			ovr();
+			return ovr();
 		}catch(boost::python::error_already_set &){
 			PyErr_Print();
 			//
 			boost::python::handle_exception();
 			PyErr_Clear();
 		}
-	}else ContainerInterface::OnFocus();
+	}
+	return ContainerInterface::OnFocus();
 }
 
 void ContainerProxy::OnPropertyChange(PROPERTY_ID id){
@@ -595,7 +597,8 @@ BOOST_PYTHON_MODULE(chamfer){
 			[](ContainerInterface &container){
 				if(!container.pcontainer)
 					return;
-				Config::BackendInterface::SetFocus(container.pcontainer);
+				if(container.OnFocus())
+					BackendInterface::SetFocus(container.pcontainer);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("Kill",boost::python::make_function(
 			[](ContainerInterface &container){
