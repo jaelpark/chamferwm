@@ -7,6 +7,9 @@
 #include <xcb/composite.h>
 #include <xcb/damage.h>
 #include <xcb/shm.h>
+#include <xcb/dri3.h>
+
+struct gbm_device;
 
 namespace Backend{
 class X11Backend;
@@ -61,6 +64,9 @@ protected:
 };
 
 class CompositorInterface{
+friend class TextureBase;
+friend class TextureStaged;
+friend class TexturePixmap;
 friend class Texture;
 friend class ShaderModule;
 friend class Pipeline;
@@ -235,6 +241,7 @@ public:
 
 //Default compositor assumes XCB for its surface
 class X11Compositor : public CompositorInterface{
+friend class TexturePixmap;
 public:
 	//Derivatives of compositor classes should not point to their default corresponding backend classes (Backend::Default in this case). This is to allow the compositor to be independent of the backend implementation, as long as it's based on X11 here.
 	X11Compositor(const Configuration *, const Backend::X11Backend *);
@@ -248,6 +255,8 @@ public:
 	void SetBackgroundPixmap(const Backend::BackendPixmapProperty *);
 	VkExtent2D GetExtent() const;
 	const Backend::X11Backend *pbackend;
+	struct gbm_device *pgbmdev;
+	sint cardfd;
 	//X11Background *pbackground;
 	xcb_window_t overlay;
 protected:

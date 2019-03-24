@@ -22,13 +22,15 @@ xcb = [
 	dependency('xcb-xfixes'),
 	dependency('xcb-damage'),
 	dependency('xcb-shm'),
+	dependency('xcb-dri3'),
 	dependency('xcb-composite'),
 	dependency('xcb-icccm'),
 	dependency('xcb-ewmh')
 ]
 
 vk = [
-	dependency('vulkan')
+	dependency('vulkan'),
+	dependency('gbm')
 ]
 
 python = [

@@ -4,32 +4,63 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_xcb.h>
 
+struct gbm_bo;
+
 namespace Compositor{
 
-//texture class for shader reads
-class Texture{
+class TextureBase{
 public:
-	Texture(uint, uint, VkFormat, const class CompositorInterface *pcomp);
-	~Texture();
-	const void * Map() const;
-	void Unmap(const VkCommandBuffer *, const VkRect2D *, uint);
-
-	const class CompositorInterface *pcomp;
-	VkImage image;
+	TextureBase(uint, uint, VkFormat, const class CompositorInterface *);
+	virtual ~TextureBase();
+	//
+	uint w, h;
+	uint formatIndex;
 	VkImageLayout imageLayout;
+
+	VkImage image;
 	VkImageView imageView;
 	VkDeviceMemory deviceMemory;
+
+	const class CompositorInterface *pcomp;
+
+	static const std::vector<std::pair<VkFormat, uint>> formatSizeMap;
+};
+
+//texture class for shader reads
+class TextureStaged : virtual public TextureBase{
+public:
+	TextureStaged(uint, uint, VkFormat, const class CompositorInterface *);
+	virtual ~TextureStaged();
+	const void * Map() const;
+	void Unmap(const VkCommandBuffer *, const VkRect2D *, uint);
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingMemory;
 
 	uint stagingMemorySize;
-	uint w, h;
-	uint formatIndex;
 
 	std::vector<VkBufferImageCopy> bufferImageCopyBuffer; //to avoid repeated dynamic allocations each time texture is updated in multiple regions
 
-	static const std::vector<std::pair<VkFormat, uint>> formatSizeMap;
+	//const class CompositorInterface *pcomp;
+};
+
+class TexturePixmap : virtual public TextureBase{
+public:
+	TexturePixmap(uint, uint, const class CompositorInterface *);
+	virtual ~TexturePixmap();
+	void Attach(xcb_pixmap_t);
+	void Detach();
+	void Update(const VkCommandBuffer *);
+	
+	sint dmafd;
+	struct gbm_bo *pgbmBufferObject;
+	const class X11Compositor *pcomp11;
+};
+
+class Texture : public TextureStaged, public TexturePixmap{
+public:
+	Texture(uint, uint, const class CompositorInterface *);
+	~Texture();
 };
 
 class ShaderModule{
