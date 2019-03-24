@@ -755,8 +755,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderQueue.push_back(renderObject);
 	}
 
-	printf("queue size: %u\n",renderQueue.size());
-
 	//deque of scissors, pop_front
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
