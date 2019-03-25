@@ -1393,11 +1393,11 @@ void X11Compositor::Start(){
 
 	//compositor
 	if(!pbackend->QueryExtension("Composite",&compEventOffset,&compErrorOffset))
-		throw Exception("XCompositor unavailable.\n");
+		throw Exception("XCompositor unavailable.");
 	xcb_composite_query_version_cookie_t compCookie = xcb_composite_query_version(pbackend->pcon,XCB_COMPOSITE_MAJOR_VERSION,XCB_COMPOSITE_MINOR_VERSION);
 	xcb_composite_query_version_reply_t *pcompReply = xcb_composite_query_version_reply(pbackend->pcon,compCookie,0);
 	if(!pcompReply)
-		throw Exception("XCompositor unavailable.\n");
+		throw Exception("XCompositor unavailable.");
 	DebugPrintf(stdout,"XComposite %u.%u\n",pcompReply->major_version,pcompReply->minor_version);
 	free(pcompReply);
 
@@ -1405,7 +1405,7 @@ void X11Compositor::Start(){
 	xcb_composite_get_overlay_window_cookie_t overlayCookie = xcb_composite_get_overlay_window(pbackend->pcon,pbackend->pscr->root);
 	xcb_composite_get_overlay_window_reply_t *poverlayReply = xcb_composite_get_overlay_window_reply(pbackend->pcon,overlayCookie,0);
 	if(!poverlayReply)
-		throw Exception("Unable to get overlay window.\n");
+		throw Exception("Unable to get overlay window.");
 	overlay = poverlayReply->overlay_win;
 	free(poverlayReply);
 	DebugPrintf(stdout,"overlay xid: %u\n",overlay);
@@ -1416,11 +1416,11 @@ void X11Compositor::Start(){
 
 	//xfixes
 	if(!pbackend->QueryExtension("XFIXES",&xfixesEventOffset,&xfixesErrorOffset))
-		throw Exception("XFixes unavailable.\n");
+		throw Exception("XFixes unavailable.");
 	xcb_xfixes_query_version_cookie_t fixesCookie = xcb_xfixes_query_version(pbackend->pcon,XCB_XFIXES_MAJOR_VERSION,XCB_XFIXES_MINOR_VERSION);
 	xcb_xfixes_query_version_reply_t *pfixesReply = xcb_xfixes_query_version_reply(pbackend->pcon,fixesCookie,0);
 	if(!pfixesReply)
-		throw Exception("XFixes unavailable.\n");
+		throw Exception("XFixes unavailable.");
 	DebugPrintf(stdout,"XFixes %u.%u\n",pfixesReply->major_version,pfixesReply->minor_version);
 	free(pfixesReply);
 
@@ -1439,26 +1439,26 @@ void X11Compositor::Start(){
 
 	//damage
 	if(!pbackend->QueryExtension("DAMAGE",&damageEventOffset,&damageErrorOffset))
-		throw Exception("Damage extension unavailable.\n");
+		throw Exception("Damage extension unavailable.");
 
 	xcb_damage_query_version_cookie_t damageCookie = xcb_damage_query_version(pbackend->pcon,XCB_DAMAGE_MAJOR_VERSION,XCB_DAMAGE_MINOR_VERSION);
 	xcb_damage_query_version_reply_t *pdamageReply = xcb_damage_query_version_reply(pbackend->pcon,damageCookie,0);
 	if(!pdamageReply)
-		throw Exception("Damage extension unavailable.\n");
+		throw Exception("Damage extension unavailable.");
 	DebugPrintf(stdout,"Damage %u.%u\n",pdamageReply->major_version,pdamageReply->minor_version);
 	free(pdamageReply);
 
 	xcb_shm_query_version_cookie_t shmCookie = xcb_shm_query_version(pbackend->pcon);
 	xcb_shm_query_version_reply_t *pshmReply = xcb_shm_query_version_reply(pbackend->pcon,shmCookie,0);
 	if(!pshmReply || !pshmReply->shared_pixmaps)
-		throw Exception("SHM extension unavailable.\n");
+		throw Exception("SHM extension unavailable.");
 	DebugPrintf(stdout,"SHM %u.%u\n",pshmReply->major_version,pshmReply->minor_version);
 	free(pshmReply);
 
 	xcb_dri3_query_version_cookie_t dri3Cookie = xcb_dri3_query_version(pbackend->pcon,XCB_DRI3_MAJOR_VERSION,XCB_DRI3_MINOR_VERSION);
 	xcb_dri3_query_version_reply_t *pdri3Reply = xcb_dri3_query_version_reply(pbackend->pcon,dri3Cookie,0);
 	if(!pdri3Reply)
-		throw Exception("DRI3 extension unavailable.\n");
+		throw Exception("DRI3 extension unavailable.");
 	DebugPrintf(stdout,"DRI3 %u.%u\n",pdri3Reply->major_version,pdri3Reply->minor_version);
 	free(pdri3Reply);
 
@@ -1468,10 +1468,10 @@ void X11Compositor::Start(){
 
 	cardfd = open("/dev/dri/card1",O_RDWR|FD_CLOEXEC);
 	if(cardfd < 0)
-		throw Exception("Failed to open /dev/dri/card*\n");
+		throw Exception("Failed to open /dev/dri/card1");
 	pgbmdev = gbm_create_device(cardfd);
 	if(!pgbmdev)
-		throw Exception("Failed to create GBM device.\n");
+		throw Exception("Failed to create GBM device.");
 }
 
 void X11Compositor::Stop(){

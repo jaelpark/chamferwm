@@ -205,8 +205,8 @@ void TexturePixmap::Attach(xcb_pixmap_t pixmap){
 		.format = GBM_FORMAT_ARGB8888
 	};
 	pgbmBufferObject = gbm_bo_import(pcomp11->pgbmdev,GBM_BO_IMPORT_FD,&gbmImportFdData,0);
-	if(!pgbmBufferObject)
-		throw Exception("Failed to import GBM buffer object.\n");
+	if(!pgbmBufferObject) //TODO: import once for the first buffer, assume same modifiers and format for all?
+		throw Exception("Failed to import GBM buffer object.");
 
 	VkSubresourceLayout subresourceLayout = {};
 	subresourceLayout.offset = 0;
@@ -214,10 +214,15 @@ void TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	subresourceLayout.rowPitch = (uint)pbufferFromPixmapReply->stride;
 	subresourceLayout.arrayPitch = subresourceLayout.size;
 	subresourceLayout.depthPitch = subresourceLayout.size;
+
+	uint64_t modifier = gbm_bo_get_modifier(pgbmBufferObject);
+	DebugPrintf(stdout,"Image modifier: %llu\n",modifier);
+
+	//dmafd = gbm_bo_get_fd(pgbmBufferObject);
 	
 	VkImageDrmFormatModifierExplicitCreateInfoEXT imageDrmFormatModifierExpCreateInfo = {};
 	imageDrmFormatModifierExpCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_EXPLICIT_CREATE_INFO_EXT;
-	imageDrmFormatModifierExpCreateInfo.drmFormatModifier = 0;
+	imageDrmFormatModifierExpCreateInfo.drmFormatModifier = modifier;//gbm_bo_get_modifier(pgbmBufferObject);
 	imageDrmFormatModifierExpCreateInfo.drmFormatModifierPlaneCount = 1;
 	imageDrmFormatModifierExpCreateInfo.pPlaneLayouts = &subresourceLayout;
 
@@ -236,25 +241,54 @@ void TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	imageCreateInfo.arrayLayers = 1;
 	imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM; //todo: format from image reply?
 	imageCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
-	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageCreateInfo.flags = 0;
 	imageCreateInfo.pNext = &externalMemoryCreateInfo;
-	/*if(vkCreateImage(pcomp->logicalDev,&imageCreateInfo,0,&image) != VK_SUCCESS)
+	if(vkCreateImage(pcomp->logicalDev,&imageCreateInfo,0,&transferImage) != VK_SUCCESS)
 		throw Exception("Failed to create an image.");
 	
 	VkMemoryFdPropertiesKHR memoryFdProps;
+	memoryFdProps.sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR;
 	if(((PFN_vkGetMemoryFdPropertiesKHR)vkGetInstanceProcAddr(pcomp11->instance,"vkGetMemoryFdPropertiesKHR"))(pcomp->logicalDev,VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,dmafd,&memoryFdProps) != VK_SUCCESS)
-		throw Exception("Failed to get memory fd properties.");*/
+		throw Exception("Failed to get memory fd properties.");
 
-	//
-	free(pbufferFromPixmapReply);
+	VkMemoryRequirements memoryRequirements;
+	vkGetImageMemoryRequirements(pcomp->logicalDev,transferImage,&memoryRequirements);
 	
+	VkMemoryDedicatedAllocateInfo memoryDedicatedAllocateInfo = {};
+	memoryDedicatedAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
+	memoryDedicatedAllocateInfo.image = transferImage;
+
+	VkImportMemoryFdInfoKHR importMemoryFdInfo = {};
+	importMemoryFdInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR;
+	importMemoryFdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
+	importMemoryFdInfo.fd = dmafd;
+	importMemoryFdInfo.pNext = &memoryDedicatedAllocateInfo;
+
+	VkMemoryAllocateInfo memoryAllocateInfo = {};
+	memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memoryAllocateInfo.allocationSize = memoryRequirements.size;
+	memoryAllocateInfo.pNext = &importMemoryFdInfo;
+	//for(memoryAllocateInfo.memoryTypeIndex = 0; memoryAllocateInfo.memoryTypeIndex < physicalDeviceMemoryProps.memoryTypeCount; memoryAllocateInfo.memoryTypeIndex++){
+	for(memoryAllocateInfo.memoryTypeIndex = 0;; memoryAllocateInfo.memoryTypeIndex++){
+		if(memoryFdProps.memoryTypeBits & (1<<memoryAllocateInfo.memoryTypeIndex))
+			break;
+	}
+	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&transferMemory) != VK_SUCCESS)
+		throw Exception("Failed to allocate transfer image memory."); //NOTE: may return invalid handle, if the buffer that we're trying to import is only shortly available (for example firefox animating it's url menu by resizing). Need xcb_dri3 fences to keep the handle alive most likely.
+	if(vkBindImageMemory(pcomp->logicalDev,transferImage,transferMemory,0) != VK_SUCCESS)
+		throw Exception("Failed to bind transfer image memory.");
+
+	free(pbufferFromPixmapReply);
 }
 
 void TexturePixmap::Detach(){
+	vkFreeMemory(pcomp->logicalDev,transferMemory,0);
+	vkDestroyImage(pcomp->logicalDev,transferImage,0);
+
 	gbm_bo_destroy(pgbmBufferObject);
 	close(dmafd);
 }

@@ -45,7 +45,7 @@ Blob::Blob(const char *pfileName){
 		char path[256];
 		ssize_t len = readlink("/proc/self/exe",path,sizeof(path));
 		if(len == -1)
-			throw Exception("readlink() failed for /proc/self/exe.\n");
+			throw Exception("readlink() failed for /proc/self/exe.");
 		path[len] = 0;
 		pf = fopen((boost::filesystem::path(path).parent_path()/pfileName).string().c_str(),"rb");
 		if(pf)
@@ -56,7 +56,7 @@ Blob::Blob(const char *pfileName){
 		if(pf)
 			break;
 
-		snprintf(Exception::buffer,sizeof(Exception::buffer),"Unable to open file: %s\n",pfileName);
+		snprintf(Exception::buffer,sizeof(Exception::buffer),"Unable to open file: %s",pfileName);
 		throw Exception();
 	}while(0);
 
@@ -86,7 +86,7 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	time(&rt);
 	const struct tm *pti = localtime(&rt);
 
-	//pf = fopen("/tmp/log1","a+");
+	pf = fopen("/tmp/log1","a+");
 	char tbuf[256];
 	strftime(tbuf,sizeof(tbuf),"[chamferwm %F %T]",pti);
 	fprintf(pf,"%s ",tbuf);
@@ -96,7 +96,7 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	if(pf == stderr)
 		fprintf(pf,"Error: ");
 	vfprintf(pf,pfmt,args);
-	//fclose(pf);
+	fclose(pf);
 	va_end(args);
 }
 
@@ -121,7 +121,7 @@ public:
 		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
 		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
 		if(!containerExtract.check())
-			throw Exception("OnCreateContainer(): Invalid container object returned.\n"); //TODO: create default
+			throw Exception("OnCreateContainer(): Invalid container object returned."); //TODO: create default
 
 		Config::ContainerInterface &containerInt = containerExtract();
 		containerInt.self = containerObject;
@@ -168,11 +168,11 @@ public:
 				boost::python::object parentObject = containerInt.OnParent();
 				boost::python::extract<Config::ContainerInterface &> parentExtract(parentObject);
 				if(!parentExtract.check())
-					throw Exception("OnParent(): Invalid parent container object returned.\n");
+					throw Exception("OnParent(): Invalid parent container object returned.");
 
 				Config::ContainerInterface &parentInt = parentExtract();
 				if(parentInt.pcontainer == containerInt.pcontainer)
-					throw Exception("OnParent(): Cannot parent to itself.\n");
+					throw Exception("OnParent(): Cannot parent to itself.");
 
 				if(parentInt.pcontainer->pclient){
 					Config::ContainerInterface &parentInt1 = SetupContainer<T,U>(parentInt.pcontainer,0);

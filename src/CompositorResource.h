@@ -51,6 +51,9 @@ public:
 	void Attach(xcb_pixmap_t);
 	void Detach();
 	void Update(const VkCommandBuffer *);
+
+	VkImage transferImage;
+	VkDeviceMemory transferMemory;
 	
 	sint dmafd;
 	struct gbm_bo *pgbmBufferObject;
