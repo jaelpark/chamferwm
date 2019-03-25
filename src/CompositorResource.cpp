@@ -56,7 +56,8 @@ TextureBase::TextureBase(uint _w, uint _h, VkFormat format, const CompositorInte
 
 	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&deviceMemory) != VK_SUCCESS)
 		throw Exception("Failed to allocate image memory.");
-	vkBindImageMemory(pcomp->logicalDev,image,deviceMemory,0);
+	if(vkBindImageMemory(pcomp->logicalDev,image,deviceMemory,0) != VK_SUCCESS)
+		throw Exception("Failed to bind image memory.");
 
 	VkImageViewCreateInfo imageViewCreateInfo = {};
 	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -114,7 +115,8 @@ TextureStaged::TextureStaged(uint _w, uint _h, VkFormat _format, const Composito
 	}
 	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&stagingMemory) != VK_SUCCESS)
 		throw Exception("Failed to allocate staging buffer memory.");
-	vkBindBufferMemory(pcomp->logicalDev,stagingBuffer,stagingMemory,0);
+	if(vkBindBufferMemory(pcomp->logicalDev,stagingBuffer,stagingMemory,0) != VK_SUCCESS)
+		throw Exception("Failed to bind staging buffer memory.");
 
 	stagingMemorySize = memoryRequirements.size;
 }
@@ -293,8 +295,52 @@ void TexturePixmap::Detach(){
 	close(dmafd);
 }
 
-void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer){
+void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prects, uint rectCount){
 	//
+	VkImageSubresourceRange imageSubresourceRange = {};
+	imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageSubresourceRange.baseMipLevel = 0;
+	imageSubresourceRange.levelCount = 1;
+	imageSubresourceRange.layerCount = 1;
+
+	//barrier for transferImage?
+
+	VkImageMemoryBarrier imageMemoryBarrier = {};
+	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageMemoryBarrier.image = image;
+	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
+	imageMemoryBarrier.srcAccessMask = 0;
+	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
+		0,0,0,0,1,&imageMemoryBarrier);
+	
+	VkImageSubresourceLayers imageSubresourceLayers = {};
+	imageSubresourceLayers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageSubresourceLayers.mipLevel = 0;
+	imageSubresourceLayers.baseArrayLayer = 0;
+	imageSubresourceLayers.layerCount = 1;
+
+	imageCopyBuffer.reserve(rectCount);
+	for(uint i = 0; i < rectCount; ++i){
+		imageCopyBuffer[i].srcSubresource = imageSubresourceLayers;
+		imageCopyBuffer[i].srcOffset = (VkOffset3D){prects[i].offset.x,prects[i].offset.y,0};
+		imageCopyBuffer[i].dstSubresource = imageSubresourceLayers;
+		imageCopyBuffer[i].dstOffset = imageCopyBuffer[i].srcOffset;
+		imageCopyBuffer[i].extent = (VkExtent3D){prects[i].extent.width,prects[i].extent.height,1};
+	}
+	vkCmdCopyImage(*pcommandBuffer,transferImage,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,rectCount,imageCopyBuffer.data());
+
+	//create in transfer stage, use in fragment shader stage
+	imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,0,
+		0,0,0,0,1,&imageMemoryBarrier);
+	
+	imageLayout = imageMemoryBarrier.newLayout;
 }
 
 Texture::Texture(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TexturePixmap(_w,_h,_pcomp){

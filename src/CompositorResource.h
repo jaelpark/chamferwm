@@ -50,10 +50,12 @@ public:
 	virtual ~TexturePixmap();
 	void Attach(xcb_pixmap_t);
 	void Detach();
-	void Update(const VkCommandBuffer *);
+	void Update(const VkCommandBuffer *, const VkRect2D *, uint);
 
 	VkImage transferImage;
 	VkDeviceMemory transferMemory;
+
+	std::vector<VkImageCopy> imageCopyBuffer;
 	
 	sint dmafd;
 	struct gbm_bo *pgbmBufferObject;
