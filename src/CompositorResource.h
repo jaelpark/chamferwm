@@ -54,6 +54,7 @@ public:
 
 	VkImage transferImage;
 	VkDeviceMemory transferMemory;
+	VkImageLayout transferImageLayout;
 
 	std::vector<VkImageCopy> imageCopyBuffer;
 	

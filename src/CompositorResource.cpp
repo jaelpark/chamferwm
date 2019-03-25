@@ -140,6 +140,7 @@ void TextureStaged::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D 
 	imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	imageSubresourceRange.baseMipLevel = 0;
 	imageSubresourceRange.levelCount = 1;
+	imageSubresourceRange.baseArrayLayer = 0;
 	imageSubresourceRange.layerCount = 1;
 
 	//create in host stage (map), use in transfer stage
@@ -182,10 +183,8 @@ void TextureStaged::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D 
 	imageLayout = imageMemoryBarrier.newLayout;
 }
 
-TexturePixmap::TexturePixmap(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp){
+TexturePixmap::TexturePixmap(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), transferImageLayout(VK_IMAGE_LAYOUT_PREINITIALIZED){
 	pcomp11 = dynamic_cast<const X11Compositor *>(pcomp);
-	if(!pcomp11) //hack, solve this!
-		return;
 }
 
 TexturePixmap::~TexturePixmap(){
@@ -212,13 +211,14 @@ void TexturePixmap::Attach(xcb_pixmap_t pixmap){
 
 	VkSubresourceLayout subresourceLayout = {};
 	subresourceLayout.offset = 0;
-	subresourceLayout.size = (uint)pbufferFromPixmapReply->stride*h;
+	subresourceLayout.size = (uint)pbufferFromPixmapReply->size;//(uint)pbufferFromPixmapReply->stride*h;
 	subresourceLayout.rowPitch = (uint)pbufferFromPixmapReply->stride;
 	subresourceLayout.arrayPitch = subresourceLayout.size;
 	subresourceLayout.depthPitch = subresourceLayout.size;
 
 	uint64_t modifier = gbm_bo_get_modifier(pgbmBufferObject);
-	DebugPrintf(stdout,"Image modifier: %llu\n",modifier);
+	sint planeCount = gbm_bo_get_plane_count(pgbmBufferObject);
+	DebugPrintf(stdout,"Image modifier: %llu, plane count: %d\n",modifier,planeCount);
 
 	//dmafd = gbm_bo_get_fd(pgbmBufferObject);
 	
@@ -242,8 +242,10 @@ void TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	imageCreateInfo.mipLevels = 1;
 	imageCreateInfo.arrayLayers = 1;
 	imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM; //todo: format from image reply?
-	imageCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
-	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;//VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
+	//imageCreateInfo.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT; //need the extension
+	imageCreateInfo.initialLayout = transferImageLayout;//VK_IMAGE_LAYOUT_PREINITIALIZED;//VK_IMAGE_LAYOUT_UNDEFINED;
+	//imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -301,9 +303,20 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D
 	imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	imageSubresourceRange.baseMipLevel = 0;
 	imageSubresourceRange.levelCount = 1;
+	imageSubresourceRange.baseArrayLayer = 0;
 	imageSubresourceRange.layerCount = 1;
 
-	//barrier for transferImage?
+	VkImageMemoryBarrier transferImageMemoryBarrier = {};
+	transferImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	transferImageMemoryBarrier.image = transferImage;
+	transferImageMemoryBarrier.subresourceRange = imageSubresourceRange;
+	transferImageMemoryBarrier.srcAccessMask = 0;
+	transferImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+	//transferImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	transferImageMemoryBarrier.oldLayout = transferImageLayout;
+	transferImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	//vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
+		//0,0,0,0,1,&transferImageMemoryBarrier);
 
 	VkImageMemoryBarrier imageMemoryBarrier = {};
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -313,8 +326,11 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D
 	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
 	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
-		0,0,0,0,1,&imageMemoryBarrier);
+	//vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
+		//0,0,0,0,1,&imageMemoryBarrier);
+	const VkImageMemoryBarrier barriers[] = {imageMemoryBarrier,transferImageMemoryBarrier};
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
+		0,0,0,0,2,barriers);
 	
 	VkImageSubresourceLayers imageSubresourceLayers = {};
 	imageSubresourceLayers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -331,6 +347,13 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D
 		imageCopyBuffer[i].extent = (VkExtent3D){prects[i].extent.width,prects[i].extent.height,1};
 	}
 	vkCmdCopyImage(*pcommandBuffer,transferImage,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,rectCount,imageCopyBuffer.data());
+	/*VkImageCopy region;
+	region.srcSubresource = imageSubresourceLayers;
+	region.srcOffset = (VkOffset3D){0,0,0};
+	region.dstSubresource = imageSubresourceLayers;
+	region.dstOffset = region.srcOffset;
+	region.extent = (VkExtent3D){w,h,1};
+	vkCmdCopyImage(*pcommandBuffer,transferImage,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&region);*/
 
 	//create in transfer stage, use in fragment shader stage
 	imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -341,6 +364,7 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D
 		0,0,0,0,1,&imageMemoryBarrier);
 	
 	imageLayout = imageMemoryBarrier.newLayout;
+	transferImageLayout = transferImageMemoryBarrier.newLayout;
 }
 
 Texture::Texture(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TexturePixmap(_w,_h,_pcomp){
