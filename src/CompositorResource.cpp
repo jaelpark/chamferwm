@@ -183,12 +183,14 @@ void TextureStaged::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D 
 	imageLayout = imageMemoryBarrier.newLayout;
 }
 
-TexturePixmap::TexturePixmap(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), transferImageLayout(VK_IMAGE_LAYOUT_PREINITIALIZED){
+TexturePixmap::TexturePixmap(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), transferImage(0), transferImageLayout(VK_IMAGE_LAYOUT_PREINITIALIZED){
 	pcomp11 = dynamic_cast<const X11Compositor *>(pcomp);
 }
 
 TexturePixmap::~TexturePixmap(){
-	//
+	if(transferImage == 0)
+		return;
+	Detach();
 }
 
 //only pixmaps that correspond to the created texture in size should be attached
@@ -205,7 +207,7 @@ void TexturePixmap::Attach(xcb_pixmap_t pixmap){
 		.stride = pbufferFromPixmapReply->stride,
 		.format = GBM_FORMAT_ARGB8888
 	};
-	pgbmBufferObject = gbm_bo_import(pcomp11->pgbmdev,GBM_BO_IMPORT_FD,&gbmImportFdData,0);
+	pgbmBufferObject = gbm_bo_import(pcomp11->pgbmdev,GBM_BO_IMPORT_FD,&gbmImportFdData,0);//GBM_BO_USE_LINEAR);
 	if(!pgbmBufferObject) //TODO: import once for the first buffer, assume same modifiers and format for all?
 		throw Exception("Failed to import GBM buffer object.");
 

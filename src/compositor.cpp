@@ -1229,7 +1229,7 @@ X11ClientFrame::~X11ClientFrame(){
 	xcb_shm_detach(pbackend->pcon,segment);
 	shmdt(pchpixels);
 
-	ptexture->Detach();
+	//ptexture->Detach();
 
 	xcb_damage_destroy(pbackend->pcon,damage);
 
