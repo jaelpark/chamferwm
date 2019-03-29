@@ -183,14 +183,12 @@ void TextureStaged::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D 
 	imageLayout = imageMemoryBarrier.newLayout;
 }
 
-TexturePixmap::TexturePixmap(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), transferImage(0), transferImageLayout(VK_IMAGE_LAYOUT_PREINITIALIZED){
+TexturePixmap::TexturePixmap(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), transferImageLayout(VK_IMAGE_LAYOUT_PREINITIALIZED){
 	pcomp11 = dynamic_cast<const X11Compositor *>(pcomp);
 }
 
 TexturePixmap::~TexturePixmap(){
-	if(transferImage == 0)
-		return;
-	Detach();
+	//
 }
 
 //only pixmaps that correspond to the created texture in size should be attached
