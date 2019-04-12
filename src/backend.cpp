@@ -696,13 +696,19 @@ sint Default::HandleEvent(bool forcePoll){
 			}
 
 			//center the window to screen, otherwise it might end up to the left upper corner
-			if(!allowPositionConfig || (rect.x == 0 && rect.y == 0 && pev->value_mask & XCB_CONFIG_WINDOW_X && pev->value_mask & XCB_CONFIG_WINDOW_Y)){
-				rect.x = (pscr->width_in_pixels-rect.w)/2;
-				rect.y = (pscr->height_in_pixels-rect.h)/2;
-				pev->value_mask |= XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y;
+			if(!allowPositionConfig){
+				if((rect.x == 0 && pev->value_mask & XCB_CONFIG_WINDOW_X) || (mrect != configCache.end() && (*mrect).second.x == 0 && !(pev->value_mask & XCB_CONFIG_WINDOW_X))){ //TODO: need this same check in MAP_REQUEST
+					rect.x = (pscr->width_in_pixels-rect.w)/2;
+					pev->value_mask |= XCB_CONFIG_WINDOW_X;
+				}
+				if((rect.y == 0 && pev->value_mask & XCB_CONFIG_WINDOW_Y) || (mrect != configCache.end() && (*mrect).second.y == 0 && !(pev->value_mask & XCB_CONFIG_WINDOW_Y))){
+					rect.y = (pscr->height_in_pixels-rect.h)/2;
+					pev->value_mask |= XCB_CONFIG_WINDOW_Y;
+				}
 			}
 			
 			if(mrect == configCache.end()){
+				//an entry should always be present, since CREATE_NOTIFY creates one
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
 				mrect = configCache.end()-1;
 			}else{
@@ -720,10 +726,10 @@ sint Default::HandleEvent(bool forcePoll){
 				uint16_t m;
 				uint32_t v;
 			} maskm[] = {
-				{XCB_CONFIG_WINDOW_X,rect.x},
-				{XCB_CONFIG_WINDOW_Y,rect.y},
-				{XCB_CONFIG_WINDOW_WIDTH,rect.w},
-				{XCB_CONFIG_WINDOW_HEIGHT,rect.h},
+				{XCB_CONFIG_WINDOW_X,(*mrect).second.x},
+				{XCB_CONFIG_WINDOW_Y,(*mrect).second.y},
+				{XCB_CONFIG_WINDOW_WIDTH,(*mrect).second.w},
+				{XCB_CONFIG_WINDOW_HEIGHT,(*mrect).second.h},
 				{XCB_CONFIG_WINDOW_BORDER_WIDTH,pev->border_width},
 				{XCB_CONFIG_WINDOW_SIBLING,pev->sibling},
 				//{XCB_CONFIG_WINDOW_STACK_MODE,pev->stack_mode} //floating clients may request configuration, including stack mode, which ruins the stacking order we've already set
@@ -740,7 +746,11 @@ sint Default::HandleEvent(bool forcePoll){
 
 			if(pclient1)
 				pclient1->UpdateTranslation(&(*mrect).second);
-				//pclient1->UpdateTranslation(&rect);
+
+			/*if(pev->value_mask & XCB_CONFIG_WINDOW_X)
+				DebugPrintf(stdout,"----Wants to config X = %d (allowed: %d)\n",pev->x,allowPositionConfig);
+			if(pev->value_mask & XCB_CONFIG_WINDOW_Y)
+				DebugPrintf(stdout,"----Wants to config Y = %d (allowed: %d)\n",pev->y,allowPositionConfig);*/
 
 			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u (mask: %x)\n",pev->window,pev->x,pev->y,pev->width,pev->height,pev->value_mask);
 			}
@@ -1247,8 +1257,6 @@ sint Default::HandleEvent(bool forcePoll){
 
 			WManager::Rectangle rect = {values[0],values[1],pdragClient->rect.w,pdragClient->rect.h};
 			pdragClient->UpdateTranslation(&rect);
-
-			//printf("*** motion %d,%d\n",pev->event_x,pev->event_y);
 			}
 			break;
 		case XCB_FOCUS_IN:{
@@ -1285,7 +1293,7 @@ sint Default::HandleEvent(bool forcePoll){
 			DebugPrintf(stdout,"Invalid event\n");
 			break;
 		default:
-			DebugPrintf(stdout,"default event: %u\n",pevent->response_type & 0x7f);
+			//DebugPrintf(stdout,"default event: %u\n",pevent->response_type & 0x7f);
 
 			X11Event event11(pevent,this);
 			EventNotify(&event11);
