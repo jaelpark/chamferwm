@@ -155,7 +155,6 @@ X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateI
 	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_PROPERTY_CHANGE|XCB_EVENT_MASK_FOCUS_CHANGE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
-	//if(!(pcontainer->flags & WManager::Container::FLAG_FLOATING))
 	if(pcreateInfo->mode == CreateInfo::CREATE_CONTAINED && !(pcontainer->flags & WManager::Container::FLAG_FLOATING)){
 		UpdateTranslation();
 		oldRect = rect;
@@ -198,7 +197,10 @@ void X11Client::UpdateTranslation(){
 }
 
 void X11Client::UpdateTranslation(const WManager::Rectangle *prect){
-	oldRect = rect; //should be animated at all in this case?
+	//assumes that the xcb configuration has already been performed - automatic windows do this.
+	//alternatively, check if window is manually managed
+	oldRect = (pcontainer->flags & WManager::Container::FLAG_FLOATING)?*prect:rect;
+	//oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	if(prect->w != rect.w || prect->h != rect.h){
 		rect = *prect;
@@ -636,13 +638,13 @@ sint Default::HandleEvent(bool forcePoll){
 
 			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			
-			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return pev->window == p.first;
 			});
-			if(m == configCache.end()){
+			if(mrect == configCache.end()){
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
-				m = configCache.end()-1;
-			}else (*m).second = rect;
+				mrect = configCache.end()-1;
+			}else (*mrect).second = rect;
 
 			DebugPrintf(stdout,"create %x | %d,%d %ux%u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
 			}
@@ -653,6 +655,7 @@ sint Default::HandleEvent(bool forcePoll){
 			//check if window already exists
 			//further configuration should be blocked (for example Firefox on restore session)
 			X11Client *pclient1 = FindClient(pev->window,MODE_MANUAL);
+			//TODO: FIX BUG!!! CONFIGURE_REQUEST may happen before map, when pclient1 doesn't exist yet
 			if(pclient1 && !(pclient1->pcontainer->flags & WManager::Container::FLAG_FLOATING))
 				break;
 
@@ -747,12 +750,17 @@ sint Default::HandleEvent(bool forcePoll){
 			if(pclient1)
 				pclient1->UpdateTranslation(&(*mrect).second);
 
-			/*if(pev->value_mask & XCB_CONFIG_WINDOW_X)
-				DebugPrintf(stdout,"----Wants to config X = %d (allowed: %d)\n",pev->x,allowPositionConfig);
+			/*printf("allow position configuration: %d\n",allowPositionConfig);
+			if(pev->value_mask & XCB_CONFIG_WINDOW_X)
+				printf(" - config X\n");
 			if(pev->value_mask & XCB_CONFIG_WINDOW_Y)
-				DebugPrintf(stdout,"----Wants to config Y = %d (allowed: %d)\n",pev->y,allowPositionConfig);*/
+				printf(" - config Y\n");
+			if(pev->value_mask & XCB_CONFIG_WINDOW_WIDTH)
+				printf(" - config W\n");
+			if(pev->value_mask & XCB_CONFIG_WINDOW_HEIGHT)
+				printf(" - config H\n");*/
 
-			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u (mask: %x)\n",pev->window,pev->x,pev->y,pev->width,pev->height,pev->value_mask);
+			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u (mask: %x) -> %d, %d, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height,pev->value_mask,(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
 			}
 			break;
 		case XCB_MAP_REQUEST:{
@@ -826,6 +834,7 @@ sint Default::HandleEvent(bool forcePoll){
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
 				mrect = configCache.end()-1;
 			}
+			printf("Found cached location: %d, %d, %u, %u.\n",(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
 
 			if(boolHints){
 				if(hints.flags & XCB_ICCCM_WM_HINT_INPUT && !hints.input)
@@ -852,7 +861,11 @@ sint Default::HandleEvent(bool forcePoll){
 					(*mrect).second.x = sizeHints.x;
 					(*mrect).second.y = sizeHints.y;
 				}
+				uint values[4] = {(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h};
+				xcb_configure_window(pcon,pev->window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,values);
 			}
+			printf("Size hints: %d, %d, %u, %u.\n",(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
+
 			if(propertyReplyWindowType){
 				//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
 				uint l = xcb_get_property_value_length(propertyReplyWindowType);
@@ -1004,10 +1017,10 @@ sint Default::HandleEvent(bool forcePoll){
 				free(propertyReplyTransientFor);
 			}
 
-			auto m = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return pev->window == p.first;
 			});
-			if(m == configCache.end()){
+			if(mrect == configCache.end()){
 				//it might be the case that no configure notification was received
 				xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pcon,pev->window);
 				xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pcon,geometryCookie,0);
@@ -1017,10 +1030,10 @@ sint Default::HandleEvent(bool forcePoll){
 				free(pgeometryReply);
 
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
-				m = configCache.end()-1;
+				mrect = configCache.end()-1;
 
 			}
-			WManager::Rectangle *prect = &(*m).second;
+			WManager::Rectangle *prect = &(*mrect).second;
 
 			static WManager::Client dummyClient(0);
 
