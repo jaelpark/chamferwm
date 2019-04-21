@@ -50,7 +50,7 @@ friend class ShaderModule;
 friend class Pipeline;
 friend class ClientFrame;
 public:
-	CompositorInterface(uint);
+	CompositorInterface(uint, bool);
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
 	virtual void Stop() = 0;
@@ -152,6 +152,7 @@ protected:
 	std::vector<DescSetCacheEntry> descSetCache;
 
 	bool playingAnimation;
+	bool debugLayers;
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };
@@ -184,7 +185,7 @@ public:
 class X11Compositor : public CompositorInterface{
 public:
 	//Derivatives of compositor classes should not point to their default corresponding backend classes (Backend::Default in this case). This is to allow the compositor to be independent of the backend implementation, as long as it's based on X11 here.
-	X11Compositor(uint, const Backend::X11Backend *);
+	X11Compositor(uint, bool, const Backend::X11Backend *);
 	~X11Compositor();
 	virtual void Start();
 	virtual void Stop();
@@ -216,7 +217,7 @@ public:
 
 class X11DebugCompositor : public X11Compositor{
 public:
-	X11DebugCompositor(uint, const Backend::X11Backend *);
+	X11DebugCompositor(uint, bool, const Backend::X11Backend *);
 	~X11DebugCompositor();
 	void Start();
 	void Stop();

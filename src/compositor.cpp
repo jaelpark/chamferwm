@@ -173,7 +173,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(uint _physicalDevIndex) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0), pbackground(0), playingAnimation(false){
+CompositorInterface::CompositorInterface(uint _physicalDevIndex, bool _debugLayers) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0), pbackground(0), debugLayers(_debugLayers), playingAnimation(false){
 	//
 }
 
@@ -187,7 +187,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkLayerProperties *playerProps = new VkLayerProperties[layerCount];
 	vkEnumerateInstanceLayerProperties(&layerCount,playerProps);
 
-	/*const char *players[] = {"VK_LAYER_LUNARG_standard_validation"}; //TODO: add choice
+	const char *players[] = {"VK_LAYER_LUNARG_standard_validation"};
 	DebugPrintf(stdout,"Enumerating required layers\n");
 	uint layersFound = 0;
 	for(uint i = 0; i < layerCount; ++i)
@@ -196,8 +196,8 @@ void CompositorInterface::InitializeRenderEngine(){
 				printf("%s\n",players[j]);
 				++layersFound;
 			}
-	if(layersFound < sizeof(players)/sizeof(players[0]))
-		throw Exception("Could not find all required layers.");*/
+	if(debugLayers && layersFound < sizeof(players)/sizeof(players[0]))
+		throw Exception("Could not find all required layers.");
 
 	uint extCount;
 	vkEnumerateInstanceExtensionProperties(0,&extCount,0);
@@ -233,8 +233,13 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkInstanceCreateInfo instanceCreateInfo = {};
 	instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	instanceCreateInfo.pApplicationInfo = &appInfo;
-	instanceCreateInfo.enabledLayerCount = 0;//sizeof(players)/sizeof(players[0]); //also in vkCreateDevice
-	instanceCreateInfo.ppEnabledLayerNames = 0;//players;
+	if(debugLayers){
+		instanceCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]); //also in vkCreateDevice
+		instanceCreateInfo.ppEnabledLayerNames = players;
+	}else{
+		instanceCreateInfo.enabledLayerCount = 0;
+		instanceCreateInfo.ppEnabledLayerNames = 0;
+	}
 	instanceCreateInfo.enabledExtensionCount = sizeof(pextensions)/sizeof(pextensions[0]);
 	instanceCreateInfo.ppEnabledExtensionNames = pextensions;
 	if(vkCreateInstance(&instanceCreateInfo,0,&instance) != VK_SUCCESS)
@@ -379,8 +384,13 @@ void CompositorInterface::InitializeRenderEngine(){
 	devCreateInfo.pEnabledFeatures = &physicalDevFeatures;
 	devCreateInfo.ppEnabledExtensionNames = pdevExtensions;
 	devCreateInfo.enabledExtensionCount = sizeof(pdevExtensions)/sizeof(pdevExtensions[0]);
-	devCreateInfo.ppEnabledLayerNames = 0;//players;
-	devCreateInfo.enabledLayerCount = 0;//sizeof(players)/sizeof(players[0]);
+	if(debugLayers){
+		devCreateInfo.ppEnabledLayerNames = players;
+		devCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]);
+	}else{
+		devCreateInfo.ppEnabledLayerNames = 0;
+		devCreateInfo.enabledLayerCount = 0;
+	}
 	if(vkCreateDevice(physicalDev,&devCreateInfo,0,&logicalDev) != VK_SUCCESS)
 		throw Exception("Failed to create a logical device.");
 	
@@ -1185,7 +1195,7 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	shmdt(pchpixels);
 }
 
-X11Compositor::X11Compositor(uint physicalDevIndex, const Backend::X11Backend *_pbackend) : CompositorInterface(physicalDevIndex), pbackend(_pbackend){//, pbackground(0){
+X11Compositor::X11Compositor(uint physicalDevIndex, bool debugLayers, const Backend::X11Backend *_pbackend) : CompositorInterface(physicalDevIndex,debugLayers), pbackend(_pbackend){//, pbackground(0){
 	//
 }
 
@@ -1384,7 +1394,7 @@ void X11DebugClientFrame::AdjustSurface1(){
 	AdjustSurface(rect.w,rect.h);
 }
 
-X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,pbackend){
+X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, bool debugLayers, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,debugLayers,pbackend){
 	//
 }
 
@@ -1402,7 +1412,7 @@ void X11DebugCompositor::Stop(){
 	DestroyRenderEngine();
 }
 
-NullCompositor::NullCompositor() : CompositorInterface(0){
+NullCompositor::NullCompositor() : CompositorInterface(0,false){
 	//
 }
 

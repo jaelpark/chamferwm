@@ -624,7 +624,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11Compositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
+	DefaultCompositor(uint gpuIndex, bool debugLayers, WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11Compositor(gpuIndex,false,pbackend), RunCompositor(_proot,_pstackAppendix){
 		Start();
 
 		for(auto &m : args::get(shaderPaths)){
@@ -663,7 +663,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(uint gpuIndex, WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11DebugCompositor(gpuIndex,pbackend), RunCompositor(_proot,_pstackAppendix){
+	DebugCompositor(uint gpuIndex, bool debugLayers, WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11DebugCompositor(gpuIndex,false,pbackend), RunCompositor(_proot,_pstackAppendix){
 		Compositor::X11DebugCompositor::Start();
 
 		for(auto &m : args::get(shaderPaths)){
@@ -735,8 +735,8 @@ int main(sint argc, const char **pargv){
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
 	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
 	args::ValueFlag<uint> gpuIndex(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"},0);
+	args::Flag debugLayers(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified.",{"shader-path"});
-	//args::ValueFlag<std::string> defaultVertexShader(group_comp,"path","Default vertex shader file name.",{"default-vertex-shader"});
 
 	try{
 		parser.ParseCLI(argc,pargv);
@@ -774,8 +774,8 @@ int main(sint argc, const char **pargv){
 			pcomp = new NullCompositor();
 		else
 		if(debugBackend.Get())
-			pcomp = new DebugCompositor(gpuIndex.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
-		else pcomp = new DefaultCompositor(gpuIndex.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
+			pcomp = new DebugCompositor(gpuIndex.Get(),debugLayers.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
+		else pcomp = new DefaultCompositor(gpuIndex.Get(),debugLayers.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
 
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
