@@ -193,7 +193,8 @@ void X11Client::UpdateTranslation(){
 	//Virtual function gets called only if the compositor client class has been initialized.
 	//In case compositor client class hasn't been initialized yet, this will be taken care of
 	//later on subsequent constructor calls.
-	AdjustSurface1();
+	if(oldRect.w != rect.w || oldRect.h != rect.h)
+		AdjustSurface1();
 }
 
 void X11Client::UpdateTranslation(const WManager::Rectangle *prect){
@@ -1244,12 +1245,16 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_button_press_event_t *pev = (xcb_button_press_event_t*)pevent;
 			//
 			X11Client *pclient11 = FindClient(pev->event,MODE_UNDEFINED);
-			if(!pclient11 || !(pclient11->pcontainer->flags & WManager::Container::FLAG_FLOATING))
+			/*if(!pclient11 || !(pclient11->pcontainer->flags & WManager::Container::FLAG_FLOATING))
+				break;*/
+			if(!pclient11)
 				break;
 
 			pdragClient = pclient11;
-			dragClientX = pev->event_x;
-			dragClientY = pev->event_y;
+			//dragClientX = pev->event_x; //client frame location
+			//dragClientY = pev->event_y;
+			dragRootX = pev->root_x;
+			dragRootY = pev->root_y;
 
 			xcb_grab_pointer(pcon,0,pscr->root,XCB_EVENT_MASK_BUTTON_RELEASE|XCB_EVENT_MASK_POINTER_MOTION,
 				XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,XCB_CURRENT_TIME);
@@ -1265,11 +1270,21 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_MOTION_NOTIFY:{
 			xcb_motion_notify_event_t *pev = (xcb_motion_notify_event_t*)pevent;
 
-			sint values[2] = {pev->event_x-dragClientX,pev->event_y-dragClientY};
-			xcb_configure_window(pcon,pdragClient->window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y,values);
+			if(pdragClient->pcontainer->flags & WManager::Container::FLAG_FLOATING){
+				sint values[2] = {pdragClient->rect.x+pev->event_x-dragRootX,pdragClient->rect.y+pev->event_y-dragRootY};
+				xcb_configure_window(pcon,pdragClient->window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y,values);
 
-			WManager::Rectangle rect = {values[0],values[1],pdragClient->rect.w,pdragClient->rect.h};
-			pdragClient->UpdateTranslation(&rect);
+				WManager::Rectangle rect = {values[0],values[1],pdragClient->rect.w,pdragClient->rect.h};
+				pdragClient->UpdateTranslation(&rect);
+
+			}else{
+				pdragClient->pcontainer->canvasOffset += glm::vec2(pev->event_x-dragRootX,pev->event_y-dragRootY)
+					/glm::vec2(pscr->width_in_pixels,pscr->height_in_pixels);
+				pdragClient->pcontainer->Translate();
+			}
+
+			dragRootX = pev->event_x;
+			dragRootY = pev->event_y;
 			}
 			break;
 		case XCB_FOCUS_IN:{

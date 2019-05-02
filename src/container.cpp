@@ -503,8 +503,11 @@ void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCan
 
 	this->posFullCanvas = posFullCanvas;
 	this->extFullCanvas = extFullCanvas;
-	this->p = p;
-	this->e = e;
+	glm::vec2 pcorr = glm::min(p,glm::vec2(0.0f));
+	p -= pcorr;
+	glm::vec2 ecorr = glm::min(1.0f-(p+e),glm::vec2(0.0f));
+	this->p = glm::max(p+ecorr,0.0f);
+	this->e = glm::min(e,1.0f);
 	if(pclient)
 		pclient->UpdateTranslation();
 }

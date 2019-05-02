@@ -238,7 +238,8 @@ private:
 	std::vector<X11Client *> unmappingQueue;
 	std::vector<xcb_window_t> netClientList; //used only to update the property - not maintained
 	X11Client *pdragClient;
-	sint dragClientX, dragClientY;
+	//sint dragClientX, dragClientY;
+	sint dragRootX, dragRootY;
 };
 
 class DebugClient : public WManager::Client{
