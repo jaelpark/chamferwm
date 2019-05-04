@@ -119,11 +119,11 @@ public:
 	virtual void OnKeyPress(uint);
 	virtual void OnKeyRelease(uint);
 	virtual void OnTimer();
+	boost::python::object GetFocus();
+	boost::python::object GetRoot();
 
 	static void Bind(boost::python::object);
-	static void SetFocus(WManager::Container *);
-	static boost::python::object GetFocus();
-	static boost::python::object GetRoot();
+	static void SetFocus(WManager::Container *); //!!!
 	//static void ResetFocus();
 
 	static BackendInterface defaultInt;

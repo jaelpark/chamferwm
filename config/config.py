@@ -69,15 +69,6 @@ class Key(Enum):
 
 	NOOP = auto()
 
-def GetFocusTiled():
-	root = chamfer.GetRoot();
-	focusHead = root.GetFocus();
-	focusPrev = None;
-	while focusHead is not None:
-		focusPrev = focusHead;
-		focusHead = focusHead.GetFocus();
-	return focusPrev;
-
 class Container(chamfer.Container):
 	#setup the container before it's created (dimensions)
 	def OnSetupContainer(self):
@@ -106,7 +97,7 @@ class Container(chamfer.Container):
 
 	#select and assign a parent container
 	def OnParent(self):
-		focus = chamfer.GetFocus();
+		focus = self.GetFocus();
 		if hasattr(focus,'splitArmed') and focus.splitArmed:
 			focus.splitArmed = False;
 			return focus;
@@ -262,9 +253,18 @@ class Backend(chamfer.Backend):
 		print("OnCreateContainer()");
 		return Container();
 
+	def GetFocusTiled():
+		root = self.GetRoot();
+		focusHead = root.GetFocus();
+		focusPrev = None;
+		while focusHead is not None:
+			focusPrev = focusHead;
+			focusHead = focusHead.GetFocus();
+		return focusPrev;
+
 	def OnKeyPress(self, keyId):
 		print("key press: {}".format(keyId));
-		focus = chamfer.GetFocus();
+		focus = self.GetFocus();
 		parent = focus.GetParent();
 
 		if keyId == Key.FOCUS_RIGHT.value:
@@ -393,30 +393,30 @@ class Backend(chamfer.Backend):
 			focus.SetFullscreen(not focus.fullscreen);
 		
 		elif keyId == Key.CONTRACT_ROOT_RESET.value:
-			root = chamfer.GetRoot();
+			root = self.GetRoot();
 			root.canvasOffset = (0.0,0.0);
 			root.canvasExtent = (0.0,0.0);
 			root.ShiftLayout(root.layout);
 
 		elif keyId == Key.CONTRACT_ROOT_LEFT.value:
-			root = chamfer.GetRoot();
+			root = self.GetRoot();
 			root.canvasOffset = (root.canvasOffset[0]+0.1,root.canvasOffset[1]);
 			root.canvasExtent = (root.canvasExtent[0]+0.1,root.canvasExtent[1]);#root.canvasOffset;
 			root.ShiftLayout(root.layout);
 
 		elif keyId == Key.CONTRACT_ROOT_RIGHT.value:
-			root = chamfer.GetRoot();
+			root = self.GetRoot();
 			root.canvasExtent = (root.canvasExtent[0]+0.1,root.canvasExtent[1]);
 			root.ShiftLayout(root.layout);
 
 		elif keyId == Key.EXPAND_ROOT_LEFT.value:
-			root = chamfer.GetRoot();
+			root = self.GetRoot();
 			root.canvasOffset = (root.canvasOffset[0]-0.1,root.canvasOffset[1]);
 			root.canvasExtent = (root.canvasExtent[0]-0.1,root.canvasExtent[1]);
 			root.ShiftLayout(root.layout);
 
 		elif keyId == Key.EXPAND_ROOT_RIGHT.value:
-			root = chamfer.GetRoot();
+			root = self.GetRoot();
 			root.canvasExtent = (root.canvasExtent[0]-0.1,root.canvasExtent[1]);
 			root.ShiftLayout(root.layout);
 
@@ -505,7 +505,7 @@ class Compositor(chamfer.Compositor):
 	pass
 
 backend = Backend();
-chamfer.bind_Backend(backend);
+chamfer.BindBackend(backend);
 
 pids = psutil.pids();
 pnames = [psutil.Process(pid).name() for pid in pids];

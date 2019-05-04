@@ -76,7 +76,8 @@ void ContainerInterface::OnSetupClient(){
 
 boost::python::object ContainerInterface::OnParent(){
 	//
-	return BackendInterface::GetFocus(); //TODO: sensible default
+	//return BackendInterface::GetFocus1(); //TODO: sensible default
+	return boost::python::object();
 }
 
 void ContainerInterface::OnCreate(){
@@ -401,22 +402,6 @@ void BackendInterface::OnTimer(){
 	//
 }
 
-void BackendInterface::Bind(boost::python::object obj){
-	BackendInterface &backendInt1 = boost::python::extract<BackendInterface&>(obj)();
-	pbackendInt = &backendInt1;
-}
-
-void BackendInterface::SetFocus(WManager::Container *pcontainer){
-	if(pcontainer->flags & WManager::Container::FLAG_NO_FOCUS)
-		return;
-	if(pcontainer->flags & WManager::Container::FLAG_FLOATING){
-		floatFocusQueue.erase(std::remove(floatFocusQueue.begin(),floatFocusQueue.end(),pcontainer),floatFocusQueue.end());
-		floatFocusQueue.push_back(pcontainer);
-	}
-	pfocus = pcontainer;
-	pcontainer->Focus();
-}
-
 boost::python::object BackendInterface::GetFocus(){
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pfocus);
 	if(pcontainer1)
@@ -431,6 +416,23 @@ boost::python::object BackendInterface::GetRoot(){
 	if(pcontainer1)
 		return pcontainer1->pcontainerInt->self;
 	return boost::python::object();
+}
+
+void BackendInterface::Bind(boost::python::object obj){
+	BackendInterface &backendInt1 = boost::python::extract<BackendInterface&>(obj)();
+	pbackendInt = &backendInt1;
+	boost::python::import("chamfer").attr("backend") = obj;
+}
+
+void BackendInterface::SetFocus(WManager::Container *pcontainer){
+	if(pcontainer->flags & WManager::Container::FLAG_NO_FOCUS)
+		return;
+	if(pcontainer->flags & WManager::Container::FLAG_FLOATING){
+		floatFocusQueue.erase(std::remove(floatFocusQueue.begin(),floatFocusQueue.end(),pcontainer),floatFocusQueue.end());
+		floatFocusQueue.push_back(pcontainer);
+	}
+	pfocus = pcontainer;
+	pcontainer->Focus();
 }
 
 BackendInterface BackendInterface::defaultInt;
@@ -528,6 +530,7 @@ CompositorInterface::~CompositorInterface(){
 void CompositorInterface::Bind(boost::python::object obj){
 	CompositorInterface &compositorInt = boost::python::extract<CompositorInterface&>(obj)();
 	pcompositorInt = &compositorInt;
+	boost::python::import("chamfer").attr("compositor") = obj;
 }
 
 CompositorInterface CompositorInterface::defaultInt;
@@ -549,10 +552,6 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::scope().attr("MOD_MASK_5") = uint(XCB_MOD_MASK_5);
 	boost::python::scope().attr("MOD_MASK_SHIFT") = uint(XCB_MOD_MASK_SHIFT);
 	boost::python::scope().attr("MOD_MASK_CONTROL") = uint(XCB_MOD_MASK_CONTROL);
-
-	boost::python::scope().attr("KEY_RETURN") = uint(XK_Return);
-	boost::python::scope().attr("KEY_SPACE") = uint(XK_space);
-	boost::python::scope().attr("KEY_TAB") = uint(XK_Tab);
 
 	boost::python::class_<Backend::X11KeyBinder>("KeyBinder",boost::python::no_init)
 		.def("BindKey",&Backend::X11KeyBinder::BindKey)
@@ -710,15 +709,15 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("OnKeyPress",&BackendInterface::OnKeyPress)
 		.def("OnKeyRelease",&BackendInterface::OnKeyRelease)
 		.def("OnTimer",&BackendInterface::OnTimer)
+		.def("GetFocus",&BackendInterface::GetFocus)
+		.def("GetRoot",&BackendInterface::GetRoot)
 		;
-	boost::python::def("bind_Backend",BackendInterface::Bind);
+	boost::python::def("BindBackend",BackendInterface::Bind);
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")
 		.add_property("shaderPath",&CompositorInterface::shaderPath)
 		;
-	boost::python::def("bind_Compositor",CompositorInterface::Bind);
-
-	boost::python::def("GetFocus",&BackendInterface::GetFocus);
-	boost::python::def("GetRoot",&BackendInterface::GetRoot);
+	boost::python::def("BindCompositor",CompositorInterface::Bind);
+	//boost::python::def("GetCompositor",CompositorInterface::GetInterface);
 }
 
 Loader::Loader(const char *pargv0){
