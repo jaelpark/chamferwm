@@ -218,7 +218,9 @@ public:
 		if(premoved != pcontainer)
 			pcontainer->pParent->pch = 0;
 
-		pcontainer->Focus();
+		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pcontainer);
+		if(pcontainer1->pcontainerInt->OnFocus())
+			pcontainer1->Focus();
 
 		PrintTree(proot,0);
 		printf("-----------\n");
@@ -460,7 +462,9 @@ public:
 			WManager::Container *pNewFocus = proot;
 			//for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():pcontainer->pch);
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
-			pNewFocus->Focus();
+			Config::X11ContainerConfig *pNewFocus1 = dynamic_cast<Config::X11ContainerConfig *>(pNewFocus);
+			if(pNewFocus1->pcontainerInt->OnFocus())
+				pNewFocus1->Focus();
 		}
 		if(premoved->pch)
 			ReleaseContainersRecursive(premoved->pch);
@@ -577,7 +581,9 @@ public:
 		if(WManager::Container::pglobalFocus == pclient->pcontainer){
 			WManager::Container *pNewFocus = proot;
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
-			pNewFocus->Focus();
+			Config::X11ContainerConfig *pNewFocus1 = dynamic_cast<Config::X11ContainerConfig *>(pNewFocus);
+			if(pNewFocus1->pcontainerInt->OnFocus())
+				pNewFocus1->Focus();
 		}
 		if(premoved->pch)
 			ReleaseContainersRecursive(premoved->pch);
