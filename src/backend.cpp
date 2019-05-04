@@ -460,13 +460,6 @@ Default::Default() : X11Backend(), pdragClient(0){
 
 Default::~Default(){
 	//sigprocmask(SIG_UNBLOCK,&signals,0);
-
-	//cleanup
-	xcb_destroy_window(pcon,ewmh_window);
-	xcb_ewmh_connection_wipe(&ewmh);
-	xcb_set_input_focus(pcon,XCB_NONE,XCB_INPUT_FOCUS_POINTER_ROOT,XCB_CURRENT_TIME);
-	xcb_disconnect(pcon);
-	xcb_flush(pcon);
 }
 
 void Default::Start(){
@@ -515,12 +508,15 @@ void Default::Start(){
 
 	if(perr != 0){
 		snprintf(Exception::buffer,sizeof(Exception::buffer),"Substructure redirection failed (%d). WM already present.\n",perr->error_code);
+		xcb_disconnect(pcon);
 		throw Exception();
 	}
 
 	xcb_intern_atom_cookie_t *patomCookie = xcb_ewmh_init_atoms(pcon,&ewmh);
-	if(!xcb_ewmh_init_atoms_replies(&ewmh,patomCookie,0))
+	if(!xcb_ewmh_init_atoms_replies(&ewmh,patomCookie,0)){
+		xcb_disconnect(pcon);
 		throw Exception("Failed to initialize EWMH atoms.\n");
+	}
 	
 	for(uint i = 0; i < ATOM_COUNT; ++i)
 		atoms[i] = GetAtom(patomStrs[i]);
@@ -569,6 +565,15 @@ void Default::Start(){
 
 	values[0] = XCB_STACK_MODE_BELOW;
 	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+}
+
+void Default::Stop(){
+	//cleanup
+	xcb_destroy_window(pcon,ewmh_window);
+	xcb_ewmh_connection_wipe(&ewmh);
+	xcb_set_input_focus(pcon,XCB_NONE,XCB_INPUT_FOCUS_POINTER_ROOT,XCB_CURRENT_TIME);
+	xcb_disconnect(pcon);
+	xcb_flush(pcon);
 }
 
 sint Default::HandleEvent(bool forcePoll){
@@ -1416,8 +1421,6 @@ Debug::Debug() : X11Backend(){
 
 Debug::~Debug(){
 	//
-	xcb_destroy_window(pcon,window);
-	xcb_flush(pcon);
 }
 
 void Debug::Start(){
@@ -1467,6 +1470,12 @@ void Debug::Start(){
 	xcb_flush(pcon);
 
 	xcb_key_symbols_free(psymbols);
+}
+
+void Debug::Stop(){
+	//
+	xcb_destroy_window(pcon,window);
+	xcb_flush(pcon);
 }
 
 sint Debug::HandleEvent(bool forcePoll){

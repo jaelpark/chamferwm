@@ -71,6 +71,7 @@ public:
 	BackendInterface();
 	virtual ~BackendInterface();
 	virtual void Start() = 0;
+	virtual void Stop() = 0;
 	//virtual sint GetEventFileDescriptor() = 0;
 	//virtual void SetupEnvironment() = 0;
 	virtual sint HandleEvent(bool) = 0;
@@ -216,6 +217,7 @@ public:
 	Default();
 	virtual ~Default();
 	void Start();
+	void Stop();
 	//void SetupEnvironment();
 	sint HandleEvent(bool);
 	X11Client * FindClient(xcb_window_t, MODE) const;
@@ -238,7 +240,6 @@ private:
 	std::vector<X11Client *> unmappingQueue;
 	std::vector<xcb_window_t> netClientList; //used only to update the property - not maintained
 	X11Client *pdragClient;
-	//sint dragClientX, dragClientY;
 	sint dragRootX, dragRootY;
 };
 
@@ -271,6 +272,7 @@ public:
 	Debug();
 	virtual ~Debug();
 	void Start();
+	void Stop();
 	//void SetupEnvironment();
 	sint HandleEvent(bool);
 	X11Client * FindClient(xcb_window_t, MODE) const;

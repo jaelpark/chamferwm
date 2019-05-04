@@ -6,6 +6,7 @@
 #include "config.h"
 #include <xcb/xcb_keysyms.h> //todo: should not depend on xcb here
 #include <X11/keysym.h>
+#include <wordexp.h>
 
 namespace Config{
 
@@ -734,9 +735,28 @@ Loader::~Loader(){
 }
 
 void Loader::Run(const char *pfilePath, const char *pfileLabel){
-	FILE *pf = fopen(pfilePath,"rb");
+	FILE *pf = 0;
+	if(!pfilePath){
+		const char *pconfigPaths[] = {
+			"~/.config/chamfer/config.py",
+			"~/.chamfer/config.py",
+			"/usr/share/chamfer/config/config.py"
+		};
+		wordexp_t expResult;
+		for(uint i = 0; i < sizeof(pconfigPaths)/sizeof(pconfigPaths[0]); ++i){
+			wordexp(pconfigPaths[i],&expResult,WRDE_NOCMD);
+			if((pf = fopen(expResult.we_wordv[0],"rb"))){
+				DebugPrintf(stdout,"Found config %s\n",expResult.we_wordv[0]);
+				break;
+			}
+			wordfree(&expResult);
+		}
+	}else{
+		DebugPrintf(stdout,"Loading config %s...\n",pfilePath);
+		pf = fopen(pfilePath,"rb");
+	}
 	if(!pf){
-		DebugPrintf(stderr,"Unable to open configuration file %s\n",pfilePath);
+		DebugPrintf(stderr,"Unable to find configuration file.\n");
 		return;
 	}
 	try{

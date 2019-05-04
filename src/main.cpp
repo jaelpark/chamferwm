@@ -306,6 +306,7 @@ public:
 	}
 
 	~DefaultBackend(){
+		Stop();
 		delete proot;
 	}
 
@@ -520,13 +521,13 @@ public:
 //TODO: some of these functions can be templated and shared with the DefaultBackend
 class DebugBackend : public Backend::Debug, public RunBackend{
 public:
-	//DebugBackend() : Debug(), RunBackend(new Backend::DebugContainer(this)){
 	DebugBackend() : Debug(), RunBackend(new Config::DebugContainerConfig(this)){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
 
 	~DebugBackend(){
+		Stop();
 		delete proot;
 	}
 
@@ -727,7 +728,7 @@ int main(sint argc, const char **pargv){
 	args::ArgumentParser parser("chamferwm - A compositing window manager","");
 	args::HelpFlag help(parser,"help","Display this help menu",{'h',"help"});
 
-	args::ValueFlag<std::string> configPath(parser,"path","Configuration Python script",{"config",'c'},"config.py");
+	args::ValueFlag<std::string> configPath(parser,"path","Configuration Python script",{"config",'c'});
 
 	args::Group group_backend(parser,"Backend",args::Group::Validators::DontCare);
 	args::Flag debugBackend(group_backend,"debugBackend","Create a test environment for the compositor engine without redirection. The application will not act as a window manager.",{'d',"debug-backend"});
@@ -751,7 +752,7 @@ int main(sint argc, const char **pargv){
 	}
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
-	pconfigLoader->Run(configPath.Get().c_str(),"config.py");
+	pconfigLoader->Run(configPath?configPath.Get().c_str():0,"config.py");
 
 	RunBackend *pbackend;
 	try{
