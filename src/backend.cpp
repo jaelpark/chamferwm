@@ -795,8 +795,8 @@ sint Default::HandleEvent(bool forcePoll){
 				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_WINDOW_TYPE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
 			xcb_get_property_cookie_t propertyCookieWindowState
 				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_STATE,XCB_ATOM_ATOM,0,std::numeric_limits<uint32_t>::max());
-			xcb_get_property_cookie_t propertyCookieStrut
-				= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_STRUT_PARTIAL,XCB_ATOM_CARDINAL,0,std::numeric_limits<uint32_t>::max());
+			//xcb_get_property_cookie_t propertyCookieStrut
+				//= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_STRUT_PARTIAL,XCB_ATOM_CARDINAL,0,std::numeric_limits<uint32_t>::max());
 			xcb_get_property_cookie_t propertyCookieTransientFor
 				= xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
 
@@ -1294,7 +1294,7 @@ sint Default::HandleEvent(bool forcePoll){
 			break;
 		case XCB_FOCUS_IN:{
 			xcb_focus_in_event_t *pev = (xcb_focus_in_event_t*)pevent;
-			printf("*** focus %x\n",pev->event);
+			printf("XCB_FOCUS_IN: *** focus %x\n",pev->event);
 			}
 			break;
 		case XCB_ENTER_NOTIFY:{

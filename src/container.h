@@ -116,6 +116,9 @@ public:
 
 	uint flags;
 	LAYOUT layout;
+
+	static WManager::Container *pglobalFocus; //client focus, managed by Python
+	static std::deque<WManager::Container *> floatFocusQueue;
 };
 
 }

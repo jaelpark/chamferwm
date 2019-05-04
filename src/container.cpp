@@ -197,11 +197,15 @@ Container * Container::Collapse(){
 }
 
 void Container::Focus(){
-	if(flags & FLAG_FLOATING){
-		Stack1();
-		Focus1();
+	if(flags & FLAG_NO_FOCUS)
 		return;
-	}
+	if(flags & FLAG_FLOATING){
+		floatFocusQueue.erase(std::remove(floatFocusQueue.begin(),floatFocusQueue.end(),this),floatFocusQueue.end());
+		floatFocusQueue.push_back(this);
+
+		Stack1();
+
+	}else
 	if(pParent){
 		pParent->focusQueue.erase(std::remove(pParent->focusQueue.begin(),pParent->focusQueue.end(),this),pParent->focusQueue.end());
 		pParent->focusQueue.push_back(this);
@@ -209,6 +213,7 @@ void Container::Focus(){
 		GetRoot()->Stack();
 	}
 
+	pglobalFocus = this;
 	Focus1();
 }
 
@@ -610,6 +615,9 @@ void Container::SetLayout(LAYOUT layout){
 	this->layout = layout;
 	Translate();
 }
+
+WManager::Container *Container::pglobalFocus = 0; //initially set to root container as soon as it's created
+std::deque<WManager::Container *> Container::floatFocusQueue;
 
 }
 

@@ -97,7 +97,7 @@ class Container(chamfer.Container):
 
 	#select and assign a parent container
 	def OnParent(self):
-		focus = self.GetFocus();
+		focus = chamfer.backend.GetFocus();
 		if hasattr(focus,'splitArmed') and focus.splitArmed:
 			focus.splitArmed = False;
 			return focus;
@@ -253,7 +253,7 @@ class Backend(chamfer.Backend):
 		print("OnCreateContainer()");
 		return Container();
 
-	def GetFocusTiled():
+	def GetFocusTiled(self):
 		root = self.GetRoot();
 		focusHead = root.GetFocus();
 		focusPrev = None;
@@ -268,12 +268,12 @@ class Backend(chamfer.Backend):
 		parent = focus.GetParent();
 
 		if keyId == Key.FOCUS_RIGHT.value:
-			focus = GetFocusTiled() if focus.IsFloating() else focus.GetNext();
+			focus = self.GetFocusTiled() if focus.IsFloating() else focus.GetNext();
 			#focus = focus.GetAdjacent(chamfer.adjacent.RIGHT);
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_LEFT.value:
-			focus = GetFocusTiled() if focus.IsFloating() else focus.GetPrev();
+			focus = self.GetFocusTiled() if focus.IsFloating() else focus.GetPrev();
 			#focus = focus.GetAdjacent(chamfer.adjacent.LEFT);
 			focus.Focus();
 

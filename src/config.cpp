@@ -143,11 +143,11 @@ boost::python::object ContainerInterface::GetFocus() const{
 boost::python::object ContainerInterface::GetFloatFocus() const{
 	if(!pcontainer)
 		return boost::python::object();
-	auto m = std::find(BackendInterface::floatFocusQueue.begin(),BackendInterface::floatFocusQueue.end(),pcontainer);
-	if(m == BackendInterface::floatFocusQueue.begin() || m == BackendInterface::floatFocusQueue.end()){
-		if(BackendInterface::floatFocusQueue.size() == 0)
+	auto m = std::find(WManager::Container::floatFocusQueue.begin(),WManager::Container::floatFocusQueue.end(),pcontainer);
+	if(m == WManager::Container::floatFocusQueue.begin() || m == WManager::Container::floatFocusQueue.end()){
+		if(WManager::Container::floatFocusQueue.size() == 0)
 			return boost::python::object();
-		ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(BackendInterface::floatFocusQueue.back());
+		ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(WManager::Container::floatFocusQueue.back());
 		if(pcontainer1)
 			return pcontainer1->pcontainerInt->self;
 		return boost::python::object();
@@ -403,15 +403,16 @@ void BackendInterface::OnTimer(){
 }
 
 boost::python::object BackendInterface::GetFocus(){
-	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pfocus);
+	printf("backend.GetFocus()\n");
+	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(WManager::Container::pglobalFocus);
 	if(pcontainer1)
 		return pcontainer1->pcontainerInt->self;
 	return boost::python::object();
 }
 
 boost::python::object BackendInterface::GetRoot(){
-	WManager::Container *pParent = pfocus;
-	for(WManager::Container *pcontainer = pfocus->pParent; pcontainer; pParent = pcontainer, pcontainer = pcontainer->pParent);
+	WManager::Container *pParent = WManager::Container::pglobalFocus;//pfocus;
+	for(WManager::Container *pcontainer = pParent->pParent; pcontainer; pParent = pcontainer, pcontainer = pcontainer->pParent);
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pParent);
 	if(pcontainer1)
 		return pcontainer1->pcontainerInt->self;
@@ -424,21 +425,8 @@ void BackendInterface::Bind(boost::python::object obj){
 	boost::python::import("chamfer").attr("backend") = obj;
 }
 
-void BackendInterface::SetFocus(WManager::Container *pcontainer){
-	if(pcontainer->flags & WManager::Container::FLAG_NO_FOCUS)
-		return;
-	if(pcontainer->flags & WManager::Container::FLAG_FLOATING){
-		floatFocusQueue.erase(std::remove(floatFocusQueue.begin(),floatFocusQueue.end(),pcontainer),floatFocusQueue.end());
-		floatFocusQueue.push_back(pcontainer);
-	}
-	pfocus = pcontainer;
-	pcontainer->Focus();
-}
-
 BackendInterface BackendInterface::defaultInt;
 BackendInterface *BackendInterface::pbackendInt = &BackendInterface::defaultInt;
-WManager::Container *BackendInterface::pfocus = 0; //initially set to root container as soon as it's created
-std::deque<WManager::Container *> BackendInterface::floatFocusQueue;
 
 BackendProxy::BackendProxy(){
 	//
@@ -598,7 +586,7 @@ BOOST_PYTHON_MODULE(chamfer){
 				if(!container.pcontainer)
 					return;
 				if(container.OnFocus())
-					BackendInterface::SetFocus(container.pcontainer);
+					container.pcontainer->Focus();
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("Kill",boost::python::make_function(
 			[](ContainerInterface &container){

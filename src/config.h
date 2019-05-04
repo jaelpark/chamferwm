@@ -123,13 +123,11 @@ public:
 	boost::python::object GetRoot();
 
 	static void Bind(boost::python::object);
-	static void SetFocus(WManager::Container *); //!!!
-	//static void ResetFocus();
 
 	static BackendInterface defaultInt;
 	static BackendInterface *pbackendInt;
-	static WManager::Container *pfocus; //client focus, managed by Python
-	static std::deque<WManager::Container *> floatFocusQueue;
+	//static WManager::Container *pfocus; //client focus, managed by Python
+	//static std::deque<WManager::Container *> floatFocusQueue;
 };
 
 class BackendProxy : public BackendInterface, public boost::python::wrapper<BackendInterface>{

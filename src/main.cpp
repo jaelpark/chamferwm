@@ -218,7 +218,7 @@ public:
 		if(premoved != pcontainer)
 			pcontainer->pParent->pch = 0;
 
-		Config::BackendInterface::SetFocus(pcontainer);
+		pcontainer->Focus();
 
 		PrintTree(proot,0);
 		printf("-----------\n");
@@ -270,7 +270,7 @@ public:
 			printf("(client), ");
 		if(pcontainer->pParent)
 			printf("(parent: %p), ",pcontainer->pParent);
-		if(Config::BackendInterface::pfocus == pcontainer)
+		if(WManager::Container::pglobalFocus == pcontainer)
 			printf("(focus), ");
 		Config::ContainerConfig *pcontainerConfig = dynamic_cast<Config::ContainerConfig *>(pcontainer);
 		printf("[ContainerConfig: %p, (->container: %p)], ",pcontainerConfig,pcontainerConfig->pcontainerInt->pcontainer);
@@ -390,7 +390,7 @@ public:
 			return;
 		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
 		if(pcontainer1->pcontainerInt->OnFocus())
-			Config::BackendInterface::SetFocus(pcontainer1);
+			pcontainer1->Focus();
 	}
 
 	void PropertyChange(Backend::X11Client *pclient, PROPERTY_ID id, const Backend::BackendProperty *pProperty){
@@ -427,9 +427,9 @@ public:
 	}
 
 	void DestroyClient(Backend::X11Client *pclient){
-		auto n = std::find(Config::BackendInterface::floatFocusQueue.begin(),Config::BackendInterface::floatFocusQueue.end(),pclient->pcontainer);
-		if(n != Config::BackendInterface::floatFocusQueue.end())
-			Config::BackendInterface::floatFocusQueue.erase(n);
+		auto n = std::find(WManager::Container::floatFocusQueue.begin(),WManager::Container::floatFocusQueue.end(),pclient->pcontainer);
+		if(n != WManager::Container::floatFocusQueue.end())
+			WManager::Container::floatFocusQueue.erase(n);
 
 		PrintTree(proot,0);
 
@@ -456,11 +456,11 @@ public:
 		if(!pcollapsed && pOrigParent->pch)
 			pcollapsed = pOrigParent->pch->Collapse();
 
-		if(Config::BackendInterface::pfocus == pclient->pcontainer){
+		if(WManager::Container::pglobalFocus == pclient->pcontainer){
 			WManager::Container *pNewFocus = proot;
 			//for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():pcontainer->pch);
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
-			Config::BackendInterface::SetFocus(pNewFocus);
+			pNewFocus->Focus();
 		}
 		if(premoved->pch)
 			ReleaseContainersRecursive(premoved->pch);
@@ -502,7 +502,7 @@ public:
 
 	void SortStackAppendix(){
 		std::sort(stackAppendix.begin(),stackAppendix.end(),[&](std::pair<const WManager::Client *, WManager::Client *> &a, std::pair<const WManager::Client *, WManager::Client *> &b)->bool{
-			for(auto *p : Config::BackendInterface::floatFocusQueue){
+			for(auto *p : WManager::Container::floatFocusQueue){
 				if(p == a.second->pcontainer)
 					return true;
 				if(p == b.second->pcontainer)
@@ -574,10 +574,10 @@ public:
 		if(!pcollapsed && premoved->pParent->pch) //check if pch is alive, in this case this wasn't the last container
 			pcollapsed = premoved->pParent->pch->Collapse();
 
-		if(Config::BackendInterface::pfocus == pclient->pcontainer){
+		if(WManager::Container::pglobalFocus == pclient->pcontainer){
 			WManager::Container *pNewFocus = proot;
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
-			Config::BackendInterface::SetFocus(pNewFocus);
+			pNewFocus->Focus();
 		}
 		if(premoved->pch)
 			ReleaseContainersRecursive(premoved->pch);
@@ -649,7 +649,7 @@ public:
 	void Present(){
 		if(!PollFrameFence())
 			return;
-		GenerateCommandBuffers(proot,pstackAppendix,Config::BackendInterface::pfocus);
+		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::pglobalFocus);
 		Compositor::X11Compositor::Present();
 	}
 
@@ -688,7 +688,7 @@ public:
 	void Present(){
 		if(!PollFrameFence())
 			return;
-		GenerateCommandBuffers(proot,pstackAppendix,Config::BackendInterface::pfocus);
+		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::pglobalFocus);
 		Compositor::X11DebugCompositor::Present();
 	}
 
@@ -765,7 +765,7 @@ int main(sint argc, const char **pargv){
 		return 1;
 	}
 
-	Config::BackendInterface::pfocus = pbackend->proot;
+	WManager::Container::pglobalFocus = pbackend->proot;
 
 	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
 
