@@ -403,7 +403,6 @@ void BackendInterface::OnTimer(){
 }
 
 boost::python::object BackendInterface::GetFocus(){
-	printf("backend.GetFocus()\n");
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(WManager::Container::pglobalFocus);
 	if(pcontainer1)
 		return pcontainer1->pcontainerInt->self;
@@ -507,6 +506,14 @@ void BackendProxy::OnTimer(){
 	}else BackendInterface::OnTimer();
 }
 
+BackendConfig::BackendConfig(BackendInterface *_pbackendInt) : pbackendInt(_pbackendInt){
+	pbackendInt->pbackend = this;
+}
+
+BackendConfig::~BackendConfig(){
+	//
+}
+
 CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers){
 	//
 }
@@ -529,6 +536,14 @@ CompositorProxy::CompositorProxy(){
 }
 
 CompositorProxy::~CompositorProxy(){
+	//
+}
+
+CompositorConfig::CompositorConfig(CompositorInterface *_pcompositorInt) : pcompositorInt(_pcompositorInt){
+	pcompositorInt->pcompositor = this;
+}
+
+CompositorConfig::~CompositorConfig(){
 	//
 }
 

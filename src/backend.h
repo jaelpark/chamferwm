@@ -235,6 +235,7 @@ protected:
 	virtual void DestroyClient(X11Client *) = 0;
 private:
 	xcb_keycode_t exitKeycode;
+	xcb_keycode_t testKeycode;
 	std::vector<std::pair<X11Client *, MODE>> clients;
 	std::vector<std::pair<xcb_window_t, WManager::Rectangle>> configCache;
 	std::vector<X11Client *> unmappingQueue;

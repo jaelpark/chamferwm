@@ -100,9 +100,9 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	va_end(args);
 }
 
-class RunBackend{
+class RunBackend : public Config::BackendConfig{
 public:
-	RunBackend(WManager::Container *_proot) : proot(_proot), pcomp(0){}
+	RunBackend(WManager::Container *_proot, Config::BackendInterface *_pbackendInt) : proot(_proot), pcomp(0), Config::BackendConfig(_pbackendInt){}
 	virtual ~RunBackend(){}
 
 	void SetCompositor(class RunCompositor *pcomp){
@@ -289,9 +289,9 @@ public:
 	class RunCompositor *pcomp;
 };
 
-class RunCompositor{
+class RunCompositor : public Config::CompositorConfig{
 public:
-	RunCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix) : proot(_proot), pstackAppendix(_pstackAppendix){}
+	RunCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : proot(_proot), pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
 	virtual bool IsAnimating() const = 0;
@@ -303,7 +303,7 @@ protected:
 
 class DefaultBackend : public Backend::Default, public RunBackend{
 public:
-	DefaultBackend() : Default(), RunBackend(new Config::X11ContainerConfig(this)){
+	DefaultBackend(Config::BackendInterface *_pbackendInt) : Default(), RunBackend(new Config::X11ContainerConfig(this),_pbackendInt){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -526,7 +526,7 @@ public:
 //TODO: some of these functions can be templated and shared with the DefaultBackend
 class DebugBackend : public Backend::Debug, public RunBackend{
 public:
-	DebugBackend() : Debug(), RunBackend(new Config::DebugContainerConfig(this)){
+	DebugBackend(Config::BackendInterface *_pbackendInt) : Debug(), RunBackend(new Config::DebugContainerConfig(this),_pbackendInt){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -632,7 +632,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(uint gpuIndex, bool debugLayers, WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11Compositor(gpuIndex,false,pbackend), RunCompositor(_proot,_pstackAppendix){
+	DefaultCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Start();
 
 		wordexp_t expResult;
@@ -678,7 +678,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(uint gpuIndex, bool debugLayers, WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11DebugCompositor(gpuIndex,false,pbackend), RunCompositor(_proot,_pstackAppendix){
+	DebugCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Compositor::X11DebugCompositor::Start();
 
 		wordexp_t expResult;
@@ -724,7 +724,7 @@ public:
 
 class NullCompositor : public Compositor::NullCompositor, public RunCompositor{
 public:
-	NullCompositor() : Compositor::NullCompositor(), RunCompositor(0,0){
+	NullCompositor(Config::CompositorInterface *_pcompositorInt) : Compositor::NullCompositor(), RunCompositor(0,0,_pcompositorInt){
 		Start();
 	}
 
@@ -778,14 +778,16 @@ int main(sint argc, const char **pargv){
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
 	pconfigLoader->Run(configPath?configPath.Get().c_str():0,"config.py");
 
-	uint deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():Config::CompositorInterface::pcompositorInt->deviceIndex;
-	bool debugLayers = debugLayersOpt.Get()?true:Config::CompositorInterface::pcompositorInt->debugLayers;
+	if(deviceIndexOpt)
+		Config::CompositorInterface::pcompositorInt->deviceIndex = deviceIndexOpt.Get();
+	if(debugLayersOpt.Get())
+		Config::CompositorInterface::pcompositorInt->debugLayers = true;
 
 	RunBackend *pbackend;
 	try{
 		if(debugBackend.Get())
-			pbackend = new DebugBackend();
-		else pbackend = new DefaultBackend();
+			pbackend = new DebugBackend(Config::BackendInterface::pbackendInt);
+		else pbackend = new DefaultBackend(Config::BackendInterface::pbackendInt);
 
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
@@ -799,11 +801,11 @@ int main(sint argc, const char **pargv){
 	RunCompositor *pcomp;
 	try{
 		if(noComp.Get())
-			pcomp = new NullCompositor();
+			pcomp = new NullCompositor(Config::CompositorInterface::pcompositorInt);
 		else
 		if(debugBackend.Get())
-			pcomp = new DebugCompositor(deviceIndex,debugLayers,pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
-		else pcomp = new DefaultCompositor(deviceIndex,debugLayers,pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
+			pcomp = new DebugCompositor(pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths,Config::CompositorInterface::pcompositorInt);
+		else pcomp = new DefaultCompositor(pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths,Config::CompositorInterface::pcompositorInt);
 
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());

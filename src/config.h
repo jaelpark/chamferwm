@@ -122,6 +122,8 @@ public:
 	boost::python::object GetFocus();
 	boost::python::object GetRoot();
 
+	class BackendConfig *pbackend;
+
 	static void Bind(boost::python::object);
 
 	static BackendInterface defaultInt;
@@ -142,6 +144,13 @@ public:
 	void OnTimer();
 };
 
+class BackendConfig{
+public:
+	BackendConfig(BackendInterface *);
+	virtual ~BackendConfig();
+	BackendInterface *pbackendInt;
+};
+
 class CompositorInterface{
 public:
 	CompositorInterface();
@@ -149,6 +158,8 @@ public:
 
 	sint deviceIndex;
 	bool debugLayers;
+
+	class CompositorConfig *pcompositor;
 
 	static void Bind(boost::python::object);
 
@@ -160,6 +171,13 @@ class CompositorProxy : public CompositorInterface, public boost::python::wrappe
 public:
 	CompositorProxy();
 	~CompositorProxy();
+};
+
+class CompositorConfig{
+public:
+	CompositorConfig(CompositorInterface *);
+	virtual ~CompositorConfig();
+	CompositorInterface *pcompositorInt;
 };
 
 class Loader{

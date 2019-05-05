@@ -482,6 +482,9 @@ void Default::Start(){
 
 	xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
 
+	testKeycode = SymbolToKeycode(XK_X,psymbols);
+	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,testKeycode,
+		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	exitKeycode = SymbolToKeycode(XK_E,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
@@ -1220,6 +1223,11 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_KEY_PRESS:{
 			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
 			lastTime = pev->time;
+			if(pev->state == XCB_MOD_MASK_1 && pev->detail == testKeycode){
+				//
+				printf("test\n");
+				xcb_grab_keyboard(pcon,0,pscr->root,lastTime,XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+			}else
 			if(pev->state == (XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT) && pev->detail == exitKeycode){
 				free(pevent);
 				return -1;
@@ -1236,6 +1244,7 @@ sint Default::HandleEvent(bool forcePoll){
 			break;
 		case XCB_KEY_RELEASE:{
 			xcb_key_release_event_t *pev = (xcb_key_release_event_t*)pevent;
+			printf("---release %d\n",pev->detail);
 			lastTime = pev->time;
 			for(KeyBinding &binding : keycodes){
 				if(pev->state == binding.mask && pev->detail == binding.keycode){
@@ -1461,7 +1470,8 @@ void Debug::Start(){
 
 	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
-		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY};
+		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
+		|XCB_EVENT_MASK_KEY_RELEASE};
 	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,window,pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pscr->root_visual,XCB_CW_EVENT_MASK,values);
 	const char title[] = "chamferwm compositor debug mode";
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,window,XCB_ATOM_WM_NAME,XCB_ATOM_STRING,8,strlen(title),title);
