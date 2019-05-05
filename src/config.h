@@ -146,10 +146,12 @@ class CompositorInterface{
 public:
 	CompositorInterface();
 	~CompositorInterface();
-	std::string shaderPath;
-	//virtual void SetupShaders();
+
+	sint deviceIndex;
+	bool debugLayers;
 
 	static void Bind(boost::python::object);
+
 	static CompositorInterface defaultInt;
 	static CompositorInterface *pcompositorInt;
 };
@@ -165,6 +167,9 @@ public:
 	Loader(const char *);
 	~Loader();
 	void Run(const char *, const char *);
+
+	static sint deviceIndex;
+	static bool debugLayers;
 };
 
 }

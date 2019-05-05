@@ -507,7 +507,7 @@ void BackendProxy::OnTimer(){
 	}else BackendInterface::OnTimer();
 }
 
-CompositorInterface::CompositorInterface() : shaderPath("."){
+CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers){
 	//
 }
 
@@ -702,7 +702,8 @@ BOOST_PYTHON_MODULE(chamfer){
 		;
 	boost::python::def("BindBackend",BackendInterface::Bind);
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")
-		.add_property("shaderPath",&CompositorInterface::shaderPath)
+		.def_readwrite("deviceIndex",&CompositorInterface::deviceIndex)
+		.def_readwrite("debugLayers",&CompositorInterface::debugLayers)
 		;
 	boost::python::def("BindCompositor",CompositorInterface::Bind);
 	//boost::python::def("GetCompositor",CompositorInterface::GetInterface);
@@ -755,6 +756,9 @@ void Loader::Run(const char *pfilePath, const char *pfileLabel){
 	}
 	fclose(pf);
 }
+
+sint Loader::deviceIndex;
+bool Loader::debugLayers;
 
 }
 

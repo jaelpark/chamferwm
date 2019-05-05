@@ -13,6 +13,7 @@
 #include <iostream>
 
 #include <boost/filesystem.hpp>
+#include <wordexp.h>
 
 Exception::Exception(){
 	this->pmsg = buffer;
@@ -634,15 +635,22 @@ public:
 	DefaultCompositor(uint gpuIndex, bool debugLayers, WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11Compositor(gpuIndex,false,pbackend), RunCompositor(_proot,_pstackAppendix){
 		Start();
 
+		wordexp_t expResult;
 		for(auto &m : args::get(shaderPaths)){
-			boost::filesystem::directory_iterator end;
-			for(boost::filesystem::directory_iterator di(m); di != end; ++di){
-				if(boost::filesystem::is_regular_file(di->status()) &&
-					boost::filesystem::extension(di->path()) == ".spv"){
-					Blob blob(di->path().string().c_str());
-					AddShader(di->path().filename().string().c_str(),&blob);
+			wordexp(m.c_str(),&expResult,WRDE_NOCMD);
+			try{
+				boost::filesystem::directory_iterator end;
+				for(boost::filesystem::directory_iterator di(expResult.we_wordv[0]); di != end; ++di){
+					if(boost::filesystem::is_regular_file(di->status()) &&
+						boost::filesystem::extension(di->path()) == ".spv"){
+						Blob blob(di->path().string().c_str());
+						AddShader(di->path().filename().string().c_str(),&blob);
+					}
 				}
+			}catch(boost::filesystem::filesystem_error &e){
+				DebugPrintf(stderr,"%s\n",e.what());
 			}
+			wordfree(&expResult);
 		}
 
 		DebugPrintf(stdout,"Compositor enabled.\n");
@@ -673,15 +681,22 @@ public:
 	DebugCompositor(uint gpuIndex, bool debugLayers, WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths) : X11DebugCompositor(gpuIndex,false,pbackend), RunCompositor(_proot,_pstackAppendix){
 		Compositor::X11DebugCompositor::Start();
 
+		wordexp_t expResult;
 		for(auto &m : args::get(shaderPaths)){
-			boost::filesystem::directory_iterator end;
-			for(boost::filesystem::directory_iterator di(m); di != end; ++di){
-				if(boost::filesystem::is_regular_file(di->status()) &&
-					boost::filesystem::extension(di->path()) == ".spv"){
-					Blob blob(di->path().string().c_str());
-					AddShader(di->path().filename().string().c_str(),&blob);
+			wordexp(m.c_str(),&expResult,WRDE_NOCMD);
+			try{
+				boost::filesystem::directory_iterator end;
+				for(boost::filesystem::directory_iterator di(expResult.we_wordv[0]); di != end; ++di){
+					if(boost::filesystem::is_regular_file(di->status()) &&
+						boost::filesystem::extension(di->path()) == ".spv"){
+						Blob blob(di->path().string().c_str());
+						AddShader(di->path().filename().string().c_str(),&blob);
+					}
 				}
+			}catch(boost::filesystem::filesystem_error &e){
+				DebugPrintf(stderr,"%s\n",e.what());
 			}
+			wordfree(&expResult);
 		}
 
 		DebugPrintf(stdout,"Compositor enabled.\n");
@@ -741,8 +756,8 @@ int main(sint argc, const char **pargv){
 
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
 	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
-	args::ValueFlag<uint> gpuIndex(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"},0);
-	args::Flag debugLayers(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
+	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
+	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified.",{"shader-path"});
 
 	try{
@@ -757,8 +772,14 @@ int main(sint argc, const char **pargv){
 		return 1;
 	}
 
+	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
+	Config::Loader::debugLayers = debugLayersOpt.Get();
+
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
 	pconfigLoader->Run(configPath?configPath.Get().c_str():0,"config.py");
+
+	uint deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():Config::CompositorInterface::pcompositorInt->deviceIndex;
+	bool debugLayers = debugLayersOpt.Get()?true:Config::CompositorInterface::pcompositorInt->debugLayers;
 
 	RunBackend *pbackend;
 	try{
@@ -781,8 +802,8 @@ int main(sint argc, const char **pargv){
 			pcomp = new NullCompositor();
 		else
 		if(debugBackend.Get())
-			pcomp = new DebugCompositor(gpuIndex.Get(),debugLayers.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
-		else pcomp = new DefaultCompositor(gpuIndex.Get(),debugLayers.Get(),pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
+			pcomp = new DebugCompositor(deviceIndex,debugLayers,pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
+		else pcomp = new DefaultCompositor(deviceIndex,debugLayers,pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths);
 
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());

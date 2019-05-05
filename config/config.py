@@ -507,6 +507,10 @@ class Compositor(chamfer.Compositor):
 backend = Backend();
 chamfer.BindBackend(backend);
 
+compositor = Compositor();
+#compositor.deviceIndex = 0;
+chamfer.BindCompositor(compositor);
+
 pids = psutil.pids();
 pnames = [psutil.Process(pid).name() for pid in pids];
 pcmdls = [a for p in [psutil.Process(pid).cmdline() for pid in pids] for a in p];
