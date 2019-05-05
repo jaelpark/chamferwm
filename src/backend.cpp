@@ -957,8 +957,8 @@ sint Default::HandleEvent(bool forcePoll){
 
 			StackClients();
 
-			if(hintFlags & X11Client::CreateInfo::HINT_FULLSCREEN)
-				SetFullscreen(pclient,true);
+			//if(hintFlags & X11Client::CreateInfo::HINT_FULLSCREEN)
+				//SetFullscreen(pclient,true);
 
 			for(uint i = 0; i < 2; ++i)
 				free(propertyReply1[i]);
