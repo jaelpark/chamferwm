@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=chamfer
+Comment=A tiling X11 window manager with Vulkan compositor.
+Exec=chamfer --shader-path=~/.local/share/chamfer/shaders --shader-path=~/.config/chamfer/shaders/ --shader-path=/usr/share/chamfer/shaders/
+Type=Application
