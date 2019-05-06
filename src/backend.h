@@ -59,13 +59,6 @@ public:
 	virtual ~BackendEvent();
 };
 
-class BackendKeyBinder{
-public:
-	BackendKeyBinder();
-	virtual ~BackendKeyBinder();
-	virtual void BindKey(uint, uint, uint) = 0;
-};
-
 class BackendInterface{
 public:
 	BackendInterface();
@@ -81,7 +74,7 @@ public:
 	virtual void SortStackAppendix() = 0;
 protected:
 	//Functions defined by the implementing backends.
-	virtual void DefineBindings(BackendKeyBinder *) = 0;
+	virtual void DefineBindings() = 0;
 	virtual void EventNotify(const BackendEvent *) = 0;
 	virtual void KeyPress(uint, bool) = 0;
 };
@@ -92,15 +85,6 @@ public:
 	~X11Event();
 	xcb_generic_event_t *pevent;
 	const X11Backend *pbackend;
-};
-
-class X11KeyBinder : public BackendKeyBinder{
-public:
-	X11KeyBinder(xcb_key_symbols_t *, class X11Backend *);
-	~X11KeyBinder();
-	void BindKey(uint, uint, uint);
-	xcb_key_symbols_t *psymbols;
-	X11Backend *pbackend;
 };
 
 class X11Client : public WManager::Client{
@@ -154,7 +138,6 @@ public:
 
 class X11Backend : public BackendInterface{
 friend class X11Event;
-friend class X11KeyBinder;
 friend class X11Client;
 friend class X11Container;
 friend class DebugClient;
@@ -170,6 +153,8 @@ public:
 	void StackRecursiveAppendix(const WManager::Client *);
 	void StackRecursive(const WManager::Container *);
 	void StackClients();
+	void BindKey(uint, uint, uint);
+	void MapKey(uint, uint, uint);
 	//void HandleTimer() const;
 	enum MODE{
 		MODE_UNDEFINED,
@@ -183,6 +168,7 @@ public:
 protected:
 	xcb_connection_t *pcon;
 	xcb_screen_t *pscr;
+	xcb_key_symbols_t *psymbols;
 	xcb_window_t window; //root or test window
 	xcb_timestamp_t lastTime;
 	struct timespec eventTimer;

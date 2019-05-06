@@ -313,9 +313,10 @@ public:
 		delete proot;
 	}
 
-	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
-		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
-		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,false);
+	void DefineBindings(){
+		//Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
+		//Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,false);
+		Config::BackendInterface::pbackendInt->OnSetupKeys(false);
 	}
 
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
@@ -598,9 +599,10 @@ public:
 		}
 	}
 
-	void DefineBindings(Backend::BackendKeyBinder *pkeyBinder){
-		Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
-		Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,true);
+	void DefineBindings(){
+		//Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
+		//Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,true);
+		Config::BackendInterface::pbackendInt->OnSetupKeys(true);
 	}
 
 	void EventNotify(const Backend::BackendEvent *pevent){

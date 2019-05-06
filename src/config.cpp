@@ -380,7 +380,7 @@ BackendInterface::~BackendInterface(){
 	//
 }
 
-void BackendInterface::OnSetupKeys(Backend::X11KeyBinder *pkeyBinder, bool debug){
+void BackendInterface::OnSetupKeys(bool debug){
 	//
 	DebugPrintf(stdout,"No KeyConfig interface, skipping configuration.\n");
 }
@@ -418,6 +418,16 @@ boost::python::object BackendInterface::GetRoot(){
 	return boost::python::object();
 }
 
+void BackendInterface::BindKey(uint symbol, uint mask, uint keyId){
+	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
+	pbackend11->BindKey(symbol,mask,keyId);
+}
+
+void BackendInterface::MapKey(uint symbol, uint mask, uint keyId){
+	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
+	pbackend11->MapKey(symbol,mask,keyId);
+}
+
 void BackendInterface::Bind(boost::python::object obj){
 	BackendInterface &backendInt1 = boost::python::extract<BackendInterface&>(obj)();
 	pbackendInt = &backendInt1;
@@ -435,18 +445,18 @@ BackendProxy::~BackendProxy(){
 	//
 }
 
-void BackendProxy::OnSetupKeys(Backend::X11KeyBinder *pkeyBinder, bool debug){
+void BackendProxy::OnSetupKeys(bool debug){
 	boost::python::override ovr = this->get_override("OnSetupKeys");
 	if(ovr){
 		try{
-			ovr(pkeyBinder,debug);
+			ovr(debug);
 		}catch(boost::python::error_already_set &){
 			PyErr_Print();
 			//
 			boost::python::handle_exception();
 			PyErr_Clear();
 		}
-	}else BackendInterface::OnSetupKeys(pkeyBinder,debug);
+	}else BackendInterface::OnSetupKeys(debug);
 }
 
 boost::python::object BackendProxy::OnCreateContainer(){
@@ -507,7 +517,7 @@ void BackendProxy::OnTimer(){
 }
 
 BackendConfig::BackendConfig(BackendInterface *_pbackendInt) : pbackendInt(_pbackendInt){
-	pbackendInt->pbackend = this;
+	pbackendInt->pbackend = this;//dynamic_cast<Backend::X11Backend *>(this);
 }
 
 BackendConfig::~BackendConfig(){
@@ -556,9 +566,9 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::scope().attr("MOD_MASK_SHIFT") = uint(XCB_MOD_MASK_SHIFT);
 	boost::python::scope().attr("MOD_MASK_CONTROL") = uint(XCB_MOD_MASK_CONTROL);
 
-	boost::python::class_<Backend::X11KeyBinder>("KeyBinder",boost::python::no_init)
-		.def("BindKey",&Backend::X11KeyBinder::BindKey)
-		;
+	//boost::python::class_<Backend::X11KeyBinder>("KeyBinder",boost::python::no_init)
+	//	.def("BindKey",&Backend::X11KeyBinder::BindKey)
+	//	;
 	
 	boost::python::enum_<ContainerInterface::FLOAT>("floatingMode")
 		.value("AUTOMATIC",ContainerInterface::FLOAT_AUTOMATIC)
@@ -714,6 +724,8 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("OnTimer",&BackendInterface::OnTimer)
 		.def("GetFocus",&BackendInterface::GetFocus)
 		.def("GetRoot",&BackendInterface::GetRoot)
+		.def("BindKey",&BackendInterface::BindKey)
+		.def("MapKey",&BackendInterface::MapKey)
 		;
 	boost::python::def("BindBackend",BackendInterface::Bind);
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")

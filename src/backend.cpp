@@ -108,14 +108,6 @@ BackendEvent::~BackendEvent(){
 	//
 }
 
-BackendKeyBinder::BackendKeyBinder(){
-	//
-}
-
-BackendKeyBinder::~BackendKeyBinder(){
-	//
-}
-
 BackendInterface::BackendInterface(){
 	//
 }
@@ -130,25 +122,6 @@ X11Event::X11Event(xcb_generic_event_t *_pevent, const X11Backend *_pbackend) : 
 
 X11Event::~X11Event(){
 	//
-}
-
-X11KeyBinder::X11KeyBinder(xcb_key_symbols_t *_psymbols, X11Backend *_pbackend) : BackendKeyBinder(), psymbols(_psymbols), pbackend(_pbackend){
-	//
-}
-
-X11KeyBinder::~X11KeyBinder(){
-	//
-}
-
-void X11KeyBinder::BindKey(uint symbol, uint mask, uint keyId){
-	xcb_keycode_t keycode = SymbolToKeycode(symbol,psymbols);
-	xcb_grab_key(pbackend->pcon,1,pbackend->pscr->root,mask,keycode,
-		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-	X11Backend::KeyBinding binding;
-	binding.keycode = keycode;
-	binding.mask = mask;
-	binding.keyId = keyId;
-	pbackend->keycodes.push_back(binding);
 }
 
 X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend), flags(0){
@@ -431,6 +404,25 @@ void X11Backend::StackClients(){
 	}
 }
 
+void X11Backend::BindKey(uint symbol, uint mask, uint keyId){
+	xcb_keycode_t keycode = SymbolToKeycode(symbol,psymbols);
+	xcb_grab_key(pcon,1,pscr->root,mask,keycode,
+		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+	X11Backend::KeyBinding binding;
+	binding.keycode = keycode;
+	binding.mask = mask;
+	binding.keyId = keyId;
+	keycodes.push_back(binding);
+}
+
+void X11Backend::MapKey(uint symbol, uint mask, uint keyId){
+	X11Backend::KeyBinding binding;
+	binding.keycode = SymbolToKeycode(symbol,psymbols);
+	binding.mask = mask;
+	binding.keyId = keyId;
+	keycodes.push_back(binding);
+}
+
 /*void X11Backend::HandleTimer() const{
 	char buffer[32];
 
@@ -480,7 +472,8 @@ void Default::Start(){
 	DebugPrintf(stdout,"Screen size: %ux%u\n",pscr->width_in_pixels,pscr->height_in_pixels);
 	//https://standards.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
 
-	xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
+	//xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
+	psymbols = xcb_key_symbols_alloc(pcon);
 
 	testKeycode = SymbolToKeycode(XK_X,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,testKeycode,
@@ -489,12 +482,9 @@ void Default::Start(){
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	
-	X11KeyBinder binder(psymbols,this);
-	DefineBindings(&binder); //TODO: an interface to define bindings? This is passed to config before calling SetupKeys
+	DefineBindings();
 
 	xcb_flush(pcon);
-
-	xcb_key_symbols_free(psymbols);
 
 	uint values[2] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
@@ -575,6 +565,9 @@ void Default::Stop(){
 	xcb_destroy_window(pcon,ewmh_window);
 	xcb_ewmh_connection_wipe(&ewmh);
 	xcb_set_input_focus(pcon,XCB_NONE,XCB_INPUT_FOCUS_POINTER_ROOT,XCB_CURRENT_TIME);
+
+	xcb_key_symbols_free(psymbols);
+
 	xcb_disconnect(pcon);
 	xcb_flush(pcon);
 }
@@ -1449,7 +1442,7 @@ void Debug::Start(){
 
 	DebugPrintf(stdout,"Screen size: %ux%u\n",pscr->width_in_pixels,pscr->height_in_pixels);
 
-	xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
+	psymbols = xcb_key_symbols_alloc(pcon);
 
 	exitKeycode = SymbolToKeycode(XK_Q,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,exitKeycode,
@@ -1461,8 +1454,7 @@ void Debug::Start(){
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_SHIFT,closeKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	
-	X11KeyBinder binder(psymbols,this);
-	DefineBindings(&binder);
+	DefineBindings();
 
 	xcb_flush(pcon);
 
@@ -1478,11 +1470,10 @@ void Debug::Start(){
 	xcb_map_window(pcon,window);
 
 	xcb_flush(pcon);
-
-	xcb_key_symbols_free(psymbols);
 }
 
 void Debug::Stop(){
+	xcb_key_symbols_free(psymbols);
 	//
 	xcb_destroy_window(pcon,window);
 	xcb_flush(pcon);

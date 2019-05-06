@@ -162,92 +162,91 @@ class Container(chamfer.Container):
 			return target.GetParent();
 		
 class Backend(chamfer.Backend):
-	def OnSetupKeys(self, binder, debug):
+	def OnSetupKeys(self, debug):
 		if not debug:
 			#setup key bindings
 			#focusing clients
-			binder.BindKey(ord('l'),chamfer.MOD_MASK_1,Key.FOCUS_RIGHT.value);
-			binder.BindKey(ord('l'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.MOVE_RIGHT.value);
-			binder.BindKey(ord('h'),chamfer.MOD_MASK_1,Key.FOCUS_LEFT.value);
-			binder.BindKey(ord('h'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.MOVE_LEFT.value);
-			binder.BindKey(ord('k'),chamfer.MOD_MASK_1,Key.FOCUS_UP.value);
-			binder.BindKey(ord('j'),chamfer.MOD_MASK_1,Key.FOCUS_DOWN.value);
-			binder.BindKey(ord('a'),chamfer.MOD_MASK_1,Key.FOCUS_PARENT.value);
-			binder.BindKey(ord('s'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
-			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1,Key.FOCUS_FLOAT.value);
-			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.FOCUS_FLOAT_PREV.value);
+			self.BindKey(ord('l'),chamfer.MOD_MASK_1,Key.FOCUS_RIGHT.value);
+			self.BindKey(ord('l'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.MOVE_RIGHT.value);
+			self.BindKey(ord('h'),chamfer.MOD_MASK_1,Key.FOCUS_LEFT.value);
+			self.BindKey(ord('h'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.MOVE_LEFT.value);
+			self.BindKey(ord('k'),chamfer.MOD_MASK_1,Key.FOCUS_UP.value);
+			self.BindKey(ord('j'),chamfer.MOD_MASK_1,Key.FOCUS_DOWN.value);
+			self.BindKey(ord('a'),chamfer.MOD_MASK_1,Key.FOCUS_PARENT.value);
+			self.BindKey(ord('s'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
+			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1,Key.FOCUS_FLOAT.value);
+			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.FOCUS_FLOAT_PREV.value);
 			
 			#reserved
-			binder.BindKey(ord('l'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_RIGHT.value);
-			binder.BindKey(ord('h'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_LEFT.value);
+			self.BindKey(ord('l'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_RIGHT.value);
+			self.BindKey(ord('h'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_LEFT.value);
 
 			#yanking and pasting containers
-			binder.BindKey(ord('y'),chamfer.MOD_MASK_1,Key.YANK_CONTAINER.value);
-			binder.BindKey(ord('y'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL,Key.YANK_APPEND_CONTAINER.value);
-			binder.BindKey(ord('p'),chamfer.MOD_MASK_1,Key.PASTE_CONTAINER.value);
+			self.BindKey(ord('y'),chamfer.MOD_MASK_1,Key.YANK_CONTAINER.value);
+			self.BindKey(ord('y'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL,Key.YANK_APPEND_CONTAINER.value);
+			self.BindKey(ord('p'),chamfer.MOD_MASK_1,Key.PASTE_CONTAINER.value);
 
 			#misc grouping and parenting operations
-			binder.BindKey(ord('w'),chamfer.MOD_MASK_1,Key.LIFT_CONTAINER.value);
+			self.BindKey(ord('w'),chamfer.MOD_MASK_1,Key.LIFT_CONTAINER.value);
 
 			#layout, splits and fullscreen
-			binder.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
-			binder.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
-			binder.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.SPLIT_V.value);
-			binder.BindKey(ord('s'),chamfer.MOD_MASK_4,Key.SPLIT_V.value);
-			binder.BindKey(ord('f'),chamfer.MOD_MASK_1,Key.FULLSCREEN.value);
+			self.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
+			self.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
+			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.SPLIT_V.value);
+			self.BindKey(ord('s'),chamfer.MOD_MASK_4,Key.SPLIT_V.value);
+			self.BindKey(ord('f'),chamfer.MOD_MASK_1,Key.FULLSCREEN.value);
 
 			#workspace dimensions
-			#binder.BindKey(latin1.XK_bracketleft,chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RIGHT.value);
-			binder.BindKey(ord('r'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RESET.value);
-			binder.BindKey(ord('u'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_LEFT.value);
-			binder.BindKey(ord('i'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RIGHT.value);
-			binder.BindKey(ord('u'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_ROOT_LEFT.value);
-			binder.BindKey(ord('i'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_ROOT_RIGHT.value);
+			self.BindKey(ord('r'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RESET.value);
+			self.BindKey(ord('u'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_LEFT.value);
+			self.BindKey(ord('i'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RIGHT.value);
+			self.BindKey(ord('u'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_ROOT_LEFT.value);
+			self.BindKey(ord('i'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_ROOT_RIGHT.value);
 
 			#client dimensions
-			binder.BindKey(ord('r'),chamfer.MOD_MASK_1,Key.CONTRACT_RESET.value);
-			binder.BindKey(latin1.XK_minus,chamfer.MOD_MASK_1,Key.CONTRACT_HORIZONTAL.value);
-			binder.BindKey(ord('j'),chamfer.MOD_MASK_4,Key.CONTRACT_HORIZONTAL.value);
-			binder.BindKey(latin1.XK_minus,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
-			binder.BindKey(ord('j'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
-			binder.BindKey(latin1.XK_plus,chamfer.MOD_MASK_1,Key.EXPAND_HORIZONTAL.value);
-			binder.BindKey(ord('k'),chamfer.MOD_MASK_4,Key.EXPAND_HORIZONTAL.value);
-			binder.BindKey(latin1.XK_plus,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.EXPAND_VERTICAL.value);
-			binder.BindKey(ord('k'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_VERTICAL.value);
+			self.BindKey(ord('r'),chamfer.MOD_MASK_1,Key.CONTRACT_RESET.value);
+			self.BindKey(latin1.XK_minus,chamfer.MOD_MASK_1,Key.CONTRACT_HORIZONTAL.value);
+			self.BindKey(ord('j'),chamfer.MOD_MASK_4,Key.CONTRACT_HORIZONTAL.value);
+			self.BindKey(latin1.XK_minus,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
+			self.BindKey(ord('j'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
+			self.BindKey(latin1.XK_plus,chamfer.MOD_MASK_1,Key.EXPAND_HORIZONTAL.value);
+			self.BindKey(ord('k'),chamfer.MOD_MASK_4,Key.EXPAND_HORIZONTAL.value);
+			self.BindKey(latin1.XK_plus,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.EXPAND_VERTICAL.value);
+			self.BindKey(ord('k'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_VERTICAL.value);
 			
 			#kill + launching applications
-			binder.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
-			binder.BindKey(miscellany.XK_Return,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
-			binder.BindKey(ord('1'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER.value);
-			binder.BindKey(ord('2'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER_PRIVATE.value);
+			self.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
+			self.BindKey(miscellany.XK_Return,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
+			self.BindKey(ord('1'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER.value);
+			self.BindKey(ord('2'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER_PRIVATE.value);
 
 			#volume
-			binder.BindKey(xf86.XK_XF86_AudioRaiseVolume,0,Key.AUDIO_VOLUME_UP.value);
-			binder.BindKey(xf86.XK_XF86_AudioLowerVolume,0,Key.AUDIO_VOLUME_DOWN.value);
+			self.BindKey(xf86.XK_XF86_AudioRaiseVolume,0,Key.AUDIO_VOLUME_UP.value);
+			self.BindKey(xf86.XK_XF86_AudioLowerVolume,0,Key.AUDIO_VOLUME_DOWN.value);
 
 			#monitor brightness
-			binder.BindKey(xf86.XK_XF86_MonBrightnessUp,0,Key.MONITOR_BRIGHTNESS_UP.value);
-			binder.BindKey(xf86.XK_XF86_MonBrightnessDown,0,Key.MONITOR_BRIGHTNESS_DOWN.value);
+			self.BindKey(xf86.XK_XF86_MonBrightnessUp,0,Key.MONITOR_BRIGHTNESS_UP.value);
+			self.BindKey(xf86.XK_XF86_MonBrightnessDown,0,Key.MONITOR_BRIGHTNESS_DOWN.value);
 
 			#hacks
-			binder.BindKey(ord('q'),chamfer.MOD_MASK_CONTROL,Key.NOOP.value); #prevent madness while browsing the web 
+			self.BindKey(ord('q'),chamfer.MOD_MASK_CONTROL,Key.NOOP.value); #prevent madness while browsing the web 
 
 		else:
 			#debug only
-			binder.BindKey(ord('h'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_LEFT.value);
-			binder.BindKey(ord('k'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_UP.value);
-			binder.BindKey(ord('l'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_RIGHT.value);
-			binder.BindKey(ord('j'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_DOWN.value);
-			binder.BindKey(ord('u'),chamfer.MOD_MASK_SHIFT,Key.MOVE_LEFT.value);
-			binder.BindKey(ord('i'),chamfer.MOD_MASK_SHIFT,Key.MOVE_RIGHT.value);
-			binder.BindKey(ord('a'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_PARENT.value);
-			binder.BindKey(ord('s'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_CHILD.value);
-			binder.BindKey(ord('y'),chamfer.MOD_MASK_SHIFT,Key.YANK_CONTAINER.value);
-			binder.BindKey(ord('y'),chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.YANK_APPEND_CONTAINER.value);
-			binder.BindKey(ord('p'),chamfer.MOD_MASK_SHIFT,Key.PASTE_CONTAINER.value);
-			binder.BindKey(ord('w'),chamfer.MOD_MASK_SHIFT,Key.LIFT_CONTAINER.value);
-			binder.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
-			binder.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
+			self.BindKey(ord('h'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_LEFT.value);
+			self.BindKey(ord('k'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_UP.value);
+			self.BindKey(ord('l'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_RIGHT.value);
+			self.BindKey(ord('j'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_DOWN.value);
+			self.BindKey(ord('u'),chamfer.MOD_MASK_SHIFT,Key.MOVE_LEFT.value);
+			self.BindKey(ord('i'),chamfer.MOD_MASK_SHIFT,Key.MOVE_RIGHT.value);
+			self.BindKey(ord('a'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_PARENT.value);
+			self.BindKey(ord('s'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_CHILD.value);
+			self.BindKey(ord('y'),chamfer.MOD_MASK_SHIFT,Key.YANK_CONTAINER.value);
+			self.BindKey(ord('y'),chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.YANK_APPEND_CONTAINER.value);
+			self.BindKey(ord('p'),chamfer.MOD_MASK_SHIFT,Key.PASTE_CONTAINER.value);
+			self.BindKey(ord('w'),chamfer.MOD_MASK_SHIFT,Key.LIFT_CONTAINER.value);
+			self.BindKey(ord('e'),chamfer.MOD_MASK_SHIFT,Key.LAYOUT.value);
+			self.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
 	
 	def OnCreateContainer(self):
 		print("OnCreateContainer()");

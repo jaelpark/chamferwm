@@ -3,11 +3,6 @@
 
 #include <boost/python.hpp>
 
-namespace Backend{
-class BackendKeyBinder;
-class X11KeyBinder;
-}
-
 namespace WManager{
 class Client;
 class Container;
@@ -114,14 +109,17 @@ class BackendInterface{
 public:
 	BackendInterface();
 	virtual ~BackendInterface();
-	virtual void OnSetupKeys(Backend::X11KeyBinder *, bool);
+	virtual void OnSetupKeys(bool);
 	virtual boost::python::object OnCreateContainer();
 	virtual void OnKeyPress(uint);
 	virtual void OnKeyRelease(uint);
 	virtual void OnTimer();
 	boost::python::object GetFocus();
 	boost::python::object GetRoot();
+	void BindKey(uint, uint, uint);
+	void MapKey(uint, uint, uint);
 
+	//class Backend::X11Backend *pbackend;
 	class BackendConfig *pbackend;
 
 	static void Bind(boost::python::object);
@@ -137,7 +135,7 @@ public:
 	BackendProxy();
 	~BackendProxy();
 	//
-	void OnSetupKeys(Backend::X11KeyBinder *, bool);
+	void OnSetupKeys(bool);
 	boost::python::object OnCreateContainer();
 	void OnKeyPress(uint);
 	void OnKeyRelease(uint);
