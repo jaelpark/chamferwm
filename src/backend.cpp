@@ -420,7 +420,14 @@ void X11Backend::MapKey(uint symbol, uint mask, uint keyId){
 	binding.keycode = SymbolToKeycode(symbol,psymbols);
 	binding.mask = mask;
 	binding.keyId = keyId;
+	//printf("map %x, %x, %u\n",mask,binding.keycode,keyId);
 	keycodes.push_back(binding);
+}
+
+void X11Backend::GrabKeyboard(bool enable){
+	if(enable)
+		xcb_grab_keyboard(pcon,0,pscr->root,lastTime,XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+	else xcb_ungrab_keyboard(pcon,lastTime);
 }
 
 /*void X11Backend::HandleTimer() const{
@@ -1216,7 +1223,7 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_KEY_PRESS:{
 			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
 			lastTime = pev->time;
-			if(pev->state == XCB_MOD_MASK_1 && pev->detail == testKeycode){
+			if(pev->state & XCB_MOD_MASK_1 && pev->detail == testKeycode){
 				//
 				printf("test\n");
 				xcb_grab_keyboard(pcon,0,pscr->root,lastTime,XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
@@ -1239,8 +1246,9 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_key_release_event_t *pev = (xcb_key_release_event_t*)pevent;
 			printf("---release %d\n",pev->detail);
 			lastTime = pev->time;
+			//printf("release: %x, %x\n",pev->state,pev->detail);
 			for(KeyBinding &binding : keycodes){
-				if(pev->state == binding.mask && pev->detail == binding.keycode){
+				if(pev->state & binding.mask && pev->detail == binding.keycode){
 					KeyPress(binding.keyId,false);
 					result = 1;
 					break;
@@ -1276,6 +1284,8 @@ sint Default::HandleEvent(bool forcePoll){
 			break;
 		case XCB_MOTION_NOTIFY:{
 			xcb_motion_notify_event_t *pev = (xcb_motion_notify_event_t*)pevent;
+			if(!pdragClient)
+				break;
 
 			if(pdragClient->pcontainer->flags & WManager::Container::FLAG_FLOATING){
 				sint values[2] = {pdragClient->rect.x+pev->event_x-dragRootX,pdragClient->rect.y+pev->event_y-dragRootY};
@@ -1331,9 +1341,9 @@ sint Default::HandleEvent(bool forcePoll){
 			//DebugPrintf(stdout,"default event: %u\n",pevent->response_type & 0x7f);
 
 			X11Event event11(pevent,this);
-			EventNotify(&event11);
+			if(EventNotify(&event11))
+				result = 1;
 
-			result = 1;
 			break;
 		}
 		
@@ -1463,6 +1473,7 @@ void Debug::Start(){
 	uint values[1] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
+		|XCB_EVENT_MASK_KEY_PRESS
 		|XCB_EVENT_MASK_KEY_RELEASE};
 	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,window,pscr->root,100,100,800,600,0,XCB_WINDOW_CLASS_INPUT_OUTPUT,pscr->root_visual,XCB_CW_EVENT_MASK,values);
 	const char title[] = "chamferwm compositor debug mode";
@@ -1517,7 +1528,7 @@ sint Debug::HandleEvent(bool forcePoll){
 				clients.pop_back();
 			}else
 			for(KeyBinding &binding : keycodes){
-				if(pev->state == binding.mask && pev->detail == binding.keycode){
+				if(pev->state & binding.mask && pev->detail == binding.keycode){
 					KeyPress(binding.keyId,true);
 					break;
 				}
@@ -1527,7 +1538,7 @@ sint Debug::HandleEvent(bool forcePoll){
 		case XCB_KEY_RELEASE:{
 			xcb_key_release_event_t *pev = (xcb_key_release_event_t*)pevent;
 			for(KeyBinding &binding : keycodes){
-				if(pev->state == binding.mask && pev->detail == binding.keycode){
+				if(pev->state & binding.mask && pev->detail == binding.keycode){
 					KeyPress(binding.keyId,false);
 					break;
 				}

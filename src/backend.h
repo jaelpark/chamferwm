@@ -75,7 +75,7 @@ public:
 protected:
 	//Functions defined by the implementing backends.
 	virtual void DefineBindings() = 0;
-	virtual void EventNotify(const BackendEvent *) = 0;
+	virtual bool EventNotify(const BackendEvent *) = 0;
 	virtual void KeyPress(uint, bool) = 0;
 };
 
@@ -155,6 +155,7 @@ public:
 	void StackClients();
 	void BindKey(uint, uint, uint);
 	void MapKey(uint, uint, uint);
+	void GrabKeyboard(bool);
 	//void HandleTimer() const;
 	enum MODE{
 		MODE_UNDEFINED,

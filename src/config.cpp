@@ -4,7 +4,6 @@
 #include "CompositorResource.h"
 #include "compositor.h"
 #include "config.h"
-#include <xcb/xcb_keysyms.h> //todo: should not depend on xcb here
 #include <X11/keysym.h>
 #include <wordexp.h>
 
@@ -141,12 +140,11 @@ boost::python::object ContainerInterface::GetFocus() const{
 }
 
 boost::python::object ContainerInterface::GetFloatFocus() const{
-	if(!pcontainer)
+	if(WManager::Container::floatFocusQueue.size() == 0)
 		return boost::python::object();
+	
 	auto m = std::find(WManager::Container::floatFocusQueue.begin(),WManager::Container::floatFocusQueue.end(),pcontainer);
 	if(m == WManager::Container::floatFocusQueue.begin() || m == WManager::Container::floatFocusQueue.end()){
-		if(WManager::Container::floatFocusQueue.size() == 0)
-			return boost::python::object();
 		ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(WManager::Container::floatFocusQueue.back());
 		if(pcontainer1)
 			return pcontainer1->pcontainerInt->self;
@@ -326,6 +324,7 @@ ContainerConfig::ContainerConfig(Backend::X11Backend *_pbackend) : pbackend(_pba
 
 ContainerConfig::~ContainerConfig(){
 	//
+	pcontainerInt->pcontainer = 0;
 }
 
 /*template<typename T>
@@ -419,13 +418,24 @@ boost::python::object BackendInterface::GetRoot(){
 }
 
 void BackendInterface::BindKey(uint symbol, uint mask, uint keyId){
+	if(!pbackend)
+		return;
 	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
 	pbackend11->BindKey(symbol,mask,keyId);
 }
 
 void BackendInterface::MapKey(uint symbol, uint mask, uint keyId){
+	if(!pbackend)
+		return;
 	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
 	pbackend11->MapKey(symbol,mask,keyId);
+}
+
+void BackendInterface::GrabKeyboard(bool enable){
+	if(!pbackend)
+		return;
+	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
+	pbackend11->GrabKeyboard(enable);
 }
 
 void BackendInterface::Bind(boost::python::object obj){
@@ -522,6 +532,7 @@ BackendConfig::BackendConfig(BackendInterface *_pbackendInt) : pbackendInt(_pbac
 
 BackendConfig::~BackendConfig(){
 	//
+	pbackendInt->pbackend = 0;
 }
 
 CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers){
@@ -555,6 +566,7 @@ CompositorConfig::CompositorConfig(CompositorInterface *_pcompositorInt) : pcomp
 
 CompositorConfig::~CompositorConfig(){
 	//
+	pcompositorInt->pcompositor = 0;
 }
 
 BOOST_PYTHON_MODULE(chamfer){
@@ -565,6 +577,7 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::scope().attr("MOD_MASK_5") = uint(XCB_MOD_MASK_5);
 	boost::python::scope().attr("MOD_MASK_SHIFT") = uint(XCB_MOD_MASK_SHIFT);
 	boost::python::scope().attr("MOD_MASK_CONTROL") = uint(XCB_MOD_MASK_CONTROL);
+	boost::python::scope().attr("MOD_MASK_ANY") = uint(XCB_MOD_MASK_ANY);
 
 	//boost::python::class_<Backend::X11KeyBinder>("KeyBinder",boost::python::no_init)
 	//	.def("BindKey",&Backend::X11KeyBinder::BindKey)
@@ -726,6 +739,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("GetRoot",&BackendInterface::GetRoot)
 		.def("BindKey",&BackendInterface::BindKey)
 		.def("MapKey",&BackendInterface::MapKey)
+		.def("GrabKeyboard",&BackendInterface::GrabKeyboard)
 		;
 	boost::python::def("BindBackend",BackendInterface::Bind);
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")

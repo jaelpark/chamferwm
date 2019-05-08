@@ -10,6 +10,7 @@ except ModuleNotFoundError:
 
 try:
 	from Xlib.keysymdef import latin1,miscellany,xf86
+	from Xlib import XK
 except ModuleNotFoundError:
 	print("No Xlib module.");
 
@@ -66,6 +67,8 @@ class Key(Enum):
 
 	MONITOR_BRIGHTNESS_UP = auto()
 	MONITOR_BRIGHTNESS_DOWN = auto()
+
+	MODIFIER = auto()
 
 	NOOP = auto()
 
@@ -228,6 +231,9 @@ class Backend(chamfer.Backend):
 			self.BindKey(xf86.XK_XF86_MonBrightnessUp,0,Key.MONITOR_BRIGHTNESS_UP.value);
 			self.BindKey(xf86.XK_XF86_MonBrightnessDown,0,Key.MONITOR_BRIGHTNESS_DOWN.value);
 
+			#control mappings
+			self.MapKey(XK.XK_Alt_L,chamfer.MOD_MASK_1,Key.MODIFIER.value);
+
 			#hacks
 			self.BindKey(ord('q'),chamfer.MOD_MASK_CONTROL,Key.NOOP.value); #prevent madness while browsing the web 
 
@@ -267,21 +273,25 @@ class Backend(chamfer.Backend):
 		parent = focus.GetParent();
 
 		if keyId == Key.FOCUS_RIGHT.value:
+			self.shiftFocus = None;
 			focus = self.GetFocusTiled() if focus.IsFloating() else focus.GetNext();
 			#focus = focus.GetAdjacent(chamfer.adjacent.RIGHT);
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_LEFT.value:
+			self.shiftFocus = None;
 			focus = self.GetFocusTiled() if focus.IsFloating() else focus.GetPrev();
 			#focus = focus.GetAdjacent(chamfer.adjacent.LEFT);
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_DOWN.value:
+			self.shiftFocus = None;
 			focus = focus.GetNext();
 			#focus = focus.GetAdjacent(chamfer.adjacent.DOWN);
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_UP.value:
+			self.shiftFocus = None;
 			focus = focus.GetPrev();
 			#focus = focus.GetAdjacent(chamfer.adjacent.UP);
 			focus.Focus();
@@ -304,10 +314,16 @@ class Backend(chamfer.Backend):
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_FLOAT.value:
-			focus = focus.GetFloatFocus();
-			if focus is None:
+			try:
+				self.shiftFocus = self.shiftFocus.GetFloatFocus();
+			except AttributeError:
+				self.shiftFocus = focus.GetFloatFocus();
+
+			if self.shiftFocus is None:
 				return;
-			focus.Focus();
+			self.GrabKeyboard(True);
+
+			#TODO: need to draw a yellow "to-focus" frame, until alt is relased
 
 		elif keyId == Key.FOCUS_FLOAT_PREV.value:
 			#TODO, get previous from the focus history
@@ -476,6 +492,13 @@ class Backend(chamfer.Backend):
 
 	def OnKeyRelease(self, keyId):
 		print("key release: {}".format(keyId));
+
+		if keyId == Key.MODIFIER.value:
+			self.GrabKeyboard(False);
+			try:
+				self.shiftFocus.Focus();
+			except AttributeError:
+				pass;
 	
 	def OnTimer(self):
 		battery = psutil.sensors_battery();

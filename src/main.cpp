@@ -484,12 +484,12 @@ public:
 		printf("stackAppendix: %lu\n",stackAppendix.size());
 	}
 
-	void EventNotify(const Backend::BackendEvent *pevent){
+	bool EventNotify(const Backend::BackendEvent *pevent){
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 		if(!pcomp11)
-			return;
+			return false;
 		const Backend::X11Event *pevent11 = dynamic_cast<const Backend::X11Event *>(pevent);
-		pcomp11->FilterEvent(pevent11);
+		return pcomp11->FilterEvent(pevent11);
 	}
 
 	void KeyPress(uint keyId, bool down){
@@ -605,8 +605,9 @@ public:
 		Config::BackendInterface::pbackendInt->OnSetupKeys(true);
 	}
 
-	void EventNotify(const Backend::BackendEvent *pevent){
+	bool EventNotify(const Backend::BackendEvent *pevent){
 		//nothing to process
+		return false;
 	}
 
 	void KeyPress(uint keyId, bool down){

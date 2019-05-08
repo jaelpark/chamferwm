@@ -118,6 +118,7 @@ public:
 	boost::python::object GetRoot();
 	void BindKey(uint, uint, uint);
 	void MapKey(uint, uint, uint);
+	void GrabKeyboard(bool);
 
 	//class Backend::X11Backend *pbackend;
 	class BackendConfig *pbackend;
