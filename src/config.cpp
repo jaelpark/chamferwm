@@ -667,6 +667,10 @@ BOOST_PYTHON_MODULE(chamfer){
 				}
 				return (container.pcontainer->flags & WManager::Container::FLAG_FLOATING) != 0;
 			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
+		.def("IsAlive",boost::python::make_function(
+			[](ContainerInterface &container){
+				return container.pcontainer != 0;
+			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
 		.def_readwrite("canvasOffset",&ContainerInterface::canvasOffset)
 		.def_readwrite("canvasExtent",&ContainerInterface::canvasExtent)
 		.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
