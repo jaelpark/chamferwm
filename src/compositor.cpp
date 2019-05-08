@@ -749,7 +749,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		RenderObject renderObject;
 		renderObject.pclient = (*m).second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
-		renderObject.flags = renderObject.pclient->pcontainer == pfocus?0x1:0;
+		renderObject.flags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 
 		CreateRenderQueueAppendix((*m).second,pfocus);

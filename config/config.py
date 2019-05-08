@@ -19,6 +19,9 @@ try:
 except ModuleNotFoundError:
 	print("No pulsectl module.");
 
+class ShaderFlag(Enum):
+	FOCUS_NEXT = 0x2
+
 class Key(Enum):
 	FOCUS_RIGHT = auto()
 	FOCUS_LEFT = auto()
@@ -273,25 +276,21 @@ class Backend(chamfer.Backend):
 		parent = focus.GetParent();
 
 		if keyId == Key.FOCUS_RIGHT.value:
-			self.shiftFocus = None;
 			focus = self.GetFocusTiled() if focus.IsFloating() else focus.GetNext();
 			#focus = focus.GetAdjacent(chamfer.adjacent.RIGHT);
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_LEFT.value:
-			self.shiftFocus = None;
 			focus = self.GetFocusTiled() if focus.IsFloating() else focus.GetPrev();
 			#focus = focus.GetAdjacent(chamfer.adjacent.LEFT);
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_DOWN.value:
-			self.shiftFocus = None;
 			focus = focus.GetNext();
 			#focus = focus.GetAdjacent(chamfer.adjacent.DOWN);
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_UP.value:
-			self.shiftFocus = None;
 			focus = focus.GetPrev();
 			#focus = focus.GetAdjacent(chamfer.adjacent.UP);
 			focus.Focus();
@@ -315,15 +314,20 @@ class Backend(chamfer.Backend):
 
 		elif keyId == Key.FOCUS_FLOAT.value:
 			try:
+				self.shiftFocus.shaderFlags &= ~ShaderFlag.FOCUS_NEXT.value;
+			except AttributeError:
+				pass;
+
+			try:
 				self.shiftFocus = self.shiftFocus.GetFloatFocus();
 			except AttributeError:
 				self.shiftFocus = focus.GetFloatFocus();
 
 			if self.shiftFocus is None:
 				return;
-			self.GrabKeyboard(True);
+			self.shiftFocus.shaderFlags |= ShaderFlag.FOCUS_NEXT.value;
 
-			#TODO: need to draw a yellow "to-focus" frame, until alt is relased
+			self.GrabKeyboard(True);
 
 		elif keyId == Key.FOCUS_FLOAT_PREV.value:
 			#TODO, get previous from the focus history
@@ -496,10 +500,13 @@ class Backend(chamfer.Backend):
 		if keyId == Key.MODIFIER.value:
 			self.GrabKeyboard(False);
 			try:
+				self.shiftFocus.shaderFlags &= ~ShaderFlag.FOCUS_NEXT.value;
 				self.shiftFocus.Focus();
 			except AttributeError:
 				pass;
 	
+			self.shiftFocus = None;
+
 	def OnTimer(self):
 		battery = psutil.sensors_battery();
 		try:

@@ -79,6 +79,7 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 #elif defined(SHADER_STAGE_PS)
 
 #include "chamfer.hlsl"
+#define FLAGS_FOCUS_NEXT 0x2
 
 [[vk::binding(0)]] Texture2D<float4> content;
 //[[vk::binding(1)]] SamplerState sm;
@@ -120,6 +121,11 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 			if((any(posh > p1-0.5f*d1 && posh < p1+0.5f*d1 && fmod(floor(posh/50.0f),3.0f) < 0.5f) &&
 				any(posh < p1-0.5f*d1-0.25f*screen*borderWidth || posh > p1+0.5f*d1+0.25f*screen*borderWidth)))
 				c.xyz = float3(1.0f,0.6f,0.33f);
+
+		if(flags & FLAGS_FOCUS_NEXT)
+			if((any(posh > p1-0.5f*d1 && posh < p1+0.5f*d1 && fmod(floor(posh/50.0f),3.0f) < 0.5f) &&
+				any(posh < p1-0.5f*d1-0.25f*screen*borderWidth || posh > p1+0.5f*d1+0.25f*screen*borderWidth)))
+				c.xyz = float3(0.957f,0.910f,0.824f);
 
 	}else{
 		if(length(max(abs(posh.xy-p1)-(0.5f*d1-40.0f),0.0f))-40.0f > 0.0f){
