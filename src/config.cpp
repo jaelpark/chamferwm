@@ -139,6 +139,26 @@ boost::python::object ContainerInterface::GetFocus() const{
 	return boost::python::object();
 }
 
+boost::python::object ContainerInterface::GetTiledFocus() const{
+	if(WManager::Container::tiledFocusQueue.size() == 0)
+		return boost::python::object();
+	
+	auto m = std::find_if(WManager::Container::tiledFocusQueue.begin(),WManager::Container::tiledFocusQueue.end(),[&](auto &p)->bool{
+		return p.first == pcontainer;
+	});
+	if(m == WManager::Container::tiledFocusQueue.begin() || m == WManager::Container::tiledFocusQueue.end()){
+		ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(WManager::Container::tiledFocusQueue.back().first);
+		if(pcontainer1)
+			return pcontainer1->pcontainerInt->self;
+		return boost::python::object();
+	}
+
+	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>((*(m-1)).first);
+	if(pcontainer1)
+		return pcontainer1->pcontainerInt->self;
+	return boost::python::object();
+}
+
 boost::python::object ContainerInterface::GetFloatFocus() const{
 	if(WManager::Container::floatFocusQueue.size() == 0)
 		return boost::python::object();
@@ -604,6 +624,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("GetPrev",&ContainerInterface::GetPrev)
 		.def("GetParent",&ContainerInterface::GetParent)
 		.def("GetFocus",&ContainerInterface::GetFocus)
+		.def("GetTiledFocus",&ContainerInterface::GetTiledFocus)
 		.def("GetFloatFocus",&ContainerInterface::GetFloatFocus)
 		.def("GetAdjacent",&ContainerInterface::GetAdjacent)
 		.def("MoveNext",boost::python::make_function(

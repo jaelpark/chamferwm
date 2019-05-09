@@ -431,9 +431,14 @@ public:
 	}
 
 	void DestroyClient(Backend::X11Client *pclient){
-		auto n = std::find(WManager::Container::floatFocusQueue.begin(),WManager::Container::floatFocusQueue.end(),pclient->pcontainer);
-		if(n != WManager::Container::floatFocusQueue.end())
-			WManager::Container::floatFocusQueue.erase(n);
+		auto n1 = std::find_if(WManager::Container::tiledFocusQueue.begin(),WManager::Container::tiledFocusQueue.end(),[&](auto &p)->bool{
+			return p.first == pclient->pcontainer;
+		});
+		if(n1 != WManager::Container::tiledFocusQueue.end())
+			WManager::Container::tiledFocusQueue.erase(n1);
+		auto n2 = std::find(WManager::Container::floatFocusQueue.begin(),WManager::Container::floatFocusQueue.end(),pclient->pcontainer);
+		if(n2 != WManager::Container::floatFocusQueue.end())
+			WManager::Container::floatFocusQueue.erase(n2);
 
 		PrintTree(proot,0);
 

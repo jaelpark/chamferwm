@@ -207,6 +207,16 @@ void Container::Focus(){
 
 	}else
 	if(pParent){
+		tiledFocusQueue.erase(std::remove_if(tiledFocusQueue.begin(),tiledFocusQueue.end(),[&](auto &p)->bool{
+			return p.first == this;
+		}),tiledFocusQueue.end());
+		struct timespec focusTime;
+		clock_gettime(CLOCK_MONOTONIC,&focusTime);
+		if(tiledFocusQueue.size() > 1 && //keep the previous container if it's the only one
+			timespec_diff(focusTime,tiledFocusQueue.back().second) < 0.5)
+			tiledFocusQueue.back() = std::pair<WManager::Container *, struct timespec>(this,focusTime);
+		else tiledFocusQueue.push_back(std::pair<WManager::Container *, struct timespec>(this,focusTime));
+
 		pParent->focusQueue.erase(std::remove(pParent->focusQueue.begin(),pParent->focusQueue.end(),this),pParent->focusQueue.end());
 		pParent->focusQueue.push_back(this);
 
@@ -617,6 +627,7 @@ void Container::SetLayout(LAYOUT layout){
 }
 
 WManager::Container *Container::pglobalFocus = 0; //initially set to root container as soon as it's created
+std::deque<std::pair<WManager::Container *, struct timespec>> Container::tiledFocusQueue;
 std::deque<WManager::Container *> Container::floatFocusQueue;
 
 }

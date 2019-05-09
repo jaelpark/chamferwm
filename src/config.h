@@ -32,6 +32,7 @@ public:
 	boost::python::object GetPrev() const;
 	boost::python::object GetParent() const;
 	boost::python::object GetFocus() const;
+	boost::python::object GetTiledFocus() const;
 	boost::python::object GetFloatFocus() const;
 	boost::python::object GetAdjacent(WManager::Container::ADJACENT) const;
 	void Move(boost::python::object);
@@ -120,15 +121,12 @@ public:
 	void MapKey(uint, uint, uint);
 	void GrabKeyboard(bool);
 
-	//class Backend::X11Backend *pbackend;
 	class BackendConfig *pbackend;
 
 	static void Bind(boost::python::object);
 
 	static BackendInterface defaultInt;
 	static BackendInterface *pbackendInt;
-	//static WManager::Container *pfocus; //client focus, managed by Python
-	//static std::deque<WManager::Container *> floatFocusQueue;
 };
 
 class BackendProxy : public BackendInterface, public boost::python::wrapper<BackendInterface>{

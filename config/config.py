@@ -29,6 +29,7 @@ class Key(Enum):
 	FOCUS_DOWN = auto()
 	FOCUS_PARENT = auto()
 	FOCUS_CHILD = auto()
+	FOCUS_MRU = auto()
 	FOCUS_FLOAT = auto()
 	FOCUS_FLOAT_PREV = auto()
 
@@ -71,7 +72,8 @@ class Key(Enum):
 	MONITOR_BRIGHTNESS_UP = auto()
 	MONITOR_BRIGHTNESS_DOWN = auto()
 
-	MODIFIER = auto()
+	MODIFIER_1 = auto()
+	MODIFIER_4 = auto()
 
 	NOOP = auto()
 
@@ -180,6 +182,7 @@ class Backend(chamfer.Backend):
 			self.BindKey(ord('j'),chamfer.MOD_MASK_1,Key.FOCUS_DOWN.value);
 			self.BindKey(ord('a'),chamfer.MOD_MASK_1,Key.FOCUS_PARENT.value);
 			self.BindKey(ord('s'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
+			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.FOCUS_MRU.value);
 			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1,Key.FOCUS_FLOAT.value);
 			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.FOCUS_FLOAT_PREV.value);
 			
@@ -235,7 +238,8 @@ class Backend(chamfer.Backend):
 			self.BindKey(xf86.XK_XF86_MonBrightnessDown,0,Key.MONITOR_BRIGHTNESS_DOWN.value);
 
 			#control mappings
-			self.MapKey(XK.XK_Alt_L,chamfer.MOD_MASK_1,Key.MODIFIER.value);
+			self.MapKey(XK.XK_Alt_L,chamfer.MOD_MASK_1,Key.MODIFIER_1.value);
+			self.MapKey(XK.XK_Super_L,chamfer.MOD_MASK_4,Key.MODIFIER_4.value);
 
 			#hacks
 			self.BindKey(ord('q'),chamfer.MOD_MASK_CONTROL,Key.NOOP.value); #prevent madness while browsing the web 
@@ -311,6 +315,23 @@ class Backend(chamfer.Backend):
 			if focus is None:
 				return;
 			focus.Focus();
+
+		elif keyId == Key.FOCUS_MRU.value:
+			try:
+				self.shiftFocus.shaderFlags &= ~ShaderFlag.FOCUS_NEXT.value;
+			except AttributeError:
+				pass;
+
+			try:
+				self.shiftFocus = self.shiftFocus.GetTiledFocus();
+			except AttributeError:
+				self.shiftFocus = focus.GetTiledFocus();
+
+			if self.shiftFocus is None:
+				return;
+			self.shiftFocus.shaderFlags |= ShaderFlag.FOCUS_NEXT.value;
+
+			self.GrabKeyboard(True);
 
 		elif keyId == Key.FOCUS_FLOAT.value:
 			try:
@@ -497,7 +518,7 @@ class Backend(chamfer.Backend):
 	def OnKeyRelease(self, keyId):
 		print("key release: {}".format(keyId));
 
-		if keyId == Key.MODIFIER.value:
+		if keyId == Key.MODIFIER_1.value or keyId == Key.MODIFIER_4.value:
 			self.GrabKeyboard(False);
 			try:
 				self.shiftFocus.shaderFlags &= ~ShaderFlag.FOCUS_NEXT.value;

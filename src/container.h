@@ -118,6 +118,7 @@ public:
 	LAYOUT layout;
 
 	static WManager::Container *pglobalFocus; //client focus, managed by Python
+	static std::deque<std::pair<WManager::Container *, struct timespec>> tiledFocusQueue;
 	static std::deque<WManager::Container *> floatFocusQueue;
 };
 
