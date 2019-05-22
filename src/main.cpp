@@ -771,11 +771,11 @@ int main(sint argc, const char **pargv){
 	try{
 		parser.ParseCLI(argc,pargv);
 
-	}catch(args::Help){
+	}catch(args::Help &e){
 		std::cout<<parser;
 		return 0;
 
-	}catch(args::ParseError e){
+	}catch(args::ParseError &e){
 		std::cout<<e.what()<<std::endl<<parser;
 		return 1;
 	}

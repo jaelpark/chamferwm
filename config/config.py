@@ -522,7 +522,7 @@ class Backend(chamfer.Backend):
 			self.GrabKeyboard(False);
 			try:
 				self.shiftFocus.shaderFlags &= ~ShaderFlag.FOCUS_NEXT.value;
-				self.shiftFocus.Focus();
+				self.shiftFocus.Focus(); #ignoreTimer=True
 			except AttributeError:
 				pass;
 	
