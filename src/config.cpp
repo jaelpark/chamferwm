@@ -16,7 +16,7 @@ borderWidth(boost::python::make_tuple(0.0f,0.0f)),
 minSize(boost::python::make_tuple(0.0f,0.0f)),
 maxSize(boost::python::make_tuple(1.0f,1.0f)),
 floatingMode(FLOAT_AUTOMATIC),
-deferredShaderUserFlags(0),
+shaderUserFlags(0),
 pcontainer(0){//,
 	//
 }
@@ -38,31 +38,11 @@ void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 	setup.maxSize.y = boost::python::extract<float>(maxSize[1])();
 }
 
-void ContainerInterface::CopySettingsContainer(){
-	pcontainer->canvasOffset.x = boost::python::extract<float>(canvasOffset[0])();
-	pcontainer->canvasOffset.y = boost::python::extract<float>(canvasOffset[1])();
-	pcontainer->canvasExtent.x = boost::python::extract<float>(canvasExtent[0])();
-	pcontainer->canvasExtent.y = boost::python::extract<float>(canvasExtent[1])();
-	pcontainer->borderWidth.x = boost::python::extract<float>(borderWidth[0])();
-	pcontainer->borderWidth.y = boost::python::extract<float>(borderWidth[1])();
-	pcontainer->minSize.x = boost::python::extract<float>(minSize[0])();
-	pcontainer->minSize.y = boost::python::extract<float>(minSize[1])();
-	pcontainer->maxSize.x = boost::python::extract<float>(maxSize[0])();
-	pcontainer->maxSize.y = boost::python::extract<float>(maxSize[1])();
-
-	for(WManager::Container *pcontainter1 = pcontainer->pch; pcontainter1; pcontainter1 = pcontainter1->pnext){
-		ContainerConfig *pcontainerConfig = dynamic_cast<ContainerConfig *>(pcontainter1);
-		if(!pcontainerConfig)
-			break;
-		pcontainerConfig->pcontainerInt->CopySettingsContainer();
-	}
-}
-
 void ContainerInterface::DeferredPropertyTransfer(){
 	Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>(pcontainer->pclient);
 	if(!pclientFrame)
 		return;
-	pclientFrame->shaderUserFlags = deferredShaderUserFlags;
+	pclientFrame->shaderUserFlags = shaderUserFlags;
 }
 
 void ContainerInterface::OnSetupContainer(){
@@ -658,7 +638,6 @@ BOOST_PYTHON_MODULE(chamfer){
 			[](ContainerInterface &container, WManager::Container::LAYOUT layout){
 				if(!container.pcontainer)
 					return;
-				container.CopySettingsContainer();
 				container.pcontainer->SetLayout(layout);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, WManager::Container::LAYOUT>()))
 		.def("SetFullscreen",boost::python::make_function(
@@ -692,11 +671,91 @@ BOOST_PYTHON_MODULE(chamfer){
 			[](ContainerInterface &container){
 				return container.pcontainer != 0;
 			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
-		.def_readwrite("canvasOffset",&ContainerInterface::canvasOffset)
-		.def_readwrite("canvasExtent",&ContainerInterface::canvasExtent)
-		.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
-		.def_readwrite("minSize",&ContainerInterface::minSize)
-		.def_readwrite("maxSize",&ContainerInterface::maxSize)
+		//.def_readwrite("canvasOffset",&ContainerInterface::canvasOffset)
+		.add_property("canvasOffset",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return container.canvasOffset;
+				return boost::python::make_tuple(container.pcontainer->canvasOffset.x,container.pcontainer->canvasOffset.y);
+			},boost::python::default_call_policies(),boost::mpl::vector<boost::python::tuple, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, boost::python::tuple tuple){
+				if(!container.pcontainer){
+					container.canvasOffset = tuple;
+					return;
+				}
+				container.pcontainer->canvasOffset.x = boost::python::extract<float>(tuple[0])();
+				container.pcontainer->canvasOffset.y = boost::python::extract<float>(tuple[1])();
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, boost::python::tuple>()))
+		//.def_readwrite("canvasExtent",&ContainerInterface::canvasExtent)
+		.add_property("canvasExtent",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return container.canvasExtent;
+				return boost::python::make_tuple(container.pcontainer->canvasExtent.x,container.pcontainer->canvasExtent.y);
+			},boost::python::default_call_policies(),boost::mpl::vector<boost::python::tuple, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, boost::python::tuple tuple){
+				if(!container.pcontainer){
+					container.canvasExtent = tuple;
+					return;
+				}
+				container.pcontainer->canvasExtent.x = boost::python::extract<float>(tuple[0])();
+				container.pcontainer->canvasExtent.y = boost::python::extract<float>(tuple[1])();
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, boost::python::tuple>()))
+		//.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
+		.add_property("borderWidth",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return container.borderWidth;
+				return boost::python::make_tuple(container.pcontainer->borderWidth.x,container.pcontainer->borderWidth.y);
+			},boost::python::default_call_policies(),boost::mpl::vector<boost::python::tuple, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, boost::python::tuple tuple){
+				if(!container.pcontainer){
+					container.borderWidth = tuple;
+					return;
+				}
+				container.pcontainer->borderWidth.x = boost::python::extract<float>(tuple[0])();
+				container.pcontainer->borderWidth.y = boost::python::extract<float>(tuple[1])();
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, boost::python::tuple>()))
+		//.def_readwrite("minSize",&ContainerInterface::minSize)
+		.add_property("minSize",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return container.minSize;
+				return boost::python::make_tuple(container.pcontainer->minSize.x,container.pcontainer->minSize.y);
+			},boost::python::default_call_policies(),boost::mpl::vector<boost::python::tuple, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, boost::python::tuple tuple){
+				if(!container.pcontainer){
+					container.minSize = tuple;
+					return;
+				}
+				container.pcontainer->minSize.x = boost::python::extract<float>(tuple[0])();
+				container.pcontainer->minSize.y = boost::python::extract<float>(tuple[1])();
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, boost::python::tuple>()))
+		//.def_readwrite("maxSize",&ContainerInterface::maxSize)
+		.add_property("maxSize",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return container.maxSize;
+				return boost::python::make_tuple(container.pcontainer->maxSize.x,container.pcontainer->maxSize.y);
+			},boost::python::default_call_policies(),boost::mpl::vector<boost::python::tuple, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, boost::python::tuple tuple){
+				if(!container.pcontainer){
+					container.maxSize = tuple;
+					return;
+				}
+				container.pcontainer->maxSize.x = boost::python::extract<float>(tuple[0])();
+				container.pcontainer->maxSize.y = boost::python::extract<float>(tuple[1])();
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, boost::python::tuple>()))
 		.add_property("fullscreen",boost::python::make_function(
 			[](ContainerInterface &container){
 				if(!container.pcontainer){
@@ -709,21 +768,21 @@ BOOST_PYTHON_MODULE(chamfer){
 			boost::python::make_function(
 			[](ContainerInterface &container){
 				if(!container.pcontainer)
-					return container.deferredShaderUserFlags;
+					return container.shaderUserFlags;
 				Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>(container.pcontainer->pclient);
 				if(!pclientFrame)
-					return container.deferredShaderUserFlags;
+					return container.shaderUserFlags;
 				return pclientFrame->shaderUserFlags;
 			},boost::python::default_call_policies(),boost::mpl::vector<uint, ContainerInterface &>()),
-				boost::python::make_function(
+			boost::python::make_function(
 			[](ContainerInterface &container, uint flags){
 				if(!container.pcontainer){
-					container.deferredShaderUserFlags = flags;
+					container.shaderUserFlags = flags;
 					return;
 				}
 				Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>(container.pcontainer->pclient);
 				if(!pclientFrame){
-					container.deferredShaderUserFlags = flags;
+					container.shaderUserFlags = flags;
 					return;
 				}
 				pclientFrame->shaderUserFlags = flags;

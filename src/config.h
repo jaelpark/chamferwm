@@ -15,7 +15,6 @@ public:
 	ContainerInterface();
 	virtual ~ContainerInterface();
 	void CopySettingsSetup(WManager::Container::Setup &);
-	void CopySettingsContainer();
 	void DeferredPropertyTransfer();
 	virtual void OnSetupContainer();
 	virtual void OnSetupClient();
@@ -37,11 +36,6 @@ public:
 	boost::python::object GetAdjacent(WManager::Container::ADJACENT) const;
 	void Move(boost::python::object);
 //public:
-	boost::python::tuple canvasOffset;
-	boost::python::tuple canvasExtent;
-	boost::python::tuple borderWidth;
-	boost::python::tuple minSize;
-	boost::python::tuple maxSize;
 	enum FLOAT{
 		FLOAT_AUTOMATIC,
 		FLOAT_ALWAYS,
@@ -55,8 +49,15 @@ public:
 	std::string geometryShader;
 	std::string fragmentShader;
 
-	//cached until compositor frame is created
-	uint deferredShaderUserFlags;
+	//temporary storage for deferred assignment (before container is created)
+	boost::python::tuple canvasOffset;
+	boost::python::tuple canvasExtent;
+	boost::python::tuple borderWidth;
+	boost::python::tuple minSize;
+	boost::python::tuple maxSize;
+	//client variables
+	uint shaderUserFlags;
+	//--------------------------------
 
 	WManager::Container *pcontainer;
 	boost::python::object self;
