@@ -314,8 +314,6 @@ public:
 	}
 
 	void DefineBindings(){
-		//Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
-		//Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,false);
 		Config::BackendInterface::pbackendInt->OnSetupKeys(false);
 	}
 
@@ -605,8 +603,6 @@ public:
 	}
 
 	void DefineBindings(){
-		//Backend::X11KeyBinder *pkeyBinder11 = dynamic_cast<Backend::X11KeyBinder*>(pkeyBinder);
-		//Config::BackendInterface::pbackendInt->OnSetupKeys(pkeyBinder11,true);
 		Config::BackendInterface::pbackendInt->OnSetupKeys(true);
 	}
 

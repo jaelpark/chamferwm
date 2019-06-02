@@ -54,6 +54,7 @@ public:
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
 	virtual void Stop() = 0;
+	void AddDamageRegion(const VkRect2D *);
 protected:
 	void InitializeRenderEngine();
 	void DestroyRenderEngine();
@@ -92,6 +93,10 @@ protected:
 	};
 	VkSemaphore (*psemaphore)[SEMAPHORE_INDEX_COUNT];
 	VkFence *pfence;
+	//back buffer to enable the use of previous frame contents
+	//VkImage renderImage;
+	//VkDeviceMemory renderImageDeviceMemory;
+
 	VkCommandPool commandPool;
 	VkCommandBuffer *pcommandBuffers;
 	VkCommandBuffer *pcopyCommandBuffers;
@@ -112,6 +117,7 @@ protected:
 	std::vector<Pipeline> pipelines;
 
 	std::vector<ClientFrame *> updateQueue;
+	std::vector<std::pair<VkRect2D, uint64>> scissorRegions; //scissoring regions based on client damage
 
 	ClientFrame *pbackground;
 

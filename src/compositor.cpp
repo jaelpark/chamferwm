@@ -234,7 +234,9 @@ void CompositorInterface::InitializeRenderEngine(){
 	instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	instanceCreateInfo.pApplicationInfo = &appInfo;
 	if(debugLayers){
-		instanceCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]); //also in vkCreateDevice
+		DebugPrintf(stdout,"Debug layers enabled.\n");
+		//also in vkCreateDevice
+		instanceCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]);
 		instanceCreateInfo.ppEnabledLayerNames = players;
 	}else{
 		instanceCreateInfo.enabledLayerCount = 0;
@@ -412,7 +414,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkAttachmentDescription attachmentDesc = {};
 	attachmentDesc.format = VK_FORMAT_B8G8R8A8_UNORM;
 	attachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-	attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;//VK_ATTACHMENT_LOAD_OP_CLEAR;
 	attachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	attachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -522,6 +524,43 @@ void CompositorInterface::InitializeRenderEngine(){
 				throw Exception("Failed to create a semaphore.");
 	}
 
+	/*VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProps;
+	vkGetPhysicalDeviceMemoryProperties(physicalDev,&physicalDeviceMemoryProps);
+
+	//TODO: replace with Texture() instance
+	VkImageCreateInfo imageCreateInfo = {};
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.extent.width = imageExtent.width;
+	imageCreateInfo.extent.height = imageExtent.height;
+	imageCreateInfo.extent.depth = 1;
+	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.arrayLayers = 1;
+	imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageCreateInfo.flags = 0;
+	if(vkCreateImage(logicalDev,&imageCreateInfo,0,&renderImage) != VK_SUCCESS)
+		throw Exception("Failed to create an image.");
+	
+	VkMemoryRequirements memoryRequirements;
+	vkGetImageMemoryRequirements(logicalDev,renderImage,&memoryRequirements);
+	
+	VkMemoryAllocateInfo memoryAllocateInfo = {};
+	memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memoryAllocateInfo.allocationSize = memoryRequirements.size;
+	for(memoryAllocateInfo.memoryTypeIndex = 0; memoryAllocateInfo.memoryTypeIndex < physicalDeviceMemoryProps.memoryTypeCount; memoryAllocateInfo.memoryTypeIndex++){
+		if(memoryRequirements.memoryTypeBits & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+			break;
+	}
+
+	if(vkAllocateMemory(logicalDev,&memoryAllocateInfo,0,&renderImageDeviceMemory) != VK_SUCCESS)
+		throw Exception("Failed to allocate image memory.");
+	vkBindImageMemory(logicalDev,renderImage,renderImageDeviceMemory,0);*/
+
 	//sampler
 	VkSamplerCreateInfo samplerCreateInfo = {};
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -612,6 +651,9 @@ void CompositorInterface::DestroyRenderEngine(){
 
 	vkDestroySampler(logicalDev,pointSampler,0);
 
+	//vkFreeMemory(logicalDev,renderImageDeviceMemory,0);
+	//vkDestroyImage(logicalDev,renderImage,0);
+
 	for(uint i = 0; i < swapChainImageCount; ++i){
 		vkDestroyFence(logicalDev,pfence[i],0);
 		for(uint j = 0; j < SEMAPHORE_INDEX_COUNT; ++j)
@@ -638,6 +680,17 @@ void CompositorInterface::DestroyRenderEngine(){
 
 void CompositorInterface::AddShader(const char *pname, const Blob *pblob){
 	shaders.emplace_back(pname,pblob,this);
+}
+
+void CompositorInterface::AddDamageRegion(const VkRect2D *prect){
+	//find the regions that ae completely covered by the param
+	//printf("AddDamageRegion: %d, %d, (%ux%u)\n",prect->offset.x,prect->offset.y,prect->extent.width,prect->extent.height);
+	scissorRegions.erase(std::remove_if(scissorRegions.begin(),scissorRegions.end(),[&](auto &scissorRegion)->bool{
+		return prect->offset.x <= scissorRegion.first.offset.x && prect->offset.y <= scissorRegion.first.offset.y
+			&& prect->offset.x+prect->extent.width >= scissorRegion.first.offset.x+scissorRegion.first.extent.width
+			&& prect->offset.y+prect->extent.height >= scissorRegion.first.offset.y+scissorRegion.first.extent.height;
+	}),scissorRegions.end());
+	scissorRegions.push_back(std::pair<VkRect2D, uint>(*prect,frameTag));
 }
 
 void CompositorInterface::WaitIdle(){
@@ -765,13 +818,34 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderQueue.push_back(renderObject);
 	}
 
+	playingAnimation = false;
+	clock_gettime(CLOCK_MONOTONIC,&frameTime);
+
+	for(uint i = 0; i < renderQueue.size(); ++i){
+		RenderObject &renderObject = renderQueue[i];
+
+		float t = timespec_diff(frameTime,renderObject.pclient->translationTime);
+		float s = std::clamp(t/0.3f,0.0f,1.0f);
+		s = 1.0f/(1.0f+expf(-10.0f*s+5.0f));
+
+		glm::vec2 oldRect1 = glm::vec2(renderObject.pclient->oldRect.x,renderObject.pclient->oldRect.y);
+		renderObject.pclient->position = oldRect1+s*(glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y)-oldRect1);
+		if(s < 0.99f)
+			playingAnimation = true;
+		else renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
+
+		VkRect2D frame;
+		frame.offset = {(sint)renderObject.pclient->position.x,(sint)renderObject.pclient->position.y};
+		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
+	}
+	
 	//deque of scissors, pop_front
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	commandBufferBeginInfo.flags = 0;
 	if(vkBeginCommandBuffer(pcopyCommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
-	
+
 	if(pbackground)
 		pbackground->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 
@@ -782,55 +856,65 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to end command buffer recording.");
 
+	VkRect2D screenRect;
+	screenRect.offset = {0,0};
+	screenRect.extent = imageExtent;
+
+	if(playingAnimation)
+		AddDamageRegion(&screenRect);
+
+	glm::ivec2 a = glm::ivec2(imageExtent.width,imageExtent.height);
+	glm::ivec2 b = glm::ivec2(0);
+	for(auto m = scissorRegions.begin(); m != scissorRegions.end();){
+		glm::ivec2 a1 = glm::ivec2((*m).first.offset.x,(*m).first.offset.y);
+		glm::ivec2 b1 = a1+glm::ivec2((*m).first.extent.width,(*m).first.extent.height);
+		a = glm::min(a,a1);
+		b = glm::max(b,b1);
+		
+		if(frameTag > (*m).second+swapChainImageCount+1)
+			m = scissorRegions.erase(m);
+		else ++m;
+	}
+
 	commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 	if(vkBeginCommandBuffer(pcommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
 
-	static const VkClearValue clearValue = {1.0f,1.0f,1.0f,1.0f};
+	//TODO: debug option: draw frames around scissor area
+	VkRect2D scissor;
+	scissor.offset = {a.x,a.y};
+	scissor.extent = {std::max(b.x-a.x,0),std::max(b.y-a.y,0)};
+	vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
+	//printf("scissor: %d, %d, (%ux%u) - %lu\n",scissor.offset.x,scissor.offset.y,scissor.extent.width,scissor.extent.height,scissorRegions.size());
+	//debug: number of scissorRegions, region itself
+
+	//static const VkClearValue clearValue = {1.0f,1.0f,1.0f,1.0f};
 	VkRenderPassBeginInfo renderPassBeginInfo = {};
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassBeginInfo.renderPass = renderPass;
 	renderPassBeginInfo.framebuffer = pframebuffers[currentFrame];
 	renderPassBeginInfo.renderArea.offset = {0,0};
 	renderPassBeginInfo.renderArea.extent = imageExtent;
-	renderPassBeginInfo.clearValueCount = 1;
-	renderPassBeginInfo.pClearValues = &clearValue;
+	renderPassBeginInfo.clearValueCount = 0;//1;
+	renderPassBeginInfo.pClearValues = 0;//&clearValue;
 	vkCmdBeginRenderPass(pcommandBuffers[currentFrame],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
-
-	playingAnimation = false;
-	clock_gettime(CLOCK_MONOTONIC,&frameTime);
 
 	if(pbackground){
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pbackground->passignedSet->p->pipeline);
-		//
-		VkRect2D frame;
-		frame.offset = {0,0};
-		frame.extent = imageExtent;
-
 		//vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&frame);
-		pbackground->Draw(frame,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
+		pbackground->Draw(screenRect,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
 	}
 
 	//for(RenderObject &renderObject : renderQueue){
 	for(uint i = 0; i < renderQueue.size(); ++i){
 		RenderObject &renderObject = renderQueue[i];
 
-		if(renderObject.pclient->rect.x+renderObject.pclient->rect.w <= 1 || renderObject.pclient->rect.y+renderObject.pclient->rect.h <= 1
-			|| renderObject.pclient->rect.x > (sint)imageExtent.width || renderObject.pclient->rect.y > (sint)imageExtent.height)
+		if((sint)renderObject.pclient->position.x+renderObject.pclient->rect.w <= 1 || (sint)renderObject.pclient->position.y+renderObject.pclient->rect.h <= 1
+			|| (sint)renderObject.pclient->position.x > (sint)imageExtent.width || (sint)renderObject.pclient->position.y > (sint)imageExtent.height)
 			continue;
 
-		float t = timespec_diff(frameTime,renderObject.pclient->translationTime);
-		float s = std::clamp(t/0.3f,0.0f,1.0f);
-		s = 1.0f/(1.0f+expf(-10.0f*s+5.0f));
-
-		glm::vec2 oldRect1 = glm::vec2(renderObject.pclient->oldRect.x,renderObject.pclient->oldRect.y);
-		glm::vec2 position = oldRect1+s*(glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y)-oldRect1);
-		if(s < 0.99f)
-			playingAnimation = true;
-		else position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
-
 		VkRect2D frame;
-		frame.offset = {(sint)position.x,(sint)position.y};
+		frame.offset = {(sint)renderObject.pclient->position.x,(sint)renderObject.pclient->position.y};
 		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
 		//frame.offset = {renderObject.pclient->rect.x,renderObject.pclient->rect.y};
 		//frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
@@ -1113,6 +1197,11 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		}
 
 		shmdt(pchpixels);
+
+		VkRect2D screenRect;
+		screenRect.offset = {(sint)position.x+rect1.offset.x,(sint)position.y+rect1.offset.y};
+		screenRect.extent = rect1.extent;
+		pcomp->AddDamageRegion(&screenRect);
 	}
 
 	ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
