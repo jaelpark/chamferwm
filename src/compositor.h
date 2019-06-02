@@ -51,16 +51,18 @@ friend class Texture;
 friend class ShaderModule;
 friend class Pipeline;
 friend class ClientFrame;
+friend class X11ClientFrame;
+friend class X11Background;
 public:
 	CompositorInterface(uint, bool);
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
 	virtual void Stop() = 0;
-	void AddDamageRegion(const VkRect2D *);
 protected:
 	void InitializeRenderEngine();
 	void DestroyRenderEngine();
 	void AddShader(const char *, const Blob *);
+	void AddDamageRegion(const VkRect2D *);
 	void WaitIdle();
 	void CreateRenderQueueAppendix(const WManager::Client *, const WManager::Container *);
 	void CreateRenderQueue(const WManager::Container *, const WManager::Container *);

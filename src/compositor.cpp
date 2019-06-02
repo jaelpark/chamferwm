@@ -840,13 +840,13 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		else renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
 
 		if(renderObject.pclientFrame->shaderFlags != renderObject.pclientFrame->oldShaderFlags){
-			glm::ivec2 borderWidth = 2*glm::ivec2(
+			glm::ivec2 borderWidth = 4*glm::ivec2(
 				renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
 				renderObject.pclient->pcontainer->borderWidth.y*(float)imageExtent.width); //due to aspect, this must be *width
 
 			VkRect2D frame;
-			frame.offset = {(sint)renderObject.pclient->position.x-2*borderWidth.x,(sint)renderObject.pclient->position.y-2*borderWidth.y};
-			frame.extent = {renderObject.pclient->rect.w+4*borderWidth.x,renderObject.pclient->rect.h+4*borderWidth.y};
+			frame.offset = {(sint)renderObject.pclient->position.x-borderWidth.x,(sint)renderObject.pclient->position.y-borderWidth.y};
+			frame.extent = {renderObject.pclient->rect.w+2*borderWidth.x,renderObject.pclient->rect.h+2*borderWidth.y};
 			AddDamageRegion(&frame);
 		}
 	}
@@ -1145,6 +1145,15 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 
 	damage = xcb_generate_id(pbackend->pcon);
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
+
+	glm::ivec2 borderWidth = 4*glm::ivec2(
+		pcontainer->borderWidth.x*(float)pcomp->imageExtent.width,
+		pcontainer->borderWidth.y*(float)pcomp->imageExtent.width); //due to aspect, this must be *width
+	
+	VkRect2D rect1;
+	rect1.offset = {rect.x-borderWidth.x,rect.y-borderWidth.y};
+	rect1.extent = {rect.w+2*borderWidth.x,rect.h+2*borderWidth.y};
+	pcomp->AddDamageRegion(&rect1);
 }
 
 X11ClientFrame::~X11ClientFrame(){
@@ -1152,6 +1161,15 @@ X11ClientFrame::~X11ClientFrame(){
 	//
 	xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	xcb_free_pixmap(pbackend->pcon,windowPixmap);
+
+	glm::ivec2 borderWidth = 4*glm::ivec2(
+		pcontainer->borderWidth.x*(float)pcomp->imageExtent.width,
+		pcontainer->borderWidth.y*(float)pcomp->imageExtent.width); //due to aspect, this must be *width
+	
+	VkRect2D rect1;
+	rect1.offset = {rect.x-borderWidth.x,rect.y-borderWidth.y};
+	rect1.extent = {rect.w+2*borderWidth.x,rect.h+2*borderWidth.y};
+	pcomp->AddDamageRegion(&rect1);
 }
 
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
@@ -1294,6 +1312,11 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	ptexture->Unmap(pcommandBuffer,&rect1,1);
 
 	shmdt(pchpixels);
+
+	VkRect2D screenRect;
+	screenRect.offset = {0,0};
+	screenRect.extent = {w,h};
+	pcomp->AddDamageRegion(&screenRect);
 }
 
 X11Compositor::X11Compositor(uint physicalDevIndex, bool debugLayers, const Backend::X11Backend *_pbackend) : CompositorInterface(physicalDevIndex,debugLayers), pbackend(_pbackend){//, pbackground(0){
