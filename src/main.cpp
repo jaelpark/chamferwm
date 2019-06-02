@@ -588,7 +588,7 @@ public:
 		if(WManager::Container::pglobalFocus == pclient->pcontainer){
 			WManager::Container *pNewFocus = proot;
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
-			Config::X11ContainerConfig *pNewFocus1 = dynamic_cast<Config::X11ContainerConfig *>(pNewFocus);
+			Config::DebugContainerConfig *pNewFocus1 = dynamic_cast<Config::DebugContainerConfig *>(pNewFocus);
 			if(pNewFocus1->pcontainerInt->OnFocus())
 				pNewFocus1->Focus();
 		}
