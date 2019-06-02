@@ -41,6 +41,8 @@ protected:
 public:
 	uint shaderUserFlags;
 protected:
+	uint shaderFlags; //current frame shader flags
+	uint oldShaderFlags; //used to keep track of changes
 	bool fullRegionUpdate;
 };
 
@@ -129,7 +131,7 @@ protected:
 	struct RenderObject{
 		WManager::Client *pclient;
 		ClientFrame *pclientFrame;
-		uint flags;
+		//uint flags;
 	};
 	std::vector<RenderObject> renderQueue;
 	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue;

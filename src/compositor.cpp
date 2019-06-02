@@ -12,7 +12,7 @@
 
 namespace Compositor{
 
-ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), shaderUserFlags(0), fullRegionUpdate(true){
+ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0), fullRegionUpdate(true){
 	pcomp->updateQueue.push_back(this);
 
 	ptexture = pcomp->CreateTexture(w,h);
@@ -706,7 +706,8 @@ void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pcli
 		RenderObject renderObject;
 		renderObject.pclient = (*m).second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
-		renderObject.flags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
+		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
+		renderObject.pclientFrame->shaderFlags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 
 		CreateRenderQueueAppendix((*m).second,pfocus);
@@ -725,7 +726,8 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			RenderObject renderObject;
 			renderObject.pclient = pcont->pclient;
 			renderObject.pclientFrame = pclientFrame;
-			renderObject.flags =
+			renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
+			renderObject.pclientFrame->shaderFlags =
 				(pcont == pfocus || pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
 			renderQueue.push_back(renderObject);
 		}
@@ -784,7 +786,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		RenderObject renderObject;
 		renderObject.pclient = p.second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>(p.second);
-		renderObject.flags = renderObject.pclient->pcontainer == pfocus?0x1:0;
+		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
+		renderObject.pclientFrame->shaderFlags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 	}
 
@@ -802,7 +805,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		RenderObject renderObject;
 		renderObject.pclient = (*m).second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
-		renderObject.flags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
+		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
+		renderObject.pclientFrame->shaderFlags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 
 		CreateRenderQueueAppendix((*m).second,pfocus);
@@ -814,7 +818,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		RenderObject renderObject;
 		renderObject.pclient = p.second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>(p.second);
-		renderObject.flags = renderObject.pclient->pcontainer == pfocus?0x1:0;
+		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
+		renderObject.pclientFrame->shaderFlags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 	}
 
@@ -834,9 +839,16 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			playingAnimation = true;
 		else renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
 
-		VkRect2D frame;
-		frame.offset = {(sint)renderObject.pclient->position.x,(sint)renderObject.pclient->position.y};
-		frame.extent = {renderObject.pclient->rect.w,renderObject.pclient->rect.h};
+		if(renderObject.pclientFrame->shaderFlags != renderObject.pclientFrame->oldShaderFlags){
+			glm::ivec2 borderWidth = 2*glm::ivec2(
+				renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
+				renderObject.pclient->pcontainer->borderWidth.y*(float)imageExtent.width); //due to aspect, this must be *width
+
+			VkRect2D frame;
+			frame.offset = {(sint)renderObject.pclient->position.x-2*borderWidth.x,(sint)renderObject.pclient->position.y-2*borderWidth.y};
+			frame.extent = {renderObject.pclient->rect.w+4*borderWidth.x,renderObject.pclient->rect.h+4*borderWidth.y};
+			AddDamageRegion(&frame);
+		}
 	}
 	
 	//deque of scissors, pop_front
@@ -882,11 +894,10 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 	//TODO: debug option: draw frames around scissor area
 	VkRect2D scissor;
-	scissor.offset = {a.x,a.y};
-	scissor.extent = {std::max(b.x-a.x,0),std::max(b.y-a.y,0)};
+	scissor.offset = {std::max(a.x,0),std::max(a.y,0)};
+	scissor.extent = {std::max(b.x-scissor.offset.x,0),std::max(b.y-scissor.offset.y,0)};
 	vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
 	//printf("scissor: %d, %d, (%ux%u) - %lu\n",scissor.offset.x,scissor.offset.y,scissor.extent.width,scissor.extent.height,scissorRegions.size());
-	//debug: number of scissorRegions, region itself
 
 	//static const VkClearValue clearValue = {1.0f,1.0f,1.0f,1.0f};
 	VkRenderPassBeginInfo renderPassBeginInfo = {};
@@ -949,7 +960,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
 		//vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
-		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.flags,&pcommandBuffers[currentFrame]);
+		//renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.flags,&pcommandBuffers[currentFrame]);
+		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 	}
 
 	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);
