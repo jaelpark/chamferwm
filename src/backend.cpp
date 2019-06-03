@@ -166,20 +166,19 @@ void X11Client::UpdateTranslation(){
 	//Virtual function gets called only if the compositor client class has been initialized.
 	//In case compositor client class hasn't been initialized yet, this will be taken care of
 	//later on subsequent constructor calls.
-	if(oldRect.w != rect.w || oldRect.h != rect.h)
-		AdjustSurface1();
+	//if(oldRect.w != rect.w || oldRect.h != rect.h) //<- moved to compositor
+	AdjustSurface1();
 }
 
 void X11Client::UpdateTranslation(const WManager::Rectangle *prect){
 	//assumes that the xcb configuration has already been performed - automatic windows do this.
 	//alternatively, check if window is manually managed
-	oldRect = (pcontainer->flags & WManager::Container::FLAG_FLOATING)?*prect:rect;
-	//oldRect = rect;
+	//oldRect = (pcontainer->flags & WManager::Container::FLAG_FLOATING)?*prect:rect;
+	oldRect = rect; //TODO: ^^do-not-animate compositore flag
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
-	if(prect->w != rect.w || prect->h != rect.h){
-		rect = *prect;
-		AdjustSurface1();
-	}else rect = *prect;
+	rect = *prect;
+
+	AdjustSurface1();
 }
 
 bool X11Client::ProtocolSupport(xcb_atom_t atom){

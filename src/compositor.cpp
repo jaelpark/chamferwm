@@ -698,8 +698,12 @@ void CompositorInterface::AddDamageRegion(const WManager::Client *pclient){
 		pclient->pcontainer->borderWidth.y*(float)imageExtent.width); //due to aspect, this must be *width
 	
 	VkRect2D rect1;
-	rect1.offset = {(sint)pclient->position.x-borderWidth.x,(sint)pclient->position.y-borderWidth.y};
+	//rect1.offset = {(sint)pclient->position.x-borderWidth.x,(sint)pclient->position.y-borderWidth.y};
+	rect1.offset = {pclient->rect.x-borderWidth.x,pclient->rect.y-borderWidth.y};
 	rect1.extent = {pclient->rect.w+2*borderWidth.x,pclient->rect.h+2*borderWidth.y};
+	AddDamageRegion(&rect1);
+	rect1.offset = {pclient->oldRect.x-borderWidth.x,pclient->oldRect.y-borderWidth.y};
+	rect1.extent = {pclient->oldRect.w+2*borderWidth.x,pclient->oldRect.h+2*borderWidth.y};
 	AddDamageRegion(&rect1);
 }
 
@@ -845,18 +849,10 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 		glm::vec2 oldRect1 = glm::vec2(renderObject.pclient->oldRect.x,renderObject.pclient->oldRect.y);
 		renderObject.pclient->position = oldRect1+s*(glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y)-oldRect1);
-		if(s < 0.99f &&
-			(renderObject.pclient->oldRect.x != renderObject.pclient->rect.x || renderObject.pclient->oldRect.y != renderObject.pclient->rect.y)){
-			glm::ivec2 borderWidth = 4*glm::ivec2(
-				renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
-				renderObject.pclient->pcontainer->borderWidth.y*(float)imageExtent.width); //due to aspect, this must be *width
-			
-			VkRect2D rect1;
-			rect1.offset = {renderObject.pclient->oldRect.x-borderWidth.x,renderObject.pclient->oldRect.y-borderWidth.y};
-			rect1.extent = {renderObject.pclient->rect.w+2*borderWidth.x,renderObject.pclient->rect.h+2*borderWidth.y};
-			AddDamageRegion(&rect1);
-			rect1.offset = {renderObject.pclient->rect.x-borderWidth.x,renderObject.pclient->rect.y-borderWidth.y};
-			AddDamageRegion(&rect1);
+		if(s < 0.99f
+			&& (renderObject.pclient->oldRect.x != renderObject.pclient->rect.x || renderObject.pclient->oldRect.y != renderObject.pclient->rect.y)
+			&& !(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING)){
+			AddDamageRegion(renderObject.pclient); //need to keep adding the client for as long as the animation is playing
 
 			playingAnimation = true;
 		}else renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
@@ -1237,11 +1233,15 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 }
 
 void X11ClientFrame::AdjustSurface1(){
-	xcb_free_pixmap(pbackend->pcon,windowPixmap);
-	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
+	if(oldRect.w != rect.w || oldRect.h != rect.h){
+		xcb_free_pixmap(pbackend->pcon,windowPixmap);
+		xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 
-	AdjustSurface(rect.w,rect.h);
-	pcomp->AddDamageRegion(this);
+		AdjustSurface(rect.w,rect.h);
+		pcomp->AddDamageRegion(this);
+	}else
+	if(oldRect.x != rect.x || oldRect.y != rect.y)
+		pcomp->AddDamageRegion(this);
 }
 
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_w,_h,_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
@@ -1508,9 +1508,12 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 }
 
 void X11DebugClientFrame::AdjustSurface1(){
-	//
-	AdjustSurface(rect.w,rect.h);
-	pcomp->AddDamageRegion(this);
+	if(oldRect.w != rect.w || oldRect.h != rect.h){
+		AdjustSurface(rect.w,rect.h);
+		pcomp->AddDamageRegion(this);
+	}else
+	if(oldRect.x != rect.x || oldRect.y != rect.y)
+		pcomp->AddDamageRegion(this);
 }
 
 X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, bool debugLayers, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,debugLayers,pbackend){
