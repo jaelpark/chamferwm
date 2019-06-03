@@ -845,9 +845,21 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 		glm::vec2 oldRect1 = glm::vec2(renderObject.pclient->oldRect.x,renderObject.pclient->oldRect.y);
 		renderObject.pclient->position = oldRect1+s*(glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y)-oldRect1);
-		if(s < 0.99f)
+		if(s < 0.99f &&
+			(renderObject.pclient->oldRect.x != renderObject.pclient->rect.x || renderObject.pclient->oldRect.y != renderObject.pclient->rect.y)){
+			glm::ivec2 borderWidth = 4*glm::ivec2(
+				renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
+				renderObject.pclient->pcontainer->borderWidth.y*(float)imageExtent.width); //due to aspect, this must be *width
+			
+			VkRect2D rect1;
+			rect1.offset = {renderObject.pclient->oldRect.x-borderWidth.x,renderObject.pclient->oldRect.y-borderWidth.y};
+			rect1.extent = {renderObject.pclient->rect.w+2*borderWidth.x,renderObject.pclient->rect.h+2*borderWidth.y};
+			AddDamageRegion(&rect1);
+			rect1.offset = {renderObject.pclient->rect.x-borderWidth.x,renderObject.pclient->rect.y-borderWidth.y};
+			AddDamageRegion(&rect1);
+
 			playingAnimation = true;
-		else renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
+		}else renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
 
 		if(renderObject.pclientFrame->shaderFlags != renderObject.pclientFrame->oldShaderFlags)
 			AddDamageRegion(renderObject.pclient);
@@ -869,13 +881,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to end command buffer recording.");
-
-	VkRect2D screenRect;
-	screenRect.offset = {0,0};
-	screenRect.extent = imageExtent;
-
-	if(playingAnimation)
-		AddDamageRegion(&screenRect);
 
 	glm::ivec2 a = glm::ivec2(imageExtent.width,imageExtent.height);
 	glm::ivec2 b = glm::ivec2(0);
@@ -899,7 +904,9 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	scissor.offset = {std::max(a.x,0),std::max(a.y,0)};
 	scissor.extent = {std::max(b.x-scissor.offset.x,0),std::max(b.y-scissor.offset.y,0)};
 	vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
-	//printf("scissor: %d, %d, (%ux%u) - %lu\n",scissor.offset.x,scissor.offset.y,scissor.extent.width,scissor.extent.height,scissorRegions.size());
+	//printf("scissor: %d, %d, (%ux%u)\n",scissor.offset.x,scissor.offset.y,scissor.extent.width,scissor.extent.height,scissorRegions.size());
+	//for(auto scissorRegion : scissorRegions)
+		//printf("\t- %d, %d, (%ux%u)\n",scissorRegion.first.offset.x,scissorRegion.first.offset.y,scissorRegion.first.extent.width,scissorRegion.first.extent.height);
 
 	//static const VkClearValue clearValue = {1.0f,1.0f,1.0f,1.0f};
 	VkRenderPassBeginInfo renderPassBeginInfo = {};
@@ -914,7 +921,10 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 	if(pbackground){
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pbackground->passignedSet->p->pipeline);
-		//vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&frame);
+
+		VkRect2D screenRect;
+		screenRect.offset = {0,0};
+		screenRect.extent = imageExtent;
 		pbackground->Draw(screenRect,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
 	}
 
@@ -949,19 +959,10 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 					scissor.extent.width -= scissor.offset.x-oldOffset;
 				}
 			}
-		}
-		//TODO: need five scissors, one for the content and 4 for the thin borders around it
-		glm::ivec2 borderWidth = 2*glm::ivec2(
-			renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
-			renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width); //due to aspect, this must be *width
-		scissor.offset.x = std::max(scissor.offset.x-borderWidth.x,0);
-		scissor.extent.width += 2*borderWidth.x;
-		scissor.offset.y = std::max(scissor.offset.y-borderWidth.y,0);
-		scissor.extent.height += 2*borderWidth.y;*/
+		}*/
 
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
-		//vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
 		//renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.flags,&pcommandBuffers[currentFrame]);
 		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 	}
@@ -1240,6 +1241,7 @@ void X11ClientFrame::AdjustSurface1(){
 	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 
 	AdjustSurface(rect.w,rect.h);
+	pcomp->AddDamageRegion(this);
 }
 
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_w,_h,_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
@@ -1475,10 +1477,12 @@ VkExtent2D X11Compositor::GetExtent() const{
 
 X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : DebugClient(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pshaderName,_pcomp){
 	//
+	pcomp->AddDamageRegion(this);
 }
 
 X11DebugClientFrame::~X11DebugClientFrame(){
 	//delete ptexture;
+	pcomp->AddDamageRegion(this);
 }
 
 void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
@@ -1499,11 +1503,14 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	rect1.offset = {0,0};
 	rect1.extent = {rect.w,rect.h};
 	ptexture->Unmap(pcommandBuffer,&rect1,1);
+
+	pcomp->AddDamageRegion(&rect1);
 }
 
 void X11DebugClientFrame::AdjustSurface1(){
 	//
 	AdjustSurface(rect.w,rect.h);
+	pcomp->AddDamageRegion(this);
 }
 
 X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, bool debugLayers, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,debugLayers,pbackend){

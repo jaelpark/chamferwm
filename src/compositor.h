@@ -53,6 +53,7 @@ friend class Pipeline;
 friend class ClientFrame;
 friend class X11ClientFrame;
 friend class X11Background;
+friend class X11DebugClientFrame;
 public:
 	CompositorInterface(uint, bool);
 	virtual ~CompositorInterface();
