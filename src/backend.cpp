@@ -173,8 +173,7 @@ void X11Client::UpdateTranslation(){
 void X11Client::UpdateTranslation(const WManager::Rectangle *prect){
 	//assumes that the xcb configuration has already been performed - automatic windows do this.
 	//alternatively, check if window is manually managed
-	//oldRect = (pcontainer->flags & WManager::Container::FLAG_FLOATING)?*prect:rect;
-	oldRect = rect; //TODO: ^^do-not-animate compositore flag
+	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = *prect;
 

@@ -524,43 +524,6 @@ void CompositorInterface::InitializeRenderEngine(){
 				throw Exception("Failed to create a semaphore.");
 	}
 
-	/*VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProps;
-	vkGetPhysicalDeviceMemoryProperties(physicalDev,&physicalDeviceMemoryProps);
-
-	//TODO: replace with Texture() instance
-	VkImageCreateInfo imageCreateInfo = {};
-	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageCreateInfo.extent.width = imageExtent.width;
-	imageCreateInfo.extent.height = imageExtent.height;
-	imageCreateInfo.extent.depth = 1;
-	imageCreateInfo.mipLevels = 1;
-	imageCreateInfo.arrayLayers = 1;
-	imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageCreateInfo.flags = 0;
-	if(vkCreateImage(logicalDev,&imageCreateInfo,0,&renderImage) != VK_SUCCESS)
-		throw Exception("Failed to create an image.");
-	
-	VkMemoryRequirements memoryRequirements;
-	vkGetImageMemoryRequirements(logicalDev,renderImage,&memoryRequirements);
-	
-	VkMemoryAllocateInfo memoryAllocateInfo = {};
-	memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	memoryAllocateInfo.allocationSize = memoryRequirements.size;
-	for(memoryAllocateInfo.memoryTypeIndex = 0; memoryAllocateInfo.memoryTypeIndex < physicalDeviceMemoryProps.memoryTypeCount; memoryAllocateInfo.memoryTypeIndex++){
-		if(memoryRequirements.memoryTypeBits & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-			break;
-	}
-
-	if(vkAllocateMemory(logicalDev,&memoryAllocateInfo,0,&renderImageDeviceMemory) != VK_SUCCESS)
-		throw Exception("Failed to allocate image memory.");
-	vkBindImageMemory(logicalDev,renderImage,renderImageDeviceMemory,0);*/
-
 	//sampler
 	VkSamplerCreateInfo samplerCreateInfo = {};
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -647,12 +610,8 @@ void CompositorInterface::DestroyRenderEngine(){
 	for(VkDescriptorPool &descPool : descPoolArray)
 		vkDestroyDescriptorPool(logicalDev,descPool,0);
 	descPoolArray.clear();
-	//vkDestroyDescriptorPool(logicalDev,descPool,0);
 
 	vkDestroySampler(logicalDev,pointSampler,0);
-
-	//vkFreeMemory(logicalDev,renderImageDeviceMemory,0);
-	//vkDestroyImage(logicalDev,renderImage,0);
 
 	for(uint i = 0; i < swapChainImageCount; ++i){
 		vkDestroyFence(logicalDev,pfence[i],0);
@@ -861,7 +820,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			AddDamageRegion(renderObject.pclient);
 	}
 	
-	//deque of scissors, pop_front
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	commandBufferBeginInfo.flags = 0;
@@ -1247,10 +1205,19 @@ void X11ClientFrame::AdjustSurface1(){
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_w,_h,_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
 	//
 	segment = xcb_generate_id(pcomp11->pbackend->pcon);
+
+	VkRect2D screenRect;
+	screenRect.offset = {0,0};
+	screenRect.extent = {w,h};
+	pcomp->AddDamageRegion(&screenRect);
 }
 
 X11Background::~X11Background(){
 	//
+	VkRect2D screenRect;
+	screenRect.offset = {0,0};
+	screenRect.extent = {w,h};
+	pcomp->AddDamageRegion(&screenRect);
 }
 
 void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
