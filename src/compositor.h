@@ -63,6 +63,7 @@ protected:
 	void DestroyRenderEngine();
 	void AddShader(const char *, const Blob *);
 	void AddDamageRegion(const VkRect2D *);
+	void AddDamageRegion(const WManager::Client *);
 	void WaitIdle();
 	void CreateRenderQueueAppendix(const WManager::Client *, const WManager::Container *);
 	void CreateRenderQueue(const WManager::Container *, const WManager::Container *);

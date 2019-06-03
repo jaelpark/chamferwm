@@ -683,14 +683,24 @@ void CompositorInterface::AddShader(const char *pname, const Blob *pblob){
 }
 
 void CompositorInterface::AddDamageRegion(const VkRect2D *prect){
-	//find the regions that ae completely covered by the param
-	//printf("AddDamageRegion: %d, %d, (%ux%u)\n",prect->offset.x,prect->offset.y,prect->extent.width,prect->extent.height);
+	//find the regions that are completely covered by the param and replace them all with the one larger area
 	scissorRegions.erase(std::remove_if(scissorRegions.begin(),scissorRegions.end(),[&](auto &scissorRegion)->bool{
 		return prect->offset.x <= scissorRegion.first.offset.x && prect->offset.y <= scissorRegion.first.offset.y
 			&& prect->offset.x+prect->extent.width >= scissorRegion.first.offset.x+scissorRegion.first.extent.width
 			&& prect->offset.y+prect->extent.height >= scissorRegion.first.offset.y+scissorRegion.first.extent.height;
 	}),scissorRegions.end());
 	scissorRegions.push_back(std::pair<VkRect2D, uint>(*prect,frameTag));
+}
+
+void CompositorInterface::AddDamageRegion(const WManager::Client *pclient){
+	glm::ivec2 borderWidth = 4*glm::ivec2(
+		pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
+		pclient->pcontainer->borderWidth.y*(float)imageExtent.width); //due to aspect, this must be *width
+	
+	VkRect2D rect1;
+	rect1.offset = {(sint)pclient->position.x-borderWidth.x,(sint)pclient->position.y-borderWidth.y};
+	rect1.extent = {pclient->rect.w+2*borderWidth.x,pclient->rect.h+2*borderWidth.y};
+	AddDamageRegion(&rect1);
 }
 
 void CompositorInterface::WaitIdle(){
@@ -839,16 +849,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			playingAnimation = true;
 		else renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
 
-		if(renderObject.pclientFrame->shaderFlags != renderObject.pclientFrame->oldShaderFlags){
-			glm::ivec2 borderWidth = 4*glm::ivec2(
-				renderObject.pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
-				renderObject.pclient->pcontainer->borderWidth.y*(float)imageExtent.width); //due to aspect, this must be *width
-
-			VkRect2D frame;
-			frame.offset = {(sint)renderObject.pclient->position.x-borderWidth.x,(sint)renderObject.pclient->position.y-borderWidth.y};
-			frame.extent = {renderObject.pclient->rect.w+2*borderWidth.x,renderObject.pclient->rect.h+2*borderWidth.y};
-			AddDamageRegion(&frame);
-		}
+		if(renderObject.pclientFrame->shaderFlags != renderObject.pclientFrame->oldShaderFlags)
+			AddDamageRegion(renderObject.pclient);
 	}
 	
 	//deque of scissors, pop_front
@@ -1146,14 +1148,7 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	damage = xcb_generate_id(pbackend->pcon);
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
 
-	glm::ivec2 borderWidth = 4*glm::ivec2(
-		pcontainer->borderWidth.x*(float)pcomp->imageExtent.width,
-		pcontainer->borderWidth.y*(float)pcomp->imageExtent.width); //due to aspect, this must be *width
-	
-	VkRect2D rect1;
-	rect1.offset = {rect.x-borderWidth.x,rect.y-borderWidth.y};
-	rect1.extent = {rect.w+2*borderWidth.x,rect.h+2*borderWidth.y};
-	pcomp->AddDamageRegion(&rect1);
+	pcomp->AddDamageRegion(this);
 }
 
 X11ClientFrame::~X11ClientFrame(){
@@ -1162,14 +1157,7 @@ X11ClientFrame::~X11ClientFrame(){
 	xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	xcb_free_pixmap(pbackend->pcon,windowPixmap);
 
-	glm::ivec2 borderWidth = 4*glm::ivec2(
-		pcontainer->borderWidth.x*(float)pcomp->imageExtent.width,
-		pcontainer->borderWidth.y*(float)pcomp->imageExtent.width); //due to aspect, this must be *width
-	
-	VkRect2D rect1;
-	rect1.offset = {rect.x-borderWidth.x,rect.y-borderWidth.y};
-	rect1.extent = {rect.w+2*borderWidth.x,rect.h+2*borderWidth.y};
-	pcomp->AddDamageRegion(&rect1);
+	pcomp->AddDamageRegion(this);
 }
 
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
