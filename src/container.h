@@ -60,13 +60,6 @@ public:
 	Container * GetParent() const;
 	Container * GetFocus() const;
 	Container * GetRoot();
-	enum ADJACENT{
-		ADJACENT_LEFT,
-		ADJACENT_RIGHT,
-		ADJACENT_UP,
-		ADJACENT_DOWN
-	};
-	Container * GetAdjacent(ADJACENT);
 
 	void MoveNext();
 	void MovePrev();
@@ -118,7 +111,7 @@ public:
 	uint flags;
 	LAYOUT layout;
 
-	static WManager::Container *pglobalFocus; //client focus, managed by Python
+	static WManager::Container *ptreeFocus; //client focus, managed by Python
 	static std::deque<std::pair<WManager::Container *, struct timespec>> tiledFocusQueue;
 	static std::deque<WManager::Container *> floatFocusQueue;
 };

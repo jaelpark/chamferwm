@@ -273,7 +273,7 @@ public:
 			printf("(client), ");
 		if(pcontainer->pParent)
 			printf("(parent: %p), ",pcontainer->pParent);
-		if(WManager::Container::pglobalFocus == pcontainer)
+		if(WManager::Container::ptreeFocus == pcontainer)
 			printf("(focus), ");
 		Config::ContainerConfig *pcontainerConfig = dynamic_cast<Config::ContainerConfig *>(pcontainer);
 		printf("[ContainerConfig: %p, (->container: %p)], ",pcontainerConfig,pcontainerConfig->pcontainerInt->pcontainer);
@@ -463,7 +463,7 @@ public:
 		if(!pcollapsed && pOrigParent->pch)
 			pcollapsed = pOrigParent->pch->Collapse();
 
-		if(WManager::Container::pglobalFocus == pclient->pcontainer){
+		if(WManager::Container::ptreeFocus == pclient->pcontainer){
 			WManager::Container *pNewFocus = proot;
 			//for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():pcontainer->pch);
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
@@ -583,7 +583,7 @@ public:
 		if(!pcollapsed && premoved->pParent->pch) //check if pch is alive, in this case this wasn't the last container
 			pcollapsed = premoved->pParent->pch->Collapse();
 
-		if(WManager::Container::pglobalFocus == pclient->pcontainer){
+		if(WManager::Container::ptreeFocus == pclient->pcontainer){
 			WManager::Container *pNewFocus = proot;
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
 			Config::DebugContainerConfig *pNewFocus1 = dynamic_cast<Config::DebugContainerConfig *>(pNewFocus);
@@ -667,7 +667,7 @@ public:
 	void Present(){
 		if(!PollFrameFence())
 			return;
-		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::pglobalFocus);
+		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
 		Compositor::X11Compositor::Present();
 	}
 
@@ -713,7 +713,7 @@ public:
 	void Present(){
 		if(!PollFrameFence())
 			return;
-		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::pglobalFocus);
+		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
 		Compositor::X11DebugCompositor::Present();
 	}
 
@@ -798,7 +798,7 @@ int main(sint argc, const char **pargv){
 		return 1;
 	}
 
-	WManager::Container::pglobalFocus = pbackend->proot;
+	WManager::Container::ptreeFocus = pbackend->proot;
 
 	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
 

@@ -169,41 +169,61 @@ class Container(chamfer.Container):
 		else:
 			return target.GetParent();
 		
+	def GetFocusDescend(self):
+		container = self;
+		while container.GetFocus() is not None:
+			container = container.GetFocus();
+		return container;
+	
+	#TODO: stop at specified layout
+	#def FindFocusLayout(self, layout):
+		
+	def FindParentLayout(self, layout):
+		try:
+			container = self;
+			while container.GetParent().layout != layout:
+				container = container.GetParent();
+			return container;
+
+		except AttributeError:
+			return self;
+
 class Backend(chamfer.Backend):
 	def OnSetupKeys(self, debug):
 		if not debug:
+			self.modMask = chamfer.MOD_MASK_1;
 			#setup key bindings
 			#focusing clients
-			self.BindKey(ord('l'),chamfer.MOD_MASK_1,Key.FOCUS_RIGHT.value);
-			self.BindKey(ord('l'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.MOVE_RIGHT.value);
-			self.BindKey(ord('h'),chamfer.MOD_MASK_1,Key.FOCUS_LEFT.value);
-			self.BindKey(ord('h'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.MOVE_LEFT.value);
-			self.BindKey(ord('k'),chamfer.MOD_MASK_1,Key.FOCUS_UP.value);
-			self.BindKey(ord('j'),chamfer.MOD_MASK_1,Key.FOCUS_DOWN.value);
-			self.BindKey(ord('a'),chamfer.MOD_MASK_1,Key.FOCUS_PARENT.value);
-			self.BindKey(ord('s'),chamfer.MOD_MASK_1,Key.FOCUS_CHILD.value);
+			self.BindKey(ord('l'),self.modMask,Key.FOCUS_RIGHT.value);
+			self.BindKey(ord('l'),self.modMask|chamfer.MOD_MASK_SHIFT,Key.MOVE_RIGHT.value);
+			self.BindKey(ord('h'),self.modMask,Key.FOCUS_LEFT.value);
+			self.BindKey(ord('h'),self.modMask|chamfer.MOD_MASK_SHIFT,Key.MOVE_LEFT.value);
+			self.BindKey(ord('k'),self.modMask,Key.FOCUS_UP.value);
+			self.BindKey(ord('j'),self.modMask,Key.FOCUS_DOWN.value);
+			self.BindKey(ord('a'),self.modMask,Key.FOCUS_PARENT.value);
+			self.BindKey(ord('s'),self.modMask,Key.FOCUS_CHILD.value);
 			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.FOCUS_MRU.value);
-			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1,Key.FOCUS_FLOAT.value);
-			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.FOCUS_FLOAT_PREV.value);
+			self.BindKey(miscellany.XK_Tab,self.modMask,Key.FOCUS_FLOAT.value);
+			self.BindKey(miscellany.XK_Tab,self.modMask|chamfer.MOD_MASK_SHIFT,Key.FOCUS_FLOAT_PREV.value);
 			
 			#reserved
 			self.BindKey(ord('l'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_RIGHT.value);
 			self.BindKey(ord('h'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_LEFT.value);
 
 			#yanking and pasting containers
-			self.BindKey(ord('y'),chamfer.MOD_MASK_1,Key.YANK_CONTAINER.value);
-			self.BindKey(ord('y'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_CONTROL,Key.YANK_APPEND_CONTAINER.value);
-			self.BindKey(ord('p'),chamfer.MOD_MASK_1,Key.PASTE_CONTAINER.value);
+			self.BindKey(ord('y'),self.modMask,Key.YANK_CONTAINER.value);
+			self.BindKey(ord('y'),self.modMask|chamfer.MOD_MASK_CONTROL,Key.YANK_APPEND_CONTAINER.value);
+			self.BindKey(ord('p'),self.modMask,Key.PASTE_CONTAINER.value);
 
 			#misc grouping and parenting operations
-			self.BindKey(ord('w'),chamfer.MOD_MASK_1,Key.LIFT_CONTAINER.value);
+			self.BindKey(ord('w'),self.modMask,Key.LIFT_CONTAINER.value);
 
 			#layout, splits and fullscreen
-			self.BindKey(ord('e'),chamfer.MOD_MASK_1,Key.LAYOUT.value);
-			self.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_1,Key.SPLIT_V.value);
+			self.BindKey(ord('e'),self.modMask,Key.LAYOUT.value);
+			self.BindKey(latin1.XK_onehalf,self.modMask,Key.SPLIT_V.value);
 			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.SPLIT_V.value);
 			self.BindKey(ord('s'),chamfer.MOD_MASK_4,Key.SPLIT_V.value);
-			self.BindKey(ord('f'),chamfer.MOD_MASK_1,Key.FULLSCREEN.value);
+			self.BindKey(ord('f'),self.modMask,Key.FULLSCREEN.value);
 
 			#workspace dimensions
 			self.BindKey(ord('r'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RESET.value);
@@ -213,19 +233,19 @@ class Backend(chamfer.Backend):
 			self.BindKey(ord('i'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_ROOT_RIGHT.value);
 
 			#client dimensions
-			self.BindKey(ord('r'),chamfer.MOD_MASK_1,Key.CONTRACT_RESET.value);
-			self.BindKey(latin1.XK_minus,chamfer.MOD_MASK_1,Key.CONTRACT_HORIZONTAL.value);
+			self.BindKey(ord('r'),self.modMask,Key.CONTRACT_RESET.value);
+			self.BindKey(latin1.XK_minus,self.modMask,Key.CONTRACT_HORIZONTAL.value);
 			self.BindKey(ord('j'),chamfer.MOD_MASK_4,Key.CONTRACT_HORIZONTAL.value);
-			self.BindKey(latin1.XK_minus,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
+			self.BindKey(latin1.XK_minus,self.modMask|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
 			self.BindKey(ord('j'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
-			self.BindKey(latin1.XK_plus,chamfer.MOD_MASK_1,Key.EXPAND_HORIZONTAL.value);
+			self.BindKey(latin1.XK_plus,self.modMask,Key.EXPAND_HORIZONTAL.value);
 			self.BindKey(ord('k'),chamfer.MOD_MASK_4,Key.EXPAND_HORIZONTAL.value);
-			self.BindKey(latin1.XK_plus,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.EXPAND_VERTICAL.value);
+			self.BindKey(latin1.XK_plus,self.modMask|chamfer.MOD_MASK_SHIFT,Key.EXPAND_VERTICAL.value);
 			self.BindKey(ord('k'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_VERTICAL.value);
 			
 			#kill + launching applications
-			self.BindKey(ord('q'),chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
-			self.BindKey(miscellany.XK_Return,chamfer.MOD_MASK_1,Key.LAUNCH_TERMINAL.value);
+			self.BindKey(ord('q'),self.modMask|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
+			self.BindKey(miscellany.XK_Return,self.modMask,Key.LAUNCH_TERMINAL.value);
 			self.BindKey(ord('1'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER.value);
 			self.BindKey(ord('2'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER_PRIVATE.value);
 
@@ -265,38 +285,25 @@ class Backend(chamfer.Backend):
 		print("OnCreateContainer()");
 		return Container();
 
-	def GetFocusTiled(self):
-		root = self.GetRoot();
-		focusHead = root.GetFocus();
-		focusPrev = None;
-		while focusHead is not None:
-			focusPrev = focusHead;
-			focusHead = focusHead.GetFocus();
-		return focusPrev;
-
 	def OnKeyPress(self, keyId):
 		print("key press: {}".format(keyId));
 		focus = self.GetFocus();
 		parent = focus.GetParent();
 
 		if keyId == Key.FOCUS_RIGHT.value:
-			focus = self.GetFocusTiled() if focus.IsFloating() else focus.GetNext();
-			#focus = focus.GetAdjacent(chamfer.adjacent.RIGHT);
+			focus = focus.GetTiledFocus() if focus.IsFloating() else focus.FindParentLayout(chamfer.layout.VSPLIT).GetNext().GetFocusDescend();
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_LEFT.value:
-			focus = self.GetFocusTiled() if focus.IsFloating() else focus.GetPrev();
-			#focus = focus.GetAdjacent(chamfer.adjacent.LEFT);
+			focus = focus.GetTiledFocus() if focus.IsFloating() else focus.FindParentLayout(chamfer.layout.VSPLIT).GetPrev().GetFocusDescend();
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_DOWN.value:
-			focus = focus.GetNext();
-			#focus = focus.GetAdjacent(chamfer.adjacent.DOWN);
+			focus = focus.GetTiledFocus() if focus.IsFloating() else focus.FindParentLayout(chamfer.layout.HSPLIT).GetNext().GetFocusDescend();
 			focus.Focus();
 
 		elif keyId == Key.FOCUS_UP.value:
-			focus = focus.GetPrev();
-			#focus = focus.GetAdjacent(chamfer.adjacent.UP);
+			focus = focus.GetTiledFocus() if focus.IsFloating() else focus.FindParentLayout(chamfer.layout.HSPLIT).GetPrev().GetFocusDescend();
 			focus.Focus();
 
 		elif keyId == Key.MOVE_RIGHT.value:

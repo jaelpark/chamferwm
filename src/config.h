@@ -33,7 +33,6 @@ public:
 	boost::python::object GetFocus() const;
 	boost::python::object GetTiledFocus() const;
 	boost::python::object GetFloatFocus() const;
-	boost::python::object GetAdjacent(WManager::Container::ADJACENT) const;
 	void Move(boost::python::object);
 //public:
 	enum FLOAT{

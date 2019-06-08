@@ -205,8 +205,8 @@ void Container::Focus(){
 
 		Stack1();
 
-	}else
-	if(pParent){
+	}else{
+	//if(pParent){
 		tiledFocusQueue.erase(std::remove_if(tiledFocusQueue.begin(),tiledFocusQueue.end(),[&](auto &p)->bool{
 			return p.first == this;
 		}),tiledFocusQueue.end());
@@ -217,13 +217,15 @@ void Container::Focus(){
 			tiledFocusQueue.back() = std::pair<WManager::Container *, struct timespec>(this,focusTime);
 		else tiledFocusQueue.push_back(std::pair<WManager::Container *, struct timespec>(this,focusTime));
 
-		pParent->focusQueue.erase(std::remove(pParent->focusQueue.begin(),pParent->focusQueue.end(),this),pParent->focusQueue.end());
-		pParent->focusQueue.push_back(this);
+		for(Container *pcontainer = this; pcontainer->pParent; pcontainer = pcontainer->pParent){
+			pcontainer->pParent->focusQueue.erase(std::remove(pcontainer->pParent->focusQueue.begin(),pcontainer->pParent->focusQueue.end(),pcontainer),pcontainer->pParent->focusQueue.end());
+			pcontainer->pParent->focusQueue.push_back(pcontainer);
+		}
 
 		GetRoot()->Stack();
 	}
 
-	pglobalFocus = this;
+	ptreeFocus = this;
 	Focus1();
 }
 
@@ -270,92 +272,6 @@ Container * Container::GetRoot(){
 	Container *proot = this;
 	for(Container *pcontainer = pParent; pcontainer; proot = pcontainer, pcontainer = pcontainer->pParent);
 	return proot;
-}
-
-Container * Container::GetAdjacent(ADJACENT d){
-	if(!pParent)
-		return this;
-	switch(d){
-	case ADJACENT_LEFT:{
-		//traverse up to get the first container to the left
-		Container *pbase = GetPrev(); //if nothing is found below, it means we are already the most left container
-		for(Container *pcontainer = pParent, *pPrev = this; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pParent){
-			if(pcontainer->layout == LAYOUT_VSPLIT){
-				if(pcontainer->pch != this){
-					pbase = pPrev->GetPrev();
-					break;
-				}
-			}else continue; //cannot move left in vertical placement, continue up
-		}
-		//traverse back down to get the right most container
-		Container *padj = pbase;
-		for(; padj->pch;){
-			if(padj->layout == LAYOUT_VSPLIT || padj->focusQueue.size() == 0)
-				padj = padj->pch->GetPrev();
-			else padj = padj->focusQueue.back();
-		}
-
-		return padj;
-		}
-	case ADJACENT_RIGHT:{
-		Container *pbase = GetNext();
-		for(Container *pcontainer = pParent, *pPrev = this; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pParent){
-			if(pcontainer->layout == LAYOUT_VSPLIT){
-				if(pcontainer->pch->GetPrev() != this){
-					pbase = pPrev->GetNext();
-					break;
-				}
-			}else continue;
-		}
-		Container *padj = pbase;
-		for(; padj->pch;){
-			if(padj->layout == LAYOUT_VSPLIT || padj->focusQueue.size() == 0)
-				padj = padj->pch;
-			else padj = padj->focusQueue.back();
-		}
-
-		return padj;
-		}
-	case ADJACENT_UP:{
-		Container *pbase = GetPrev();
-		for(Container *pcontainer = pParent, *pPrev = this; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pParent){
-			if(pcontainer->layout == LAYOUT_HSPLIT){
-				if(pcontainer->pch != this){
-					pbase = pPrev->GetPrev();
-					break;
-				}
-			}else continue;
-		}
-		Container *padj = pbase;
-		for(; padj->pch;){
-			if(padj->layout == LAYOUT_HSPLIT || padj->focusQueue.size() == 0)
-				padj = padj->pch->GetPrev();
-			else padj = padj->focusQueue.back();
-		}
-
-		return padj;
-		}
-	case ADJACENT_DOWN:{
-		Container *pbase = GetNext();
-		for(Container *pcontainer = pParent, *pPrev = this; pcontainer; pPrev = pcontainer, pcontainer = pcontainer->pParent){
-			if(pcontainer->layout == LAYOUT_HSPLIT){
-				if(pcontainer->pch->GetPrev() != this){
-					pbase = pPrev->GetNext();
-					break;
-				}
-			}else continue;
-		}
-		Container *padj = pbase;
-		for(; padj->pch;){
-			if(padj->layout == LAYOUT_HSPLIT || padj->focusQueue.size() == 0)
-				padj = padj->pch;
-			else padj = padj->focusQueue.back();
-		}
-
-		return padj;
-		}
-	}
-	return this;
 }
 
 void Container::MoveNext(){
@@ -626,7 +542,7 @@ void Container::SetLayout(LAYOUT layout){
 	Translate();
 }
 
-WManager::Container *Container::pglobalFocus = 0; //initially set to root container as soon as it's created
+WManager::Container *Container::ptreeFocus = 0; //initially set to root container as soon as it's created
 std::deque<std::pair<WManager::Container *, struct timespec>> Container::tiledFocusQueue;
 std::deque<WManager::Container *> Container::floatFocusQueue;
 

@@ -157,16 +157,6 @@ boost::python::object ContainerInterface::GetFloatFocus() const{
 	return boost::python::object();
 }
 
-boost::python::object ContainerInterface::GetAdjacent(WManager::Container::ADJACENT a) const{
-	if(!pcontainer)
-		return boost::python::object();
-	WManager::Container *padj = pcontainer->GetAdjacent(a);
-	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(padj);
-	if(pcontainer1)
-		return pcontainer1->pcontainerInt->self;
-	return boost::python::object();
-}
-
 void ContainerInterface::Move(boost::python::object containerObject){
 	//
 	boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
@@ -402,14 +392,14 @@ void BackendInterface::OnTimer(){
 }
 
 boost::python::object BackendInterface::GetFocus(){
-	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(WManager::Container::pglobalFocus);
+	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(WManager::Container::ptreeFocus);
 	if(pcontainer1)
 		return pcontainer1->pcontainerInt->self;
 	return boost::python::object();
 }
 
 boost::python::object BackendInterface::GetRoot(){
-	WManager::Container *pParent = WManager::Container::pglobalFocus;//pfocus;
+	WManager::Container *pParent = WManager::Container::ptreeFocus;//pfocus;
 	for(WManager::Container *pcontainer = pParent->pParent; pcontainer; pParent = pcontainer, pcontainer = pcontainer->pParent);
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pParent);
 	if(pcontainer1)
@@ -599,14 +589,13 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("OnCreate",&ContainerInterface::OnCreate)
 		.def("OnFullscreen",&ContainerInterface::OnFullscreen)
 		.def("OnFocus",&ContainerInterface::OnFocus)
-		.def("OnProperty",&ContainerInterface::OnPropertyChange)
+		.def("OnPropertyChange",&ContainerInterface::OnPropertyChange)
 		.def("GetNext",&ContainerInterface::GetNext)
 		.def("GetPrev",&ContainerInterface::GetPrev)
 		.def("GetParent",&ContainerInterface::GetParent)
 		.def("GetFocus",&ContainerInterface::GetFocus)
 		.def("GetTiledFocus",&ContainerInterface::GetTiledFocus)
 		.def("GetFloatFocus",&ContainerInterface::GetFloatFocus)
-		.def("GetAdjacent",&ContainerInterface::GetAdjacent)
 		.def("MoveNext",boost::python::make_function(
 			[](ContainerInterface &container){
 				if(!container.pcontainer)
@@ -803,11 +792,11 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("floatingMode",&ContainerInterface::floatingMode)
 		;
 	
-	boost::python::enum_<WManager::Container::ADJACENT>("adjacent")
+	/*boost::python::enum_<WManager::Container::ADJACENT>("adjacent")
 		.value("LEFT",WManager::Container::ADJACENT_LEFT)
 		.value("RIGHT",WManager::Container::ADJACENT_RIGHT)
 		.value("UP",WManager::Container::ADJACENT_UP)
-		.value("DOWN",WManager::Container::ADJACENT_DOWN);
+		.value("DOWN",WManager::Container::ADJACENT_DOWN);*/
 
 	boost::python::enum_<WManager::Container::LAYOUT>("layout")
 		.value("VSPLIT",WManager::Container::LAYOUT_VSPLIT)
