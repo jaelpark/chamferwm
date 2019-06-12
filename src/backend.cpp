@@ -146,8 +146,6 @@ X11Client::~X11Client(){
 }
 
 void X11Client::UpdateTranslation(){
-	if(flags & FLAG_UNMAPPING)
-		return; //if the window is about to be destroyed, do not attempt to adjust the surface of anything
 	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
 	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
 	//glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
@@ -163,6 +161,9 @@ void X11Client::UpdateTranslation(){
 
 	xcb_flush(pbackend->pcon);
 
+	if(flags & FLAG_UNMAPPING)
+		return; //if the window is about to be destroyed, do not attempt to adjust the surface of anything
+	
 	//Virtual function gets called only if the compositor client class has been initialized.
 	//In case compositor client class hasn't been initialized yet, this will be taken care of
 	//later on subsequent constructor calls.
@@ -387,7 +388,6 @@ void X11Backend::StackClients(){
 
 		uint values[1] = {XCB_STACK_MODE_ABOVE};
 		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
-		printf("stack: %x\n",pclient11->window);
 
 		StackRecursiveAppendix((*m).second);
 
@@ -480,9 +480,9 @@ void Default::Start(){
 	//xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
 	psymbols = xcb_key_symbols_alloc(pcon);
 
-	testKeycode = SymbolToKeycode(XK_X,psymbols);
-	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,testKeycode,
-		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
+	//testKeycode = SymbolToKeycode(XK_X,psymbols);
+	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,testKeycode,
+	//	XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	exitKeycode = SymbolToKeycode(XK_E,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
@@ -1128,7 +1128,7 @@ sint Default::HandleEvent(bool forcePoll){
 			}
 
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
-			if(!pclient1)
+			if(!pclient1 || pclient1->flags & X11Client::FLAG_UNMAPPING)
 				break;
 
 			if(pev->atom == XCB_ATOM_WM_NAME){
@@ -1179,7 +1179,7 @@ sint Default::HandleEvent(bool forcePoll){
 				break;
 			}*/
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
-			if(!pclient1)
+			if(!pclient1 || pclient1->flags & X11Client::FLAG_UNMAPPING)
 				break;
 
 			if(pev->type == ewmh._NET_WM_STATE){
@@ -1221,11 +1221,11 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_KEY_PRESS:{
 			xcb_key_press_event_t *pev = (xcb_key_press_event_t*)pevent;
 			lastTime = pev->time;
-			if(pev->state & XCB_MOD_MASK_1 && pev->detail == testKeycode){
+			/*if(pev->state & XCB_MOD_MASK_1 && pev->detail == testKeycode){
 				//
 				printf("test\n");
 				xcb_grab_keyboard(pcon,0,pscr->root,lastTime,XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
-			}else
+			}else*/
 			if(pev->state == (XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT) && pev->detail == exitKeycode){
 				free(pevent);
 				return -1;
@@ -1242,7 +1242,6 @@ sint Default::HandleEvent(bool forcePoll){
 			break;
 		case XCB_KEY_RELEASE:{
 			xcb_key_release_event_t *pev = (xcb_key_release_event_t*)pevent;
-			printf("---release %d\n",pev->detail);
 			lastTime = pev->time;
 			//printf("release: %x, %x\n",pev->state,pev->detail);
 			for(KeyBinding &binding : keycodes){
@@ -1260,7 +1259,7 @@ sint Default::HandleEvent(bool forcePoll){
 			X11Client *pclient11 = FindClient(pev->event,MODE_UNDEFINED);
 			/*if(!pclient11 || !(pclient11->pcontainer->flags & WManager::Container::FLAG_FLOATING))
 				break;*/
-			if(!pclient11)
+			if(!pclient11 || pclient11->flags & X11Client::FLAG_UNMAPPING)
 				break;
 
 			pdragClient = pclient11;
@@ -1282,7 +1281,7 @@ sint Default::HandleEvent(bool forcePoll){
 			break;
 		case XCB_MOTION_NOTIFY:{
 			xcb_motion_notify_event_t *pev = (xcb_motion_notify_event_t*)pevent;
-			if(!pdragClient)
+			if(!pdragClient || pdragClient->flags & X11Client::FLAG_UNMAPPING)
 				break;
 
 			if(pdragClient->pcontainer->flags & WManager::Container::FLAG_FLOATING){
@@ -1349,8 +1348,7 @@ sint Default::HandleEvent(bool forcePoll){
 		xcb_flush(pcon);
 	}
 
-	//Destroy the clients here, after the event queue has been cleared. This is to ensure that no already destroyed
-	//client is attempted to be readjusted.
+	//Destroy the clients here, after the event queue has been cleared. This is to ensure that no already destroyed client is attempted to be readjusted.
 	for(X11Client *pclient : unmappingQueue)
 		DestroyClient(pclient);
 	unmappingQueue.clear();

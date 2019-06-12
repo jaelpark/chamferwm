@@ -854,8 +854,11 @@ void Loader::Run(const char *pfilePath, const char *pfileLabel){
 			wordfree(&expResult);
 		}
 	}else{
-		DebugPrintf(stdout,"Loading config %s...\n",pfilePath);
-		pf = fopen(pfilePath,"rb");
+		wordexp_t expResult;
+		wordexp(pfilePath,&expResult,WRDE_NOCMD);
+		DebugPrintf(stdout,"Loading config %s...\n",expResult.we_wordv[0]);
+		pf = fopen(expResult.we_wordv[0],"rb");
+		wordfree(&expResult);
 	}
 	if(!pf){
 		DebugPrintf(stderr,"Unable to find configuration file.\n");

@@ -92,8 +92,12 @@ class Container(chamfer.Container):
 
 	#setup the client before it's created (shaders)
 	def OnSetupClient(self):
-		#Panels, docks etc. should be rendered with no decorations. Later, it should be possible to check
-		#this by looking at the window type property, not just the class name.
+		#TODO: Panels, docks etc. should be rendered with no decorations. Later, it should be possible to check this by looking at the window type property, not just the class name.
+		try:
+			print("Setting up \"{}\" ({})".format(self.wm_name,self.wm_class),flush=True);
+		except UnicodeDecodeError:
+			print("UnicodeDecodeError",flush=True);
+
 		if self.wm_class == "Conky":
 			self.vertexShader = "default_vertex.spv";
 			self.geometryShader = "default_geometry.spv";
@@ -119,9 +123,9 @@ class Container(chamfer.Container):
 	#called once client has been created and mapped to display
 	def OnCreate(self):
 		try:
-			print("created client, {} ({})".format(self.wm_name,self.wm_class));
+			print("Created client \"{}\" ({})".format(self.wm_name,self.wm_class),flush=True);
 		except UnicodeDecodeError:
-			pass;
+			print("UnicodeDecodeError",flush=True);
 		self.Focus();
 
 	#called to request fullscreen mode - either by calling SetFullscreen or by client message
@@ -145,7 +149,10 @@ class Container(chamfer.Container):
 
 	#called every time a client property has changed (title etc.)
 	def OnPropertyChange(self, propId):
-		print(self.wm_name);
+		try:
+			print(self.wm_name,flush=True);
+		except UnicodeDecodeError:
+			print("UnicodeDecodeError",flush=True);
 
 	#called whenever cursor enters the window
 	def OnEnter(self):
@@ -282,11 +289,10 @@ class Backend(chamfer.Backend):
 			self.BindKey(latin1.XK_onehalf,chamfer.MOD_MASK_SHIFT,Key.SPLIT_V.value);
 	
 	def OnCreateContainer(self):
-		print("OnCreateContainer()");
+		print("OnCreateContainer()",flush=True);
 		return Container();
 
 	def OnKeyPress(self, keyId):
-		print("key press: {}".format(keyId));
 		focus = self.GetFocus();
 		parent = focus.GetParent();
 
@@ -380,21 +386,21 @@ class Backend(chamfer.Backend):
 			focus.Focus();
 			
 		elif keyId == Key.YANK_CONTAINER.value:
-			print("yanking container...");
+			print("yanking container...",flush=True);
 			self.yank = {focus};
 
 		elif keyId == Key.YANK_APPEND_CONTAINER.value:
-			print("yanking container (append)...");
+			print("yanking container (append)...",flush=True);
 			try:
 				self.yank.add(focus);
 			except AttributeError:
 				self.yank = {focus};
 
 		elif keyId == Key.PASTE_CONTAINER.value:
-			print("pasting container...");
+			print("pasting container...",flush=True);
 			try:
 				if focus in self.yank:
-					print("cannot paste on selection (one of the yanked containers).");
+					print("cannot paste on selection (one of the yanked containers).",flush=True);
 					self.yank.remove(focus);
 				peers = list(self.yank);
 
@@ -407,7 +413,7 @@ class Backend(chamfer.Backend):
 					peer.Move(focus);
 					
 			except (AttributeError,IndexError):
-				print("no containers to paste.");
+				print("no containers to paste.",flush=True);
 
 		elif keyId == Key.LIFT_CONTAINER.value:
 			sibling = focus.GetNext();
@@ -432,11 +438,11 @@ class Backend(chamfer.Backend):
 
 		elif keyId == Key.SPLIT_V.value:
 			#TODO: add render flags property, bitwise OR them
-			print("split armed.");
+			print("split armed.",flush=True);
 			focus.splitArmed = not focus.splitArmed;
 
 		elif keyId == Key.FULLSCREEN.value:
-			print("setting fullscreen");
+			print("setting fullscreen",flush=True);
 			focus.SetFullscreen(not focus.fullscreen);
 		
 		elif keyId == Key.CONTRACT_ROOT_RESET.value:
@@ -523,8 +529,6 @@ class Backend(chamfer.Backend):
 			psutil.Popen(["xbacklight","-dec","20"]);
 
 	def OnKeyRelease(self, keyId):
-		print("key release: {}".format(keyId));
-
 		if keyId == Key.MODIFIER_1.value or keyId == Key.MODIFIER_4.value:
 			self.GrabKeyboard(False);
 			try:
