@@ -36,9 +36,9 @@ python = [
 ]
 
 glslc = find_program('glslc')
-glslc_invoke_vertex = [glslc,'--target-env=vulkan','-fshader-stage=vertex','-x','hlsl','-DSHADER_STAGE_VS','-o','@OUTPUT@','@INPUT@']
-glslc_invoke_geometry = [glslc,'--target-env=vulkan','-fshader-stage=geometry','-x','hlsl','-DSHADER_STAGE_GS','-o','@OUTPUT@','@INPUT@']
-glslc_invoke_fragment = [glslc,'--target-env=vulkan','-fshader-stage=fragment','-x','hlsl','-DSHADER_STAGE_PS','-o','@OUTPUT@','@INPUT@']
+glslc_invoke_vertex = [glslc,'--target-env=vulkan','-fshader-stage=vertex','-O','-x','hlsl','-DSHADER_STAGE_VS','-o','@OUTPUT@','@INPUT@']
+glslc_invoke_geometry = [glslc,'--target-env=vulkan','-fshader-stage=geometry','-O','-x','hlsl','-DSHADER_STAGE_GS','-o','@OUTPUT@','@INPUT@']
+glslc_invoke_fragment = [glslc,'--target-env=vulkan','-fshader-stage=fragment','-O','-x','hlsl','-DSHADER_STAGE_PS','-o','@OUTPUT@','@INPUT@']
 
 custom_target('default_vertex',output:'default_vertex.spv',input:'shaders/default.hlsl',command:glslc_invoke_vertex,install:true,install_dir:'.')
 custom_target('default_geometry',output:'default_geometry.spv',input:'shaders/default.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')

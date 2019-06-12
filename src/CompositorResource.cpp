@@ -208,7 +208,7 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 			pbindings[j].pImmutableSamplers = &pcomp->pointSampler;
 
 			Binding &b = bindings.emplace_back();
-			b.pname = mstrdup(preflectDescSets[i]->bindings[j]->name);
+			b.pname = preflectDescSets[i]->bindings[j]->name?mstrdup(preflectDescSets[i]->bindings[j]->name):mstrdup("content"); //hack: name might be null in optimized shader builds
 			b.type = pbindings[j].descriptorType;
 			b.setIndex = i;
 			b.binding = pbindings[j].binding;

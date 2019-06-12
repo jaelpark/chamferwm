@@ -161,7 +161,7 @@ protected:
 	void ClearBackground();
 
 	ColorFrame *pcolorBackground;
-	ClientFrame *pbackground;
+	ColorFrame *pbackground;
 
 	VkSampler pointSampler;
 

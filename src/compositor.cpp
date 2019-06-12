@@ -167,7 +167,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), frameTag(0), pbackground(0), pcolorBackground(0), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), playingAnimation(false){
+CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), frameTag(0), pcolorBackground(0), pbackground(0), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), playingAnimation(false){
 	//
 }
 
@@ -824,8 +824,9 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	if(vkBeginCommandBuffer(pcopyCommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
 
-	if(pbackground)
-		pbackground->UpdateContents(&pcopyCommandBuffers[currentFrame]);
+	ClientFrame *pbackground1 = dynamic_cast<ClientFrame *>(pbackground);
+	if(pbackground1)
+		pbackground1->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 
 	for(ClientFrame *pclientFrame : updateQueue)
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
@@ -878,13 +879,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		screenRect.extent = imageExtent;
 		pbackground->Draw(screenRect,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
 
-	}else{
-		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pcolorBackground->passignedSet->p->pipeline);
-
-		VkRect2D screenRect;
-		screenRect.offset = {0,0};
-		screenRect.extent = imageExtent;
-		pcolorBackground->Draw(screenRect,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
 	}
 
 	//for(RenderObject &renderObject : renderQueue){
@@ -1004,10 +998,9 @@ Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::S
 }
 
 void CompositorInterface::ClearBackground(){
-	if(pbackground){
-		delete pbackground;
-		pbackground = 0;
-	}
+	ClientFrame *pbackground1 = dynamic_cast<ClientFrame *>(pbackground);
+	if(pbackground1)
+		delete pbackground1;
 	if(!pcolorBackground){
 		static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
 			"default_vertex.spv","default_geometry.spv","solid_fragment.spv"
@@ -1015,6 +1008,8 @@ void CompositorInterface::ClearBackground(){
 		pcolorBackground = new ColorFrame(pshaderName,this);
 	}
 
+	pbackground = pcolorBackground;
+	
 	VkRect2D screenRect;
 	screenRect.offset = {0,0};
 	screenRect.extent = imageExtent;//{imageExtent.width,h};
@@ -1299,7 +1294,7 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	pcomp->AddDamageRegion(&screenRect);
 }
 
-X11Compositor::X11Compositor(const Configuration *_pconfig, const Backend::X11Backend *_pbackend) : CompositorInterface(_pconfig), pbackend(_pbackend){//, pbackground(0){
+X11Compositor::X11Compositor(const Configuration *_pconfig, const Backend::X11Backend *_pbackend) : CompositorInterface(_pconfig), pbackend(_pbackend){
 	//
 }
 
@@ -1379,7 +1374,7 @@ void X11Compositor::Start(){
 }
 
 void X11Compositor::Stop(){
-	if(pbackground)
+	if(dynamic_cast<ClientFrame *>(pbackground))
 		delete pbackground;
 	if(pcolorBackground)
 		delete pcolorBackground;
@@ -1441,7 +1436,7 @@ void X11Compositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
 void X11Compositor::SetBackgroundPixmap(const Backend::BackendPixmapProperty *pPixmapProperty){
 	if(pbackground){
 		delete pbackground;
-		pbackground = 0;
+		pbackground = pcolorBackground;
 	}
 	if(pPixmapProperty->pixmap != 0){
 		xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,pPixmapProperty->pixmap);
