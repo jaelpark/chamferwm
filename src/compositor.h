@@ -83,10 +83,11 @@ friend class X11Background;
 friend class X11DebugClientFrame;
 public:
 	struct Configuration{
+		uint deviceIndex;
 		bool debugLayers;
 		bool scissoring;
 	};
-	CompositorInterface(uint, const Configuration *);
+	CompositorInterface(const Configuration *);
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
 	virtual void Stop() = 0;
@@ -232,7 +233,7 @@ public:
 class X11Compositor : public CompositorInterface{
 public:
 	//Derivatives of compositor classes should not point to their default corresponding backend classes (Backend::Default in this case). This is to allow the compositor to be independent of the backend implementation, as long as it's based on X11 here.
-	X11Compositor(uint, const Configuration *, const Backend::X11Backend *);
+	X11Compositor(const Configuration *, const Backend::X11Backend *);
 	~X11Compositor();
 	virtual void Start();
 	virtual void Stop();
@@ -264,7 +265,7 @@ public:
 
 class X11DebugCompositor : public X11Compositor{
 public:
-	X11DebugCompositor(uint, const Configuration *, const Backend::X11Backend *);
+	X11DebugCompositor(const Configuration *, const Backend::X11Backend *);
 	~X11DebugCompositor();
 	void Start();
 	void Stop();
@@ -280,6 +281,7 @@ public:
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
 	VkExtent2D GetExtent() const;
 	Configuration config{ //dummy config
+		.deviceIndex = 0,
 		.debugLayers = false,
 		.scissoring = true
 	};

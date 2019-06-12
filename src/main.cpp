@@ -636,7 +636,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : config{_pcompositorInt->debugLayers,_pcompositorInt->scissoring}, X11Compositor(_pcompositorInt->deviceIndex,&config,pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DefaultCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Start();
 
 		wordexp_t expResult;
@@ -663,6 +663,7 @@ public:
 	}
 
 	~DefaultCompositor(){
+		delete pconfig;
 		Stop();
 	}
 
@@ -681,12 +682,13 @@ public:
 		Compositor::X11Compositor::WaitIdle();
 	}
 
-	Configuration config;
+	Configuration *pconfig;
+	//Configuration config; //NOTE: doing config{...} in the constructor doesn't work.
 };
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : config{_pcompositorInt->debugLayers,_pcompositorInt->scissoring}, X11DebugCompositor(_pcompositorInt->deviceIndex,&config,pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DebugCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Compositor::X11DebugCompositor::Start();
 
 		wordexp_t expResult;
@@ -714,6 +716,7 @@ public:
 
 	~DebugCompositor(){
 		Compositor::X11DebugCompositor::Stop();
+		delete pconfig;
 	}
 
 	void Present(){
@@ -731,7 +734,7 @@ public:
 		Compositor::X11DebugCompositor::WaitIdle();
 	}
 
-	Configuration config;
+	Configuration *pconfig;
 };
 
 class NullCompositor : public Compositor::NullCompositor, public RunCompositor{

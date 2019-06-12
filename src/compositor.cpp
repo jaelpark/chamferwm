@@ -262,7 +262,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(uint _physicalDevIndex, const Configuration *pconfig) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0), pbackground(0), pcolorBackground(0), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), playingAnimation(false){
+CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), frameTag(0), pbackground(0), pcolorBackground(0), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), playingAnimation(false){
 	//
 }
 
@@ -1394,7 +1394,7 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	pcomp->AddDamageRegion(&screenRect);
 }
 
-X11Compositor::X11Compositor(uint physicalDevIndex, const Configuration *_pconfig, const Backend::X11Backend *_pbackend) : CompositorInterface(physicalDevIndex,_pconfig), pbackend(_pbackend){//, pbackground(0){
+X11Compositor::X11Compositor(const Configuration *_pconfig, const Backend::X11Backend *_pbackend) : CompositorInterface(_pconfig), pbackend(_pbackend){//, pbackground(0){
 	//
 }
 
@@ -1603,7 +1603,7 @@ void X11DebugClientFrame::AdjustSurface1(){
 		pcomp->AddDamageRegion(this);
 }
 
-X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, const Configuration *_pconfig, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,_pconfig,pbackend){
+X11DebugCompositor::X11DebugCompositor(const Configuration *_pconfig, const Backend::X11Backend *pbackend) : X11Compositor(_pconfig,pbackend){
 	//
 }
 
@@ -1621,7 +1621,7 @@ void X11DebugCompositor::Stop(){
 	DestroyRenderEngine();
 }
 
-NullCompositor::NullCompositor() : CompositorInterface(0,&config){
+NullCompositor::NullCompositor() : CompositorInterface(&config){
 	//
 }
 
