@@ -87,7 +87,7 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID0) : SV_Target{
 	float2 aspect = float2(1.0f,screen.x/screen.y);
 	float2 borderWidth = border*aspect; //this results in borders half the gap size
-	float borderScaling = 0.25f;//border.x/0.015f;
+	float borderScaling = 1.0f;//0.25f;//border.x/0.015f;
 
 	float2 p = screen*(0.5f*xy0+0.5f);
 
