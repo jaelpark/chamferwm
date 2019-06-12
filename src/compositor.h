@@ -20,9 +20,10 @@ public:
 	ColorFrame(const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
 	virtual ~ColorFrame();
 	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
-	void Draw(const VkRect2D &, const VkCommandBuffer *);
+	//void Draw(const VkRect2D &, const VkCommandBuffer *);
+	void Draw(const VkRect2D &, const glm::vec2 &, uint, const VkCommandBuffer *);
 	bool AssignPipeline(const Pipeline *);
-	void UpdateDescSets();
+	//virtual void UpdateDescSets();
 	class CompositorInterface *pcomp;
 	struct PipelineDescriptorSet{
 		uint64 fenceTag;
@@ -40,21 +41,21 @@ protected:
 	uint oldShaderFlags; //used to keep track of changes
 };
 
-class ClientFrame{
+class ClientFrame : public ColorFrame{
 friend class CompositorInterface;
 public:
 	ClientFrame(uint, uint, const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
-	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
-	void Draw(const VkRect2D &, const glm::vec2 &, uint, const VkCommandBuffer *);
+	//void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
+	//void Draw(const VkRect2D &, const glm::vec2 &, uint, const VkCommandBuffer *);
 	void AdjustSurface(uint, uint);
-	bool AssignPipeline(const Pipeline *);
+	//bool AssignPipeline(const Pipeline *);
 private:
 	void UpdateDescSets();
 protected:
 	Texture *ptexture;
-	class CompositorInterface *pcomp;
+	/*class CompositorInterface *pcomp;
 	struct PipelineDescriptorSet{
 		uint64 fenceTag;
 		const Pipeline *p;
@@ -68,7 +69,7 @@ public:
 	uint shaderUserFlags;
 protected:
 	uint shaderFlags; //current frame shader flags
-	uint oldShaderFlags; //used to keep track of changes
+	uint oldShaderFlags; //used to keep track of changes*/
 	bool fullRegionUpdate;
 };
 

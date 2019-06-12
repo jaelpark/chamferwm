@@ -17,9 +17,8 @@ ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], C
 	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
 	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
-	clock_gettime(CLOCK_MONOTONIC,&creationTime);
 
-	UpdateDescSets();
+	clock_gettime(CLOCK_MONOTONIC,&creationTime);
 }
 
 ColorFrame::~ColorFrame(){
@@ -35,7 +34,7 @@ void ColorFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUN
 		throw Exception("Failed to assign a pipeline.");
 }
 
-void ColorFrame::Draw(const VkRect2D &frame, const VkCommandBuffer *pcommandBuffer){
+void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, uint flags, const VkCommandBuffer *pcommandBuffer){
 	time = timespec_diff(pcomp->frameTime,creationTime);
 
 	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
@@ -59,8 +58,8 @@ void ColorFrame::Draw(const VkRect2D &frame, const VkCommandBuffer *pcommandBuff
 	pushConstants.frameVec -= 1.0f;
 
 	pushConstants.imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
-	pushConstants.borderWidth = glm::vec2(0);//borderWidth;
-	pushConstants.flags = 0;//flags;
+	pushConstants.borderWidth = borderWidth;
+	pushConstants.flags = flags;
 	pushConstants.time = time;
 
 	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,40,&pushConstants); //size fixed also in CompositorResource VkPushConstantRange
@@ -97,77 +96,18 @@ bool ColorFrame::AssignPipeline(const Pipeline *prenderPipeline){
 	return true;
 }
 
-void ColorFrame::UpdateDescSets(){
-	vkUpdateDescriptorSets(pcomp->logicalDev,0,0,0,0);
-}
-
-ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0), fullRegionUpdate(true){
+ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : ColorFrame(pshaderName,_pcomp), fullRegionUpdate(true){
 	pcomp->updateQueue.push_back(this);
 
 	ptexture = pcomp->CreateTexture(w,h);
-	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
-	if(!AssignPipeline(pPipeline))
-		throw Exception("Failed to assign a pipeline.");
-	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
 
 	UpdateDescSets();
-
-	clock_gettime(CLOCK_MONOTONIC,&creationTime);
 }
 
 ClientFrame::~ClientFrame(){
 	pcomp->updateQueue.erase(std::remove(pcomp->updateQueue.begin(),pcomp->updateQueue.end(),this),pcomp->updateQueue.end());
 
 	pcomp->ReleaseTexture(ptexture);
-
-	for(PipelineDescriptorSet &pipelineDescSet : descSets)
-		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-			if(pipelineDescSet.pdescSets[i]){
-				/*vkFreeDescriptorSets(pcomp->logicalDev,pcomp->descPool,pipelineDescSet.p->pshaderModule[i]->setCount,pipelineDescSet.pdescSets[i]);
-				delete []pipelineDescSet.pdescSets[i];*/
-				pcomp->ReleaseDescSets(pipelineDescSet.p->pshaderModule[i],pipelineDescSet.pdescSets[i]);
-			}
-}
-
-void ClientFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
-	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
-	if(!AssignPipeline(pPipeline))
-		throw Exception("Failed to assign a pipeline.");
-}
-
-void ClientFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, uint flags, const VkCommandBuffer *pcommandBuffer){
-	time = timespec_diff(pcomp->frameTime,creationTime);
-
-	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-		if(passignedSet->p->pshaderModule[i]->setCount > 0){
-			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,passignedSet->p->pipelineLayout,descPointer,passignedSet->p->pshaderModule[i]->setCount,passignedSet->pdescSets[i],0,0);
-			descPointer += passignedSet->p->pshaderModule[i]->setCount;
-		}
-	
-	struct{
-		glm::vec4 frameVec;
-		glm::vec2 imageExtent;
-		glm::vec2 borderWidth;
-		uint flags;
-		float time;
-	} pushConstants;
-
-	pushConstants.frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
-	pushConstants.frameVec += 0.5f;
-	pushConstants.frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
-	pushConstants.frameVec *= 2.0f;
-	pushConstants.frameVec -= 1.0f;
-
-	pushConstants.imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
-	pushConstants.borderWidth = borderWidth;
-	pushConstants.flags = flags;
-	pushConstants.time = time;
-
-	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,40,&pushConstants); //size fixed also in CompositorResource VkPushConstantRange
-
-	vkCmdDraw(*pcommandBuffer,1,1,0,0);
-
-	passignedSet->fenceTag = pcomp->frameTag;
 }
 
 void ClientFrame::AdjustSurface(uint w, uint h){
@@ -183,41 +123,6 @@ void ClientFrame::AdjustSurface(uint w, uint h){
 	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
 
 	UpdateDescSets();
-}
-
-bool ClientFrame::AssignPipeline(const Pipeline *prenderPipeline){
-	auto m = std::find_if(descSets.begin(),descSets.end(),[&](auto &r)->bool{
-		return r.p == prenderPipeline && pcomp->frameTag > r.fenceTag+pcomp->swapChainImageCount+1;
-	});
-	if(m != descSets.end()){
-		passignedSet = &(*m);
-		return true;
-	}
-
-	PipelineDescriptorSet pipelineDescSet;
-	pipelineDescSet.fenceTag = pcomp->frameTag;
-	pipelineDescSet.p = prenderPipeline;
-	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
-		if(!prenderPipeline->pshaderModule[i] || prenderPipeline->pshaderModule[i]->setCount == 0){
-			pipelineDescSet.pdescSets[i] = 0;
-			continue;
-		}
-		/*pipelineDescSet.pdescSets[i] = new VkDescriptorSet[prenderPipeline->pshaderModule[i]->setCount];
-		VkDescriptorSetAllocateInfo descSetAllocateInfo = {};
-		descSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		descSetAllocateInfo.descriptorPool = pcomp->descPool;
-		descSetAllocateInfo.pSetLayouts = prenderPipeline->pshaderModule[i]->pdescSetLayouts;
-		descSetAllocateInfo.descriptorSetCount = prenderPipeline->pshaderModule[i]->setCount;
-		if(vkAllocateDescriptorSets(pcomp->logicalDev,&descSetAllocateInfo,pipelineDescSet.pdescSets[i]) != VK_SUCCESS)
-			return false;*/
-		pipelineDescSet.pdescSets[i] = pcomp->CreateDescSets(prenderPipeline->pshaderModule[i]);
-		if(!pipelineDescSet.pdescSets[i])
-			return false;
-	}
-	descSets.push_back(pipelineDescSet);
-	passignedSet = &descSets.back();
-
-	return true;
 }
 
 void ClientFrame::UpdateDescSets(){
@@ -979,7 +884,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		VkRect2D screenRect;
 		screenRect.offset = {0,0};
 		screenRect.extent = imageExtent;
-		pcolorBackground->Draw(screenRect,&pcommandBuffers[currentFrame]);
+		pcolorBackground->Draw(screenRect,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
 	}
 
 	//for(RenderObject &renderObject : renderQueue){
