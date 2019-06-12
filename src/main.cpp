@@ -1,9 +1,9 @@
 #include "main.h"
 #include "container.h"
 #include "backend.h"
-#include "config.h"
 #include "CompositorResource.h"
 #include "compositor.h"
+#include "config.h"
 
 #include <cstdlib>
 #include <stdarg.h>
@@ -636,7 +636,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DefaultCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : config{_pcompositorInt->debugLayers,_pcompositorInt->scissoring}, X11Compositor(_pcompositorInt->deviceIndex,&config,pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Start();
 
 		wordexp_t expResult;
@@ -656,6 +656,8 @@ public:
 			}
 			wordfree(&expResult);
 		}
+
+		ClearBackground();
 
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
@@ -678,11 +680,13 @@ public:
 	void WaitIdle(){
 		Compositor::X11Compositor::WaitIdle();
 	}
+
+	Configuration config;
 };
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DebugCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : config{_pcompositorInt->debugLayers,_pcompositorInt->scissoring}, X11DebugCompositor(_pcompositorInt->deviceIndex,&config,pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Compositor::X11DebugCompositor::Start();
 
 		wordexp_t expResult;
@@ -702,6 +706,8 @@ public:
 			}
 			wordfree(&expResult);
 		}
+
+		ClearBackground();
 
 		DebugPrintf(stdout,"Compositor enabled.\n");
 	}
@@ -724,6 +730,8 @@ public:
 	void WaitIdle(){
 		Compositor::X11DebugCompositor::WaitIdle();
 	}
+
+	Configuration config;
 };
 
 class NullCompositor : public Compositor::NullCompositor, public RunCompositor{
@@ -762,6 +770,7 @@ int main(sint argc, const char **pargv){
 	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
 	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
+	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
 	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified.",{"shader-path"});
 
 	try{
@@ -778,6 +787,7 @@ int main(sint argc, const char **pargv){
 
 	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
 	Config::Loader::debugLayers = debugLayersOpt.Get();
+	Config::Loader::scissoring = !noScissoringOpt.Get();
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
 	pconfigLoader->Run(configPath?configPath.Get().c_str():0,"config.py");
@@ -786,6 +796,8 @@ int main(sint argc, const char **pargv){
 		Config::CompositorInterface::pcompositorInt->deviceIndex = deviceIndexOpt.Get();
 	if(debugLayersOpt.Get())
 		Config::CompositorInterface::pcompositorInt->debugLayers = true;
+	if(noScissoringOpt.Get())
+		Config::CompositorInterface::pcompositorInt->scissoring = false;
 
 	RunBackend *pbackend;
 	try{

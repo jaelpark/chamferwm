@@ -155,6 +155,7 @@ public:
 
 	sint deviceIndex;
 	bool debugLayers;
+	bool scissoring;
 
 	class CompositorConfig *pcompositor;
 
@@ -185,6 +186,7 @@ public:
 
 	static sint deviceIndex;
 	static bool debugLayers;
+	static bool scissoring;
 };
 
 }

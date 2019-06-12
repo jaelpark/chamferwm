@@ -14,6 +14,32 @@ class X11Backend;
 
 namespace Compositor{
 
+class ColorFrame{
+friend class CompositorInterface;
+public:
+	ColorFrame(const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
+	virtual ~ColorFrame();
+	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
+	void Draw(const VkRect2D &, const VkCommandBuffer *);
+	bool AssignPipeline(const Pipeline *);
+	void UpdateDescSets();
+	class CompositorInterface *pcomp;
+	struct PipelineDescriptorSet{
+		uint64 fenceTag;
+		const Pipeline *p;
+		VkDescriptorSet *pdescSets[Pipeline::SHADER_MODULE_COUNT];
+	};
+	PipelineDescriptorSet *passignedSet;
+	std::vector<PipelineDescriptorSet> descSets;
+	struct timespec creationTime;
+	float time;
+public:
+	uint shaderUserFlags;
+protected:
+	uint shaderFlags; //current frame shader flags
+	uint oldShaderFlags; //used to keep track of changes
+};
+
 class ClientFrame{
 friend class CompositorInterface;
 public:
@@ -50,12 +76,17 @@ class CompositorInterface{
 friend class Texture;
 friend class ShaderModule;
 friend class Pipeline;
+friend class ColorFrame;
 friend class ClientFrame;
 friend class X11ClientFrame;
 friend class X11Background;
 friend class X11DebugClientFrame;
 public:
-	CompositorInterface(uint, bool);
+	struct Configuration{
+		bool debugLayers;
+		bool scissoring;
+	};
+	CompositorInterface(uint, const Configuration *);
 	virtual ~CompositorInterface();
 	virtual void Start() = 0;
 	virtual void Stop() = 0;
@@ -125,6 +156,9 @@ protected:
 	std::vector<ClientFrame *> updateQueue;
 	std::vector<std::pair<VkRect2D, uint64>> scissorRegions; //scissoring regions based on client damage
 
+	void ClearBackground();
+
+	ColorFrame *pcolorBackground;
 	ClientFrame *pbackground;
 
 	VkSampler pointSampler;
@@ -165,6 +199,7 @@ protected:
 
 	bool playingAnimation;
 	bool debugLayers;
+	bool scissoring;
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };
@@ -197,7 +232,7 @@ public:
 class X11Compositor : public CompositorInterface{
 public:
 	//Derivatives of compositor classes should not point to their default corresponding backend classes (Backend::Default in this case). This is to allow the compositor to be independent of the backend implementation, as long as it's based on X11 here.
-	X11Compositor(uint, bool, const Backend::X11Backend *);
+	X11Compositor(uint, const Configuration *, const Backend::X11Backend *);
 	~X11Compositor();
 	virtual void Start();
 	virtual void Stop();
@@ -229,7 +264,7 @@ public:
 
 class X11DebugCompositor : public X11Compositor{
 public:
-	X11DebugCompositor(uint, bool, const Backend::X11Backend *);
+	X11DebugCompositor(uint, const Configuration *, const Backend::X11Backend *);
 	~X11DebugCompositor();
 	void Start();
 	void Stop();
@@ -244,6 +279,10 @@ public:
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
 	VkExtent2D GetExtent() const;
+	Configuration config{ //dummy config
+		.debugLayers = false,
+		.scissoring = true
+	};
 };
 
 }

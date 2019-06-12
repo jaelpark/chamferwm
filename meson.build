@@ -43,6 +43,7 @@ glslc_invoke_fragment = [glslc,'--target-env=vulkan','-fshader-stage=fragment','
 custom_target('default_vertex',output:'default_vertex.spv',input:'shaders/default.hlsl',command:glslc_invoke_vertex,install:true,install_dir:'.')
 custom_target('default_geometry',output:'default_geometry.spv',input:'shaders/default.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
 custom_target('default_fragment',output:'default_fragment.spv',input:'shaders/default.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
+custom_target('solid_fragment',output:'solid_fragment.spv',input:'shaders/solid.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
 custom_target('frame_vertex',output:'frame_vertex.spv',input:'shaders/frame.hlsl',command:glslc_invoke_vertex,install:true,install_dir:'.')
 custom_target('frame_geometry',output:'frame_geometry.spv',input:'shaders/frame.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
 custom_target('frame_fragment',output:'frame_fragment.spv',input:'shaders/frame.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')

@@ -525,7 +525,7 @@ BackendConfig::~BackendConfig(){
 	pbackendInt->pbackend = 0;
 }
 
-CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers){
+CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring){
 	//
 }
 
@@ -818,6 +818,7 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")
 		.def_readwrite("deviceIndex",&CompositorInterface::deviceIndex)
 		.def_readwrite("debugLayers",&CompositorInterface::debugLayers)
+		.def_readwrite("scissoring",&CompositorInterface::scissoring)
 		;
 	boost::python::def("BindCompositor",CompositorInterface::Bind);
 	//boost::python::def("GetCompositor",CompositorInterface::GetInterface);
@@ -876,6 +877,7 @@ void Loader::Run(const char *pfilePath, const char *pfileLabel){
 
 sint Loader::deviceIndex;
 bool Loader::debugLayers;
+bool Loader::scissoring;
 
 }
 

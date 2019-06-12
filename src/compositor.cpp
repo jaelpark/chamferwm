@@ -12,6 +12,95 @@
 
 namespace Compositor{
 
+ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0){
+	//
+	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
+	if(!AssignPipeline(pPipeline))
+		throw Exception("Failed to assign a pipeline.");
+	clock_gettime(CLOCK_MONOTONIC,&creationTime);
+
+	UpdateDescSets();
+}
+
+ColorFrame::~ColorFrame(){
+	for(PipelineDescriptorSet &pipelineDescSet : descSets)
+		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+			if(pipelineDescSet.pdescSets[i])
+				pcomp->ReleaseDescSets(pipelineDescSet.p->pshaderModule[i],pipelineDescSet.pdescSets[i]);
+}
+
+void ColorFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
+	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
+	if(!AssignPipeline(pPipeline))
+		throw Exception("Failed to assign a pipeline.");
+}
+
+void ColorFrame::Draw(const VkRect2D &frame, const VkCommandBuffer *pcommandBuffer){
+	time = timespec_diff(pcomp->frameTime,creationTime);
+
+	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+		if(passignedSet->p->pshaderModule[i]->setCount > 0){
+			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,passignedSet->p->pipelineLayout,descPointer,passignedSet->p->pshaderModule[i]->setCount,passignedSet->pdescSets[i],0,0);
+			descPointer += passignedSet->p->pshaderModule[i]->setCount;
+		}
+	
+	struct{
+		glm::vec4 frameVec;
+		glm::vec2 imageExtent;
+		glm::vec2 borderWidth;
+		uint flags;
+		float time;
+	} pushConstants;
+
+	pushConstants.frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
+	pushConstants.frameVec += 0.5f;
+	pushConstants.frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
+	pushConstants.frameVec *= 2.0f;
+	pushConstants.frameVec -= 1.0f;
+
+	pushConstants.imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
+	pushConstants.borderWidth = glm::vec2(0);//borderWidth;
+	pushConstants.flags = 0;//flags;
+	pushConstants.time = time;
+
+	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,40,&pushConstants); //size fixed also in CompositorResource VkPushConstantRange
+
+	vkCmdDraw(*pcommandBuffer,1,1,0,0);
+
+	passignedSet->fenceTag = pcomp->frameTag;
+}
+
+bool ColorFrame::AssignPipeline(const Pipeline *prenderPipeline){
+	auto m = std::find_if(descSets.begin(),descSets.end(),[&](auto &r)->bool{
+		return r.p == prenderPipeline && pcomp->frameTag > r.fenceTag+pcomp->swapChainImageCount+1;
+	});
+	if(m != descSets.end()){
+		passignedSet = &(*m);
+		return true;
+	}
+
+	PipelineDescriptorSet pipelineDescSet;
+	pipelineDescSet.fenceTag = pcomp->frameTag;
+	pipelineDescSet.p = prenderPipeline;
+	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		if(!prenderPipeline->pshaderModule[i] || prenderPipeline->pshaderModule[i]->setCount == 0){
+			pipelineDescSet.pdescSets[i] = 0;
+			continue;
+		}
+		pipelineDescSet.pdescSets[i] = pcomp->CreateDescSets(prenderPipeline->pshaderModule[i]);
+		if(!pipelineDescSet.pdescSets[i])
+			return false;
+	}
+	descSets.push_back(pipelineDescSet);
+	passignedSet = &descSets.back();
+
+	return true;
+}
+
+void ColorFrame::UpdateDescSets(){
+	vkUpdateDescriptorSets(pcomp->logicalDev,0,0,0,0);
+}
+
 ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0), fullRegionUpdate(true){
 	pcomp->updateQueue.push_back(this);
 
@@ -173,7 +262,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(uint _physicalDevIndex, bool _debugLayers) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0), pbackground(0), debugLayers(_debugLayers), playingAnimation(false){
+CompositorInterface::CompositorInterface(uint _physicalDevIndex, const Configuration *pconfig) : physicalDevIndex(_physicalDevIndex), currentFrame(0), frameTag(0), pbackground(0), pcolorBackground(0), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), playingAnimation(false){
 	//
 }
 
@@ -588,7 +677,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	
 	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcopyCommandBuffers) != VK_SUCCESS)
 		throw Exception("Failed to allocate copy command buffer.");
-
+	
 	shaders.reserve(1024);
 
 	pipelines.reserve(1024);
@@ -642,6 +731,8 @@ void CompositorInterface::AddShader(const char *pname, const Blob *pblob){
 }
 
 void CompositorInterface::AddDamageRegion(const VkRect2D *prect){
+	if(!scissoring)
+		return;
 	//find the regions that are completely covered by the param and replace them all with the one larger area
 	scissorRegions.erase(std::remove_if(scissorRegions.begin(),scissorRegions.end(),[&](auto &scissorRegion)->bool{
 		return prect->offset.x <= scissorRegion.first.offset.x && prect->offset.y <= scissorRegion.first.offset.y
@@ -652,6 +743,8 @@ void CompositorInterface::AddDamageRegion(const VkRect2D *prect){
 }
 
 void CompositorInterface::AddDamageRegion(const WManager::Client *pclient){
+	if(!scissoring)
+		return;
 	glm::ivec2 borderWidth = 4*glm::ivec2(
 		pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
 		pclient->pcontainer->borderWidth.y*(float)imageExtent.width); //due to aspect, this must be *width
@@ -836,31 +929,30 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to end command buffer recording.");
 
-	glm::ivec2 a = glm::ivec2(imageExtent.width,imageExtent.height);
-	glm::ivec2 b = glm::ivec2(0);
-	for(auto m = scissorRegions.begin(); m != scissorRegions.end();){
-		glm::ivec2 a1 = glm::ivec2((*m).first.offset.x,(*m).first.offset.y);
-		glm::ivec2 b1 = a1+glm::ivec2((*m).first.extent.width,(*m).first.extent.height);
-		a = glm::min(a,a1);
-		b = glm::max(b,b1);
-		
-		if(frameTag > (*m).second+swapChainImageCount+1)
-			m = scissorRegions.erase(m);
-		else ++m;
-	}
-
 	commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 	if(vkBeginCommandBuffer(pcommandBuffers[currentFrame],&commandBufferBeginInfo) != VK_SUCCESS)
 		throw Exception("Failed to begin command buffer recording.");
 
 	//TODO: debug option: draw frames around scissor area
-	VkRect2D scissor;
-	scissor.offset = {std::max(a.x,0),std::max(a.y,0)};
-	scissor.extent = {std::max(b.x-scissor.offset.x,0),std::max(b.y-scissor.offset.y,0)};
-	vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
-	//printf("scissor: %d, %d, (%ux%u)\n",scissor.offset.x,scissor.offset.y,scissor.extent.width,scissor.extent.height,scissorRegions.size());
-	//for(auto scissorRegion : scissorRegions)
-		//printf("\t- %d, %d, (%ux%u)\n",scissorRegion.first.offset.x,scissorRegion.first.offset.y,scissorRegion.first.extent.width,scissorRegion.first.extent.height);
+	if(scissoring){
+		glm::ivec2 a = glm::ivec2(imageExtent.width,imageExtent.height);
+		glm::ivec2 b = glm::ivec2(0);
+		for(auto m = scissorRegions.begin(); m != scissorRegions.end();){
+			glm::ivec2 a1 = glm::ivec2((*m).first.offset.x,(*m).first.offset.y);
+			glm::ivec2 b1 = a1+glm::ivec2((*m).first.extent.width,(*m).first.extent.height);
+			a = glm::min(a,a1);
+			b = glm::max(b,b1);
+			
+			if(frameTag > (*m).second+swapChainImageCount+1)
+				m = scissorRegions.erase(m);
+			else ++m;
+		}
+
+		VkRect2D scissor;
+		scissor.offset = {std::max(a.x,0),std::max(a.y,0)};
+		scissor.extent = {std::max(b.x-scissor.offset.x,0),std::max(b.y-scissor.offset.y,0)};
+		vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
+	}
 
 	//static const VkClearValue clearValue = {1.0f,1.0f,1.0f,1.0f};
 	VkRenderPassBeginInfo renderPassBeginInfo = {};
@@ -880,6 +972,14 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		screenRect.offset = {0,0};
 		screenRect.extent = imageExtent;
 		pbackground->Draw(screenRect,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
+
+	}else{
+		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pcolorBackground->passignedSet->p->pipeline);
+
+		VkRect2D screenRect;
+		screenRect.offset = {0,0};
+		screenRect.extent = imageExtent;
+		pcolorBackground->Draw(screenRect,&pcommandBuffers[currentFrame]);
 	}
 
 	//for(RenderObject &renderObject : renderQueue){
@@ -996,6 +1096,24 @@ Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::S
 			pshader[Pipeline::SHADER_MODULE_FRAGMENT],this);
 	}
 	return pPipeline;
+}
+
+void CompositorInterface::ClearBackground(){
+	if(pbackground){
+		delete pbackground;
+		pbackground = 0;
+	}
+	if(!pcolorBackground){
+		static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
+			"default_vertex.spv","default_geometry.spv","solid_fragment.spv"
+		};
+		pcolorBackground = new ColorFrame(pshaderName,this);
+	}
+
+	VkRect2D screenRect;
+	screenRect.offset = {0,0};
+	screenRect.extent = imageExtent;//{imageExtent.width,h};
+	AddDamageRegion(&screenRect);
 }
 
 Texture * CompositorInterface::CreateTexture(uint w, uint h){
@@ -1276,7 +1394,7 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	pcomp->AddDamageRegion(&screenRect);
 }
 
-X11Compositor::X11Compositor(uint physicalDevIndex, bool debugLayers, const Backend::X11Backend *_pbackend) : CompositorInterface(physicalDevIndex,debugLayers), pbackend(_pbackend){//, pbackground(0){
+X11Compositor::X11Compositor(uint physicalDevIndex, const Configuration *_pconfig, const Backend::X11Backend *_pbackend) : CompositorInterface(physicalDevIndex,_pconfig), pbackend(_pbackend){//, pbackground(0){
 	//
 }
 
@@ -1358,6 +1476,8 @@ void X11Compositor::Start(){
 void X11Compositor::Stop(){
 	if(pbackground)
 		delete pbackground;
+	if(pcolorBackground)
+		delete pcolorBackground;
 	DestroyRenderEngine();
 
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
@@ -1483,7 +1603,7 @@ void X11DebugClientFrame::AdjustSurface1(){
 		pcomp->AddDamageRegion(this);
 }
 
-X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, bool debugLayers, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,debugLayers,pbackend){
+X11DebugCompositor::X11DebugCompositor(uint physicalDevIndex, const Configuration *_pconfig, const Backend::X11Backend *pbackend) : X11Compositor(physicalDevIndex,_pconfig,pbackend){
 	//
 }
 
@@ -1501,7 +1621,7 @@ void X11DebugCompositor::Stop(){
 	DestroyRenderEngine();
 }
 
-NullCompositor::NullCompositor() : CompositorInterface(0,false){
+NullCompositor::NullCompositor() : CompositorInterface(0,&config){
 	//
 }
 

@@ -362,8 +362,13 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
 	dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamicStateCreateInfo.pNext = 0;
-	dynamicStateCreateInfo.pDynamicStates = dynamicStates;
-	dynamicStateCreateInfo.dynamicStateCount = 1;
+	if(pcomp->scissoring){
+		dynamicStateCreateInfo.pDynamicStates = dynamicStates;
+		dynamicStateCreateInfo.dynamicStateCount = 1;
+	}else{
+		dynamicStateCreateInfo.pDynamicStates = 0;
+		dynamicStateCreateInfo.dynamicStateCount = 0;
+	}
 
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
