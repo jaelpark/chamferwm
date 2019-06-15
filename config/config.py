@@ -210,8 +210,8 @@ class Backend(chamfer.Backend):
 			self.BindKey(ord('a'),self.modMask,Key.FOCUS_PARENT.value);
 			self.BindKey(ord('s'),self.modMask,Key.FOCUS_CHILD.value);
 			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.FOCUS_MRU.value);
-			self.BindKey(miscellany.XK_Tab,self.modMask,Key.FOCUS_FLOAT.value);
-			self.BindKey(miscellany.XK_Tab,self.modMask|chamfer.MOD_MASK_SHIFT,Key.FOCUS_FLOAT_PREV.value);
+			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1,Key.FOCUS_FLOAT.value);
+			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_1|chamfer.MOD_MASK_SHIFT,Key.FOCUS_FLOAT_PREV.value);
 			
 			#reserved
 			self.BindKey(ord('l'),chamfer.MOD_MASK_4,Key.FOCUS_PARENT_RIGHT.value);
@@ -228,8 +228,7 @@ class Backend(chamfer.Backend):
 			#layout, splits and fullscreen
 			self.BindKey(ord('e'),self.modMask,Key.LAYOUT.value);
 			self.BindKey(latin1.XK_onehalf,self.modMask,Key.SPLIT_V.value);
-			self.BindKey(miscellany.XK_Tab,chamfer.MOD_MASK_4,Key.SPLIT_V.value);
-			self.BindKey(ord('s'),chamfer.MOD_MASK_4,Key.SPLIT_V.value);
+			self.BindKey(ord('v'),self.modMask,Key.SPLIT_V.value);
 			self.BindKey(ord('f'),self.modMask,Key.FULLSCREEN.value);
 
 			#workspace dimensions
