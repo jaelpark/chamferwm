@@ -4,6 +4,7 @@
 #include <xcb/xproto.h>
 #include <xcb/xcb_keysyms.h>
 #include <xcb/xcb_ewmh.h>
+#include <xcb/xcb_cursor.h>
 
 namespace Compositor{
 //declarations for friend classes
@@ -197,6 +198,13 @@ protected:
 	xcb_atom_t atoms[ATOM_COUNT];
 	static const char *patomStrs[ATOM_COUNT];
 
+	xcb_cursor_context_t *pcursorctx;
+	enum CURSOR{
+		CURSOR_POINTER,
+		CURSOR_COUNT
+	};
+	xcb_cursor_t cursors[CURSOR_COUNT];
+	static const char *pcursorStrs[CURSOR_COUNT];
 };
 
 class Default : public X11Backend{

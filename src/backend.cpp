@@ -9,7 +9,6 @@
 #include <xcb/xcb_keysyms.h>
 #include <xcb/xcb_atom.h>
 #include <xcb/xcb_icccm.h>
-//#include <xcb/xcb_ewmh.h>
 #include <xcb/xcb_util.h>
 
 //#include <X11/X.h>
@@ -447,6 +446,10 @@ const char *X11Backend::patomStrs[ATOM_COUNT] = {
 	"WM_PROTOCOLS","WM_DELETE_WINDOW","ESETROOT_PMAP_ID","_X_ROOTPMAP_ID"
 };
 
+const char *X11Backend::pcursorStrs[CURSOR_COUNT] = {
+	"left_ptr"
+};
+
 Default::Default() : X11Backend(), pdragClient(0){
 	//
 	clock_gettime(CLOCK_MONOTONIC,&eventTimer);
@@ -563,10 +566,21 @@ void Default::Start(){
 
 	values[0] = XCB_STACK_MODE_BELOW;
 	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+
+	pcursorctx = 0;
+	if(xcb_cursor_context_new(pcon,pscr,&pcursorctx) >= 0){
+		for(uint i = 0; i < CURSOR_COUNT; ++i)
+			cursors[i] = xcb_cursor_load_cursor(pcursorctx,pcursorStrs[i]);
+	
+		xcb_change_window_attributes(pcon,pscr->root,XCB_CW_CURSOR,&cursors[CURSOR_POINTER]);
+	}
 }
 
 void Default::Stop(){
 	//cleanup
+	if(pcursorctx)
+		xcb_cursor_context_free(pcursorctx);
+	
 	xcb_destroy_window(pcon,ewmh_window);
 	xcb_ewmh_connection_wipe(&ewmh);
 	xcb_set_input_focus(pcon,XCB_NONE,XCB_INPUT_FOCUS_POINTER_ROOT,XCB_CURRENT_TIME);

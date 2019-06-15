@@ -18,6 +18,7 @@ inc = [
 xcb = [
 	dependency('xcb'),
 	dependency('xcb-keysyms'),
+	dependency('xcb-cursor'),
 	dependency('xcb-xfixes'),
 	dependency('xcb-damage'),
 	dependency('xcb-shm'),
