@@ -800,6 +800,9 @@ sint Default::HandleEvent(bool forcePoll){
 				//= xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_STRUT_PARTIAL,XCB_ATOM_CARDINAL,0,std::numeric_limits<uint32_t>::max());
 			xcb_get_property_cookie_t propertyCookieTransientFor
 				= xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
+			xcb_get_property_cookie_t propertyCookie1[2];
+			propertyCookie1[0] = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_NAME,XCB_GET_PROPERTY_TYPE_ANY,0,128);
+			propertyCookie1[1] = xcb_get_property(pcon,0,pev->window,XCB_ATOM_WM_CLASS,XCB_GET_PROPERTY_TYPE_ANY,0,128);
 
 			xcb_icccm_wm_hints_t hints;
 			bool boolHints = xcb_icccm_get_wm_hints_reply(pcon,propertyCookieHints,&hints,0);
@@ -925,11 +928,7 @@ sint Default::HandleEvent(bool forcePoll){
 				free(propertyReplyTransientFor);
 			}
 
-			xcb_get_property_cookie_t propertyCookie1[2];
 			xcb_get_property_reply_t *propertyReply1[2];
-
-			propertyCookie1[0] = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_NAME,XCB_GET_PROPERTY_TYPE_ANY,0,128);
-			propertyCookie1[1] = xcb_get_property(pcon,0,pev->window,XCB_ATOM_WM_CLASS,XCB_GET_PROPERTY_TYPE_ANY,0,128);
 			for(uint i = 0; i < 2; ++i)
 				propertyReply1[i] = xcb_get_property_reply(pcon,propertyCookie1[i],0);
 			BackendStringProperty wmName((const char *)xcb_get_property_value(propertyReply1[0]));
@@ -1014,6 +1013,9 @@ sint Default::HandleEvent(bool forcePoll){
 
 			xcb_get_property_cookie_t propertyCookieTransientFor
 				= xcb_get_property(pcon,0,pev->window,XA_WM_TRANSIENT_FOR,XCB_ATOM_WINDOW,0,std::numeric_limits<uint32_t>::max());
+			xcb_get_property_cookie_t propertyCookie1[2];
+			propertyCookie1[0] = xcb_get_property(pcon,0,pev->window,ewmh._NET_WM_NAME,XCB_GET_PROPERTY_TYPE_ANY,0,128);
+			propertyCookie1[1] = xcb_get_property(pcon,0,pev->window,XCB_ATOM_WM_CLASS,XCB_GET_PROPERTY_TYPE_ANY,0,128);
 
 			xcb_get_property_reply_t *propertyReplyTransientFor
 				= xcb_get_property_reply(pcon,propertyCookieTransientFor,0);
@@ -1055,6 +1057,12 @@ sint Default::HandleEvent(bool forcePoll){
 					pstackClient = pbaseClient;
 			}
 
+			xcb_get_property_reply_t *propertyReply1[2];
+			for(uint i = 0; i < 2; ++i)
+				propertyReply1[i] = xcb_get_property_reply(pcon,propertyCookie1[i],0);
+			BackendStringProperty wmName((const char *)xcb_get_property_value(propertyReply1[0]));
+			BackendStringProperty wmClass((const char *)xcb_get_property_value(propertyReply1[1]));
+
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
 			createInfo.prect = prect;
@@ -1062,14 +1070,17 @@ sint Default::HandleEvent(bool forcePoll){
 			createInfo.pbackend = this;
 			createInfo.mode = X11Client::CreateInfo::CREATE_AUTOMATIC;
 			createInfo.hints = 0;
-			createInfo.pwmName = 0;
-			createInfo.pwmClass = 0;
+			createInfo.pwmName = &wmName;
+			createInfo.pwmClass = &wmClass;
 			X11Client *pclient = SetupClient(&createInfo);
 			if(!pclient)
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
 
 			StackClients();
+
+			for(uint i = 0; i < 2; ++i)
+				free(propertyReply1[i]);
 
 			netClientList.clear();
 			for(auto &p : clients)

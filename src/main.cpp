@@ -117,7 +117,7 @@ public:
 	};
 
 	template<class T, class U>
-	Config::ContainerInterface & SetupContainer(WManager::Container *pParent, ContainerCreateInfo *pcreateInfo){
+	Config::ContainerInterface & SetupContainer(ContainerCreateInfo *pcreateInfo){
 		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
 		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
 		if(!containerExtract.check())
@@ -129,10 +129,32 @@ public:
 		if(pcreateInfo){
 			containerInt.wm_name = pcreateInfo->wm_name;
 			containerInt.wm_class = pcreateInfo->wm_class;
-			containerInt.vertexShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX]; //too late! needs to be done as soon as containerInt is instanced
+			containerInt.vertexShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX];
 			containerInt.geometryShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY];
 			containerInt.fragmentShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT];
 		}
+
+		return containerInt;
+	}
+
+	template<class T, class U>
+	Config::ContainerInterface & SetupContainer(WManager::Container *pParent, ContainerCreateInfo *pcreateInfo){
+		/*boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
+		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
+		if(!containerExtract.check())
+			throw Exception("OnCreateContainer(): Invalid container object returned.\n"); //TODO: create default
+
+		Config::ContainerInterface &containerInt = containerExtract();
+		containerInt.self = containerObject;
+
+		if(pcreateInfo){
+			containerInt.wm_name = pcreateInfo->wm_name;
+			containerInt.wm_class = pcreateInfo->wm_class;
+			containerInt.vertexShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX];
+			containerInt.geometryShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY];
+			containerInt.fragmentShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT];
+		}*/
+		Config::ContainerInterface &containerInt = SetupContainer<T,U>(pcreateInfo);
 		containerInt.OnSetupContainer();
 
 		WManager::Container::Setup setup;
@@ -306,6 +328,8 @@ public:
 	DefaultBackend(Config::BackendInterface *_pbackendInt) : Default(), RunBackend(new Config::X11ContainerConfig(this),_pbackendInt){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
+
+		//
 	}
 
 	~DefaultBackend(){
@@ -319,25 +343,33 @@ public:
 
 	Backend::X11Client * SetupClient(const Backend::X11Client::CreateInfo *pcreateInfo){
 		//Containers should be created always under the parent of the current focus.
-		//config script should manage this (point to container which should be the parent of the
-		//new one), while also setting some of the parameters like border width and such.
-		static const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
-			"frame_vertex.spv","frame_geometry.spv","frame_fragment.spv"
-		};
+		//config script should manage this (point to container which should be the
+		//parent of the new one), while also setting some of the parameters like border
+		//width and such.
+		ContainerCreateInfo containerCreateInfo;
+		containerCreateInfo.wm_name = pcreateInfo->pwmName->pstr;
+		containerCreateInfo.wm_class = pcreateInfo->pwmClass->pstr;
+		containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX] = "frame_vertex.spv";
+		containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY] = "frame_geometry.spv";
+		containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT] = "frame_fragment.spv";
+		containerCreateInfo.floating = (pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_FLOATING) != 0;
+
 		if(pcreateInfo->mode == Backend::X11Client::CreateInfo::CREATE_AUTOMATIC){
+			//create a temporary container through which OnSetupClient() can be called. The container is discarded as soon as the call has been made. 
+			Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(&containerCreateInfo);
+
+			containerInt.OnSetupClient();
+
+			const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
+				containerInt.vertexShader.c_str(),containerInt.geometryShader.c_str(),containerInt.fragmentShader.c_str()
+			};
 			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo,pshaderName);
+
 			if(pclient11) //in some cases the window is found to be unmanageable
 				stackAppendix.push_back(std::pair<const WManager::Client *, WManager::Client *>(pcreateInfo->pstackClient,pclient11));
 			return pclient11;
 
 		}else{
-			ContainerCreateInfo containerCreateInfo;
-			containerCreateInfo.wm_name = pcreateInfo->pwmName->pstr;
-			containerCreateInfo.wm_class = pcreateInfo->pwmClass->pstr;
-			containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX] = pshaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX];
-			containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY] = pshaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY];
-			containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT] = pshaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT];
-			containerCreateInfo.floating = (pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_FLOATING) != 0;
 			Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0,&containerCreateInfo);
 
 			if(pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_NO_INPUT)
