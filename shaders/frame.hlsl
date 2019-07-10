@@ -84,6 +84,10 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 [[vk::binding(0)]] Texture2D<float4> content;
 //[[vk::binding(1)]] SamplerState sm;
 
+float ChamferMap(float2 p, float2 b, float r){
+	return length(max(abs(p)-b,0.0f))-r;
+}
+
 float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID0) : SV_Target{
 	float2 aspect = float2(1.0f,screen.x/screen.y);
 	float2 borderWidth = border*aspect; //this results in borders half the gap size
@@ -98,22 +102,22 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 
 	float4 c = float4(0.0f,0.0f,0.0f,1.0f);
 	if(geomId == 0){
-		float2 q = abs(posh.xy-p1);
-		if(length(max(q-(0.5f*d1-40.0f*borderScaling),0.0f))-40.0f*borderScaling < 0.0f){
-			discard; //remove background to allow for transparency effects
+		float2 q = posh.xy-p1;
+		if(ChamferMap(q,0.5f*d1-40.0f*borderScaling,40.0f*borderScaling) < 0.0f){
+			discard;
 			return c;
 		}
-		float d = (length(max(abs((posh.xy-p1)/(1.0f+border.x*constScaling.x))-(0.5f*d1-50.0f*borderScaling),0.0f))-75.0f*borderScaling)*1.015f;
-
+		float d = ChamferMap(q/(1.0f+border.x*constScaling.x),0.5f*d1-50.0f*borderScaling,75.0f*borderScaling)*1.015f; //TODO: use different xy0, xy1 for shadows
 		return float4(0.0f,0.0f,0.0f,0.9f*saturate(-d/30.0f));
 
 	}else
 	if(geomId == 1){
-		if(length(max(abs(posh.xy-p1)-(0.5f*d1-50.0f*borderScaling),0.0f))-75.0f*borderScaling > 0.0f){
+		float2 q = posh.xy-p1;
+		if(ChamferMap(q,0.5f*d1-50.0f*borderScaling,75.0f*borderScaling) > 0.0f){
 			discard;
 			return c;
 		}
-		if(length(max(abs(posh.xy-p1)-(0.5f*d1-(40.0f-2.0f)*borderScaling),0.0f))-40.0f*borderScaling < 0.0f){
+		if(ChamferMap(q,0.5f*d1-(40.0f-2.0f)*borderScaling,40.0f*borderScaling) < 0.0f){
 			discard; //remove background to allow for transparency effects
 			return c;
 		}
@@ -129,11 +133,10 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 				c.xyz = float3(0.957f,0.910f,0.824f);
 
 	}else{
-		if(length(max(abs(posh.xy-p1)-(0.5f*d1-40.0f*borderScaling),0.0f))-40.0f*borderScaling > 0.0f){
+		if(ChamferMap(posh.xy-p1,0.5f*d1-40.0f*borderScaling,40.0f*borderScaling) > 0.0f){
 			return c;
 			discard;
 		}
-	
 		//float4 c = content.Sample(sm,texc);
 		float2 r = posh.xy-p;
 		c = content.Load(float3(r,0)); //p already has the 0.5f offset
