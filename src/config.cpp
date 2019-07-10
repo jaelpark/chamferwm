@@ -566,6 +566,7 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::scope().attr("MOD_MASK_4") = uint(XCB_MOD_MASK_4);
 	boost::python::scope().attr("MOD_MASK_5") = uint(XCB_MOD_MASK_5);
 	boost::python::scope().attr("MOD_MASK_SHIFT") = uint(XCB_MOD_MASK_SHIFT);
+	boost::python::scope().attr("MOD_MASK_LOCK") = uint(XCB_MOD_MASK_LOCK);
 	boost::python::scope().attr("MOD_MASK_CONTROL") = uint(XCB_MOD_MASK_CONTROL);
 	boost::python::scope().attr("MOD_MASK_ANY") = uint(XCB_MOD_MASK_ANY);
 
