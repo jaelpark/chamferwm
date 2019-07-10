@@ -858,7 +858,7 @@ sint Default::HandleEvent(bool forcePoll){
 				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
 				mrect = configCache.end()-1;
 			}
-			printf("Found cached location: %d, %d, %u, %u.\n",(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
+			//printf("Found cached location: %d, %d, %u, %u.\n",(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
 
 			if(boolHints){
 				if(hints.flags & XCB_ICCCM_WM_HINT_INPUT && !hints.input)
@@ -918,6 +918,8 @@ sint Default::HandleEvent(bool forcePoll){
 					xcb_atom_t *patom = (xcb_atom_t*)xcb_get_property_value(propertyReplyWindowState);
 
 					if(any(ewmh._NET_WM_STATE_MODAL,patom,n) || any(ewmh._NET_WM_STATE_SKIP_TASKBAR,patom,n)){
+						//TODO: BELOW should be above desktop
+						//https://specifications.freedesktop.org/wm-spec/1.3/ar01s07.html#STACKINGORDER
 						hintFlags |= X11Client::CreateInfo::HINT_FLOATING|
 							(any(ewmh._NET_WM_STATE_ABOVE,patom,n)?X11Client::CreateInfo::HINT_ABOVE:0)|
 							(any(ewmh._NET_WM_STATE_BELOW,patom,n)?X11Client::CreateInfo::HINT_DESKTOP:0)|
