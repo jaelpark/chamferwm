@@ -93,12 +93,11 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 	float2 borderWidth = border*aspect; //this results in borders half the gap size
 	float borderScaling = screen.x/3840.0f;
 
-	float2 p = screen*(0.5f*xy0+0.5f);
-
 	float2 p1 = screen*(0.25f*(xy0+xy1)+0.5f);
+
+	float2 p = screen*(0.5f*xy0+0.5f);
 	float2 m = screen*(0.5f*xy1+0.5f);
 	float2 d1 = m-p; //d1: extent of the window
-	float2 constScaling = screen.x/(d1.x+2.0f*screen.x*borderWidth.x);
 
 	float4 c = float4(0.0f,0.0f,0.0f,1.0f);
 	if(geomId == 0){
@@ -107,7 +106,11 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 			discard;
 			return c;
 		}
-		float d = ChamferMap(q/(1.0f+border.x*constScaling.x),0.5f*d1-50.0f*borderScaling,75.0f*borderScaling)*1.015f; //TODO: use different xy0, xy1 for shadows
+
+		//float constScaling = screen.x/(d1.x+2.0f*screen.x*borderWidth.x);
+		//float d = ChamferMap(q/(1.0f+border.x*constScaling),0.5f*d1-50.0f*borderScaling,75.0f*borderScaling)*1.015f; //TODO: use different xy0, xy1 for shadows
+		float2 d2 = d1+50.0f*borderScaling;
+		float d = ChamferMap(q,0.5f*d2-50.0f*borderScaling,75.0f*borderScaling);
 		return float4(0.0f,0.0f,0.0f,0.9f*saturate(-d/30.0f));
 
 	}else
