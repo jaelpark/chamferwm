@@ -51,6 +51,7 @@ private:
 protected:
 	Texture *ptexture;
 	bool fullRegionUpdate;
+	bool animationCompleted;
 };
 
 class CompositorInterface{
@@ -128,6 +129,7 @@ protected:
 	uint physicalDevIndex;
 	uint swapChainImageCount;
 	uint currentFrame;
+	uint imageIndex;
 
 	Pipeline * LoadPipeline(const char *[Pipeline::SHADER_MODULE_COUNT]);
 
@@ -136,7 +138,9 @@ protected:
 	std::vector<Pipeline> pipelines;
 
 	std::vector<ClientFrame *> updateQueue;
-	std::vector<std::pair<VkRect2D, uint64>> scissorRegions; //scissoring regions based on client damage
+	std::vector<std::pair<VkRect2D, uint>> scissorRegions; //scissoring regions based on client damage.
+	//Second (uint) is a bitmask for swap chain images, indicating which image has been updated so far.
+	//When all images have been updated, the region is removed from the list.
 
 	void ClearBackground();
 

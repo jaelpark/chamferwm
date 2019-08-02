@@ -96,7 +96,7 @@ bool ColorFrame::AssignPipeline(const Pipeline *prenderPipeline){
 	return true;
 }
 
-ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : ColorFrame(pshaderName,_pcomp), fullRegionUpdate(true){
+ClientFrame::ClientFrame(uint w, uint h, const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : ColorFrame(pshaderName,_pcomp), fullRegionUpdate(true), animationCompleted(true){
 	pcomp->updateQueue.push_back(this);
 
 	ptexture = pcomp->CreateTexture(w,h);
@@ -167,7 +167,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), frameTag(0), pcolorBackground(0), pbackground(0), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), playingAnimation(false){
+CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), playingAnimation(false){
 	//
 }
 
@@ -309,7 +309,7 @@ void CompositorInterface::InitializeRenderEngine(){
 
 	//find required queue families
 	for(uint i = 0; i < QUEUE_INDEX_COUNT; ++i)
-		queueFamilyIndex[i] = ~0;
+		queueFamilyIndex[i] = ~0u;
 	for(uint i = 0; i < queueFamilyCount; ++i){
 		if(pqueueFamilyProps[i].queueCount > 0 && pqueueFamilyProps[i].queueFlags & VK_QUEUE_GRAPHICS_BIT){
 			queueFamilyIndex[QUEUE_INDEX_GRAPHICS] = i;
@@ -644,7 +644,7 @@ void CompositorInterface::AddDamageRegion(const VkRect2D *prect){
 			&& prect->offset.x+prect->extent.width >= scissorRegion.first.offset.x+scissorRegion.first.extent.width
 			&& prect->offset.y+prect->extent.height >= scissorRegion.first.offset.y+scissorRegion.first.extent.height;
 	}),scissorRegions.end());
-	scissorRegions.push_back(std::pair<VkRect2D, uint>(*prect,frameTag));
+	scissorRegions.push_back(std::pair<VkRect2D, uint>(*prect,0));
 }
 
 void CompositorInterface::AddDamageRegion(const WManager::Client *pclient){
@@ -711,6 +711,9 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 }
 
 bool CompositorInterface::PollFrameFence(){
+	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS)
+		throw Exception("Failed to acquire a swap chain image.\n");
+	
 	if(vkWaitForFences(logicalDev,1,&pfence[currentFrame],VK_TRUE,0) == VK_TIMEOUT)
 		return false;
 	vkResetFences(logicalDev,1,&pfence[currentFrame]);
@@ -812,6 +815,15 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			AddDamageRegion(renderObject.pclient); //need to keep adding the client for as long as the animation is playing
 
 			playingAnimation = true;
+			renderObject.pclientFrame->animationCompleted = false;
+
+		}else
+		if(!renderObject.pclientFrame->animationCompleted){
+			AddDamageRegion(renderObject.pclient);
+			renderObject.pclientFrame->animationCompleted = true;
+
+			renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
+
 		}else renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
 
 		if(renderObject.pclientFrame->shaderFlags != renderObject.pclientFrame->oldShaderFlags)
@@ -844,12 +856,17 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		glm::ivec2 a = glm::ivec2(imageExtent.width,imageExtent.height);
 		glm::ivec2 b = glm::ivec2(0);
 		for(auto m = scissorRegions.begin(); m != scissorRegions.end();){
-			glm::ivec2 a1 = glm::ivec2((*m).first.offset.x,(*m).first.offset.y);
-			glm::ivec2 b1 = a1+glm::ivec2((*m).first.extent.width,(*m).first.extent.height);
-			a = glm::min(a,a1);
-			b = glm::max(b,b1);
-			
-			if(frameTag > (*m).second+swapChainImageCount+1)
+			if(((*m).second & 1<<imageIndex) == 0){
+				glm::ivec2 a1 = glm::ivec2((*m).first.offset.x,(*m).first.offset.y);
+				glm::ivec2 b1 = a1+glm::ivec2((*m).first.extent.width,(*m).first.extent.height);
+				a = glm::min(a,a1);
+				b = glm::max(b,b1);
+
+				(*m).second |= 1<<imageIndex;
+			}
+
+			//As soon as the rectangle has been drawn for every image of the swap chain, remove it
+			if(~(~0u<<swapChainImageCount) == (*m).second)
 				m = scissorRegions.erase(m);
 			else ++m;
 		}
@@ -864,7 +881,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	VkRenderPassBeginInfo renderPassBeginInfo = {};
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassBeginInfo.renderPass = renderPass;
-	renderPassBeginInfo.framebuffer = pframebuffers[currentFrame];
+	renderPassBeginInfo.framebuffer = pframebuffers[imageIndex];
 	renderPassBeginInfo.renderArea.offset = {0,0};
 	renderPassBeginInfo.renderArea.extent = imageExtent;
 	renderPassBeginInfo.clearValueCount = 0;//1;
@@ -927,9 +944,9 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 }
 
 void CompositorInterface::Present(){
-	uint imageIndex;
+	/*uint imageIndex;
 	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS)
-		throw Exception("Failed to acquire a swap chain image.\n");
+		throw Exception("Failed to acquire a swap chain image.\n");*/
 	//
 	VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 	//VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
@@ -1159,7 +1176,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		}
 		
 		xcb_shm_attach(pbackend->pcon,segment,shmid,0);
-		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
 		xcb_shm_detach(pbackend->pcon,segment);
 
 		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
@@ -1242,7 +1259,7 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	if(!fullRegionUpdate)
 		return;
 	//
-	/*xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pcomp11->pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,pixmap,0,0,w,h,~0);
+	/*xcb_get_image_cookie_t imageCookie = xcb_get_image_unchecked(pcomp11->pbackend->pcon,XCB_IMAGE_FORMAT_Z_PIXMAP,pixmap,0,0,w,h,~0u);
 	xcb_get_image_reply_t *pimageReply = xcb_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
 	if(!pimageReply){
 		DebugPrintf(stderr,"Failed to receive image reply.\n");
@@ -1258,7 +1275,7 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	}
 	
 	xcb_shm_attach(pcomp11->pbackend->pcon,segment,shmid,0);
-	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pcomp11->pbackend->pcon,pixmap,0,0,w,h,~0,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pcomp11->pbackend->pcon,pixmap,0,0,w,h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
 	xcb_shm_detach(pcomp11->pbackend->pcon,segment);
 
 	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
