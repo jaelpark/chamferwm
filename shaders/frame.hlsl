@@ -107,8 +107,6 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 			return c;
 		}
 
-		//float constScaling = screen.x/(d1.x+2.0f*screen.x*borderWidth.x);
-		//float d = ChamferMap(q/(1.0f+border.x*constScaling),0.5f*d1-50.0f*borderScaling,75.0f*borderScaling)*1.015f; //TODO: use different xy0, xy1 for shadows
 		float2 d2 = d1+50.0f*borderScaling;
 		float d = ChamferMap(q,0.5f*d2-50.0f*borderScaling,75.0f*borderScaling);
 		return float4(0.0f,0.0f,0.0f,0.9f*saturate(-d/30.0f));
