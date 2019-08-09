@@ -252,7 +252,7 @@ class Backend(chamfer.Backend):
 
 			self.BindKey(latin1.XK_minus,self.modMask|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
 			self.BindKey(ord('j'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
-			self.BindKey(ord('j'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.CONTRACT_VERTICAL_LOCAL.value);
+			self.BindKey(latin1.XK_minus,self.modMask|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.CONTRACT_VERTICAL_LOCAL.value);
 			self.BindKey(ord('j'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.CONTRACT_VERTICAL_LOCAL.value);
 
 			self.BindKey(latin1.XK_plus,self.modMask,Key.EXPAND_HORIZONTAL.value);
