@@ -12,7 +12,7 @@ namespace Config{
 ContainerInterface::ContainerInterface() :
 canvasOffset(boost::python::make_tuple(0.0f,0.0f)),
 canvasExtent(boost::python::make_tuple(0.0f,0.0f)),
-borderWidth(boost::python::make_tuple(0.0f,0.0f)),
+margin(boost::python::make_tuple(0.0f,0.0f)),
 size(boost::python::make_tuple(1.0f,1.0f)),
 minSize(boost::python::make_tuple(0.0f,0.0f)),
 maxSize(boost::python::make_tuple(1.0f,1.0f)),
@@ -31,8 +31,8 @@ void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 	setup.canvasOffset.y = boost::python::extract<float>(canvasOffset[1])();
 	setup.canvasExtent.x = boost::python::extract<float>(canvasExtent[0])();
 	setup.canvasExtent.y = boost::python::extract<float>(canvasExtent[1])();
-	setup.borderWidth.x = boost::python::extract<float>(borderWidth[0])();
-	setup.borderWidth.y = boost::python::extract<float>(borderWidth[1])();
+	setup.margin.x = boost::python::extract<float>(margin[0])();
+	setup.margin.y = boost::python::extract<float>(margin[1])();
 	setup.size.x = boost::python::extract<float>(size[0])();
 	setup.size.y = boost::python::extract<float>(size[1])();
 	setup.minSize.x = boost::python::extract<float>(minSize[0])();
@@ -698,22 +698,40 @@ BOOST_PYTHON_MODULE(chamfer){
 				container.pcontainer->canvasExtent.x = boost::python::extract<float>(tuple[0])();
 				container.pcontainer->canvasExtent.y = boost::python::extract<float>(tuple[1])();
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, boost::python::tuple>()))
-		//.def_readwrite("borderWidth",&ContainerInterface::borderWidth)
-		.add_property("borderWidth",
+		//.def_readwrite("margin",&ContainerInterface::margin)
+		.add_property("margin",
 			boost::python::make_function(
 			[](ContainerInterface &container){
 				if(!container.pcontainer)
-					return container.borderWidth;
-				return boost::python::make_tuple(container.pcontainer->borderWidth.x,container.pcontainer->borderWidth.y);
+					return container.margin;
+				return boost::python::make_tuple(container.pcontainer->margin.x,container.pcontainer->margin.y);
 			},boost::python::default_call_policies(),boost::mpl::vector<boost::python::tuple, ContainerInterface &>()),
 			boost::python::make_function(
 			[](ContainerInterface &container, boost::python::tuple tuple){
 				if(!container.pcontainer){
-					container.borderWidth = tuple;
+					container.margin = tuple;
 					return;
 				}
-				container.pcontainer->borderWidth.x = boost::python::extract<float>(tuple[0])();
-				container.pcontainer->borderWidth.y = boost::python::extract<float>(tuple[1])();
+				container.pcontainer->margin.x = boost::python::extract<float>(tuple[0])();
+				container.pcontainer->margin.y = boost::python::extract<float>(tuple[1])();
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, boost::python::tuple>()))
+		.add_property("borderWidth",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				DebugPrintf(stdout,"depcrecation warning: borderWidth - use 'margin'.\n");
+				if(!container.pcontainer)
+					return container.margin;
+				return boost::python::make_tuple(container.pcontainer->margin.x,container.pcontainer->margin.y);
+			},boost::python::default_call_policies(),boost::mpl::vector<boost::python::tuple, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, boost::python::tuple tuple){
+				DebugPrintf(stdout,"depcrecation warning: borderWidth - use 'margin'.\n");
+				if(!container.pcontainer){
+					container.margin = tuple;
+					return;
+				}
+				container.pcontainer->margin.x = boost::python::extract<float>(tuple[0])();
+				container.pcontainer->margin.y = boost::python::extract<float>(tuple[1])();
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, boost::python::tuple>()))
 		.add_property("size",
 			boost::python::make_function(

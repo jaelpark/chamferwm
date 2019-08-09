@@ -34,7 +34,7 @@ void ColorFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUN
 		throw Exception("Failed to assign a pipeline.");
 }
 
-void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, uint flags, const VkCommandBuffer *pcommandBuffer){
+void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, uint flags, const VkCommandBuffer *pcommandBuffer){
 	time = timespec_diff(pcomp->frameTime,creationTime);
 
 	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
@@ -46,7 +46,7 @@ void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, uint 
 	struct{
 		glm::vec4 frameVec;
 		glm::vec2 imageExtent;
-		glm::vec2 borderWidth;
+		glm::vec2 margin;
 		uint flags;
 		float time;
 	} pushConstants;
@@ -58,7 +58,7 @@ void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &borderWidth, uint 
 	pushConstants.frameVec -= 1.0f;
 
 	pushConstants.imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
-	pushConstants.borderWidth = borderWidth;
+	pushConstants.margin = margin;
 	pushConstants.flags = flags;
 	pushConstants.time = time;
 
@@ -650,17 +650,17 @@ void CompositorInterface::AddDamageRegion(const VkRect2D *prect){
 void CompositorInterface::AddDamageRegion(const WManager::Client *pclient){
 	if(!scissoring)
 		return;
-	glm::ivec2 borderWidth = 4*glm::ivec2(
-		pclient->pcontainer->borderWidth.x*(float)imageExtent.width,
-		pclient->pcontainer->borderWidth.y*(float)imageExtent.width); //due to aspect, this must be *width
+	glm::ivec2 margin = 4*glm::ivec2(
+		pclient->pcontainer->margin.x*(float)imageExtent.width,
+		pclient->pcontainer->margin.y*(float)imageExtent.width); //due to aspect, this must be *width
 	
 	VkRect2D rect1;
-	//rect1.offset = {(sint)pclient->position.x-borderWidth.x,(sint)pclient->position.y-borderWidth.y};
-	rect1.offset = {pclient->rect.x-borderWidth.x,pclient->rect.y-borderWidth.y};
-	rect1.extent = {pclient->rect.w+2*borderWidth.x,pclient->rect.h+2*borderWidth.y};
+	//rect1.offset = {(sint)pclient->position.x-margin.x,(sint)pclient->position.y-margin.y};
+	rect1.offset = {pclient->rect.x-margin.x,pclient->rect.y-margin.y};
+	rect1.extent = {pclient->rect.w+2*margin.x,pclient->rect.h+2*margin.y};
 	AddDamageRegion(&rect1);
-	rect1.offset = {pclient->oldRect.x-borderWidth.x,pclient->oldRect.y-borderWidth.y};
-	rect1.extent = {pclient->oldRect.w+2*borderWidth.x,pclient->oldRect.h+2*borderWidth.y};
+	rect1.offset = {pclient->oldRect.x-margin.x,pclient->oldRect.y-margin.y};
+	rect1.extent = {pclient->oldRect.w+2*margin.x,pclient->oldRect.h+2*margin.y};
 	AddDamageRegion(&rect1);
 }
 
@@ -933,8 +933,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
-		//renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.flags,&pcommandBuffers[currentFrame]);
-		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->borderWidth,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
+		//renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.flags,&pcommandBuffers[currentFrame]);
+		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 	}
 
 	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);

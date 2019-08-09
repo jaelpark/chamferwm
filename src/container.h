@@ -37,7 +37,7 @@ public:
 		glm::vec2 canvasOffset = glm::vec2(0.0f);
 		glm::vec2 canvasExtent = glm::vec2(0.0f);
 		//Border width can be set anytime before the client creation
-		glm::vec2 borderWidth = glm::vec2(0.0f);
+		glm::vec2 margin = glm::vec2(0.0f);
 		//For performance reasons, the min/maxSize has to be known before the container is created.
 		glm::vec2 size = glm::vec2(1.0f);
 		glm::vec2 minSize = glm::vec2(0.0f);
@@ -105,7 +105,7 @@ public:
 	//glm::vec2 c1; //iteration center
 	glm::vec2 e1; //iteration e
 
-	glm::vec2 borderWidth;
+	glm::vec2 margin;
 
 	glm::vec2 size;
 	glm::vec2 minSize;

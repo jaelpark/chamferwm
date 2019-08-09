@@ -51,7 +51,7 @@ public:
 	//temporary storage for deferred assignment (before container is created)
 	boost::python::tuple canvasOffset;
 	boost::python::tuple canvasExtent;
-	boost::python::tuple borderWidth;
+	boost::python::tuple margin;
 	boost::python::tuple size;
 	boost::python::tuple minSize;
 	boost::python::tuple maxSize;

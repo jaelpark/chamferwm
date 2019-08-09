@@ -84,8 +84,8 @@ class Key(Enum):
 class Container(chamfer.Container):
 	#setup the container before it's created (dimensions)
 	def OnSetupContainer(self):
-		self.borderWidth = (0.015,0.015);
-		self.minSize = (0.3,0.3);
+		self.margin = (0.015,0.015);
+		self.minSize = (0.3,0.2);
 
 		self.splitArmed = False;
 

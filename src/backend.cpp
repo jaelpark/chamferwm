@@ -147,10 +147,10 @@ X11Client::~X11Client(){
 void X11Client::UpdateTranslation(){
 	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
 	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
-	//glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
+	//glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->margin*aspect,pcontainer->e-2.0f*pcontainer->margin*aspect)*screen;
 	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN))
-		coord += glm::vec4(pcontainer->borderWidth*aspect,-2.0f*pcontainer->borderWidth*aspect)*screen;
+		coord += glm::vec4(pcontainer->margin*aspect,-2.0f*pcontainer->margin*aspect)*screen;
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
@@ -1416,7 +1416,7 @@ void DebugClient::UpdateTranslation(){
 
 	glm::vec4 screen(se.x,se.y,se.x,se.y);
 	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
-	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->borderWidth*aspect,pcontainer->e-2.0f*pcontainer->borderWidth*aspect)*screen;
+	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->margin*aspect,pcontainer->e-2.0f*pcontainer->margin*aspect)*screen;
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
