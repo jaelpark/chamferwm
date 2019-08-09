@@ -57,9 +57,13 @@ class Key(Enum):
 
 	CONTRACT_RESET = auto()
 	CONTRACT_HORIZONTAL = auto()
+	CONTRACT_HORIZONTAL_LOCAL = auto()
 	CONTRACT_VERTICAL = auto()
+	CONTRACT_VERTICAL_LOCAL = auto()
 	EXPAND_HORIZONTAL = auto()
+	EXPAND_HORIZONTAL_LOCAL = auto()
 	EXPAND_VERTICAL = auto()
+	EXPAND_VERTICAL_LOCAL = auto()
 
 	KILL = auto()
 	LAUNCH_TERMINAL = auto()
@@ -240,14 +244,26 @@ class Backend(chamfer.Backend):
 
 			#client dimensions
 			self.BindKey(ord('r'),self.modMask,Key.CONTRACT_RESET.value);
+
 			self.BindKey(latin1.XK_minus,self.modMask,Key.CONTRACT_HORIZONTAL.value);
 			self.BindKey(ord('j'),chamfer.MOD_MASK_4,Key.CONTRACT_HORIZONTAL.value);
+			self.BindKey(latin1.XK_minus,self.modMask|chamfer.MOD_MASK_CONTROL,Key.CONTRACT_HORIZONTAL_LOCAL.value);
+			self.BindKey(ord('j'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_CONTROL,Key.CONTRACT_HORIZONTAL_LOCAL.value);
+
 			self.BindKey(latin1.XK_minus,self.modMask|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
 			self.BindKey(ord('j'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.CONTRACT_VERTICAL.value);
+			self.BindKey(ord('j'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.CONTRACT_VERTICAL_LOCAL.value);
+			self.BindKey(ord('j'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.CONTRACT_VERTICAL_LOCAL.value);
+
 			self.BindKey(latin1.XK_plus,self.modMask,Key.EXPAND_HORIZONTAL.value);
 			self.BindKey(ord('k'),chamfer.MOD_MASK_4,Key.EXPAND_HORIZONTAL.value);
+			self.BindKey(latin1.XK_plus,self.modMask|chamfer.MOD_MASK_CONTROL,Key.EXPAND_HORIZONTAL_LOCAL.value);
+			self.BindKey(ord('k'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_CONTROL,Key.EXPAND_HORIZONTAL_LOCAL.value);
+
 			self.BindKey(latin1.XK_plus,self.modMask|chamfer.MOD_MASK_SHIFT,Key.EXPAND_VERTICAL.value);
 			self.BindKey(ord('k'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_VERTICAL.value);
+			self.BindKey(latin1.XK_plus,self.modMask|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.EXPAND_VERTICAL_LOCAL.value);
+			self.BindKey(ord('k'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.EXPAND_VERTICAL_LOCAL.value);
 			
 			#kill + launching applications
 			self.BindKey(ord('q'),self.modMask|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
@@ -478,21 +494,33 @@ class Backend(chamfer.Backend):
 			focus.ShiftLayout(focus.layout);
 
 		elif keyId == Key.CONTRACT_HORIZONTAL.value:
+			focus.size = (focus.size[0]-0.1,focus.size[1]);
+
+		elif keyId == Key.CONTRACT_HORIZONTAL_LOCAL.value:
 			focus.canvasOffset = (focus.canvasOffset[0]+0.05,focus.canvasOffset[1]);
 			focus.canvasExtent = (focus.canvasExtent[0]+0.10,focus.canvasExtent[1]);
 			focus.ShiftLayout(focus.layout);
 
 		elif keyId == Key.CONTRACT_VERTICAL.value:
+			focus.size = (focus.size[0],focus.size[1]-0.1);
+
+		elif keyId == Key.CONTRACT_VERTICAL_LOCAL.value:
 			focus.canvasOffset = (focus.canvasOffset[0],focus.canvasOffset[1]+0.05);
 			focus.canvasExtent = (focus.canvasExtent[0],focus.canvasExtent[1]+0.10);
 			focus.ShiftLayout(focus.layout);
 
 		elif keyId == Key.EXPAND_HORIZONTAL.value:
+			focus.size = (focus.size[0]+0.1,focus.size[1]);
+
+		elif keyId == Key.EXPAND_HORIZONTAL_LOCAL.value:
 			focus.canvasOffset = (focus.canvasOffset[0]-0.05,focus.canvasOffset[1]);
 			focus.canvasExtent = (focus.canvasExtent[0]-0.10,focus.canvasExtent[1]);
 			focus.ShiftLayout(focus.layout);
 
 		elif keyId == Key.EXPAND_VERTICAL.value:
+			focus.size = (focus.size[0],focus.size[1]+0.1);
+
+		elif keyId == Key.EXPAND_VERTICAL_LOCAL.value:
 			focus.canvasOffset = (focus.canvasOffset[0],focus.canvasOffset[1]-0.05);
 			focus.canvasExtent = (focus.canvasExtent[0],focus.canvasExtent[1]-0.10);
 			focus.ShiftLayout(focus.layout);

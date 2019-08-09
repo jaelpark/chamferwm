@@ -17,7 +17,7 @@ Container::Container() : pParent(0), pch(0), pnext(0),
 	pclient(0),
 	//scale(1.0f), p(0.0f), e(1.0f), borderWidth(0.0f), minSize(0.0f), maxSize(1.0f), mode(MODE_TILED),
 	p(0.0f), posFullCanvas(0.0f), e(1.0f), extFullCanvas(1.0f), canvasOffset(0.0f), canvasExtent(0.0f),
-	borderWidth(0.015f), minSize(0.015f), maxSize(1.0f),
+	borderWidth(0.015f), size(1.0f), minSize(0.015f), maxSize(1.0f),
 	flags(0), layout(LAYOUT_VSPLIT){//, flags(0){
 	//
 }
@@ -26,7 +26,7 @@ Container::Container(Container *_pParent, const Setup &setup) :
 	pParent(_pParent), pch(0), pnext(0),
 	pclient(0),
 	canvasOffset(setup.canvasOffset), canvasExtent(setup.canvasExtent),
-	borderWidth(setup.borderWidth), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
+	borderWidth(setup.borderWidth), size(setup.size), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
 	flags(setup.flags), layout(LAYOUT_VSPLIT){//, flags(setup.flags){
 
 	if(flags & FLAG_FLOATING)
@@ -35,9 +35,10 @@ Container::Container(Container *_pParent, const Setup &setup) :
 	//TODO: allow reparenting containers without client
 	if(pParent->pclient){
 	//if(pParent->pclient || setup.insert == Setup::INSERT_REPARENT){
+		size = pParent->size;
+		pParent->size = setup.size;
 		//reparent
 		Container *pbase = pParent->pParent;
-		//if(pbase){
 		//replace the original parent with this new container
 		if(std::find(pbase->focusQueue.begin(),pbase->focusQueue.end(),pParent) != pbase->focusQueue.end()){
 			std::replace(pbase->focusQueue.begin(),pbase->focusQueue.end(),pParent,this);
@@ -59,20 +60,6 @@ Container::Container(Container *_pParent, const Setup &setup) :
 		pch = pParent;
 		pParent = pbase;
 
-		/*}else{
-			//root container
-			if(pParent->focusQueue.size() > 0){
-				pParent->focusQueue.clear();
-				pParent->focusQueue.push_back(this);
-				focusQueue.push_back(pParent->pch);
-			}
-			pch = pParent->pch;
-			//pch->pParent = this; //!! also for above scope
-			for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
-				pcontainer->pParent = this;
-			pParent->pch = this;
-		}*/
-
 	}else{
 		if(pParent->focusQueue.size() > 0){
 			//place next to the focused container
@@ -86,9 +73,17 @@ Container::Container(Container *_pParent, const Setup &setup) :
 				pn = &(*pn)->pnext;
 			*pn = this;
 		}
+
+		uint containerCount = 0;
+		for(Container *pcontainer = pParent->pch; pcontainer; ++containerCount, pcontainer = pcontainer->pnext);
+		size = glm::vec2(1.0f/(float)containerCount);
+
+		for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
+			if(pcontainer != this)
+				pcontainer->size *= glm::vec2(1.0f)-size;
+
 	}
 
-	//GetRoot()->Stack();
 	pParent->Translate();
 }
 
@@ -114,6 +109,10 @@ void Container::Place(Container *pParent1){
 		*pn = this;
 	}
 
+	for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
+		if(pcontainer != this)
+			pcontainer->size *= glm::vec2(1.0f)-size;
+	
 	GetRoot()->Stack();
 	pParent->Translate();
 }
@@ -135,6 +134,9 @@ Container * Container::Remove(){
 			break;
 		}
 	
+	for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
+		pcontainer->size /= 1.0f-size;
+	
 	GetRoot()->Stack();
 	pbase->Translate();
 
@@ -149,7 +151,10 @@ Container * Container::Collapse(){
 	
 	if(pParent->pch->pnext){
 		if(pch->pnext)
-			return 0; //todo: combine the expressions
+			return 0; //should not collapse
+
+		pch->size = size;
+
 		//only one container to collapse
 		//printf("** type 1 collapse\n");
 		std::replace(pParent->focusQueue.begin(),pParent->focusQueue.end(),this,pch);
@@ -175,6 +180,10 @@ Container * Container::Collapse(){
 	if(pch->pnext){ //if there are more than one container
 		if(pParent->pch->pnext) //and there's a container next to this one
 			return 0; //should not collapse
+
+		for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
+			pcontainer->size /= pParent->size;
+
 		//more than one container to deal with
 		//printf("** type 2 collapse\n");
 		Container *pfocus = focusQueue.size() > 0?focusQueue.back():pch;
@@ -206,7 +215,6 @@ void Container::Focus(){
 		Stack1();
 
 	}else{
-	//if(pParent){
 		tiledFocusQueue.erase(std::remove_if(tiledFocusQueue.begin(),tiledFocusQueue.end(),[&](auto &p)->bool{
 			return p.first == this;
 		}),tiledFocusQueue.end());
@@ -274,6 +282,16 @@ Container * Container::GetRoot(){
 	return proot;
 }
 
+void Container::SetSize(glm::vec2 size1){
+	glm::vec2 sizeSum = glm::vec2(1.0f)-size;
+	size = size1;
+	for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
+		if(pcontainer != this)
+			pcontainer->size *= (glm::vec2(1.0f)-size)/sizeSum;
+
+	pParent->Translate();
+}
+
 void Container::MoveNext(){
 	if(flags & FLAG_FLOATING)
 		return;
@@ -322,47 +340,9 @@ void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCan
 	glm::vec2 maxMinSize(0.0f);
 	for(Container *pcontainer = pch; pcontainer; ++count, pcontainer = pcontainer->pnext){
 		pcontainer->e1 = pcontainer->GetMinSize();
-		//pcontainer->c1 = minSizeSum+0.5f*pcontainer->e1;
 		minSizeSum += pcontainer->e1;
 		maxMinSize = glm::max(pcontainer->e1,maxMinSize);
 	}
-
-	//glm::vec2 position1(0.0f);
-	//for(Container *pcontainer = pch; pcontainer; ++count, pcontainer = pcontainer->pnext)
-	//	position1 += pcontainer->e1;
-	/*
-	minimize overlap1(e1)/e1+overlap2(e2)/e2+...
-	st. e1+e2+...=e
-	e1 > m1
-	e2 > m2
-	...
-	//use steepest descent algorithm with boundary walls or penalty function
-	//-need initial starting point within the boundaries, use it for testing first
-
-	initial guess
-	-assign min to everyone
-	-assign the remaining equally
-	*/
-
-	/*
-	if overlap required:
-	-place the first container
-	-if the next container fits next to the first one, place it there
-	 else: stretch the first container to the maximum, place the second one to x=0 (unless this is the last container, in which case x=max-e)
-	*/
-
-	//span s = minSizeSum
-	//for each window, get center and its location on s
-	//move centers s/4 distance towards the center of the screen
-	/*for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
-		pcontainer->c1 -= 0.5f*(minSizeSum-1.0f);
-		pcontainer->c1 = (pcontainer->c1+0.5f*pcontainer->e1-0.5f)/(minSizeSum)+0.5f;
-		//pcontainer->c1 += 
-		//pcontainer->c1 -= glm::sign(pcontainer->c1-0.5f)*glm::abs(pcontainer->c1-0.5f)/(minSizeSum);
-		//1.5f*(glm::abs(pcontainer->c1-0.5f)/(minSizeSum-1.0f))*(0.5f*(minSizeSum-1.0f));
-		//0.5: 3
-		//1.0: 4
-	}*/
 
 	glm::vec2 position(p);
 	switch(layout){
@@ -398,11 +378,20 @@ void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCan
 
 		}else{
 			//optimize the containers, minimize interior overlap
-			for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
+			/*for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
 				glm::vec2 e1 = glm::vec2(pcontainer->e1.x+(e.x-minSizeSum.x)/(float)count,e.y);
 				glm::vec2 p1 = position;
 
 				position.x += e1.x;
+				pcontainer->TranslateRecursive(p1,e1,p1+pcontainer->canvasOffset,e1-pcontainer->canvasExtent);
+			}*/
+			for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
+				float s = pcontainer->size.x*e.x;
+				//glm::vec2 e1 = glm::vec2(std::max(s,pcontainer->GetMinSize().x),e.y);
+				glm::vec2 e1 = glm::vec2(s,e.y);
+				glm::vec2 p1 = position;
+
+				position.x += s;
 				pcontainer->TranslateRecursive(p1,e1,p1+pcontainer->canvasOffset,e1-pcontainer->canvasExtent);
 			}
 		}
@@ -419,23 +408,30 @@ void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCan
 			}
 
 		}else{
-			//optimize the containers, minimize interior overlap
-			for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
+			/*for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
 				glm::vec2 e1 = glm::vec2(e.x,pcontainer->e1.y+(e.y-minSizeSum.y)/(float)count);
 				glm::vec2 p1 = position;
 
 				position.y += e1.y;
 				pcontainer->TranslateRecursive(p1,e1,p1+pcontainer->canvasOffset,e1-pcontainer->canvasExtent);
+			}*/
+			for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
+				float s = pcontainer->size.y*e.y;
+				glm::vec2 e1 = glm::vec2(e.x,s);
+				//glm::vec2 e1 = glm::vec2(e.x,std::max(s,pcontainer->GetMinSize().y));
+				glm::vec2 p1 = position;
+
+				position.y += s;
+				pcontainer->TranslateRecursive(p1,e1,p1+pcontainer->canvasOffset,e1-pcontainer->canvasExtent);
 			}
 		}
-		//
 		break;
 	}
 
 	this->posFullCanvas = posFullCanvas;
 	this->extFullCanvas = extFullCanvas;
 	glm::vec2 pcorr = glm::min(p,glm::vec2(0.0f));
-	p -= pcorr;
+	p -= pcorr; //make sure the containers stay within the screen limits
 	glm::vec2 ecorr = glm::min(1.0f-(p+e),glm::vec2(0.0f));
 	this->p = glm::max(p+ecorr,0.0f);
 	this->e = glm::min(e,1.0f);

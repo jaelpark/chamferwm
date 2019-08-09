@@ -13,6 +13,7 @@ ContainerInterface::ContainerInterface() :
 canvasOffset(boost::python::make_tuple(0.0f,0.0f)),
 canvasExtent(boost::python::make_tuple(0.0f,0.0f)),
 borderWidth(boost::python::make_tuple(0.0f,0.0f)),
+size(boost::python::make_tuple(1.0f,1.0f)),
 minSize(boost::python::make_tuple(0.0f,0.0f)),
 maxSize(boost::python::make_tuple(1.0f,1.0f)),
 floatingMode(FLOAT_AUTOMATIC),
@@ -32,6 +33,8 @@ void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 	setup.canvasExtent.y = boost::python::extract<float>(canvasExtent[1])();
 	setup.borderWidth.x = boost::python::extract<float>(borderWidth[0])();
 	setup.borderWidth.y = boost::python::extract<float>(borderWidth[1])();
+	setup.size.x = boost::python::extract<float>(size[0])();
+	setup.size.y = boost::python::extract<float>(size[1])();
 	setup.minSize.x = boost::python::extract<float>(minSize[0])();
 	setup.minSize.y = boost::python::extract<float>(minSize[1])();
 	setup.maxSize.x = boost::python::extract<float>(maxSize[0])();
@@ -712,7 +715,24 @@ BOOST_PYTHON_MODULE(chamfer){
 				container.pcontainer->borderWidth.x = boost::python::extract<float>(tuple[0])();
 				container.pcontainer->borderWidth.y = boost::python::extract<float>(tuple[1])();
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, boost::python::tuple>()))
-		//.def_readwrite("minSize",&ContainerInterface::minSize)
+		.add_property("size",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return container.size;
+				return boost::python::make_tuple(container.pcontainer->size.x,container.pcontainer->size.y);
+			},boost::python::default_call_policies(),boost::mpl::vector<boost::python::tuple, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, boost::python::tuple tuple){
+				if(!container.pcontainer){
+					container.size = tuple;
+					return;
+				}
+				glm::vec2 size = glm::vec2(
+					boost::python::extract<float>(tuple[0])(),
+					boost::python::extract<float>(tuple[1])());
+				container.pcontainer->SetSize(size);
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, boost::python::tuple>()))
 		.add_property("minSize",
 			boost::python::make_function(
 			[](ContainerInterface &container){

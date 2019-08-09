@@ -39,6 +39,7 @@ public:
 		//Border width can be set anytime before the client creation
 		glm::vec2 borderWidth = glm::vec2(0.0f);
 		//For performance reasons, the min/maxSize has to be known before the container is created.
+		glm::vec2 size = glm::vec2(1.0f);
 		glm::vec2 minSize = glm::vec2(0.0f);
 		glm::vec2 maxSize = glm::vec2(1.0f);
 		uint flags = 0;
@@ -60,6 +61,7 @@ public:
 	Container * GetParent() const;
 	Container * GetFocus() const;
 	Container * GetRoot();
+	void SetSize(glm::vec2);
 
 	void MoveNext();
 	void MovePrev();
@@ -105,6 +107,7 @@ public:
 
 	glm::vec2 borderWidth;
 
+	glm::vec2 size;
 	glm::vec2 minSize;
 	glm::vec2 maxSize;
 

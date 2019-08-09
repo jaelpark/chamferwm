@@ -52,6 +52,7 @@ public:
 	boost::python::tuple canvasOffset;
 	boost::python::tuple canvasExtent;
 	boost::python::tuple borderWidth;
+	boost::python::tuple size;
 	boost::python::tuple minSize;
 	boost::python::tuple maxSize;
 	//client variables
