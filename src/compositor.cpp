@@ -711,8 +711,10 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 }
 
 bool CompositorInterface::PollFrameFence(){
-	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS)
-		throw Exception("Failed to acquire a swap chain image.\n");
+	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS){
+		DebugPrintf(stderr,"Failed to acquire a swap chain image.\n");
+		return false;
+	}
 	
 	if(vkWaitForFences(logicalDev,1,&pfence[currentFrame],VK_TRUE,0) == VK_TIMEOUT)
 		return false;
