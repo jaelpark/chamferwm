@@ -60,6 +60,10 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 #include "chamfer.hlsl"
 #define FLAGS_FOCUS_NEXT 0x2
 
+const float4 borderColor = float4(0.0f,0.0f,0.0f,1.0f);
+const float4 focusColor = float4(1.0f,0.6f,0.33f,1.0f);
+const float4 taskSelectColor = float4(0.957f,0.910f,0.824f,1.0f);
+
 [[vk::binding(0)]] Texture2D<float4> content;
 //[[vk::binding(1)]] SamplerState sm;
 
@@ -78,7 +82,6 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 	float2 center = 0.5*(a+b); //center location in pixels
 	float2 d1 = b-a; //d1: pixel extent of the window
 
-	float4 c = float4(0.0f,0.0f,0.0f,1.0f);
 	float2 q = posh.xy-center;
 	if(ChamferMap(q,0.5f*d1-50.0f*borderScaling,75.0f*borderScaling) > 0.0f){
 		//shadow region
@@ -91,17 +94,18 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 			//dashed line around focus
 			if((any(posh > center-0.5f*d1 && posh < center+0.5f*d1 && fmod(floor(posh/(50.0f*borderScaling)),3.0f) < 0.5f) &&
 				any(posh < center-0.5f*d1-0.25f*screen*marginWidth || posh > center+0.5f*d1+0.25f*screen*marginWidth)))
-				c.xyz = float3(1.0f,0.6f,0.33f);
+				return focusColor;
 
 		if(flags & FLAGS_FOCUS_NEXT)
 			if((any(posh > center-0.5f*d1 && posh < center+0.5f*d1 && fmod(floor(posh/(50.0f*borderScaling)),3.0f) < 0.5f) &&
 				any(posh < center-0.5f*d1-0.25f*screen*marginWidth || posh > center+0.5f*d1+0.25f*screen*marginWidth)))
-				c.xyz = float3(0.957f,0.910f,0.824f);
-		return c;
+				return taskSelectColor;
+
+		return borderColor;
 	}
 
 	//content region
-	c = content.Load(float3(posh.xy-a,0));
+	float4 c = content.Load(float3(posh.xy-a,0));
 
 	return c;
 }
