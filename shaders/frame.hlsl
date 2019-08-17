@@ -88,7 +88,7 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID
 		float d = ChamferMap(q,0.5f*d1-25.0f*borderScaling,75.0f*borderScaling);
 		return float4(0.0f,0.0f,0.0f,0.9f*saturate(-d/30.0f));
 	}
-	if(ChamferMap(q,0.5f*d1-40.0f*borderScaling,40.0f*borderScaling) > 0.0f){
+	if(ChamferMap(q,0.5f*d1-40.0f*borderScaling,40.0f*borderScaling) > -0.5f){
 		//border region
 		if(flags & FLAGS_FOCUS)
 			//dashed line around focus
