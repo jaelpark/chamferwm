@@ -37,12 +37,12 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 	float2 aspect = float2(1.0f,screen.x/screen.y);
 	float2 marginWidth = margin*aspect; //this results in borders half the gap size
 
-	marginWidth *= 2.0f; //stretch to double to allow room for the effects (border + shadow)
+	marginWidth *= 8.0f; //stretch to make room for the effects (border + shadow)
 
 	//expand the vertex into a quad
 	[unroll]
 	for(uint i = 0; i < 4; ++i){
-		output.posh = float4(vertices[i]+(2.0*vertexPositions[i]-1.0f)*4.0f*marginWidth,0,1);
+		output.posh = float4(vertices[i]+(2.0*vertexPositions[i]-1.0f)*marginWidth,0,1);
 		output.texc = vertexPositions[i];
 		//output.geomId = 0;
 		stream.Append(output);
