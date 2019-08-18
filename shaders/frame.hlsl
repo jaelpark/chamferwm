@@ -12,7 +12,6 @@ float2 main(uint x : SV_VertexID) : POSITION0{
 struct GS_OUTPUT{
 	float4 posh : SV_Position;
 	float2 texc : TEXCOORD;
-	//uint geomId : ID;
 };
 
 const float2 vertexPositions[4] = {
@@ -44,7 +43,6 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 	for(uint i = 0; i < 4; ++i){
 		output.posh = float4(vertices[i]+(2.0*vertexPositions[i]-1.0f)*marginWidth,0,1);
 		output.texc = vertexPositions[i];
-		//output.geomId = 0;
 		stream.Append(output);
 	}
 	stream.RestartStrip();
@@ -54,6 +52,8 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 
 #include "chamfer.hlsl"
 
+#define STOCK_FRAME_STYLE 1 //select between two stock styles (1: chamfered edges, other: basic rectangle borders)
+
 const float borderScaling = 1.0f;
 const float4 borderColor = float4(0.0f,0.0f,0.0f,1.0f);
 const float4 focusColor = float4(1.0f,0.6f,0.33f,1.0f);
@@ -62,13 +62,18 @@ const float4 taskSelectColor = float4(0.957f,0.910f,0.824f,1.0f);
 [[vk::binding(0)]] Texture2D<float4> content;
 //[[vk::binding(1)]] SamplerState sm;
 
+//signed distance field of a rectangle
+float RectangleMap(float2 p, float2 b){
+	float2 d = abs(p)-b;
+	return length(max(d,0.0f))+min(max(d.x,d.y),0.0f);
+}
+
 //signed distance field of a chamfered rectangle
 float ChamferMap(float2 p, float2 b, float r){
 	float2 d = abs(p)-b;
 	return length(max(d,0.0f))-r+min(max(d.x,d.y),0.0f);
 }
 
-//float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0, uint geomId : ID0) : SV_Target{
 float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0) : SV_Target{
 	float2 aspect = float2(1.0f,screen.x/screen.y);
 
@@ -80,12 +85,17 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0) : SV_Target{
 	float2 d1 = b-a; //d1: pixel extent of the window
 
 	float2 q = posh.xy-center;
-	if(ChamferMap(q,0.5f*d1-0.0130f*borderScalingScr.x,0.0195f*borderScalingScr.x) > 0.0f){
-		//shadow region
-		float d = ChamferMap(q,0.5f*d1-0.0065f*borderScalingScr.x,0.0195f*borderScalingScr.x);
-		return float4(0.0f,0.0f,0.0f,0.9f*saturate(-d/30.0f));
+
+#if STOCK_FRAME_STYLE == 1
+	// ----- frame 1: chamfered -------------------------
+
+	float sr = ChamferMap(q,0.5f*d1-0.0130f*borderScalingScr.x,0.0195f*borderScalingScr.x);
+	if(sr > 0.0f){
+		//shadow region - to disable shadow, replace line below with: discard; return 0.0f;
+		return float4(0.0f,0.0f,0.0f,0.7f*saturate(1.0f-sr/(0.0078f*borderScalingScr.x)));
 	}
-	if(ChamferMap(q,0.5f*d1-0.0104f*borderScalingScr.x,0.0104f*borderScalingScr.x) > -0.5f){
+	float br = ChamferMap(q,0.5f*d1-0.0104f*borderScalingScr.x,0.0104f*borderScalingScr.x);
+	if(br > -0.5f){
 		//border region
 		if(flags & FLAGS_FOCUS)
 			//dashed line around focus
@@ -100,10 +110,28 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0) : SV_Target{
 
 		return borderColor;
 	}
+#else //STOCK_FRAME_STYLE
+	// ----- frame 0: basic -----------------------------
+
+	float sr = RectangleMap(q,0.5f*d1-(0.0130f-0.0195f)*borderScalingScr.x);
+	if(sr > 0.0f){
+		//shadow region - to disable shadow, replace line below with: discard; return 0.0f;
+		return float4(0.0f,0.0f,0.0f,0.9f*saturate(1.0f-sr/(0.0078f*borderScalingScr.x)));
+	}
+	float br = RectangleMap(q,0.5f*d1);
+	if(br > -0.5f){
+		//border region
+		if(flags & FLAGS_FOCUS)
+			return focusColor;
+		if(flags & FLAGS_FOCUS_NEXT)
+			return taskSelectColor;
+
+		return borderColor;
+	}
+#endif //STOCK_FRAME_STYLE
 
 	//content region
 	float4 c = content.Load(float3(posh.xy-a,0));
-
 	return c;
 }
 
