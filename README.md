@@ -1,5 +1,5 @@
 # chamferwm
-A tiling window manager with Vulkan based compositor.
+A tiling window manager with Vulkan based compositor. [Documentation](https://jaelpark.github.io/chamferwm-docs/)
 
 [![Preview](http://users.jyu.fi/~jaelpark/gitres/scrot-chamfer-1.jpg)](http://users.jyu.fi/~jaelpark/gitres/scrot-chamfer.png)
 
