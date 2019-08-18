@@ -53,13 +53,11 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 #elif defined(SHADER_STAGE_PS)
 
 #include "chamfer.hlsl"
-#define FLAGS_FOCUS_NEXT 0x2
 
+const float borderScaling = 1.0f;
 const float4 borderColor = float4(0.0f,0.0f,0.0f,1.0f);
 const float4 focusColor = float4(1.0f,0.6f,0.33f,1.0f);
 const float4 taskSelectColor = float4(0.957f,0.910f,0.824f,1.0f);
-
-const float borderScaling = 1.0f;
 
 [[vk::binding(0)]] Texture2D<float4> content;
 //[[vk::binding(1)]] SamplerState sm;
