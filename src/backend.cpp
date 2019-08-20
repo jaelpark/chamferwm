@@ -134,6 +134,11 @@ X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateI
 		rect = *pcreateInfo->prect;
 		oldRect = rect;
 		translationTime = std::numeric_limits<timespec>::lowest(); //make sure we don't render when nothing is moving
+
+		glm::vec2 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
+		pcontainer->p = glm::vec2(rect.x,rect.y)/screen;
+		pcontainer->e = glm::vec2(rect.w,rect.h)/screen;
+		pcontainer->size = pcontainer->e;
 	}
 
 	if(pcreateInfo->mode != CreateInfo::CREATE_AUTOMATIC)
@@ -147,9 +152,8 @@ X11Client::~X11Client(){
 void X11Client::UpdateTranslation(){
 	glm::vec4 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels,pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
 	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
-	//glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->margin*aspect,pcontainer->e-2.0f*pcontainer->margin*aspect)*screen;
 	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
-	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN))
+	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) && !(pcontainer->flags & WManager::Container::FLAG_FLOATING))
 		coord += glm::vec4(pcontainer->margin*aspect,-2.0f*pcontainer->margin*aspect)*screen;
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
@@ -168,9 +172,15 @@ void X11Client::UpdateTranslation(){
 	//later on subsequent constructor calls.
 	//if(oldRect.w != rect.w || oldRect.h != rect.h) //<- moved to compositor
 	AdjustSurface1();
+	//surface adjusted on configure_notify
 }
 
 void X11Client::UpdateTranslation(const WManager::Rectangle *prect){
+	glm::vec2 screen(pbackend->pscr->width_in_pixels,pbackend->pscr->height_in_pixels);
+	pcontainer->p = glm::vec2(prect->x,prect->y)/screen;
+	pcontainer->e = glm::vec2(prect->w,prect->h)/screen;
+	pcontainer->size = pcontainer->e;
+
 	//assumes that the xcb configuration has already been performed - automatic windows do this.
 	//alternatively, check if window is manually managed
 	oldRect = rect;
@@ -676,7 +686,6 @@ sint Default::HandleEvent(bool forcePoll){
 			//check if window already exists
 			//further configuration should be blocked (for example Firefox on restore session)
 			X11Client *pclient1 = FindClient(pev->window,MODE_MANUAL);
-			//TODO: FIX BUG!!! CONFIGURE_REQUEST may happen before map, when pclient1 doesn't exist yet
 			if(pclient1 && !(pclient1->pcontainer->flags & WManager::Container::FLAG_FLOATING))
 				break;
 
@@ -768,18 +777,9 @@ sint Default::HandleEvent(bool forcePoll){
 
 			xcb_configure_window(pcon,pev->window,mask,values);
 
+			//TODO: do this and the cache in CONFIGURE_NOTIFY?
 			if(pclient1)
 				pclient1->UpdateTranslation(&(*mrect).second);
-
-			/*printf("allow position configuration: %d\n",allowPositionConfig);
-			if(pev->value_mask & XCB_CONFIG_WINDOW_X)
-				printf(" - config X\n");
-			if(pev->value_mask & XCB_CONFIG_WINDOW_Y)
-				printf(" - config Y\n");
-			if(pev->value_mask & XCB_CONFIG_WINDOW_WIDTH)
-				printf(" - config W\n");
-			if(pev->value_mask & XCB_CONFIG_WINDOW_HEIGHT)
-				printf(" - config H\n");*/
 
 			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u (mask: %x) -> %d, %d, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height,pev->value_mask,(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
 			}

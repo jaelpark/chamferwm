@@ -102,14 +102,11 @@ public:
 	glm::vec2 canvasOffset; //should be multiplied by e?
 	glm::vec2 canvasExtent;
 
-	//glm::vec2 c1; //iteration center
-	glm::vec2 e1; //iteration e
-
 	glm::vec2 margin;
 
-	glm::vec2 size;
-	glm::vec2 minSize;
-	glm::vec2 maxSize;
+	glm::vec2 size; //size relative to the parent container
+	glm::vec2 minSize; //min size, relative to screen
+	glm::vec2 maxSize; //max size, relative to screen
 
 	uint flags;
 	LAYOUT layout;

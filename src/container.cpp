@@ -283,6 +283,14 @@ Container * Container::GetRoot(){
 }
 
 void Container::SetSize(glm::vec2 size1){
+	if(flags & FLAG_FLOATING){
+		p += 0.5f*(size-size1);
+		e = size1;
+		size = size1;
+		if(pclient)
+			pclient->UpdateTranslation();
+		return;
+	}
 	glm::vec2 sizeSum = glm::vec2(1.0f)-size;
 	size = size1;
 	for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
@@ -339,9 +347,9 @@ void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCan
 	glm::vec2 minSizeSum(0.0f);
 	glm::vec2 maxMinSize(0.0f);
 	for(Container *pcontainer = pch; pcontainer; ++count, pcontainer = pcontainer->pnext){
-		pcontainer->e1 = pcontainer->GetMinSize();
-		minSizeSum += pcontainer->e1;
-		maxMinSize = glm::max(pcontainer->e1,maxMinSize);
+		glm::vec2 e1 = pcontainer->GetMinSize();
+		minSizeSum += e1;
+		maxMinSize = glm::max(e1,maxMinSize);
 	}
 
 	glm::vec2 position(p);
@@ -400,8 +408,8 @@ void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCan
 		if(e.y-minSizeSum.y < 0.0f){
 			//overlap required, everything has been minimized to the limit
 			for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext){
-				glm::vec2 e1 = glm::vec2(e.x,pcontainer->e1.y);
-				glm::vec2 p1 = position;
+				glm::vec2 e1 = glm::vec2(e.x,maxMinSize.y);
+				glm::vec2 p1 = glm::vec2(p.x,position.y);//position;
 
 				position.y += e1.y-(minSizeSum.y-e.y)/(float)(count-1);
 				pcontainer->TranslateRecursive(p1,e1,p1+pcontainer->canvasOffset,e1-pcontainer->canvasExtent);
@@ -440,12 +448,12 @@ void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCan
 }
 
 void Container::Translate(){
-	glm::vec2 size = GetMinSize();
+	glm::vec2 size1 = GetMinSize();
 
 	//Check the parent hierarchy, up to which point they won't have to be updated (condition overlappedSize <= e).
 	//Find the first ancestor large enough to contain everything without modifiying its size.
 	Container *pcontainer;
-	for(pcontainer = pParent; pcontainer && glm::any(glm::lessThan(pcontainer->e,size-1e-5f)); pcontainer = pcontainer->pParent);
+	for(pcontainer = pParent; pcontainer && glm::any(glm::lessThan(pcontainer->e,size1-1e-5f)); pcontainer = pcontainer->pParent);
 	if(!pcontainer)
 		pcontainer = this; //reached the root
 
