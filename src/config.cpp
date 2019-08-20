@@ -364,7 +364,7 @@ DebugContainerConfig::~DebugContainerConfig(){
 	//
 }
 
-BackendInterface::BackendInterface(){
+BackendInterface::BackendInterface() : pbackend(0){
 	//
 }
 
@@ -528,7 +528,7 @@ BackendConfig::~BackendConfig(){
 	pbackendInt->pbackend = 0;
 }
 
-CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring){
+CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), enableAnimation(true), animationDuration(0.3f), pcompositor(0){
 	//
 }
 
@@ -858,6 +858,36 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("deviceIndex",&CompositorInterface::deviceIndex)
 		.def_readwrite("debugLayers",&CompositorInterface::debugLayers)
 		.def_readwrite("scissoring",&CompositorInterface::scissoring)
+		.add_property("enableAnimation",
+			boost::python::make_function(
+			[](CompositorInterface &compositor){
+				if(!compositor.pcompositor)
+					return compositor.enableAnimation;
+				return dynamic_cast<Compositor::CompositorInterface *>(compositor.pcompositor)->enableAnimation;
+			},boost::python::default_call_policies(),boost::mpl::vector<bool, CompositorInterface &>()),
+			boost::python::make_function(
+			[](CompositorInterface &compositor, bool enableAnimation){
+				if(!compositor.pcompositor){
+					compositor.enableAnimation = enableAnimation;
+					return;
+				}
+				dynamic_cast<Compositor::CompositorInterface *>(compositor.pcompositor)->enableAnimation = enableAnimation;
+			},boost::python::default_call_policies(),boost::mpl::vector<void, CompositorInterface &, bool>()))
+		.add_property("animationDuration",
+			boost::python::make_function(
+			[](CompositorInterface &compositor){
+				if(!compositor.pcompositor)
+					return compositor.animationDuration;
+				return dynamic_cast<Compositor::CompositorInterface *>(compositor.pcompositor)->animationDuration;
+			},boost::python::default_call_policies(),boost::mpl::vector<float, CompositorInterface &>()),
+			boost::python::make_function(
+			[](CompositorInterface &compositor, float animationDuration){
+				if(!compositor.pcompositor){
+					compositor.animationDuration = animationDuration;
+					return;
+				}
+				dynamic_cast<Compositor::CompositorInterface *>(compositor.pcompositor)->animationDuration = animationDuration;
+			},boost::python::default_call_policies(),boost::mpl::vector<void, CompositorInterface &, float>()))
 		;
 	boost::python::def("BindCompositor",CompositorInterface::Bind);
 	//boost::python::def("GetCompositor",CompositorInterface::GetInterface);

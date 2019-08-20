@@ -668,7 +668,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DefaultCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Start();
 
 		wordexp_t expResult;
@@ -720,7 +720,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DebugCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Compositor::X11DebugCompositor::Start();
 
 		wordexp_t expResult;

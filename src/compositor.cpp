@@ -167,7 +167,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), playingAnimation(false){
+CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration){
 	//
 }
 
@@ -805,9 +805,12 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	for(uint i = 0; i < renderQueue.size(); ++i){
 		RenderObject &renderObject = renderQueue[i];
 
-		float t = timespec_diff(frameTime,renderObject.pclient->translationTime);
-		float s = std::clamp(t/0.3f,0.0f,1.0f);
-		s = 1.0f/(1.0f+expf(-10.0f*s+5.0f));
+		float s;
+		if(enableAnimation){
+			float t = timespec_diff(frameTime,renderObject.pclient->translationTime);
+			s = std::clamp(t/animationDuration,0.0f,1.0f);
+			s = 1.0f/(1.0f+expf(-10.0f*s+5.0f));
+		}else s = 1.0f;
 
 		glm::vec2 oldRect1 = glm::vec2(renderObject.pclient->oldRect.x,renderObject.pclient->oldRect.y);
 		renderObject.pclient->position = oldRect1+s*(glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y)-oldRect1);

@@ -68,6 +68,8 @@ public:
 		uint deviceIndex;
 		bool debugLayers;
 		bool scissoring;
+		bool enableAnimation;
+		float animationDuration;
 	};
 	CompositorInterface(const Configuration *);
 	virtual ~CompositorInterface();
@@ -184,8 +186,15 @@ protected:
 	std::vector<DescSetCacheEntry> descSetCache;
 
 	bool playingAnimation;
+
+	//config
 	bool debugLayers;
 	bool scissoring;
+
+public:
+	bool enableAnimation;
+	float animationDuration;
+protected:
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
 };

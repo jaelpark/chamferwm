@@ -157,6 +157,8 @@ public:
 	sint deviceIndex;
 	bool debugLayers;
 	bool scissoring;
+	bool enableAnimation;
+	float animationDuration;
 
 	class CompositorConfig *pcompositor;
 
