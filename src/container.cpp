@@ -411,7 +411,7 @@ void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCan
 				glm::vec2 e1 = glm::vec2(e.x,maxMinSize.y);
 				glm::vec2 p1 = glm::vec2(p.x,position.y);//position;
 
-				position.y += e1.y-(minSizeSum.y-e.y)/(float)(count-1);
+				position.y += e1.y-((float)count*maxMinSize.y-e.y)/(float)(count-1);
 				pcontainer->TranslateRecursive(p1,e1,p1+pcontainer->canvasOffset,e1-pcontainer->canvasExtent);
 			}
 
