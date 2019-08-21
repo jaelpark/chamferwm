@@ -22,6 +22,8 @@ public:
 	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
 	void Draw(const VkRect2D &, const glm::vec2 &, uint, const VkCommandBuffer *);
 	bool AssignPipeline(const Pipeline *);
+protected:
+	virtual void UpdateDescSets(){};
 	class CompositorInterface *pcomp;
 	struct PipelineDescriptorSet{
 		uint64 fenceTag;
@@ -46,9 +48,8 @@ public:
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	void AdjustSurface(uint, uint);
-private:
-	void UpdateDescSets();
 protected:
+	void UpdateDescSets();
 	Texture *ptexture;
 	bool fullRegionUpdate;
 	bool animationCompleted;

@@ -46,6 +46,7 @@ class Key(Enum):
 	LIFT_CONTAINER = auto()
 
 	LAYOUT = auto()
+	LAYOUT_STACKED = auto()
 	SPLIT_V = auto()
 	FULLSCREEN = auto()
 
@@ -143,7 +144,6 @@ class Container(chamfer.Container):
 			self.vertexShader = "frame_vertex.spv";
 			self.geometryShader = "frame_geometry.spv";
 			self.fragmentShader = "frame_fragment.spv";
-		self.ResetShaders(); #outside OnSetupClient, ResetShaders should be called to bind the new shaders
 
 		return True;
 	
@@ -186,9 +186,6 @@ class Container(chamfer.Container):
 			container = container.GetFocus();
 		return container;
 	
-	#TODO: stop at specified layout
-	#def FindFocusLayout(self, layout):
-		
 	def FindParentLayout(self, layout):
 		try:
 			container = self;
@@ -198,7 +195,7 @@ class Container(chamfer.Container):
 
 		except AttributeError:
 			return self;
-
+	
 class Backend(chamfer.Backend):
 	def OnSetupKeys(self, debug):
 		if not debug:
@@ -231,6 +228,7 @@ class Backend(chamfer.Backend):
 
 			#layout, splits and fullscreen
 			self.BindKey(ord('e'),self.modMask,Key.LAYOUT.value);
+			self.BindKey(ord('d'),self.modMask,Key.LAYOUT_STACKED.value);
 			self.BindKey(latin1.XK_onehalf,self.modMask,Key.SPLIT_V.value);
 			self.BindKey(ord('v'),self.modMask,Key.SPLIT_V.value);
 			self.BindKey(ord('f'),self.modMask,Key.FULLSCREEN.value);
@@ -451,9 +449,16 @@ class Backend(chamfer.Backend):
 			}[parent.layout];
 			parent.ShiftLayout(layout);
 
+		elif keyId == Key.LAYOUT_STACKED.value:
+			pass;
+			#if parent is None:
+			#	return;
+			#for child in parent.IterChildren():
+			#	child.minSize = (child.minSize[0],0.95);
+			#parent.ShiftLayout(chamfer.layout.HSPLIT);
+
 		elif keyId == Key.SPLIT_V.value:
 			#TODO: add render flags property, bitwise OR them
-			print("split armed.",flush=True);
 			focus.splitArmed = not focus.splitArmed;
 
 		elif keyId == Key.FULLSCREEN.value:

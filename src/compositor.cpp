@@ -4,7 +4,6 @@
 #include "CompositorResource.h"
 #include "compositor.h"
 
-#include <set>
 #include <algorithm>
 #include <cstdlib>
 #include <limits>
@@ -32,6 +31,8 @@ void ColorFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUN
 	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
 	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
+	
+	UpdateDescSets();
 }
 
 void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, uint flags, const VkCommandBuffer *pcommandBuffer){

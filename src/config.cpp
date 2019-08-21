@@ -23,7 +23,8 @@ pcontainer(0){//,
 }
 
 ContainerInterface::~ContainerInterface(){
-	//
+	//erase from update queues
+	shaderUpdateQueue.erase(this);
 }
 
 void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
@@ -175,6 +176,28 @@ void ContainerInterface::Move(boost::python::object containerObject){
 	if(pcontainer1)
 		pcontainer1->pbackend->MoveContainer(pcontainer,containerInt.pcontainer);
 }
+
+void ContainerInterface::UpdateShaders(){
+	for(auto m = shaderUpdateQueue.begin(); m != shaderUpdateQueue.end();){
+		if(!(*m)->pcontainer){
+			m = shaderUpdateQueue.erase(m);
+			continue;
+		}
+		Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>((*m)->pcontainer->pclient);
+		if(!pclientFrame){
+			++m;
+			continue;
+		}
+		const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
+			(*m)->vertexShader.c_str(),(*m)->geometryShader.c_str(),(*m)->fragmentShader.c_str()
+		};
+		pclientFrame->SetShaders(pshaderName);
+
+		m = shaderUpdateQueue.erase(m);
+	}
+}
+
+std::set<ContainerInterface *> ContainerInterface::shaderUpdateQueue;
 
 ContainerProxy::ContainerProxy() : ContainerInterface(){
 	//
@@ -640,18 +663,6 @@ BOOST_PYTHON_MODULE(chamfer){
 				if(container.OnFullscreen(toggle))
 					container.pcontainer->SetFullscreen(toggle);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, bool>()))
-		.def("ResetShaders",boost::python::make_function(
-			[](ContainerInterface &container){
-				if(!container.pcontainer || !container.pcontainer->pclient)
-					return;
-				Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>(container.pcontainer->pclient);
-				if(!pclientFrame)
-					return;
-				const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
-					container.vertexShader.c_str(),container.geometryShader.c_str(),container.fragmentShader.c_str()
-				};
-				pclientFrame->SetShaders(pshaderName);
-			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &>()))
 		.def("IsFloating",boost::python::make_function(
 			[](ContainerInterface &container){
 				if(!container.pcontainer){
@@ -817,9 +828,42 @@ BOOST_PYTHON_MODULE(chamfer){
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, uint>()))
 		.def_readonly("wm_name",&ContainerInterface::wm_name)
 		.def_readonly("wm_class",&ContainerInterface::wm_class)
-		.def_readwrite("vertexShader",&ContainerInterface::vertexShader)
-		.def_readwrite("geometryShader",&ContainerInterface::geometryShader)
-		.def_readwrite("fragmentShader",&ContainerInterface::fragmentShader)
+		//.def_readwrite("vertexShader",&ContainerInterface::vertexShader)
+		.add_property("vertexShader",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				return container.vertexShader;
+			},boost::python::default_call_policies(),boost::mpl::vector<std::string, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, std::string vertexShader){
+				container.vertexShader = vertexShader;
+				if(container.pcontainer && container.pcontainer->pclient){
+					ContainerInterface::shaderUpdateQueue.insert(&container);}
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, std::string>()))
+		//.def_readwrite("geometryShader",&ContainerInterface::geometryShader)
+		.add_property("geometryShader",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				return container.geometryShader;
+			},boost::python::default_call_policies(),boost::mpl::vector<std::string, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, std::string geometryShader){
+				container.geometryShader = geometryShader;
+				if(container.pcontainer && container.pcontainer->pclient)
+					ContainerInterface::shaderUpdateQueue.insert(&container);
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, std::string>()))
+		//.def_readwrite("fragmentShader",&ContainerInterface::fragmentShader)
+		.add_property("fragmentShader",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				return container.fragmentShader;
+			},boost::python::default_call_policies(),boost::mpl::vector<std::string, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, std::string fragmentShader){
+				container.fragmentShader = fragmentShader;
+				if(container.pcontainer && container.pcontainer->pclient)
+					ContainerInterface::shaderUpdateQueue.insert(&container);
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, std::string>()))
 		.add_property("layout",boost::python::make_function(
 			[](ContainerInterface &container){
 				if(!container.pcontainer){

@@ -700,8 +700,10 @@ public:
 	}
 
 	void Present(){
+		Config::ContainerInterface::UpdateShaders();
 		if(!PollFrameFence())
 			return;
+
 		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
 		Compositor::X11Compositor::Present();
 	}
@@ -752,8 +754,10 @@ public:
 	}
 
 	void Present(){
+		Config::ContainerInterface::UpdateShaders();
 		if(!PollFrameFence())
 			return;
+
 		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
 		Compositor::X11DebugCompositor::Present();
 	}

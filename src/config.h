@@ -41,13 +41,6 @@ public:
 		FLOAT_NEVER
 	} floatingMode;
 
-	std::string wm_name;
-	std::string wm_class;
-
-	std::string vertexShader;
-	std::string geometryShader;
-	std::string fragmentShader;
-
 	//temporary storage for deferred assignment (before container is created)
 	boost::python::tuple canvasOffset;
 	boost::python::tuple canvasExtent;
@@ -58,9 +51,17 @@ public:
 	//client variables
 	uint shaderUserFlags;
 	//--------------------------------
+	std::string vertexShader;
+	std::string geometryShader;
+	std::string fragmentShader;
+	std::string wm_name;
+	std::string wm_class;
 
 	WManager::Container *pcontainer;
 	boost::python::object self;
+	
+	static void UpdateShaders();
+	static std::set<ContainerInterface *> shaderUpdateQueue;
 };
 
 class ContainerProxy : public ContainerInterface, public boost::python::wrapper<ContainerInterface>{

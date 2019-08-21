@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <deque>
+#include <set>
 
 typedef unsigned int uint;
 typedef int sint;
