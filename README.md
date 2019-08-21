@@ -37,7 +37,7 @@ Currently a PKGBUILD is available for testing purposes. Install from [AUR](https
 exec chamfer --config=/usr/share/chamfer/config/config.py --shader-path=/usr/share/chamfer/shaders/
 ```
 
-When multiple rendering devices are available, make the choice with `--device-index=n`, where `n` is the zero-based index of the device (default = 0). Launch Xorg with `startx`.
+When multiple rendering devices are available, make the choice with `--device-index=n`, where `n` is the zero-based index of the device (default = 0). Launch Xorg with `startx`. NVIDIA users may have to add ``Option "AllowSHMPixmaps" "1"`` to their Xorg configuration.
 
 To run the WM without the integrated compositor, use
 
