@@ -7,6 +7,7 @@ src = [
 	'src/backend.cpp',
 	'src/compositor.cpp',
 	'src/CompositorResource.cpp',
+	'src/CompositorFont.cpp',
 	'third/spirv_reflect/spirv_reflect.c'
 ]
 
@@ -39,6 +40,10 @@ python = [
 	dependency('boost',modules:['system','filesystem','python3'])
 ]
 
+ft2 = [
+	dependency('freetype2')
+]
+
 glslc = find_program('glslc')
 glslc_invoke_vertex = [glslc,'--target-env=vulkan','-fshader-stage=vertex','-O','-x','hlsl','-DSHADER_STAGE_VS','-o','@OUTPUT@','@INPUT@']
 glslc_invoke_geometry = [glslc,'--target-env=vulkan','-fshader-stage=geometry','-O','-x','hlsl','-DSHADER_STAGE_GS','-o','@OUTPUT@','@INPUT@']
@@ -52,5 +57,5 @@ custom_target('frame_vertex',output:'frame_vertex.spv',input:'shaders/frame.hlsl
 custom_target('frame_geometry',output:'frame_geometry.spv',input:'shaders/frame.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
 custom_target('frame_fragment',output:'frame_fragment.spv',input:'shaders/frame.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
 
-executable('chamfer',sources:src,include_directories:inc,dependencies:[xcb,vk,python],cpp_args:['-std=c++17','-Wno-reorder'])
+executable('chamfer',sources:src,include_directories:inc,dependencies:[xcb,vk,python,ft2],cpp_args:['-std=c++17','-Wno-reorder'])
 
