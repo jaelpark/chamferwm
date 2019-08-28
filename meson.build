@@ -40,14 +40,15 @@ python = [
 	dependency('boost',modules:['system','filesystem','python3'])
 ]
 
-ft2 = [
-	dependency('freetype2')
+ft = [
+	dependency('freetype2'),
+	dependency('harfbuzz')
 ]
 
 glslc = find_program('glslc')
-glslc_invoke_vertex = [glslc,'--target-env=vulkan','-fshader-stage=vertex','-O','-x','hlsl','-DSHADER_STAGE_VS','-o','@OUTPUT@','@INPUT@']
-glslc_invoke_geometry = [glslc,'--target-env=vulkan','-fshader-stage=geometry','-O','-x','hlsl','-DSHADER_STAGE_GS','-o','@OUTPUT@','@INPUT@']
-glslc_invoke_fragment = [glslc,'--target-env=vulkan','-fshader-stage=fragment','-O','-x','hlsl','-DSHADER_STAGE_PS','-o','@OUTPUT@','@INPUT@']
+glslc_invoke_vertex = [glslc,'--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=vertex','-O','-x','hlsl','-DSHADER_STAGE_VS','-o','@OUTPUT@','@INPUT@']
+glslc_invoke_geometry = [glslc,'--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=geometry','-O','-x','hlsl','-DSHADER_STAGE_GS','-o','@OUTPUT@','@INPUT@']
+glslc_invoke_fragment = [glslc,'--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=fragment','-O','-x','hlsl','-DSHADER_STAGE_PS','-o','@OUTPUT@','@INPUT@']
 
 custom_target('default_vertex',output:'default_vertex.spv',input:'shaders/default.hlsl',command:glslc_invoke_vertex,install:true,install_dir:'.')
 custom_target('default_geometry',output:'default_geometry.spv',input:'shaders/default.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
@@ -57,5 +58,5 @@ custom_target('frame_vertex',output:'frame_vertex.spv',input:'shaders/frame.hlsl
 custom_target('frame_geometry',output:'frame_geometry.spv',input:'shaders/frame.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
 custom_target('frame_fragment',output:'frame_fragment.spv',input:'shaders/frame.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
 
-executable('chamfer',sources:src,include_directories:inc,dependencies:[xcb,vk,python,ft2],cpp_args:['-std=c++17','-Wno-reorder'])
+executable('chamfer',sources:src,include_directories:inc,dependencies:[xcb,vk,python,ft],cpp_args:['-std=c++17','-Wno-reorder'])
 
