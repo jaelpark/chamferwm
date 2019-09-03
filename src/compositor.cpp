@@ -376,6 +376,12 @@ void CompositorInterface::InitializeRenderEngine(){
 			break;
 		}
 	}
+	/*for(uint i = 0; i < queueFamilyCount; ++i){
+		if(pqueueFamilyProps[i].queueCount > 0 && pqueueFamilyProps[i].queueFlags & VK_QUEUE_TRANSFER_BIT){
+			queueFamilyIndex[QUEUE_INDEX_TRANSFER] = i;
+			break;
+		}
+	}*/
 	std::set<uint> queueSet;
 	for(uint i = 0; i < QUEUE_INDEX_COUNT; ++i){
 		if(queueFamilyIndex[i] == ~0u)
@@ -1085,6 +1091,7 @@ void CompositorInterface::Present(){
 	frameTag++;
 }
 
+//TODO: make template<T> to load different pipelines?
 Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
 	auto m = std::find_if(pipelines.begin(),pipelines.end(),[&](auto &r)->bool{
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)

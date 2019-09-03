@@ -509,6 +509,84 @@ Texture::~Texture(){
 	//
 }
 
+Buffer::Buffer(uint _size, VkBufferUsageFlagBits usage, const CompositorInterface *_pcomp) : pcomp(_pcomp), size(_size){
+	//
+	VkBufferCreateInfo bufferCreateInfo = {};
+	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferCreateInfo.size = size;
+	bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	if(vkCreateBuffer(pcomp->logicalDev,&bufferCreateInfo,0,&stagingBuffer) != VK_SUCCESS)
+		throw Exception("Failed to create a staging buffer.");
+
+	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProps;
+	vkGetPhysicalDeviceMemoryProperties(pcomp->physicalDev,&physicalDeviceMemoryProps);
+
+	VkMemoryRequirements memoryRequirements;
+	vkGetBufferMemoryRequirements(pcomp->logicalDev,stagingBuffer,&memoryRequirements);
+
+	VkMemoryAllocateInfo memoryAllocateInfo = {};
+	memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memoryAllocateInfo.allocationSize = memoryRequirements.size;
+	for(memoryAllocateInfo.memoryTypeIndex = 0; memoryAllocateInfo.memoryTypeIndex < physicalDeviceMemoryProps.memoryTypeCount; memoryAllocateInfo.memoryTypeIndex++){
+		if(memoryRequirements.memoryTypeBits & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+			break;
+	}
+	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&stagingMemory) != VK_SUCCESS)
+		throw Exception("Failed to allocate staging buffer memory.");
+	vkBindBufferMemory(pcomp->logicalDev,stagingBuffer,stagingMemory,0);
+
+	stagingMemorySize = memoryRequirements.size;
+	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferCreateInfo.size = size;
+	bufferCreateInfo.usage = usage;//VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	if(vkCreateBuffer(pcomp->logicalDev,&bufferCreateInfo,0,&buffer) != VK_SUCCESS)
+		throw Exception("Failed to create a buffer.");
+}
+
+Buffer::~Buffer(){
+	vkFreeMemory(pcomp->logicalDev,deviceMemory,0);
+	vkDestroyBuffer(pcomp->logicalDev,buffer,0);
+
+	vkFreeMemory(pcomp->logicalDev,stagingMemory,0);
+	vkDestroyBuffer(pcomp->logicalDev,stagingBuffer,0);
+}
+
+const void * Buffer::Map() const{
+	void *pdata;
+	if(vkMapMemory(pcomp->logicalDev,stagingMemory,0,stagingMemorySize,0,&pdata) != VK_SUCCESS)
+		return 0;
+	return pdata;
+}
+
+void Buffer::Unmap(const VkCommandBuffer *pcommandBuffer){
+	vkUnmapMemory(pcomp->logicalDev,stagingMemory);
+
+	VkBufferMemoryBarrier bufferMemoryBarrier = {};
+	bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	bufferMemoryBarrier.buffer = buffer;
+	bufferMemoryBarrier.offset = 0;
+	bufferMemoryBarrier.size = size;//VK_WHOLE_SIZE;
+	/*bufferMemoryBarrier.srcAccessMask = 0;
+	bufferMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
+		0,0,1,&bufferMemoryBarrier,0,0);*/
+	//not needed
+	//https://www.khronos.org/registry/vulkan/specs/1.0/html/vkspec.html#synchronization-submission-host-writes
+	
+	VkBufferCopy bufferCopy = {};
+	bufferCopy.srcOffset = 0;
+	bufferCopy.dstOffset = 0;
+	bufferCopy.size = size;
+	vkCmdCopyBuffer(*pcommandBuffer,stagingBuffer,buffer,1,&bufferCopy);
+
+	bufferMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	bufferMemoryBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;//VK_ACCESS_SHADER_READ_BIT;
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,0,
+		0,0,1,&bufferMemoryBarrier,0,0);
+}
+
 ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const CompositorInterface *_pcomp) : pcomp(_pcomp), pname(mstrdup(_pname)){
 	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -521,6 +599,41 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 	SpvReflectShaderModule reflectShaderModule;
 	if(spvReflectCreateShaderModule(shaderModuleCreateInfo.codeSize,shaderModuleCreateInfo.pCode,&reflectShaderModule) != SPV_REFLECT_RESULT_SUCCESS)
 		throw Exception("Failed to reflect shader module.");
+	
+	if(spvReflectEnumerateInputVariables(&reflectShaderModule,&inputCount,0) != SPV_REFLECT_RESULT_SUCCESS)
+		throw Exception("Failed to enumerate input variables.");
+	
+	SpvReflectInterfaceVariable **preflectInputVars = new SpvReflectInterfaceVariable*[inputCount];
+	spvReflectEnumerateInputVariables(&reflectShaderModule,&inputCount,preflectInputVars);
+
+	for(uint i = 0; i < inputCount; ++i){
+		if(!preflectInputVars[i]->semantic){
+			DebugPrintf(stdout,"warning: unsemantic vertex attribute in %s at location %u.\n",_pname,preflectInputVars[i]->location);
+			continue;
+		}
+		auto m = std::find_if(semanticMap.begin(),semanticMap.end(),[&](auto &r)->bool{
+			return strcasecmp(std::get<0>(r),preflectInputVars[i]->semantic) == 0
+				&& std::get<1>(r) == (VkFormat)preflectInputVars[i]->format;
+		});
+		if(m == semanticMap.end()){
+			DebugPrintf(stdout,"warning: unrecognized semantic %s in %s at location %u.\n",preflectInputVars[i]->semantic,_pname,preflectInputVars[i]->location);
+			continue;
+		}
+		Input &in = inputs.emplace_back();
+		in.location = preflectInputVars[i]->location;
+		//in.binding = 0; //one vertex buffer bound, per vertex
+		in.semanticMapIndex = m-semanticMap.begin();
+	}
+	std::sort(inputs.begin(),inputs.end(),[](const Input &a, const Input &b){
+		return a.location < b.location;
+	});
+	inputStride = 0;
+	for(auto &m : inputs){
+		m.offset = inputStride;
+		inputStride += std::get<2>(semanticMap[m.semanticMapIndex]);
+	}
+
+	delete []preflectInputVars;
 	
 	if(spvReflectEnumerateDescriptorSets(&reflectShaderModule,&setCount,0) != SPV_REFLECT_RESULT_SUCCESS)
 		throw Exception("Failed to enumerate descriptor sets.");
@@ -572,14 +685,35 @@ ShaderModule::~ShaderModule(){
 	vkDestroyShaderModule(pcomp->logicalDev,shaderModule,0);
 }
 
+const std::vector<std::tuple<const char *, VkFormat, uint>> ShaderModule::semanticMap = {
+	{"POSITION",VK_FORMAT_R32G32_SFLOAT,8},
+	{"POSITION",VK_FORMAT_R32G32_UINT,8}
+	//{VK_FORMAT_R8G8B8A8_UNORM,4}
+};
+
 Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp){
-	//
+	VkVertexInputAttributeDescription *pvertexInputAttributeDescs = new VkVertexInputAttributeDescription[_pvertexShader->inputs.size()];
+	for(uint i = 0, n = _pvertexShader->inputs.size(); i < n; ++i){
+		pvertexInputAttributeDescs[i].location = _pvertexShader->inputs[i].location;
+		pvertexInputAttributeDescs[i].binding = 0;//_pvertexShader->inputs[i].binding;
+		pvertexInputAttributeDescs[i].format = std::get<1>(ShaderModule::semanticMap[_pvertexShader->inputs[i].semanticMapIndex]);
+		pvertexInputAttributeDescs[i].offset = _pvertexShader->inputs[i].offset;
+	}
+
+	//per-vertex data only, instancing not used
+	VkVertexInputBindingDescription vertexInputBindingDesc = {};
+	vertexInputBindingDesc.binding = 0;
+	vertexInputBindingDesc.stride = _pvertexShader->inputStride;
+	vertexInputBindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+	//TODO: create multiple pipeline interfaces, for clients, text, etc.? Many of the attributes are different, such as stencil buffers (for text?) and blending. Use base class for pipeline
+	//Create ClientPipeline under compositor.cpp, and TextPipeline under CompositorFont.cpp
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
 	vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputStateCreateInfo.vertexBindingDescriptionCount = 0;
-	vertexInputStateCreateInfo.pVertexBindingDescriptions = 0;
-	vertexInputStateCreateInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputStateCreateInfo.pVertexAttributeDescriptions = 0;
+	vertexInputStateCreateInfo.vertexBindingDescriptionCount = (uint)(_pvertexShader->inputs.size() > 0);
+	vertexInputStateCreateInfo.pVertexBindingDescriptions = &vertexInputBindingDesc;
+	vertexInputStateCreateInfo.vertexAttributeDescriptionCount = _pvertexShader->inputs.size();
+	vertexInputStateCreateInfo.pVertexAttributeDescriptions = pvertexInputAttributeDescs;
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
 	inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -704,7 +838,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	graphicsPipelineCreateInfo.stageCount = sizeof(shaderStageCreateInfo)/sizeof(shaderStageCreateInfo[0]);
 	graphicsPipelineCreateInfo.pStages = shaderStageCreateInfo;
-	graphicsPipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo; //!!
+	graphicsPipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
 	graphicsPipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
 	graphicsPipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
 	graphicsPipelineCreateInfo.pRasterizationState = &rasterizationStateCreateInfo;
@@ -720,6 +854,8 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 
 	if(vkCreateGraphicsPipelines(pcomp->logicalDev,0,1,&graphicsPipelineCreateInfo,0,&pipeline) != VK_SUCCESS)
 		throw Exception("Failed to create a graphics pipeline.");
+	
+	delete []pvertexInputAttributeDescs;
 }
 
 Pipeline::~Pipeline(){

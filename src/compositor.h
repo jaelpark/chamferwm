@@ -71,8 +71,11 @@ friend class TextureStaged;
 friend class TexturePixmap;
 friend class TextureHostPointer;
 friend class Texture;
+friend class Buffer;
 friend class ShaderModule;
 friend class Pipeline;
+friend class Text;
+friend class TextEngine;
 friend class ColorFrame;
 friend class ClientFrame;
 friend class X11ClientFrame;
@@ -116,6 +119,7 @@ protected:
 	enum QUEUE_INDEX{
 		QUEUE_INDEX_GRAPHICS,
 		QUEUE_INDEX_PRESENT,
+		//QUEUE_INDEX_TRANSFER,
 		QUEUE_INDEX_COUNT
 	};
 	VkQueue queue[QUEUE_INDEX_COUNT];

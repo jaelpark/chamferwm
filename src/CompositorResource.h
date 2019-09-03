@@ -87,6 +87,24 @@ public:
 	~Texture();
 };
 
+class Buffer{
+public:
+	Buffer(uint, VkBufferUsageFlagBits, const class CompositorInterface *);
+	~Buffer();
+	const void * Map() const;
+	void Unmap(const VkCommandBuffer *);
+
+	const class CompositorInterface *pcomp;
+	VkBuffer buffer;
+	VkDeviceMemory deviceMemory;
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingMemory;
+
+	uint stagingMemorySize;
+	uint size;
+};
+
 class ShaderModule{
 public:
 	ShaderModule(const char *, const Blob *, const class CompositorInterface *);
@@ -97,6 +115,8 @@ public:
 	VkShaderModule shaderModule;
 	VkDescriptorSetLayout *pdescSetLayouts;
 	uint setCount;
+	uint inputCount;
+	uint inputStride;
 
 	struct Binding{
 		const char *pname;
@@ -105,6 +125,16 @@ public:
 		uint binding;
 	};
 	std::vector<Binding> bindings;
+
+	struct Input{
+		uint location;
+		//uint binding;
+		uint offset;
+		uint semanticMapIndex; //index to semantic map
+	};
+	std::vector<Input> inputs;
+
+	static const std::vector<std::tuple<const char *, VkFormat, uint>> semanticMap;
 };
 
 class Pipeline{
