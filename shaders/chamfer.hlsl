@@ -1,6 +1,9 @@
 
 #define FLAGS_FOCUS 0x1
-#define FLAGS_FOCUS_NEXT 0x2
+#define FLAGS_FLOATING 0x2
+#define FLAGS_USER_BIT 0x4
+
+#define FLAGS_FOCUS_NEXT (FLAGS_USER_BIT<<0x0)
 
 [[vk::push_constant]] cbuffer cb{
 	float2 xy0; //normalized top-left corner location

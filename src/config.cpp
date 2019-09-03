@@ -609,6 +609,10 @@ BOOST_PYTHON_MODULE(chamfer){
 		.value("NAME",ContainerInterface::PROPERTY_ID_NAME)
 		.value("CLASS",ContainerInterface::PROPERTY_ID_CLASS);
 
+	boost::python::enum_<WManager::Container::LAYOUT>("layout")
+		.value("VSPLIT",WManager::Container::LAYOUT_VSPLIT)
+		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT);
+
 	boost::python::class_<ContainerProxy,boost::noncopyable>("Container")
 		.def("OnSetupContainer",&ContainerInterface::OnSetupContainer)
 		.def("OnSetupClient",&ContainerInterface::OnSetupClient)
@@ -875,16 +879,6 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("floatingMode",&ContainerInterface::floatingMode)
 		;
 	
-	/*boost::python::enum_<WManager::Container::ADJACENT>("adjacent")
-		.value("LEFT",WManager::Container::ADJACENT_LEFT)
-		.value("RIGHT",WManager::Container::ADJACENT_RIGHT)
-		.value("UP",WManager::Container::ADJACENT_UP)
-		.value("DOWN",WManager::Container::ADJACENT_DOWN);*/
-
-	boost::python::enum_<WManager::Container::LAYOUT>("layout")
-		.value("VSPLIT",WManager::Container::LAYOUT_VSPLIT)
-		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT);
-
 	boost::python::class_<BackendProxy,boost::noncopyable>("Backend")
 		.def("OnSetupKeys",&BackendInterface::OnSetupKeys)
 		.def("OnCreateContainer",&BackendInterface::OnCreateContainer)
@@ -898,6 +892,12 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("GrabKeyboard",&BackendInterface::GrabKeyboard)
 		;
 	boost::python::def("BindBackend",BackendInterface::Bind);
+
+	boost::python::enum_<Compositor::ClientFrame::SHADER_FLAG>("shaderFlag")
+		.value("FOCUS",Compositor::ClientFrame::SHADER_FLAG_FOCUS)
+		.value("FLOATING",Compositor::ClientFrame::SHADER_FLAG_FLOATING)
+		.value("USER_BIT",Compositor::ClientFrame::SHADER_FLAG_USER_BIT);
+	
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")
 		.def_readwrite("deviceIndex",&CompositorInterface::deviceIndex)
 		.def_readwrite("debugLayers",&CompositorInterface::debugLayers)
@@ -934,7 +934,6 @@ BOOST_PYTHON_MODULE(chamfer){
 			},boost::python::default_call_policies(),boost::mpl::vector<void, CompositorInterface &, float>()))
 		;
 	boost::python::def("BindCompositor",CompositorInterface::Bind);
-	//boost::python::def("GetCompositor",CompositorInterface::GetInterface);
 }
 
 Loader::Loader(const char *pargv0){

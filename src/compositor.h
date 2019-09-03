@@ -48,6 +48,11 @@ public:
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	void AdjustSurface(uint, uint);
+	enum SHADER_FLAG{
+		SHADER_FLAG_FOCUS = 0x1,
+		SHADER_FLAG_FLOATING = 0x2,
+		SHADER_FLAG_USER_BIT = 0x4
+	};
 protected:
 	void UpdateDescSets();
 	Texture *ptexture;

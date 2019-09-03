@@ -679,7 +679,10 @@ void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pcli
 		renderObject.pclient = (*m).second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
-		renderObject.pclientFrame->shaderFlags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
+		renderObject.pclientFrame->shaderFlags =
+			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
+			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
+			|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 
 		CreateRenderQueueAppendix((*m).second,pfocus);
@@ -700,7 +703,9 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			renderObject.pclientFrame = pclientFrame;
 			renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
 			renderObject.pclientFrame->shaderFlags =
-				(pcont == pfocus || pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
+				(pcont == pfocus || pcontainer == pfocus?ClientFrame::ClientFrame::SHADER_FLAG_FOCUS:0)
+				|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0) //probably not required here
+				|renderObject.pclientFrame->shaderUserFlags;
 			renderQueue.push_back(renderObject);
 		}
 		CreateRenderQueue(pcont,pfocus);
@@ -764,7 +769,10 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderObject.pclient = p.second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>(p.second);
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
-		renderObject.pclientFrame->shaderFlags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
+		renderObject.pclientFrame->shaderFlags =
+			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
+			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
+			|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 	}
 
@@ -783,7 +791,10 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderObject.pclient = (*m).second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
-		renderObject.pclientFrame->shaderFlags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
+		renderObject.pclientFrame->shaderFlags =
+			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
+			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
+			|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 
 		CreateRenderQueueAppendix((*m).second,pfocus);
@@ -796,7 +807,10 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderObject.pclient = p.second;
 		renderObject.pclientFrame = dynamic_cast<ClientFrame *>(p.second);
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
-		renderObject.pclientFrame->shaderFlags = (renderObject.pclient->pcontainer == pfocus?0x1:0)|renderObject.pclientFrame->shaderUserFlags;
+		renderObject.pclientFrame->shaderFlags =
+			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
+			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
+			|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 	}
 

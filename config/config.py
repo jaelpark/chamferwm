@@ -20,7 +20,7 @@ except ModuleNotFoundError:
 	print("No pulsectl module.");
 
 class ShaderFlag(Enum):
-	FOCUS_NEXT = 0x2
+	FOCUS_NEXT = chamfer.shaderFlag.USER_BIT<<0x0
 
 class Key(Enum):
 	FOCUS_RIGHT = auto()
