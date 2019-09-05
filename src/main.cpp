@@ -198,7 +198,7 @@ public:
 		PrintTree(proot,0);
 		printf("-----------\n");
 
-		if(pcontainer == pdst)
+		if(pcontainer == pdst || pdst->flags & WManager::Container::FLAG_FLOATING)
 			return;
 
 		WManager::Container *premoved = pcontainer->Remove();
