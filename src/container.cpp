@@ -109,6 +109,10 @@ void Container::Place(Container *pParent1){
 		*pn = this;
 	}
 
+	uint containerCount = 0;
+	for(Container *pcontainer = pParent->pch; pcontainer; ++containerCount, pcontainer = pcontainer->pnext);
+	size = glm::vec2(1.0f/(float)containerCount);
+
 	for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
 		if(pcontainer != this)
 			pcontainer->size *= glm::vec2(1.0f)-size;
@@ -180,9 +184,6 @@ Container * Container::Collapse(){
 	if(pch->pnext){ //if there are more than one container
 		if(pParent->pch->pnext) //and there's a container next to this one
 			return 0; //should not collapse
-
-		for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
-			pcontainer->size /= pParent->size;
 
 		//more than one container to deal with
 		//printf("** type 2 collapse\n");
