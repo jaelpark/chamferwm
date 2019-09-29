@@ -42,13 +42,13 @@ void ColorFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUN
 void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, uint flags, const VkCommandBuffer *pcommandBuffer){
 	time = timespec_diff(pcomp->frameTime,creationTime);
 
-	for(uint i = 0, descPointer = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+	for(uint i = 0, p = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
 		if(passignedSet->p->pshaderModule[i]->setCount > 0){
-			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,passignedSet->p->pipelineLayout,descPointer,passignedSet->p->pshaderModule[i]->setCount,passignedSet->pdescSets[i],0,0);
-			descPointer += passignedSet->p->pshaderModule[i]->setCount;
+			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,passignedSet->p->pipelineLayout,p,passignedSet->p->pshaderModule[i]->setCount,passignedSet->pdescSets[i],0,0);
+			p += passignedSet->p->pshaderModule[i]->setCount;
 		}
 	
-	struct{
+	struct alignas(16){
 		glm::vec4 frameVec;
 		glm::vec2 imageExtent;
 		glm::vec2 margin;
@@ -67,7 +67,18 @@ void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, uint flags
 	pushConstants.flags = flags;
 	pushConstants.time = time;
 
-	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,40,&pushConstants); //size fixed also in CompositorResource VkPushConstantRange
+	//
+	/*VkShaderStageFlags stageFlags = 0;
+	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		if(passignedSet->p->pshaderModule[i]->pushConstantBlockCount > 0){
+			stageFlags |= passignedSet->p->pshaderModule[i]->pPushConstantRanges[0].stageFlags;
+		}
+	}*/
+	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,passignedSet->p->pushConstantRange.stageFlags,passignedSet->p->pushConstantRange.offset,sizeof(pushConstants),&pushConstants); //size fixed also in CompositorResource VkPushConstantRange
+	//vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(pushConstants),&pushConstants); //size fixed also in CompositorResource VkPushConstantRange
+	/*vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,
+		(passignedSet->p->pshaderModule[Pipeline::SHADER_MODULE_GEOMETRY]->pushConstantBlockCount > 0?VK_SHADER_STAGE_GEOMETRY_BIT:0)
+		|(passignedSet->p->pshaderModule[Pipeline::SHADER_MODULE_FRAGMENT]->pushConstantBlockCount > 0?VK_SHADER_STAGE_FRAGMENT_BIT:0),0,sizeof(pushConstants),&pushConstants); //size fixed also in CompositorResource VkPushConstantRange*/
 
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 
@@ -428,7 +439,9 @@ void CompositorInterface::InitializeRenderEngine(){
 		//VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
 		//VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,
 		//VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME
+		//VK_GOOGLE_HLSL_FUNCTIONALITY1_EXTENSION_NAME,VK_GOOGLE_DECORATE_STRING_EXTENSION_NAME};
 	};
+
 	DebugPrintf(stdout,"Enumerating required device extensions\n");
 	uint devExtFound = 0;
 	for(uint i = 0; i < devExtCount; ++i)

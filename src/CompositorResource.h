@@ -113,7 +113,10 @@ public:
 	const class CompositorInterface *pcomp;
 	const char *pname;
 	VkShaderModule shaderModule;
+	VkPushConstantRange *pPushConstantRanges;
+	//VKPushConstantRange pushConstantRange; //only one range can exist
 	VkDescriptorSetLayout *pdescSetLayouts;
+	uint pushConstantBlockCount;
 	uint setCount;
 	uint inputCount;
 	uint inputStride;
@@ -127,14 +130,30 @@ public:
 	std::vector<Binding> bindings;
 
 	struct Input{
-		uint location;
+		uint location; //index of the input
 		//uint binding;
-		uint offset;
+		uint offset; //byte offset
 		uint semanticMapIndex; //index to semantic map
 	};
 	std::vector<Input> inputs;
 
+	struct Variable{
+		uint offset;
+		uint variableMapIndex;
+	};
+	std::vector<Variable> variables;
+
 	static const std::vector<std::tuple<const char *, VkFormat, uint>> semanticMap;
+	enum VARIABLE{
+		VARIABLE_XY0,
+		VARIABLE_XY1,
+		VARIABLE_SCREEN,
+		VARIABLE_MARGIN,
+		VARIABLE_FLAGS,
+		VARIABLE_TIME,
+		VARIABLE_COUNT
+	};
+	static const std::vector<std::tuple<const char *, uint>> variableMap;
 };
 
 class Pipeline{
@@ -150,6 +169,7 @@ public:
 	}; //note: code in Pipeline() relies on this order
 	ShaderModule *pshaderModule[SHADER_MODULE_COUNT];
 	const class CompositorInterface *pcomp;
+	VkPushConstantRange pushConstantRange;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
 };

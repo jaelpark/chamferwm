@@ -603,12 +603,14 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 	if(spvReflectEnumerateInputVariables(&reflectShaderModule,&inputCount,0) != SPV_REFLECT_RESULT_SUCCESS)
 		throw Exception("Failed to enumerate input variables.");
 	
+	//input variables
 	SpvReflectInterfaceVariable **preflectInputVars = new SpvReflectInterfaceVariable*[inputCount];
 	spvReflectEnumerateInputVariables(&reflectShaderModule,&inputCount,preflectInputVars);
 
 	for(uint i = 0; i < inputCount; ++i){
 		if(!preflectInputVars[i]->semantic){
-			DebugPrintf(stdout,"warning: unsemantic vertex attribute in %s at location %u.\n",_pname,preflectInputVars[i]->location);
+			if(preflectInputVars[i]->location != ~0u)
+				DebugPrintf(stdout,"warning: unsemantic vertex attribute in %s at location %u.\n",_pname,preflectInputVars[i]->location);
 			continue;
 		}
 		auto m = std::find_if(semanticMap.begin(),semanticMap.end(),[&](auto &r)->bool{
@@ -616,7 +618,8 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 				&& std::get<1>(r) == (VkFormat)preflectInputVars[i]->format;
 		});
 		if(m == semanticMap.end()){
-			DebugPrintf(stdout,"warning: unrecognized semantic %s in %s at location %u.\n",preflectInputVars[i]->semantic,_pname,preflectInputVars[i]->location);
+			if(preflectInputVars[i]->location != ~0u)
+				DebugPrintf(stdout,"warning: unrecognized semantic %s in %s at location %u.\n",preflectInputVars[i]->semantic,_pname,preflectInputVars[i]->location);
 			continue;
 		}
 		Input &in = inputs.emplace_back();
@@ -634,10 +637,44 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 	}
 
 	delete []preflectInputVars;
+
+	//push constants
+	if(spvReflectEnumeratePushConstantBlocks(&reflectShaderModule,&pushConstantBlockCount,0) != SPV_REFLECT_RESULT_SUCCESS)
+		throw Exception("Failed to enumerate push constant blocks.");
+	
+	SpvReflectBlockVariable **preflectBlockVars = new SpvReflectBlockVariable*[pushConstantBlockCount];
+	spvReflectEnumeratePushConstantBlocks(&reflectShaderModule,&pushConstantBlockCount,preflectBlockVars);
+
+	pPushConstantRanges = new VkPushConstantRange[pushConstantBlockCount];
+	for(uint i = 0; i < pushConstantBlockCount; ++i){
+		pPushConstantRanges[i].stageFlags = (VkShaderStageFlagBits)reflectShaderModule.shader_stage;
+		pPushConstantRanges[i].offset = preflectBlockVars[i]->offset;
+		pPushConstantRanges[i].size = preflectBlockVars[i]->size;
+
+		for(uint j = 0; j < preflectBlockVars[i]->member_count; ++j){
+			auto m = std::find_if(variableMap.begin(),variableMap.end(),[&](auto &r)->bool{
+				return strcmp(std::get<0>(r),preflectBlockVars[i]->members[j].name) == 0;
+			});
+			if(m == variableMap.end()){
+				DebugPrintf(stdout,"warning: unrecognized variable %s in %s with offset %u.\n",preflectBlockVars[i]->members[j].name,_pname,preflectBlockVars[i]->members[j].offset);
+				continue;
+			}
+			Variable &var = variables.emplace_back();
+			var.offset = preflectBlockVars[i]->members[j].offset;
+			var.variableMapIndex = m-variableMap.begin();
+		}
+	}
+	//alt: one range allowed only
+	/*pushConstantRange.stageFlags = (VkShaderStageFlagBits)reflectShaderModule.shader_stage;
+	pushConstantRange.offset = preflectBlockVars[0]->offset;
+	pushConstantRange.size = preflectBlockVars[0]->size;*/
+
+	delete []preflectBlockVars;
 	
 	if(spvReflectEnumerateDescriptorSets(&reflectShaderModule,&setCount,0) != SPV_REFLECT_RESULT_SUCCESS)
 		throw Exception("Failed to enumerate descriptor sets.");
 
+	//descriptor sets
 	SpvReflectDescriptorSet **preflectDescSets = new SpvReflectDescriptorSet*[setCount];
 	spvReflectEnumerateDescriptorSets(&reflectShaderModule,&setCount,preflectDescSets);
 
@@ -679,6 +716,7 @@ ShaderModule::~ShaderModule(){
 	mstrfree(pname);
 	for(Binding &b : bindings)
 		mstrfree(b.pname);
+	delete []pPushConstantRanges;
 	for(uint i = 0; i < setCount; ++i)
 		vkDestroyDescriptorSetLayout(pcomp->logicalDev,pdescSetLayouts[i],0);
 	delete []pdescSetLayouts;
@@ -689,6 +727,15 @@ const std::vector<std::tuple<const char *, VkFormat, uint>> ShaderModule::semant
 	{"POSITION",VK_FORMAT_R32G32_SFLOAT,8},
 	{"POSITION",VK_FORMAT_R32G32_UINT,8}
 	//{VK_FORMAT_R8G8B8A8_UNORM,4}
+};
+
+const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {
+	{"xy0",8},
+	{"xy1",8},
+	{"screen",8},
+	{"margin",8},
+	{"flags",4},
+	{"time",4}
 };
 
 Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp){
@@ -706,6 +753,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	vertexInputBindingDesc.stride = _pvertexShader->inputStride;
 	vertexInputBindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
+	//TODO: move vertex attributes, push constants to shaders? desc set layouts are already there
 	//TODO: create multiple pipeline interfaces, for clients, text, etc.? Many of the attributes are different, such as stencil buffers (for text?) and blending. Use base class for pipeline
 	//Create ClientPipeline under compositor.cpp, and TextPipeline under CompositorFont.cpp
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
@@ -796,29 +844,51 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	colorBlendStateCreateInfo.blendConstants[2] = 0.0f;
 	colorBlendStateCreateInfo.blendConstants[3] = 0.0f;
 
-	VkPushConstantRange pushConstantRange = {};
+	/*VkPushConstantRange pushConstantRange = {};
 	pushConstantRange.stageFlags = VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT;
 	pushConstantRange.offset = 0;
-	pushConstantRange.size = 40;
+	pushConstantRange.size = 48;*/
+
+	//VkPushConstantRange pushConstantRange = {};
+	pushConstantRange.stageFlags = 0;
+	pushConstantRange.offset = ~0u;
+	pushConstantRange.size = 0;
+	for(uint i = 0; i < SHADER_MODULE_COUNT; ++i)
+		if(pshaderModule[i]->pushConstantBlockCount > 0){
+			pushConstantRange.stageFlags |= pshaderModule[i]->pPushConstantRanges[0].stageFlags;
+			pushConstantRange.offset = std::min(pushConstantRange.offset,pshaderModule[i]->pPushConstantRanges[0].offset);
+			pushConstantRange.size = std::max(pushConstantRange.size,pshaderModule[i]->pPushConstantRanges[0].size);
+		}
+	//printf("flags: %x, offset: %u, size: %u\n",pushConstantRange.stageFlags,pushConstantRange.offset,pushConstantRange.size);
+
+	/*uint pushConstantBlockCount = 0;
+	for(uint i = 0; i < SHADER_MODULE_COUNT; pushConstantBlockCount += pshaderModule[i]->pushConstantBlockCount, ++i);
+	VkPushConstantRange *pcombinedPushConstantRanges = new VkPushConstantRange[pushConstantBlockCount];
+
+	for(uint i = 0, p = 0; i < SHADER_MODULE_COUNT; ++i){
+		std::copy(pshaderModule[i]->pPushConstantRanges,pshaderModule[i]->pPushConstantRanges+pshaderModule[i]->pushConstantBlockCount,pcombinedPushConstantRanges+p);
+		p += pshaderModule[i]->pushConstantBlockCount;
+	}*/
 
 	uint setCount = 0;
 	for(uint i = 0; i < SHADER_MODULE_COUNT; setCount += pshaderModule[i]->setCount, ++i);
 	VkDescriptorSetLayout *pcombinedSets = new VkDescriptorSetLayout[setCount];
 
-	for(uint i = 0, descPointer = 0; i < SHADER_MODULE_COUNT; ++i){
-		std::copy(pshaderModule[i]->pdescSetLayouts,pshaderModule[i]->pdescSetLayouts+pshaderModule[i]->setCount,pcombinedSets+descPointer);
-		descPointer += pshaderModule[i]->setCount;
+	for(uint i = 0, p = 0; i < SHADER_MODULE_COUNT; ++i){
+		std::copy(pshaderModule[i]->pdescSetLayouts,pshaderModule[i]->pdescSetLayouts+pshaderModule[i]->setCount,pcombinedSets+p);
+		p += pshaderModule[i]->setCount;
 	}
 
 	VkPipelineLayoutCreateInfo layoutCreateInfo = {};
 	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	layoutCreateInfo.setLayoutCount = setCount;
 	layoutCreateInfo.pSetLayouts = pcombinedSets;
-	layoutCreateInfo.pushConstantRangeCount = 1;
-	layoutCreateInfo.pPushConstantRanges = &pushConstantRange;
+	layoutCreateInfo.pushConstantRangeCount = 1;//pushConstantBlockCount;//1;
+	layoutCreateInfo.pPushConstantRanges = &pushConstantRange;//pcombinedPushConstantRanges;//&pushConstantRange;
 	if(vkCreatePipelineLayout(pcomp->logicalDev,&layoutCreateInfo,0,&pipelineLayout) != VK_SUCCESS)
-		throw Exception("Failed to crate a pipeline layout.");
+		throw Exception("Failed to create a pipeline layout.");
 	
+	//delete []pcombinedPushConstantRanges;
 	delete []pcombinedSets;
 
 	VkDynamicState dynamicStates[1] = {VK_DYNAMIC_STATE_SCISSOR};
