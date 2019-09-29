@@ -144,7 +144,7 @@ public:
 	std::vector<Variable> variables;
 
 	static const std::vector<std::tuple<const char *, VkFormat, uint>> semanticMap;
-	enum VARIABLE{
+	/*enum VARIABLE{
 		VARIABLE_XY0,
 		VARIABLE_XY1,
 		VARIABLE_SCREEN,
@@ -152,7 +152,7 @@ public:
 		VARIABLE_FLAGS,
 		VARIABLE_TIME,
 		VARIABLE_COUNT
-	};
+	};*/
 	static const std::vector<std::tuple<const char *, uint>> variableMap;
 };
 

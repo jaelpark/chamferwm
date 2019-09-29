@@ -42,43 +42,35 @@ void ColorFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUN
 void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, uint flags, const VkCommandBuffer *pcommandBuffer){
 	time = timespec_diff(pcomp->frameTime,creationTime);
 
-	for(uint i = 0, p = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+	glm::vec2 imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
+
+	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,
+		frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
+	frameVec = 2.0f*(frameVec+0.5f)/glm::vec4(imageExtent,imageExtent)-1.0f;
+
+	const void *pReadBuf[] = {
+		&frameVec,&frameVec.z,
+		&imageExtent,
+		&margin,
+		&flags,
+		&time
+	};
+	char alignas(16) pushConstantBuffer[128];
+	for(uint i = 0, p = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		//bind descriptor sets
 		if(passignedSet->p->pshaderModule[i]->setCount > 0){
 			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,passignedSet->p->pipelineLayout,p,passignedSet->p->pshaderModule[i]->setCount,passignedSet->pdescSets[i],0,0);
 			p += passignedSet->p->pshaderModule[i]->setCount;
 		}
-	
-	struct alignas(16){
-		glm::vec4 frameVec;
-		glm::vec2 imageExtent;
-		glm::vec2 margin;
-		uint flags;
-		float time;
-	} pushConstants;
-
-	pushConstants.frameVec = {frame.offset.x,frame.offset.y,frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
-	pushConstants.frameVec += 0.5f;
-	pushConstants.frameVec /= (glm::vec4){pcomp->imageExtent.width,pcomp->imageExtent.height,pcomp->imageExtent.width,pcomp->imageExtent.height};
-	pushConstants.frameVec *= 2.0f;
-	pushConstants.frameVec -= 1.0f;
-
-	pushConstants.imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
-	pushConstants.margin = margin;
-	pushConstants.flags = flags;
-	pushConstants.time = time;
-
-	//
-	/*VkShaderStageFlags stageFlags = 0;
-	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
-		if(passignedSet->p->pshaderModule[i]->pushConstantBlockCount > 0){
-			stageFlags |= passignedSet->p->pshaderModule[i]->pPushConstantRanges[0].stageFlags;
+		//copy push constants
+		for(uint j = 0; j < passignedSet->p->pshaderModule[i]->variables.size(); ++j){
+			memcpy(pushConstantBuffer+passignedSet->p->pshaderModule[i]->variables[j].offset,
+				pReadBuf[passignedSet->p->pshaderModule[i]->variables[j].variableMapIndex],
+				std::get<1>(ShaderModule::variableMap[passignedSet->p->pshaderModule[i]->variables[j].variableMapIndex]));
 		}
-	}*/
-	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,passignedSet->p->pushConstantRange.stageFlags,passignedSet->p->pushConstantRange.offset,sizeof(pushConstants),&pushConstants); //size fixed also in CompositorResource VkPushConstantRange
-	//vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(pushConstants),&pushConstants); //size fixed also in CompositorResource VkPushConstantRange
-	/*vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,
-		(passignedSet->p->pshaderModule[Pipeline::SHADER_MODULE_GEOMETRY]->pushConstantBlockCount > 0?VK_SHADER_STAGE_GEOMETRY_BIT:0)
-		|(passignedSet->p->pshaderModule[Pipeline::SHADER_MODULE_FRAGMENT]->pushConstantBlockCount > 0?VK_SHADER_STAGE_FRAGMENT_BIT:0),0,sizeof(pushConstants),&pushConstants); //size fixed also in CompositorResource VkPushConstantRange*/
+	}
+
+	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,passignedSet->p->pushConstantRange.stageFlags,passignedSet->p->pushConstantRange.offset,passignedSet->p->pushConstantRange.size,pushConstantBuffer);
 
 	vkCmdDraw(*pcommandBuffer,1,1,0,0);
 
