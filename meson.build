@@ -45,19 +45,49 @@ ft = [
 	dependency('harfbuzz')
 ]
 
-#TODO: spirv-opt can be used to optimize the spv afterwards
 glslc = find_program('glslc')
-glslc_invoke_vertex = [glslc,'--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=vertex','-O','-g','-x','hlsl','-DSHADER_STAGE_VS','-o','@OUTPUT@','@INPUT@']
-glslc_invoke_geometry = [glslc,'--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=geometry','-O','-g','-x','hlsl','-DSHADER_STAGE_GS','-o','@OUTPUT@','@INPUT@']
-glslc_invoke_fragment = [glslc,'--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=fragment','-O','-g','-x','hlsl','-DSHADER_STAGE_PS','-o','@OUTPUT@','@INPUT@']
+spirv_opt = find_program('spirv-opt') #optimization has to be done separately as a post-processing step, since glslc removes the reflection info
 
-custom_target('default_vertex',output:'default_vertex.spv',input:'shaders/default.hlsl',command:glslc_invoke_vertex,install:true,install_dir:'.')
-custom_target('default_geometry',output:'default_geometry.spv',input:'shaders/default.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
-custom_target('default_fragment',output:'default_fragment.spv',input:'shaders/default.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
-custom_target('solid_fragment',output:'solid_fragment.spv',input:'shaders/solid.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
-custom_target('frame_vertex',output:'frame_vertex.spv',input:'shaders/frame.hlsl',command:glslc_invoke_vertex,install:true,install_dir:'.')
-custom_target('frame_geometry',output:'frame_geometry.spv',input:'shaders/frame.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
-custom_target('frame_fragment',output:'frame_fragment.spv',input:'shaders/frame.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
+#glslc_invoke_vertex = [glslc,'--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=vertex','-O','-g','-x','hlsl','-DSHADER_STAGE_VS','-o','@OUTPUT@','@INPUT@']
+#glslc_invoke_geometry = [glslc,'--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=geometry','-O','-g','-x','hlsl','-DSHADER_STAGE_GS','-o','@OUTPUT@','@INPUT@']
+#glslc_invoke_fragment = [glslc,'--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=fragment','-O','-g','-x','hlsl','-DSHADER_STAGE_PS','-o','@OUTPUT@','@INPUT@']
+glslc_args_vertex = ['--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=vertex','-x','hlsl','-DSHADER_STAGE_VS','-o','@OUTPUT@','@INPUT@']
+glslc_args_geometry = ['--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=geometry','-x','hlsl','-DSHADER_STAGE_GS','-o','@OUTPUT@','@INPUT@']
+glslc_args_fragment = ['--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=fragment','-x','hlsl','-DSHADER_STAGE_PS','-o','@OUTPUT@','@INPUT@']
+invoke_spirv_opt = [spirv_opt,'-O','-o','@OUTPUT@','@INPUT@']
+
+#custom_target('default_vertex',output:'default_vertex.spv',input:'shaders/default.hlsl',command:glslc_invoke_vertex,install:true,install_dir:'.')
+#custom_target('default_geometry',output:'default_geometry.spv',input:'shaders/default.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
+#custom_target('default_fragment',output:'default_fragment.spv',input:'shaders/default.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
+#custom_target('solid_fragment',output:'solid_fragment.spv',input:'shaders/solid.hlsl',command:glslc_invoke_fragment,install:true,install_dir:'.')
+#custom_target('frame_vertex',output:'frame_vertex.spv',input:'shaders/frame.hlsl',command:glslc_invoke_vertex,install:true,install_dir:'.')
+#custom_target('frame_geometry',output:'frame_geometry.spv',input:'shaders/frame.hlsl',command:glslc_invoke_geometry,install:true,install_dir:'.')
+#obj = custom_target('frame_fragment',output:'frame_fragment.spv',input:'shaders/frame.hlsl',command:glslc_invoke_fragment,install:false)#,install:true,install_dir:'.')
+
+gen_vertex = generator(glslc,output:'@BASENAME@_vertex_unopt.spv',arguments:glslc_args_vertex)
+gen_geometry = generator(glslc,output:'@BASENAME@_geometry_unopt.spv',arguments:glslc_args_geometry)
+gen_fragment = generator(glslc,output:'@BASENAME@_fragment_unopt.spv',arguments:glslc_args_fragment)
+
+obj = gen_vertex.process(['shaders/default.hlsl'])
+custom_target('default_vertex',output:'default_vertex.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
+
+obj = gen_vertex.process(['shaders/frame.hlsl'])
+custom_target('frame_vertex',output:'frame_vertex.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
+
+obj = gen_geometry.process(['shaders/default.hlsl'])
+custom_target('default_geometry',output:'default_geometry.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
+
+obj = gen_geometry.process(['shaders/frame.hlsl'])
+custom_target('frame_geometry',output:'frame_geometry.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
+
+obj = gen_fragment.process(['shaders/default.hlsl'])
+custom_target('default_fragment',output:'default_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
+
+obj = gen_fragment.process(['shaders/frame.hlsl'])
+custom_target('frame_fragment',output:'frame_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
+
+obj = gen_fragment.process(['shaders/solid.hlsl'])
+custom_target('solid_fragment',output:'solid_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
 
 executable('chamfer',sources:src,include_directories:inc,dependencies:[xcb,vk,python,ft],cpp_args:['-std=c++17','-Wno-reorder'])
 
