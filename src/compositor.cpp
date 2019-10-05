@@ -58,6 +58,8 @@ void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, uint flags
 	char alignas(16) pushConstantBuffer[128];
 	for(uint i = 0, p = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
 		//bind descriptor sets
+		if(!passignedSet->p->pshaderModule[i])
+			continue;
 		if(passignedSet->p->pshaderModule[i]->setCount > 0){
 			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,passignedSet->p->pipelineLayout,p,passignedSet->p->pshaderModule[i]->setCount,passignedSet->pdescSets[i],0,0);
 			p += passignedSet->p->pshaderModule[i]->setCount;
@@ -90,6 +92,8 @@ bool ColorFrame::AssignPipeline(const Pipeline *prenderPipeline){
 	pipelineDescSet.fenceTag = pcomp->frameTag;
 	pipelineDescSet.p = prenderPipeline;
 	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		if(!prenderPipeline->pshaderModule[i])
+			continue;
 		if(!prenderPipeline->pshaderModule[i] || prenderPipeline->pshaderModule[i]->setCount == 0){
 			pipelineDescSet.pdescSets[i] = 0;
 			continue;
@@ -147,6 +151,8 @@ void ClientFrame::UpdateDescSets(){
 
 	std::vector<VkWriteDescriptorSet> writeDescSets;
 	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		if(!passignedSet->p->pshaderModule[i])
+			continue;
 		auto m1 = std::find_if(passignedSet->p->pshaderModule[i]->bindings.begin(),passignedSet->p->pshaderModule[i]->bindings.end(),[&](auto &r)->bool{
 			return r.type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE && strcmp(r.pname,"content") == 0;
 		});
@@ -1100,7 +1106,7 @@ void CompositorInterface::Present(){
 Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
 	auto m = std::find_if(pipelines.begin(),pipelines.end(),[&](auto &r)->bool{
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-			if(strcmp(r.pshaderModule[i]->pname,pshaderName[i]) != 0)
+			if(r.pshaderModule[i] && strcmp(r.pshaderModule[i]->pname,pshaderName[i]) != 0)
 				return false;
 		return true;
 	});

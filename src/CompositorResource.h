@@ -108,6 +108,7 @@ public:
 class ShaderModule{
 public:
 	ShaderModule(const char *, const Blob *, const class CompositorInterface *);
+	ShaderModule(const class CompositorInterface *); //null shader
 	~ShaderModule();
 
 	const class CompositorInterface *pcomp;
@@ -118,7 +119,7 @@ public:
 	VkDescriptorSetLayout *pdescSetLayouts;
 	uint pushConstantBlockCount;
 	uint setCount;
-	uint inputCount;
+	//uint inputCount;
 	uint inputStride;
 
 	struct Binding{
@@ -131,7 +132,7 @@ public:
 
 	struct Input{
 		uint location; //index of the input
-		//uint binding;
+		uint binding;
 		uint offset; //byte offset
 		uint semanticMapIndex; //index to semantic map
 	};
@@ -173,6 +174,8 @@ public:
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
 };
+
+//class PipelineDefaults (or loader, to create info structures from shader reflection)
 
 }
 

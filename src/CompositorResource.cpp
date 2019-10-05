@@ -600,6 +600,7 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 	if(spvReflectCreateShaderModule(shaderModuleCreateInfo.codeSize,shaderModuleCreateInfo.pCode,&reflectShaderModule) != SPV_REFLECT_RESULT_SUCCESS)
 		throw Exception("Failed to reflect shader module.");
 	
+	uint inputCount;
 	if(spvReflectEnumerateInputVariables(&reflectShaderModule,&inputCount,0) != SPV_REFLECT_RESULT_SUCCESS)
 		throw Exception("Failed to enumerate input variables.");
 	
@@ -624,7 +625,7 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 		}
 		Input &in = inputs.emplace_back();
 		in.location = preflectInputVars[i]->location;
-		//in.binding = 0; //one vertex buffer bound, per vertex
+		in.binding = 0; //one vertex buffer bound, per vertex
 		in.semanticMapIndex = m-semanticMap.begin();
 	}
 	std::sort(inputs.begin(),inputs.end(),[](const Input &a, const Input &b){
@@ -712,6 +713,10 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 	spvReflectDestroyShaderModule(&reflectShaderModule);
 }
 
+ShaderModule::ShaderModule(const CompositorInterface *_pcomp) : pcomp(_pcomp), pname(mstrdup("null")), shaderModule(0), pPushConstantRanges(new VkPushConstantRange[0]), pdescSetLayouts(new VkDescriptorSetLayout[0]), pushConstantBlockCount(0), setCount(0), inputStride(0){
+	//
+}
+
 ShaderModule::~ShaderModule(){
 	mstrfree(pname);
 	for(Binding &b : bindings)
@@ -742,7 +747,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	VkVertexInputAttributeDescription *pvertexInputAttributeDescs = new VkVertexInputAttributeDescription[_pvertexShader->inputs.size()];
 	for(uint i = 0, n = _pvertexShader->inputs.size(); i < n; ++i){
 		pvertexInputAttributeDescs[i].location = _pvertexShader->inputs[i].location;
-		pvertexInputAttributeDescs[i].binding = 0;//_pvertexShader->inputs[i].binding;
+		pvertexInputAttributeDescs[i].binding = _pvertexShader->inputs[i].binding;
 		pvertexInputAttributeDescs[i].format = std::get<1>(ShaderModule::semanticMap[_pvertexShader->inputs[i].semanticMapIndex]);
 		pvertexInputAttributeDescs[i].offset = _pvertexShader->inputs[i].offset;
 	}
@@ -771,12 +776,20 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[3];
 
+	uint stageCount = 0;
+	uint setCount = 0;
 	for(uint i = 0, stageBit[] = {VK_SHADER_STAGE_VERTEX_BIT,VK_SHADER_STAGE_GEOMETRY_BIT,VK_SHADER_STAGE_FRAGMENT_BIT}; i < SHADER_MODULE_COUNT; ++i){
-		shaderStageCreateInfo[i] = (VkPipelineShaderStageCreateInfo){};
-		shaderStageCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		shaderStageCreateInfo[i].stage = (VkShaderStageFlagBits)stageBit[i];
-		shaderStageCreateInfo[i].module = pshaderModule[i]->shaderModule;
-		shaderStageCreateInfo[i].pName = "main";
+		if(!pshaderModule[i]->shaderModule)
+			continue;
+		shaderStageCreateInfo[stageCount] = (VkPipelineShaderStageCreateInfo){};
+		shaderStageCreateInfo[stageCount].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shaderStageCreateInfo[stageCount].stage = (VkShaderStageFlagBits)stageBit[i];
+		shaderStageCreateInfo[stageCount].module = pshaderModule[i]->shaderModule;
+		shaderStageCreateInfo[stageCount].pName = "main";
+
+		setCount += pshaderModule[i]->setCount;
+
+		++stageCount;
 	}
 
 	VkViewport viewport = {};
@@ -844,22 +857,19 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	colorBlendStateCreateInfo.blendConstants[2] = 0.0f;
 	colorBlendStateCreateInfo.blendConstants[3] = 0.0f;
 
-	/*VkPushConstantRange pushConstantRange = {};
-	pushConstantRange.stageFlags = VK_SHADER_STAGE_GEOMETRY_BIT|VK_SHADER_STAGE_FRAGMENT_BIT;
-	pushConstantRange.offset = 0;
-	pushConstantRange.size = 48;*/
-
 	//VkPushConstantRange pushConstantRange = {};
 	pushConstantRange.stageFlags = 0;
 	pushConstantRange.offset = ~0u;
 	pushConstantRange.size = 0;
-	for(uint i = 0; i < SHADER_MODULE_COUNT; ++i)
+	for(uint i = 0; i < SHADER_MODULE_COUNT; ++i){
+		if(!pshaderModule[i])
+			continue;
 		if(pshaderModule[i]->pushConstantBlockCount > 0){
 			pushConstantRange.stageFlags |= pshaderModule[i]->pPushConstantRanges[0].stageFlags;
 			pushConstantRange.offset = std::min(pushConstantRange.offset,pshaderModule[i]->pPushConstantRanges[0].offset);
 			pushConstantRange.size = std::max(pushConstantRange.size,pshaderModule[i]->pPushConstantRanges[0].size);
 		}
-	//printf("flags: %x, offset: %u, size: %u\n",pushConstantRange.stageFlags,pushConstantRange.offset,pushConstantRange.size);
+	}
 
 	/*uint pushConstantBlockCount = 0;
 	for(uint i = 0; i < SHADER_MODULE_COUNT; pushConstantBlockCount += pshaderModule[i]->pushConstantBlockCount, ++i);
@@ -870,11 +880,13 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 		p += pshaderModule[i]->pushConstantBlockCount;
 	}*/
 
-	uint setCount = 0;
-	for(uint i = 0; i < SHADER_MODULE_COUNT; setCount += pshaderModule[i]->setCount, ++i);
+	//uint setCount = 0;
+	//for(uint i = 0; i < SHADER_MODULE_COUNT; setCount += pshaderModule[i]->setCount, ++i);
 	VkDescriptorSetLayout *pcombinedSets = new VkDescriptorSetLayout[setCount];
 
 	for(uint i = 0, p = 0; i < SHADER_MODULE_COUNT; ++i){
+		if(!pshaderModule[i])
+			continue;
 		std::copy(pshaderModule[i]->pdescSetLayouts,pshaderModule[i]->pdescSetLayouts+pshaderModule[i]->setCount,pcombinedSets+p);
 		p += pshaderModule[i]->setCount;
 	}
@@ -906,7 +918,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	graphicsPipelineCreateInfo.stageCount = sizeof(shaderStageCreateInfo)/sizeof(shaderStageCreateInfo[0]);
+	graphicsPipelineCreateInfo.stageCount = stageCount;//sizeof(shaderStageCreateInfo)/sizeof(shaderStageCreateInfo[0]);
 	graphicsPipelineCreateInfo.pStages = shaderStageCreateInfo;
 	graphicsPipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
 	graphicsPipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
