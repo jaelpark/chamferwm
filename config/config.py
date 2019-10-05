@@ -71,6 +71,7 @@ class Key(Enum):
 	LAUNCH_BROWSER = auto()
 	LAUNCH_BROWSER_PRIVATE = auto()
 
+	AUDIO_VOLUME_MUTE = auto()
 	AUDIO_VOLUME_UP = auto()
 	AUDIO_VOLUME_DOWN = auto()
 
@@ -270,6 +271,7 @@ class Backend(chamfer.Backend):
 			self.BindKey(ord('2'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER_PRIVATE.value);
 
 			#volume
+			self.BindKey(xf86.XK_XF86_AudioMute,0,Key.AUDIO_VOLUME_MUTE.value);
 			self.BindKey(xf86.XK_XF86_AudioRaiseVolume,0,Key.AUDIO_VOLUME_UP.value);
 			self.BindKey(xf86.XK_XF86_AudioLowerVolume,0,Key.AUDIO_VOLUME_DOWN.value);
 
@@ -541,6 +543,12 @@ class Backend(chamfer.Backend):
 
 		elif keyId == Key.LAUNCH_BROWSER_PRIVATE.value:
 			psutil.Popen(["firefox","--private-window"],stdout=None,stderr=None);
+
+		elif keyId == Key.AUDIO_VOLUME_MUTE.value:
+			if "pulsectl" in sys.modules:
+				with pulsectl.Pulse('volume-increaser') as pulse:
+					for sink in pulse.sink_list():
+						pulse.mute(sink,not sink.mute);
 
 		elif keyId == Key.AUDIO_VOLUME_UP.value:
 			if "pulsectl" in sys.modules:
