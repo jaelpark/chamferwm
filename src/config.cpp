@@ -417,6 +417,10 @@ void BackendInterface::OnTimer(){
 	//
 }
 
+void BackendInterface::OnExit(){
+	//
+}
+
 boost::python::object BackendInterface::GetFocus(){
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(WManager::Container::ptreeFocus);
 	if(pcontainer1)
@@ -540,6 +544,20 @@ void BackendProxy::OnTimer(){
 			PyErr_Clear();
 		}
 	}else BackendInterface::OnTimer();
+}
+
+void BackendProxy::OnExit(){
+	boost::python::override ovr = this->get_override("OnExit");
+	if(ovr){
+		try{
+			ovr();
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else BackendInterface::OnExit();
 }
 
 BackendConfig::BackendConfig(BackendInterface *_pbackendInt) : pbackendInt(_pbackendInt){
@@ -885,6 +903,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("OnKeyPress",&BackendInterface::OnKeyPress)
 		.def("OnKeyRelease",&BackendInterface::OnKeyRelease)
 		.def("OnTimer",&BackendInterface::OnTimer)
+		.def("OnExit",&BackendInterface::OnExit)
 		.def("GetFocus",&BackendInterface::GetFocus)
 		.def("GetRoot",&BackendInterface::GetRoot)
 		.def("BindKey",&BackendInterface::BindKey)

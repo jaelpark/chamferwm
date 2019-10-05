@@ -890,6 +890,8 @@ int main(sint argc, const char **pargv){
 
 	DebugPrintf(stdout,"Exit\n");
 
+	Config::BackendInterface::pbackendInt->OnExit();
+
 	pcomp->WaitIdle();
 	pbackend->ReleaseContainers();
 

@@ -117,6 +117,7 @@ public:
 	virtual void OnKeyPress(uint);
 	virtual void OnKeyRelease(uint);
 	virtual void OnTimer();
+	virtual void OnExit();
 	boost::python::object GetFocus();
 	boost::python::object GetRoot();
 	void BindKey(uint, uint, uint);
@@ -141,6 +142,7 @@ public:
 	void OnKeyPress(uint);
 	void OnKeyRelease(uint);
 	void OnTimer();
+	void OnExit();
 };
 
 class BackendConfig{
