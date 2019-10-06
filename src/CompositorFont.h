@@ -20,6 +20,7 @@ public:
 	struct Vertex{
 		glm::vec2 pos;
 	};// alignas(16);
+	static std::vector<std::pair<ShaderModule::INPUT, uint>> vertexBufferLayout;
 };
 
 class TextEngine{

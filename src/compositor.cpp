@@ -1720,15 +1720,14 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	//
 	uint color[3];
 	for(uint &t : color)
-		//t = rand()%255;
 		t = rand()%190;
-	const void *pdata = ptexture->Map();
+	unsigned char *pdata = (unsigned char*)ptexture->Map();
 	for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
 		//unsigned char t = (float)(i/rect.w)/(float)rect.h*255;
-		((unsigned char*)pdata)[4*i+0] = color[0];
-		((unsigned char*)pdata)[4*i+1] = color[1];
-		((unsigned char*)pdata)[4*i+2] = color[2];
-		((unsigned char*)pdata)[4*i+3] = 190;//255;
+		pdata[4*i+0] = color[0];
+		pdata[4*i+1] = color[1];
+		pdata[4*i+2] = color[2];
+		pdata[4*i+3] = 190;//255;
 	}
 	VkRect2D rect1;
 	rect1.offset = {0,0};

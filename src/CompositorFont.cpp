@@ -7,7 +7,7 @@
 
 namespace Compositor{
 
-Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], class TextEngine *_ptextEngine) : Drawable(pshaderName,0,ptextEngine->pcomp), ptextEngine(_ptextEngine){
+Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], class TextEngine *_ptextEngine) : Drawable(pshaderName,&vertexBufferLayout,_ptextEngine->pcomp), ptextEngine(_ptextEngine){
 	//
 	phbBuf = hb_buffer_create();
 	hb_buffer_set_direction(phbBuf,HB_DIRECTION_LTR);
@@ -28,7 +28,7 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	hb_buffer_add_utf8(phbBuf,ptext,-1,0,-1);
 	hb_shape(ptextEngine->phbFont,phbBuf,0,0);
 
-	Vertex *pdata = (Vertex *)pvertexBuffer->Map();
+	Vertex *pdata = (Vertex*)pvertexBuffer->Map();
 
 	pdata[0].pos = glm::vec2(0.0f,-0.5f);
 	pdata[1].pos = glm::vec2(-0.5f,0.5f);
@@ -36,6 +36,10 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 
 	pvertexBuffer->Unmap(pcommandBuffer);
 }
+
+std::vector<std::pair<ShaderModule::INPUT, uint>> Text::vertexBufferLayout = {
+	{ShaderModule::INPUT_POSITION_SFLOAT2,offsetof(Text::Vertex,pos)}
+};
 
 TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp){
 	if(FT_Init_FreeType(&library) != FT_Err_Ok)
