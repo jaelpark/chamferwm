@@ -147,6 +147,7 @@ protected:
 
 	std::vector<ClientFrame *> updateQueue;
 	std::vector<std::pair<VkRect2D, uint>> scissorRegions; //scissoring regions based on client damage.
+	std::vector<VkRectLayerKHR> presentRectLayers;
 	//Second (uint) is a bitmask for swap chain images, indicating which image has been updated so far.
 	//When all images have been updated, the region is removed from the list.
 

@@ -188,7 +188,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	for(uint i = 0; i < layerCount; ++i)
 		for(uint j = 0; j < sizeof(players)/sizeof(players[0]); ++j)
 			if(strcmp(playerProps[i].layerName,players[j]) == 0){
-				printf("%s\n",players[j]);
+				printf("  %s\n",players[j]);
 				++layersFound;
 			}
 	if(debugLayers && layersFound < sizeof(players)/sizeof(players[0]))
@@ -211,7 +211,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	for(uint i = 0; i < extCount; ++i)
 		for(uint j = 0; j < sizeof(pextensions)/sizeof(pextensions[0]); ++j)
 			if(strcmp(pextProps[i].extensionName,pextensions[j]) == 0){
-				printf("%s\n",pextensions[j]);
+				printf("  %s\n",pextensions[j]);
 				++extFound;
 			}
 	if(extFound < sizeof(pextensions)/sizeof(pextensions[0]))
@@ -361,13 +361,13 @@ void CompositorInterface::InitializeRenderEngine(){
 	vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,pdevExtProps);
 
 	//device extensions
-	const char *pdevExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+	const char *pdevExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME,VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME};
 	DebugPrintf(stdout,"Enumerating required device extensions\n");
 	uint devExtFound = 0;
 	for(uint i = 0; i < devExtCount; ++i)
 		for(uint j = 0; j < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]); ++j)
 			if(strcmp(pdevExtProps[i].extensionName,pdevExtensions[j]) == 0){
-				printf("%s\n",pdevExtensions[j]);
+				printf("  %s\n",pdevExtensions[j]);
 				++devExtFound;
 			}
 	if(devExtFound < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]))
@@ -585,8 +585,10 @@ void CompositorInterface::InitializeRenderEngine(){
 		throw Exception("Failed to allocate copy command buffer.");
 	
 	shaders.reserve(1024);
-
 	pipelines.reserve(1024);
+	updateQueue.reserve(1024);
+	scissorRegions.reserve(32);
+	presentRectLayers.reserve(32);
 }
 
 void CompositorInterface::DestroyRenderEngine(){
@@ -646,6 +648,14 @@ void CompositorInterface::AddDamageRegion(const VkRect2D *prect){
 			&& prect->offset.y+prect->extent.height >= scissorRegion.first.offset.y+scissorRegion.first.extent.height;
 	}),scissorRegions.end());
 	scissorRegions.push_back(std::pair<VkRect2D, uint>(*prect,0));
+
+	VkRectLayerKHR &rectLayer = presentRectLayers.emplace_back();
+	rectLayer.offset = {std::max(prect->offset.x,0),std::max(prect->offset.y,0)};
+	rectLayer.extent = {
+		prect->extent.width+std::min((int)imageExtent.width-(rectLayer.offset.x+(int)prect->extent.width),0),
+		prect->extent.height+std::min((int)imageExtent.height-(rectLayer.offset.y+(int)prect->extent.height),0)
+	};
+	rectLayer.layer = 0;
 }
 
 void CompositorInterface::AddDamageRegion(const WManager::Client *pclient){
@@ -988,6 +998,15 @@ void CompositorInterface::Present(){
 	if(vkQueueSubmit(queue[QUEUE_INDEX_GRAPHICS],1,&submitInfo,pfence[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to submit a queue.");
 	
+	VkPresentRegionKHR presentRegion = {};
+	presentRegion.rectangleCount = presentRectLayers.size();
+	presentRegion.pRectangles = presentRectLayers.data();
+
+	VkPresentRegionsKHR presentRegions = {};
+	presentRegions.sType = VK_STRUCTURE_TYPE_PRESENT_REGIONS_KHR;
+	presentRegions.swapchainCount = 1;
+	presentRegions.pRegions = &presentRegion;
+	
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 1;
@@ -996,7 +1015,10 @@ void CompositorInterface::Present(){
 	presentInfo.pSwapchains = &swapChain;
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = 0;
+	presentInfo.pNext = &presentRegions;
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
+
+	presentRectLayers.clear();
 
 	currentFrame = (currentFrame+1)%swapChainImageCount;
 
