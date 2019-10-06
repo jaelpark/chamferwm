@@ -1015,7 +1015,7 @@ void CompositorInterface::Present(){
 	presentInfo.pSwapchains = &swapChain;
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = 0;
-	presentInfo.pNext = &presentRegions;
+	presentInfo.pNext = presentRegion.rectangleCount > 0?&presentRegions:0;
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
 
 	presentRectLayers.clear();
