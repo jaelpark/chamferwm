@@ -165,7 +165,7 @@ protected:
 	uint currentFrame;
 	uint imageIndex;
 
-	Pipeline * LoadPipeline(const char *[Pipeline::SHADER_MODULE_COUNT]);
+	Pipeline * LoadPipeline(const char *[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT,uint>> *);
 
 	//all the resources are preloaded for now
 	std::vector<ShaderModule> shaders;

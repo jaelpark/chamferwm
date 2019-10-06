@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <limits>
 #include <sys/shm.h>
+#include <boost/container_hash/hash.hpp>
 
 #include <gbm.h> //temp
 #include <fcntl.h>
@@ -16,7 +17,7 @@
 namespace Compositor{
 
 Drawable::Drawable(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
-	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
+	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName,0);
 	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
 }
@@ -29,7 +30,7 @@ Drawable::~Drawable(){
 }
 
 void Drawable::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
-	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
+	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName,0);
 	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
 	
@@ -1120,11 +1121,15 @@ void CompositorInterface::Present(){
 //TODO: make template<T> to load different pipelines?
 //TODO: LoadPipeline needs information about the vertex buffer layout - VkVertexInputAttributeDescription needs this info
 //-vertex buffer layout is always fixed, since there is no predefined information on what shaders (and thus inputs) will be used on what vertex data
-Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
+Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT,uint>> *pvertexBufferLayout){
+	size_t vertexBufferLayoutHash = pvertexBufferLayout?boost::hash_range(pvertexBufferLayout->begin(),pvertexBufferLayout->end()):0;
+
 	auto m = std::find_if(pipelines.begin(),pipelines.end(),[&](auto &r)->bool{
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
 			if(r.pshaderModule[i] && strcmp(r.pshaderModule[i]->pname,pshaderName[i]) != 0)
 				return false;
+		if(r.vertexBufferLayoutHash != vertexBufferLayoutHash)
+			return false;
 		return true;
 	});
 	Pipeline *pPipeline;
@@ -1146,7 +1151,7 @@ Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::S
 		pPipeline = &pipelines.emplace_back(
 			pshader[Pipeline::SHADER_MODULE_VERTEX],
 			pshader[Pipeline::SHADER_MODULE_GEOMETRY],
-			pshader[Pipeline::SHADER_MODULE_FRAGMENT],(const std::vector<std::pair<ShaderModule::INPUT,uint>> *)0,this);
+			pshader[Pipeline::SHADER_MODULE_FRAGMENT],pvertexBufferLayout,vertexBufferLayoutHash,this);
 	}
 	return pPipeline;
 }

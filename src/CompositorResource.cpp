@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <gbm.h>
 #include <unistd.h>
+#include <boost/container_hash/hash.hpp>
 
 #include "spirv_reflect.h"
 
@@ -713,10 +714,6 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 	spvReflectDestroyShaderModule(&reflectShaderModule);
 }
 
-ShaderModule::ShaderModule(const CompositorInterface *_pcomp) : pcomp(_pcomp), pname(mstrdup("null")), shaderModule(0), pPushConstantRanges(new VkPushConstantRange[0]), pdescSetLayouts(new VkDescriptorSetLayout[0]), pushConstantBlockCount(0), setCount(0){
-	//
-}
-
 ShaderModule::~ShaderModule(){
 	mstrfree(pname);
 	for(Binding &b : bindings)
@@ -731,7 +728,6 @@ ShaderModule::~ShaderModule(){
 const std::vector<std::tuple<const char *, VkFormat, uint>> ShaderModule::semanticMap = {
 	{"POSITION",VK_FORMAT_R32G32_SFLOAT,8},
 	{"POSITION",VK_FORMAT_R32G32_UINT,8}
-	//{VK_FORMAT_R8G8B8A8_UNORM,4}
 };
 
 const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {
@@ -743,7 +739,7 @@ const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {
 	{"time",4}
 };
 
-Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp){
+Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, size_t _vertexBufferLayoutHash, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp), vertexBufferLayoutHash(_vertexBufferLayoutHash){
 	VkVertexInputAttributeDescription *pvertexInputAttributeDescs = new VkVertexInputAttributeDescription[_pvertexShader->inputs.size()];
 	uint vertexAttributeDescCount = 0;
 	uint inputStride = 0;
@@ -768,6 +764,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 		for(auto &r : *pvertexBufferLayout)
 			inputStride += r.second;
 	}
+
 	//per-vertex data only, instancing not used
 	VkVertexInputBindingDescription vertexInputBindingDesc = {};
 	vertexInputBindingDesc.binding = 0;

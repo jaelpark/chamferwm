@@ -108,7 +108,6 @@ public:
 class ShaderModule{
 public:
 	ShaderModule(const char *, const Blob *, const class CompositorInterface *);
-	ShaderModule(const class CompositorInterface *); //null shader
 	~ShaderModule();
 
 	const class CompositorInterface *pcomp;
@@ -164,7 +163,7 @@ public:
 
 class Pipeline{
 public:
-	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, const class CompositorInterface *);
+	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, size_t, const class CompositorInterface *);
 	~Pipeline();
 
 	enum SHADER_MODULE{
@@ -174,6 +173,7 @@ public:
 		SHADER_MODULE_COUNT
 	}; //note: code in Pipeline() relies on this order
 	ShaderModule *pshaderModule[SHADER_MODULE_COUNT];
+	size_t vertexBufferLayoutHash;
 	const class CompositorInterface *pcomp;
 	VkPushConstantRange pushConstantRange;
 	VkPipelineLayout pipelineLayout;
