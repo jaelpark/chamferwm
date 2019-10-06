@@ -1,13 +1,13 @@
 #include "main.h"
 #include "container.h"
 #include "backend.h"
-#include "CompositorFont.h"
 #include "CompositorResource.h"
 #include "compositor.h"
+#include "CompositorFont.h"
 
 namespace Compositor{
 
-Text::Text(class TextEngine *_ptextEngine) : ptextEngine(_ptextEngine){
+Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], class TextEngine *_ptextEngine) : Drawable(pshaderName,0,ptextEngine->pcomp), ptextEngine(_ptextEngine){
 	//
 	phbBuf = hb_buffer_create();
 	hb_buffer_set_direction(phbBuf,HB_DIRECTION_LTR);
@@ -23,10 +23,18 @@ Text::~Text(){
 	hb_buffer_destroy(phbBuf);
 }
 
-void Text::Set(const char *ptext){
+void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	hb_buffer_reset(phbBuf);
 	hb_buffer_add_utf8(phbBuf,ptext,-1,0,-1);
 	hb_shape(ptextEngine->phbFont,phbBuf,0,0);
+
+	Vertex *pdata = (Vertex *)pvertexBuffer->Map();
+
+	pdata[0].pos = glm::vec2(0.0f,-0.5f);
+	pdata[1].pos = glm::vec2(-0.5f,0.5f);
+	pdata[2].pos = glm::vec2(+0.5f,0.5f);
+
+	pvertexBuffer->Unmap(pcommandBuffer);
 }
 
 TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp){

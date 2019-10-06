@@ -16,8 +16,8 @@
 
 namespace Compositor{
 
-Drawable::Drawable(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
-	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName,0);
+Drawable::Drawable(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
+	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName,pvertexBufferLayout);
 	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
 }
@@ -29,7 +29,7 @@ Drawable::~Drawable(){
 				pcomp->ReleaseDescSets(pipelineDescSet.p->pshaderModule[i],pipelineDescSet.pdescSets[i]);
 }
 
-void Drawable::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
+void Drawable::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout){
 	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName,0);
 	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
@@ -91,7 +91,7 @@ void Drawable::BindShaderResources(const std::vector<std::pair<ShaderModule::VAR
 	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,passignedSet->p->pushConstantRange.stageFlags,passignedSet->p->pushConstantRange.offset,passignedSet->p->pushConstantRange.size,pushConstantBuffer);
 }
 
-ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : Drawable(pshaderName,_pcomp), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0){
+ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : Drawable(pshaderName,0,_pcomp), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0){
 	//
 	clock_gettime(CLOCK_MONOTONIC,&creationTime);
 }

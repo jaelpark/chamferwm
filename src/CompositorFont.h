@@ -9,14 +9,17 @@
 
 namespace Compositor{
 
-class Text{ //: public Drawable
+class Text : public Drawable{
 public:
-	Text(class TextEngine *);
+	Text(const char *[Pipeline::SHADER_MODULE_COUNT], class TextEngine *);
 	~Text();
-	void Set(const char *); //updates the vertex buffers
+	void Set(const char *, const VkCommandBuffer *); //updates the vertex buffers
 	hb_buffer_t *phbBuf;
 	class TextEngine *ptextEngine;
 	class Buffer *pvertexBuffer;
+	struct Vertex{
+		glm::vec2 pos;
+	};// alignas(16);
 };
 
 class TextEngine{
