@@ -9,7 +9,7 @@
 
 namespace Compositor{
 
-class Text{
+class Text{ //: public Drawable
 public:
 	Text(class TextEngine *);
 	~Text();

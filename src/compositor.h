@@ -17,15 +17,16 @@ class X11Backend;
 
 namespace Compositor{
 
-class ColorFrame{
+class Drawable{
 friend class CompositorInterface;
 public:
-	ColorFrame(const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
-	virtual ~ColorFrame();
+	Drawable(const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
+	virtual ~Drawable();
+	//
 	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
-	void Draw(const VkRect2D &, const glm::vec2 &, uint, const VkCommandBuffer *);
 	bool AssignPipeline(const Pipeline *);
 protected:
+	void BindShaderResources(const std::vector<std::pair<ShaderModule::VARIABLE, const void *>> *, const VkCommandBuffer *);
 	virtual void UpdateDescSets(){};
 	class CompositorInterface *pcomp;
 	struct PipelineDescriptorSet{
@@ -35,6 +36,15 @@ protected:
 	};
 	PipelineDescriptorSet *passignedSet;
 	std::vector<PipelineDescriptorSet> descSets;
+};
+
+class ColorFrame : public Drawable{
+friend class CompositorInterface;
+public:
+	ColorFrame(const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
+	virtual ~ColorFrame();
+	void Draw(const VkRect2D &, const glm::vec2 &, uint, const VkCommandBuffer *);
+protected:
 	struct timespec creationTime;
 	float time;
 public:
@@ -76,6 +86,7 @@ friend class ShaderModule;
 friend class Pipeline;
 friend class Text;
 friend class TextEngine;
+friend class Drawable;
 friend class ColorFrame;
 friend class ClientFrame;
 friend class X11ClientFrame;

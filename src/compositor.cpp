@@ -15,23 +15,20 @@
 
 namespace Compositor{
 
-ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0), time(0.0f), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0){
-	//
+Drawable::Drawable(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
 	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
 	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
-
-	clock_gettime(CLOCK_MONOTONIC,&creationTime);
 }
 
-ColorFrame::~ColorFrame(){
+Drawable::~Drawable(){
 	for(PipelineDescriptorSet &pipelineDescSet : descSets)
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
 			if(pipelineDescSet.pdescSets[i])
 				pcomp->ReleaseDescSets(pipelineDescSet.p->pshaderModule[i],pipelineDescSet.pdescSets[i]);
 }
 
-void ColorFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
+void Drawable::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
 	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName);
 	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
@@ -39,47 +36,7 @@ void ColorFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUN
 	UpdateDescSets();
 }
 
-void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, uint flags, const VkCommandBuffer *pcommandBuffer){
-	time = timespec_diff(pcomp->frameTime,creationTime);
-
-	glm::vec2 imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
-
-	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,
-		frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
-	frameVec = 2.0f*(frameVec+0.5f)/glm::vec4(imageExtent,imageExtent)-1.0f;
-
-	const void *pReadBuf[] = {
-		&frameVec,&frameVec.z,
-		&imageExtent,
-		&margin,
-		&flags,
-		&time
-	};
-	char alignas(16) pushConstantBuffer[128];
-	for(uint i = 0, p = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
-		//bind descriptor sets
-		if(!passignedSet->p->pshaderModule[i])
-			continue;
-		if(passignedSet->p->pshaderModule[i]->setCount > 0){
-			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,passignedSet->p->pipelineLayout,p,passignedSet->p->pshaderModule[i]->setCount,passignedSet->pdescSets[i],0,0);
-			p += passignedSet->p->pshaderModule[i]->setCount;
-		}
-		//copy push constants
-		for(uint j = 0; j < passignedSet->p->pshaderModule[i]->variables.size(); ++j){
-			memcpy(pushConstantBuffer+passignedSet->p->pshaderModule[i]->variables[j].offset,
-				pReadBuf[passignedSet->p->pshaderModule[i]->variables[j].variableMapIndex],
-				std::get<1>(ShaderModule::variableMap[passignedSet->p->pshaderModule[i]->variables[j].variableMapIndex]));
-		}
-	}
-
-	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,passignedSet->p->pushConstantRange.stageFlags,passignedSet->p->pushConstantRange.offset,passignedSet->p->pushConstantRange.size,pushConstantBuffer);
-
-	vkCmdDraw(*pcommandBuffer,1,1,0,0);
-
-	passignedSet->fenceTag = pcomp->frameTag;
-}
-
-bool ColorFrame::AssignPipeline(const Pipeline *prenderPipeline){
+bool Drawable::AssignPipeline(const Pipeline *prenderPipeline){
 	auto m = std::find_if(descSets.begin(),descSets.end(),[&](auto &r)->bool{
 		return r.p == prenderPipeline && pcomp->frameTag > r.fenceTag+pcomp->swapChainImageCount+1;
 	});
@@ -106,6 +63,64 @@ bool ColorFrame::AssignPipeline(const Pipeline *prenderPipeline){
 	passignedSet = &descSets.back();
 
 	return true;
+}
+
+void Drawable::BindShaderResources(const std::vector<std::pair<ShaderModule::VARIABLE, const void *>> *pVarAddrs, const VkCommandBuffer *pcommandBuffer){
+	char alignas(16) pushConstantBuffer[128];
+	for(uint i = 0, p = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		//bind descriptor sets
+		if(!passignedSet->p->pshaderModule[i])
+			continue;
+		if(passignedSet->p->pshaderModule[i]->setCount > 0){
+			vkCmdBindDescriptorSets(*pcommandBuffer,VK_PIPELINE_BIND_POINT_GRAPHICS,passignedSet->p->pipelineLayout,p,passignedSet->p->pshaderModule[i]->setCount,passignedSet->pdescSets[i],0,0);
+			p += passignedSet->p->pshaderModule[i]->setCount;
+		}
+		//copy push constants
+		for(uint j = 0; j < passignedSet->p->pshaderModule[i]->variables.size(); ++j){
+			auto m = std::find_if(pVarAddrs->begin(),pVarAddrs->end(),[&](auto &r)->bool{
+				return (uint)r.first == passignedSet->p->pshaderModule[i]->variables[j].variableMapIndex;
+			});
+			if(m == pVarAddrs->end())
+				continue;
+			memcpy(pushConstantBuffer+passignedSet->p->pshaderModule[i]->variables[j].offset,
+				m->second,std::get<1>(ShaderModule::variableMap[passignedSet->p->pshaderModule[i]->variables[j].variableMapIndex]));
+		}
+	}
+
+	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,passignedSet->p->pushConstantRange.stageFlags,passignedSet->p->pushConstantRange.offset,passignedSet->p->pushConstantRange.size,pushConstantBuffer);
+}
+
+ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : Drawable(pshaderName,_pcomp), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0){
+	//
+	clock_gettime(CLOCK_MONOTONIC,&creationTime);
+}
+
+ColorFrame::~ColorFrame(){
+	//
+}
+
+void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, uint flags, const VkCommandBuffer *pcommandBuffer){
+	time = timespec_diff(pcomp->frameTime,creationTime);
+
+	glm::vec2 imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
+
+	glm::vec4 frameVec = {frame.offset.x,frame.offset.y,
+		frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
+	frameVec = 2.0f*(frameVec+0.5f)/glm::vec4(imageExtent,imageExtent)-1.0f;
+
+	std::vector<std::pair<ShaderModule::VARIABLE, const void *>> varAddrs = {
+		{ShaderModule::VARIABLE_XY0,&frameVec},
+		{ShaderModule::VARIABLE_XY1,&frameVec.z},
+		{ShaderModule::VARIABLE_SCREEN,&imageExtent},
+		{ShaderModule::VARIABLE_MARGIN,&margin},
+		{ShaderModule::VARIABLE_FLAGS,&flags},
+		{ShaderModule::VARIABLE_TIME,&time}
+	};
+	BindShaderResources(&varAddrs,pcommandBuffer);
+
+	vkCmdDraw(*pcommandBuffer,1,1,0,0);
+
+	passignedSet->fenceTag = pcomp->frameTag;
 }
 
 ClientFrame::ClientFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : ColorFrame(pshaderName,_pcomp), fullRegionUpdate(true), animationCompleted(true){
@@ -1103,6 +1118,8 @@ void CompositorInterface::Present(){
 }
 
 //TODO: make template<T> to load different pipelines?
+//TODO: LoadPipeline needs information about the vertex buffer layout - VkVertexInputAttributeDescription needs this info
+//-vertex buffer layout is always fixed, since there is no predefined information on what shaders (and thus inputs) will be used on what vertex data
 Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
 	auto m = std::find_if(pipelines.begin(),pipelines.end(),[&](auto &r)->bool{
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
@@ -1129,7 +1146,7 @@ Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::S
 		pPipeline = &pipelines.emplace_back(
 			pshader[Pipeline::SHADER_MODULE_VERTEX],
 			pshader[Pipeline::SHADER_MODULE_GEOMETRY],
-			pshader[Pipeline::SHADER_MODULE_FRAGMENT],this);
+			pshader[Pipeline::SHADER_MODULE_FRAGMENT],(const std::vector<std::pair<ShaderModule::INPUT,uint>> *)0,this);
 	}
 	return pPipeline;
 }

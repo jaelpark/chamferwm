@@ -120,7 +120,7 @@ public:
 	uint pushConstantBlockCount;
 	uint setCount;
 	//uint inputCount;
-	uint inputStride;
+	//uint inputStride;
 
 	struct Binding{
 		const char *pname;
@@ -133,7 +133,7 @@ public:
 	struct Input{
 		uint location; //index of the input
 		uint binding;
-		uint offset; //byte offset
+		//uint offset; //byte offset
 		uint semanticMapIndex; //index to semantic map
 	};
 	std::vector<Input> inputs;
@@ -144,8 +144,13 @@ public:
 	};
 	std::vector<Variable> variables;
 
+	enum INPUT{
+		INPUT_POSITION_SFLOAT2,
+		INPUT_POSITION_UINT2,
+		INPUT_COUNT
+	};
 	static const std::vector<std::tuple<const char *, VkFormat, uint>> semanticMap;
-	/*enum VARIABLE{
+	enum VARIABLE{
 		VARIABLE_XY0,
 		VARIABLE_XY1,
 		VARIABLE_SCREEN,
@@ -153,13 +158,13 @@ public:
 		VARIABLE_FLAGS,
 		VARIABLE_TIME,
 		VARIABLE_COUNT
-	};*/
+	};
 	static const std::vector<std::tuple<const char *, uint>> variableMap;
 };
 
 class Pipeline{
 public:
-	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const class CompositorInterface *);
+	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, const class CompositorInterface *);
 	~Pipeline();
 
 	enum SHADER_MODULE{

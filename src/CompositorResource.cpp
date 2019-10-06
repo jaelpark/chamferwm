@@ -628,14 +628,14 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 		in.binding = 0; //one vertex buffer bound, per vertex
 		in.semanticMapIndex = m-semanticMap.begin();
 	}
-	std::sort(inputs.begin(),inputs.end(),[](const Input &a, const Input &b){
+	/*std::sort(inputs.begin(),inputs.end(),[](const Input &a, const Input &b){
 		return a.location < b.location;
 	});
 	inputStride = 0;
 	for(auto &m : inputs){
 		m.offset = inputStride;
 		inputStride += std::get<2>(semanticMap[m.semanticMapIndex]);
-	}
+	}*/
 
 	delete []preflectInputVars;
 
@@ -713,7 +713,7 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 	spvReflectDestroyShaderModule(&reflectShaderModule);
 }
 
-ShaderModule::ShaderModule(const CompositorInterface *_pcomp) : pcomp(_pcomp), pname(mstrdup("null")), shaderModule(0), pPushConstantRanges(new VkPushConstantRange[0]), pdescSetLayouts(new VkDescriptorSetLayout[0]), pushConstantBlockCount(0), setCount(0), inputStride(0){
+ShaderModule::ShaderModule(const CompositorInterface *_pcomp) : pcomp(_pcomp), pname(mstrdup("null")), shaderModule(0), pPushConstantRanges(new VkPushConstantRange[0]), pdescSetLayouts(new VkDescriptorSetLayout[0]), pushConstantBlockCount(0), setCount(0){
 	//
 }
 
@@ -743,29 +743,44 @@ const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {
 	{"time",4}
 };
 
-Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp){
+Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp){
 	VkVertexInputAttributeDescription *pvertexInputAttributeDescs = new VkVertexInputAttributeDescription[_pvertexShader->inputs.size()];
-	for(uint i = 0, n = _pvertexShader->inputs.size(); i < n; ++i){
-		pvertexInputAttributeDescs[i].location = _pvertexShader->inputs[i].location;
-		pvertexInputAttributeDescs[i].binding = _pvertexShader->inputs[i].binding;
-		pvertexInputAttributeDescs[i].format = std::get<1>(ShaderModule::semanticMap[_pvertexShader->inputs[i].semanticMapIndex]);
-		pvertexInputAttributeDescs[i].offset = _pvertexShader->inputs[i].offset;
-	}
+	uint vertexAttributeDescCount = 0;
+	uint inputStride = 0;
+	if(pvertexBufferLayout){
+		for(uint i = 0, n = _pvertexShader->inputs.size(); i < n; ++i){
+			auto m = std::find_if(pvertexBufferLayout->begin(),pvertexBufferLayout->end(),[&](auto &r)->bool{
+				return (uint)r.first == _pvertexShader->inputs[i].semanticMapIndex;
+			});
+			if(m == pvertexBufferLayout->end()){
+				DebugPrintf(stdout,"warning: incompatible semantic %s in %s at location %u.\n",std::get<0>(ShaderModule::semanticMap[_pvertexShader->inputs[i].semanticMapIndex]),_pvertexShader->pname,_pvertexShader->inputs[i].location);
+				continue;
+			}
+			pvertexInputAttributeDescs[vertexAttributeDescCount].offset = m->second;
+			pvertexInputAttributeDescs[vertexAttributeDescCount].location = _pvertexShader->inputs[i].location;
+			pvertexInputAttributeDescs[vertexAttributeDescCount].binding = _pvertexShader->inputs[i].binding;
+			pvertexInputAttributeDescs[vertexAttributeDescCount].format = std::get<1>(ShaderModule::semanticMap[_pvertexShader->inputs[i].semanticMapIndex]);
+			pvertexInputAttributeDescs[vertexAttributeDescCount].offset = m->second;
 
+			++vertexAttributeDescCount;
+		}
+
+		for(auto &r : *pvertexBufferLayout)
+			inputStride += r.second;
+	}
 	//per-vertex data only, instancing not used
 	VkVertexInputBindingDescription vertexInputBindingDesc = {};
 	vertexInputBindingDesc.binding = 0;
-	vertexInputBindingDesc.stride = _pvertexShader->inputStride;
+	vertexInputBindingDesc.stride = inputStride;//_pvertexShader->inputStride;
 	vertexInputBindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-	//TODO: move vertex attributes, push constants to shaders? desc set layouts are already there
 	//TODO: create multiple pipeline interfaces, for clients, text, etc.? Many of the attributes are different, such as stencil buffers (for text?) and blending. Use base class for pipeline
 	//Create ClientPipeline under compositor.cpp, and TextPipeline under CompositorFont.cpp
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
 	vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputStateCreateInfo.vertexBindingDescriptionCount = (uint)(_pvertexShader->inputs.size() > 0);
+	vertexInputStateCreateInfo.vertexBindingDescriptionCount = (uint)(vertexAttributeDescCount > 0);
 	vertexInputStateCreateInfo.pVertexBindingDescriptions = &vertexInputBindingDesc;
-	vertexInputStateCreateInfo.vertexAttributeDescriptionCount = _pvertexShader->inputs.size();
+	vertexInputStateCreateInfo.vertexAttributeDescriptionCount = vertexAttributeDescCount;
 	vertexInputStateCreateInfo.pVertexAttributeDescriptions = pvertexInputAttributeDescs;
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
