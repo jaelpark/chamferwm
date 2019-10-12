@@ -739,7 +739,7 @@ const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {
 	{"time",4}
 };
 
-Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, size_t _vertexBufferLayoutHash, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp), vertexBufferLayoutHash(_vertexBufferLayoutHash){
+Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, size_t _vertexBufferLayoutHash, const VkPipelineInputAssemblyStateCreateInfo *pinputAssemblyStateCreateInfo, const VkPipelineRasterizationStateCreateInfo *prasterizationStateCreateInfo, const VkPipelineDepthStencilStateCreateInfo *pdepthStencilStateCreateInfo, const VkPipelineColorBlendStateCreateInfo *pcolorBlendStateCreateInfo, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp), vertexBufferLayoutHash(_vertexBufferLayoutHash){
 	VkVertexInputAttributeDescription *pvertexInputAttributeDescs = new VkVertexInputAttributeDescription[_pvertexShader->inputs.size()];
 	uint vertexAttributeDescCount = 0;
 	uint inputStride = 0;
@@ -771,19 +771,12 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	vertexInputBindingDesc.stride = inputStride;//_pvertexShader->inputStride;
 	vertexInputBindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-	//TODO: create multiple pipeline interfaces, for clients, text, etc.? Many of the attributes are different, such as stencil buffers (for text?) and blending. Use base class for pipeline
-	//Create ClientPipeline under compositor.cpp, and TextPipeline under CompositorFont.cpp
 	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {};
 	vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputStateCreateInfo.vertexBindingDescriptionCount = (uint)(vertexAttributeDescCount > 0);
 	vertexInputStateCreateInfo.pVertexBindingDescriptions = &vertexInputBindingDesc;
 	vertexInputStateCreateInfo.vertexAttributeDescriptionCount = vertexAttributeDescCount;
 	vertexInputStateCreateInfo.pVertexAttributeDescriptions = pvertexInputAttributeDescs;
-
-	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = {};
-	inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;//VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
 
 	VkPipelineShaderStageCreateInfo shaderStageCreateInfo[3];
 
@@ -821,51 +814,12 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	viewportStateCreateInfo.pViewports = &viewport;
 	viewportStateCreateInfo.scissorCount = 1;
 	viewportStateCreateInfo.pScissors = &scissor;
-	//viewportStateCreateInfo.pScissors = 0;//&scissor; //+ dynamic states below!
-
-	VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = {};
-	rasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizationStateCreateInfo.depthClampEnable = VK_FALSE;
-	rasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
-	rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizationStateCreateInfo.lineWidth = 1.0f;
-	rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
-	rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	rasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
-	rasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
-	rasterizationStateCreateInfo.depthBiasClamp = 0.0f;
-	rasterizationStateCreateInfo.depthBiasSlopeFactor = 0.0f;
 
 	VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo = {};
 	multisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;
 	multisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; 
-	//depth stencil
 
-	VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {};
-	colorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachmentState.blendEnable = VK_TRUE;
-	//premultiplied alpha blending
-	colorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
-	colorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-	colorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	colorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
-	colorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	colorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	//...
-
-	VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = {};
-	colorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlendStateCreateInfo.logicOpEnable = VK_FALSE;
-	colorBlendStateCreateInfo.logicOp = VK_LOGIC_OP_COPY;
-	colorBlendStateCreateInfo.attachmentCount = 1;
-	colorBlendStateCreateInfo.pAttachments = &colorBlendAttachmentState;
-	colorBlendStateCreateInfo.blendConstants[0] = 0.0f;
-	colorBlendStateCreateInfo.blendConstants[1] = 0.0f;
-	colorBlendStateCreateInfo.blendConstants[2] = 0.0f;
-	colorBlendStateCreateInfo.blendConstants[3] = 0.0f;
-
-	//VkPushConstantRange pushConstantRange = {};
 	pushConstantRange.stageFlags = 0;
 	pushConstantRange.offset = ~0u;
 	pushConstantRange.size = 0;
@@ -879,17 +833,6 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 		}
 	}
 
-	/*uint pushConstantBlockCount = 0;
-	for(uint i = 0; i < SHADER_MODULE_COUNT; pushConstantBlockCount += pshaderModule[i]->pushConstantBlockCount, ++i);
-	VkPushConstantRange *pcombinedPushConstantRanges = new VkPushConstantRange[pushConstantBlockCount];
-
-	for(uint i = 0, p = 0; i < SHADER_MODULE_COUNT; ++i){
-		std::copy(pshaderModule[i]->pPushConstantRanges,pshaderModule[i]->pPushConstantRanges+pshaderModule[i]->pushConstantBlockCount,pcombinedPushConstantRanges+p);
-		p += pshaderModule[i]->pushConstantBlockCount;
-	}*/
-
-	//uint setCount = 0;
-	//for(uint i = 0; i < SHADER_MODULE_COUNT; setCount += pshaderModule[i]->setCount, ++i);
 	VkDescriptorSetLayout *pcombinedSets = new VkDescriptorSetLayout[setCount];
 
 	for(uint i = 0, p = 0; i < SHADER_MODULE_COUNT; ++i){
@@ -903,12 +846,11 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	layoutCreateInfo.setLayoutCount = setCount;
 	layoutCreateInfo.pSetLayouts = pcombinedSets;
-	layoutCreateInfo.pushConstantRangeCount = 1;//pushConstantBlockCount;//1;
-	layoutCreateInfo.pPushConstantRanges = &pushConstantRange;//pcombinedPushConstantRanges;//&pushConstantRange;
+	layoutCreateInfo.pushConstantRangeCount = 1;
+	layoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 	if(vkCreatePipelineLayout(pcomp->logicalDev,&layoutCreateInfo,0,&pipelineLayout) != VK_SUCCESS)
 		throw Exception("Failed to create a pipeline layout.");
 	
-	//delete []pcombinedPushConstantRanges;
 	delete []pcombinedSets;
 
 	VkDynamicState dynamicStates[1] = {VK_DYNAMIC_STATE_SCISSOR};
@@ -926,15 +868,15 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	graphicsPipelineCreateInfo.stageCount = stageCount;//sizeof(shaderStageCreateInfo)/sizeof(shaderStageCreateInfo[0]);
+	graphicsPipelineCreateInfo.stageCount = stageCount;
 	graphicsPipelineCreateInfo.pStages = shaderStageCreateInfo;
 	graphicsPipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
-	graphicsPipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
+	graphicsPipelineCreateInfo.pInputAssemblyState = pinputAssemblyStateCreateInfo;
 	graphicsPipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
-	graphicsPipelineCreateInfo.pRasterizationState = &rasterizationStateCreateInfo;
+	graphicsPipelineCreateInfo.pRasterizationState = prasterizationStateCreateInfo;
 	graphicsPipelineCreateInfo.pMultisampleState = &multisampleStateCreateInfo;
-	graphicsPipelineCreateInfo.pDepthStencilState = 0;
-	graphicsPipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
+	graphicsPipelineCreateInfo.pDepthStencilState = pdepthStencilStateCreateInfo;
+	graphicsPipelineCreateInfo.pColorBlendState = pcolorBlendStateCreateInfo;
 	graphicsPipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
 	graphicsPipelineCreateInfo.layout = pipelineLayout;
 	graphicsPipelineCreateInfo.renderPass = pcomp->renderPass;
@@ -952,6 +894,104 @@ Pipeline::~Pipeline(){
 	vkDestroyPipeline(pcomp->logicalDev,pipeline,0);
 	vkDestroyPipelineLayout(pcomp->logicalDev,pipelineLayout,0);
 }
+
+ClientPipeline::ClientPipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, size_t _vertexBufferLayoutHash, const CompositorInterface *_pcomp) : Pipeline(_pvertexShader,_pgeometryShader,_pfragmentShader,pvertexBufferLayout,_vertexBufferLayoutHash,&inputAssemblyStateCreateInfo,&rasterizationStateCreateInfo,0,&colorBlendStateCreateInfo,_pcomp){
+	//
+}
+
+ClientPipeline::~ClientPipeline(){
+	//
+}
+
+VkPipelineInputAssemblyStateCreateInfo ClientPipeline::inputAssemblyStateCreateInfo = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+	.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST,//VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	.primitiveRestartEnable = VK_FALSE
+};
+
+VkPipelineRasterizationStateCreateInfo ClientPipeline::rasterizationStateCreateInfo = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+	.depthClampEnable = VK_FALSE,
+	.rasterizerDiscardEnable = VK_FALSE,
+	.polygonMode = VK_POLYGON_MODE_FILL,
+	.cullMode = VK_CULL_MODE_NONE,
+	.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+	.depthBiasEnable = VK_FALSE,
+	.depthBiasConstantFactor = 0.0f,
+	.depthBiasClamp = 0.0f,
+	.depthBiasSlopeFactor = 0.0f,
+	.lineWidth = 1.0f
+};
+
+VkPipelineColorBlendAttachmentState ClientPipeline::colorBlendAttachmentState = {
+	.blendEnable = VK_TRUE,
+	//premultiplied alpha blending
+	.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+	.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+	.colorBlendOp = VK_BLEND_OP_ADD,
+	.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+	.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+	.alphaBlendOp = VK_BLEND_OP_ADD,
+	.colorWriteMask = VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT
+};
+
+VkPipelineColorBlendStateCreateInfo ClientPipeline::colorBlendStateCreateInfo = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+	.logicOpEnable = VK_FALSE,
+	.logicOp = VK_LOGIC_OP_COPY,
+	.attachmentCount = 1,
+	.pAttachments = &colorBlendAttachmentState,
+	.blendConstants = {0.0f,0.0f,0.0f,0.0f}
+};
+
+TextPipeline::TextPipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, size_t _vertexBufferLayoutHash, const CompositorInterface *_pcomp) : Pipeline(_pvertexShader,_pgeometryShader,_pfragmentShader,pvertexBufferLayout,_vertexBufferLayoutHash,&inputAssemblyStateCreateInfo,&rasterizationStateCreateInfo,0,&colorBlendStateCreateInfo,_pcomp){
+	//
+}
+
+TextPipeline::~TextPipeline(){
+	//
+}
+
+VkPipelineInputAssemblyStateCreateInfo TextPipeline::inputAssemblyStateCreateInfo = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+	.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+	.primitiveRestartEnable = VK_FALSE
+};
+
+VkPipelineRasterizationStateCreateInfo TextPipeline::rasterizationStateCreateInfo = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+	.depthClampEnable = VK_FALSE,
+	.rasterizerDiscardEnable = VK_FALSE,
+	.polygonMode = VK_POLYGON_MODE_FILL,
+	.cullMode = VK_CULL_MODE_NONE,
+	.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+	.depthBiasEnable = VK_FALSE,
+	.depthBiasConstantFactor = 0.0f,
+	.depthBiasClamp = 0.0f,
+	.depthBiasSlopeFactor = 0.0f,
+	.lineWidth = 1.0f
+};
+
+VkPipelineColorBlendAttachmentState TextPipeline::colorBlendAttachmentState = {
+	.blendEnable = VK_TRUE,
+	//alpha blending
+	.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+	.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+	.colorBlendOp = VK_BLEND_OP_ADD,
+	.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+	.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+	.alphaBlendOp = VK_BLEND_OP_ADD,
+	.colorWriteMask = VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT
+};
+
+VkPipelineColorBlendStateCreateInfo TextPipeline::colorBlendStateCreateInfo = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+	.logicOpEnable = VK_FALSE,
+	.logicOp = VK_LOGIC_OP_COPY,
+	.attachmentCount = 1,
+	.pAttachments = &colorBlendAttachmentState,
+	.blendConstants = {0.0f,0.0f,0.0f,0.0f}
+};
 
 }
 

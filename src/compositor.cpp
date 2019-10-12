@@ -1171,7 +1171,7 @@ void CompositorInterface::ClearBackground(){
 	
 	VkRect2D screenRect;
 	screenRect.offset = {0,0};
-	screenRect.extent = imageExtent;//{imageExtent.width,h};
+	screenRect.extent = imageExtent;
 	AddDamageRegion(&screenRect);
 }
 

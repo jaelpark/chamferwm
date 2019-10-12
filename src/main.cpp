@@ -717,7 +717,6 @@ public:
 	}
 
 	Configuration *pconfig;
-	//Configuration config; //NOTE: doing config{...} in the constructor doesn't work.
 };
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{

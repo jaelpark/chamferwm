@@ -84,6 +84,7 @@ friend class Texture;
 friend class Buffer;
 friend class ShaderModule;
 friend class Pipeline;
+friend class ClientPipeline;
 friend class Text;
 friend class TextEngine;
 friend class Drawable;
@@ -169,13 +170,14 @@ protected:
 
 	//all the resources are preloaded for now
 	std::vector<ShaderModule> shaders;
-	std::vector<Pipeline> pipelines;
+	std::vector<ClientPipeline> pipelines;
 
 	std::vector<ClientFrame *> updateQueue;
-	std::vector<std::pair<VkRect2D, uint>> scissorRegions; //scissoring regions based on client damage.
+	//Scissoring regions based on client damage. Second (uint) is a bitmask for
+	//swap chain images, indicating which image has been updated so far. When
+	//all images have been updated, the region is removed from the list.
+	std::vector<std::pair<VkRect2D, uint>> scissorRegions; 
 	std::vector<VkRectLayerKHR> presentRectLayers;
-	//Second (uint) is a bitmask for swap chain images, indicating which image has been updated so far.
-	//When all images have been updated, the region is removed from the list.
 
 	void ClearBackground();
 

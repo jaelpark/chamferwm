@@ -163,8 +163,8 @@ public:
 
 class Pipeline{
 public:
-	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, size_t, const class CompositorInterface *);
-	~Pipeline();
+	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, size_t, const VkPipelineInputAssemblyStateCreateInfo *, const VkPipelineRasterizationStateCreateInfo *, const VkPipelineDepthStencilStateCreateInfo *, const VkPipelineColorBlendStateCreateInfo *, const class CompositorInterface *);
+	virtual ~Pipeline();
 
 	enum SHADER_MODULE{
 		SHADER_MODULE_VERTEX,
@@ -180,7 +180,25 @@ public:
 	VkPipeline pipeline;
 };
 
-//class PipelineDefaults (or loader, to create info structures from shader reflection)
+class ClientPipeline : public Pipeline{ //, public Desc
+public:
+	ClientPipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, size_t, const class CompositorInterface *);
+	~ClientPipeline();
+	static VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
+	static VkPipelineColorBlendAttachmentState colorBlendAttachmentState;
+	static VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
+	static VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
+};
+
+class TextPipeline : public Pipeline{
+public:
+	TextPipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, size_t, const class CompositorInterface *);
+	~TextPipeline();
+	static VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
+	static VkPipelineColorBlendAttachmentState colorBlendAttachmentState;
+	static VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
+	static VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
+};
 
 }
 
