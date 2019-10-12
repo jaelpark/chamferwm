@@ -749,7 +749,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 				return (uint)r.first == _pvertexShader->inputs[i].semanticMapIndex;
 			});
 			if(m == pvertexBufferLayout->end()){
-				DebugPrintf(stdout,"warning: incompatible semantic %s in %s at location %u.\n",std::get<0>(ShaderModule::semanticMap[_pvertexShader->inputs[i].semanticMapIndex]),_pvertexShader->pname,_pvertexShader->inputs[i].location);
+				DebugPrintf(stdout,"warning: semantic %s in %s at location %u not supported by the input buffer.\n",std::get<0>(ShaderModule::semanticMap[_pvertexShader->inputs[i].semanticMapIndex]),_pvertexShader->pname,_pvertexShader->inputs[i].location);
 				continue;
 			}
 			pvertexInputAttributeDescs[vertexAttributeDescCount].offset = m->second;
@@ -792,13 +792,13 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	for(uint i = 0, stageBit[] = {VK_SHADER_STAGE_VERTEX_BIT,VK_SHADER_STAGE_GEOMETRY_BIT,VK_SHADER_STAGE_FRAGMENT_BIT}; i < SHADER_MODULE_COUNT; ++i){
 		if(!pshaderModule[i]->shaderModule)
 			continue;
+		setCount += pshaderModule[i]->setCount;
+
 		shaderStageCreateInfo[stageCount] = (VkPipelineShaderStageCreateInfo){};
 		shaderStageCreateInfo[stageCount].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		shaderStageCreateInfo[stageCount].stage = (VkShaderStageFlagBits)stageBit[i];
 		shaderStageCreateInfo[stageCount].module = pshaderModule[i]->shaderModule;
 		shaderStageCreateInfo[stageCount].pName = "main";
-
-		setCount += pshaderModule[i]->setCount;
 
 		++stageCount;
 	}
@@ -830,8 +830,6 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizationStateCreateInfo.lineWidth = 1.0f;
 	rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
-	//rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-	//rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
 	rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
 	rasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
@@ -846,7 +844,6 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 
 	VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {};
 	colorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT;
-	//colorBlendAttachmentState.blendEnable = VK_FALSE;
 	colorBlendAttachmentState.blendEnable = VK_TRUE;
 	//premultiplied alpha blending
 	colorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
