@@ -16,10 +16,9 @@
 
 namespace Compositor{
 
-Drawable::Drawable(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
-	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName,pvertexBufferLayout);
+Drawable::Drawable(Pipeline *pPipeline, CompositorInterface *_pcomp) : pcomp(_pcomp), passignedSet(0){
 	if(!AssignPipeline(pPipeline))
-		throw Exception("Failed to assign a pipeline.");
+		throw Exception("Failed to assign a pipeline");
 }
 
 Drawable::~Drawable(){
@@ -27,14 +26,6 @@ Drawable::~Drawable(){
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
 			if(pipelineDescSet.pdescSets[i])
 				pcomp->ReleaseDescSets(pipelineDescSet.p->pshaderModule[i],pipelineDescSet.pdescSets[i]);
-}
-
-void Drawable::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout){
-	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName,0);
-	if(!AssignPipeline(pPipeline))
-		throw Exception("Failed to assign a pipeline.");
-	
-	UpdateDescSets();
 }
 
 bool Drawable::AssignPipeline(const Pipeline *prenderPipeline){
@@ -91,7 +82,7 @@ void Drawable::BindShaderResources(const std::vector<std::pair<ShaderModule::VAR
 	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,passignedSet->p->pushConstantRange.stageFlags,passignedSet->p->pushConstantRange.offset,passignedSet->p->pushConstantRange.size,pushConstantBuffer);
 }
 
-ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : Drawable(pshaderName,0,_pcomp), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0){
+ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : Drawable(_pcomp->LoadPipeline(pshaderName,0),_pcomp), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0){
 	//
 	clock_gettime(CLOCK_MONOTONIC,&creationTime);
 }
@@ -155,6 +146,14 @@ void ClientFrame::AdjustSurface(uint w, uint h){
 		throw Exception("Failed to assign a pipeline.");
 	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
 
+	UpdateDescSets();
+}
+
+void ClientFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
+	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName,0);
+	if(!AssignPipeline(pPipeline))
+		throw Exception("Failed to assign a pipeline.");
+	
 	UpdateDescSets();
 }
 

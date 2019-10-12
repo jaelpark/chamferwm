@@ -20,10 +20,9 @@ namespace Compositor{
 class Drawable{
 friend class CompositorInterface;
 public:
-	Drawable(const char *[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT, uint>> *, class CompositorInterface *);
+	Drawable(Pipeline *, CompositorInterface *);
 	virtual ~Drawable();
 	//
-	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT, uint>> *);
 	bool AssignPipeline(const Pipeline *);
 protected:
 	void BindShaderResources(const std::vector<std::pair<ShaderModule::VARIABLE, const void *>> *, const VkCommandBuffer *);
@@ -62,6 +61,7 @@ public:
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	void CreateSurface(uint, uint, uint);
 	void AdjustSurface(uint, uint);
+	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
 	enum SHADER_FLAG{
 		SHADER_FLAG_FOCUS = 0x1,
 		SHADER_FLAG_FLOATING = 0x2,

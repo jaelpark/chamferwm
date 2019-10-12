@@ -7,7 +7,7 @@
 
 namespace Compositor{
 
-Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], class TextEngine *_ptextEngine) : Drawable(pshaderName,&vertexBufferLayout,_ptextEngine->pcomp), ptextEngine(_ptextEngine){
+Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], class TextEngine *_ptextEngine) : Drawable(_ptextEngine->pcomp->LoadPipeline(pshaderName,&vertexBufferLayout),_ptextEngine->pcomp), ptextEngine(_ptextEngine){
 	//
 	phbBuf = hb_buffer_create();
 	hb_buffer_set_direction(phbBuf,HB_DIRECTION_LTR);

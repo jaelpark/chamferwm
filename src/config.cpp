@@ -191,7 +191,7 @@ void ContainerInterface::UpdateShaders(){
 		const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
 			(*m)->vertexShader.c_str(),(*m)->geometryShader.c_str(),(*m)->fragmentShader.c_str()
 		};
-		pclientFrame->SetShaders(pshaderName,0);
+		pclientFrame->SetShaders(pshaderName);
 
 		m = shaderUpdateQueue.erase(m);
 	}
