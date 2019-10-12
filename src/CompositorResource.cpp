@@ -739,7 +739,7 @@ const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {
 	{"time",4}
 };
 
-Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, size_t _vertexBufferLayoutHash, const VkPipelineInputAssemblyStateCreateInfo *pinputAssemblyStateCreateInfo, const VkPipelineRasterizationStateCreateInfo *prasterizationStateCreateInfo, const VkPipelineDepthStencilStateCreateInfo *pdepthStencilStateCreateInfo, const VkPipelineColorBlendStateCreateInfo *pcolorBlendStateCreateInfo, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp), vertexBufferLayoutHash(_vertexBufferLayoutHash){
+Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const VkPipelineInputAssemblyStateCreateInfo *pinputAssemblyStateCreateInfo, const VkPipelineRasterizationStateCreateInfo *prasterizationStateCreateInfo, const VkPipelineDepthStencilStateCreateInfo *pdepthStencilStateCreateInfo, const VkPipelineColorBlendStateCreateInfo *pcolorBlendStateCreateInfo, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp){
 	VkVertexInputAttributeDescription *pvertexInputAttributeDescs = new VkVertexInputAttributeDescription[_pvertexShader->inputs.size()];
 	uint vertexAttributeDescCount = 0;
 	uint inputStride = 0;
@@ -895,7 +895,7 @@ Pipeline::~Pipeline(){
 	vkDestroyPipelineLayout(pcomp->logicalDev,pipelineLayout,0);
 }
 
-ClientPipeline::ClientPipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, size_t _vertexBufferLayoutHash, const CompositorInterface *_pcomp) : Pipeline(_pvertexShader,_pgeometryShader,_pfragmentShader,pvertexBufferLayout,_vertexBufferLayoutHash,&inputAssemblyStateCreateInfo,&rasterizationStateCreateInfo,0,&colorBlendStateCreateInfo,_pcomp){
+ClientPipeline::ClientPipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const CompositorInterface *_pcomp) : Pipeline(_pvertexShader,_pgeometryShader,_pfragmentShader,pvertexBufferLayout,&inputAssemblyStateCreateInfo,&rasterizationStateCreateInfo,0,&colorBlendStateCreateInfo,_pcomp){
 	//
 }
 
@@ -944,7 +944,7 @@ VkPipelineColorBlendStateCreateInfo ClientPipeline::colorBlendStateCreateInfo = 
 	.blendConstants = {0.0f,0.0f,0.0f,0.0f}
 };
 
-TextPipeline::TextPipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, size_t _vertexBufferLayoutHash, const CompositorInterface *_pcomp) : Pipeline(_pvertexShader,_pgeometryShader,_pfragmentShader,pvertexBufferLayout,_vertexBufferLayoutHash,&inputAssemblyStateCreateInfo,&rasterizationStateCreateInfo,0,&colorBlendStateCreateInfo,_pcomp){
+TextPipeline::TextPipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const CompositorInterface *_pcomp) : Pipeline(_pvertexShader,_pgeometryShader,_pfragmentShader,pvertexBufferLayout,&inputAssemblyStateCreateInfo,&rasterizationStateCreateInfo,0,&colorBlendStateCreateInfo,_pcomp){
 	//
 }
 

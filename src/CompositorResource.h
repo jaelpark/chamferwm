@@ -163,7 +163,7 @@ public:
 
 class Pipeline{
 public:
-	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, size_t, const VkPipelineInputAssemblyStateCreateInfo *, const VkPipelineRasterizationStateCreateInfo *, const VkPipelineDepthStencilStateCreateInfo *, const VkPipelineColorBlendStateCreateInfo *, const class CompositorInterface *);
+	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, const VkPipelineInputAssemblyStateCreateInfo *, const VkPipelineRasterizationStateCreateInfo *, const VkPipelineDepthStencilStateCreateInfo *, const VkPipelineColorBlendStateCreateInfo *, const class CompositorInterface *);
 	virtual ~Pipeline();
 
 	enum SHADER_MODULE{
@@ -173,7 +173,6 @@ public:
 		SHADER_MODULE_COUNT
 	}; //note: code in Pipeline() relies on this order
 	ShaderModule *pshaderModule[SHADER_MODULE_COUNT];
-	size_t vertexBufferLayoutHash;
 	const class CompositorInterface *pcomp;
 	VkPushConstantRange pushConstantRange;
 	VkPipelineLayout pipelineLayout;
@@ -182,7 +181,7 @@ public:
 
 class ClientPipeline : public Pipeline{ //, public Desc
 public:
-	ClientPipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, size_t, const class CompositorInterface *);
+	ClientPipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, const class CompositorInterface *);
 	~ClientPipeline();
 	static VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
 	static VkPipelineColorBlendAttachmentState colorBlendAttachmentState;
@@ -192,7 +191,7 @@ public:
 
 class TextPipeline : public Pipeline{
 public:
-	TextPipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, size_t, const class CompositorInterface *);
+	TextPipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, const class CompositorInterface *);
 	~TextPipeline();
 	static VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
 	static VkPipelineColorBlendAttachmentState colorBlendAttachmentState;

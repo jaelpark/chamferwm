@@ -14,6 +14,7 @@ public:
 	Text(const char *[Pipeline::SHADER_MODULE_COUNT], class TextEngine *);
 	~Text();
 	void Set(const char *, const VkCommandBuffer *); //updates the vertex buffers
+	void Draw(const VkCommandBuffer *);
 	hb_buffer_t *phbBuf;
 	class TextEngine *ptextEngine;
 	class Buffer *pvertexBuffer;

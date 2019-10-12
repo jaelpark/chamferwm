@@ -82,7 +82,7 @@ void Drawable::BindShaderResources(const std::vector<std::pair<ShaderModule::VAR
 	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,passignedSet->p->pushConstantRange.stageFlags,passignedSet->p->pushConstantRange.offset,passignedSet->p->pushConstantRange.size,pushConstantBuffer);
 }
 
-ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : Drawable(_pcomp->LoadPipeline(pshaderName,0),_pcomp), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0){
+ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : Drawable(_pcomp->LoadPipeline<ClientPipeline>(pshaderName,0),_pcomp), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0){
 	//
 	clock_gettime(CLOCK_MONOTONIC,&creationTime);
 }
@@ -150,7 +150,7 @@ void ClientFrame::AdjustSurface(uint w, uint h){
 }
 
 void ClientFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
-	Pipeline *pPipeline = pcomp->LoadPipeline(pshaderName,0);
+	Pipeline *pPipeline = pcomp->LoadPipeline<ClientPipeline>(pshaderName,0);
 	if(!AssignPipeline(pPipeline))
 		throw Exception("Failed to assign a pipeline.");
 	
@@ -688,8 +688,9 @@ void CompositorInterface::DestroyRenderEngine(){
 
 	for(TextureCacheEntry &textureCacheEntry : textureCache)
 		delete textureCacheEntry.ptexture;
-
-	pipelines.clear();
+	
+	for(auto m : pipelines)
+		delete m.second;
 	shaders.clear();
 
 	delete []pcommandBuffers;
@@ -1117,43 +1118,43 @@ void CompositorInterface::Present(){
 	frameTag++;
 }
 
-//TODO: make template<T> to load different pipelines?
-//TODO: LoadPipeline needs information about the vertex buffer layout - VkVertexInputAttributeDescription needs this info
 //-vertex buffer layout is always fixed, since there is no predefined information on what shaders (and thus inputs) will be used on what vertex data
+template<class T>
 Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT,uint>> *pvertexBufferLayout){
-	size_t vertexBufferLayoutHash = pvertexBufferLayout?boost::hash_range(pvertexBufferLayout->begin(),pvertexBufferLayout->end()):0;
-
+	size_t hash = typeid(T).hash_code();
+	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
+		boost::hash_combine(hash,std::string(pshaderName[i]));
+	if(pvertexBufferLayout)
+		boost::hash_range(hash,pvertexBufferLayout->begin(),pvertexBufferLayout->end());
+	
 	auto m = std::find_if(pipelines.begin(),pipelines.end(),[&](auto &r)->bool{
-		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-			if(r.pshaderModule[i] && strcmp(r.pshaderModule[i]->pname,pshaderName[i]) != 0)
-				return false;
-		if(r.vertexBufferLayoutHash != vertexBufferLayoutHash)
-			return false;
-		return true;
+		return r.first == hash;
 	});
-	Pipeline *pPipeline;
 	if(m != pipelines.end())
-		pPipeline = &(*m);
-	else{
-		ShaderModule *pshader[Pipeline::SHADER_MODULE_COUNT];
-		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
-			auto n = std::find_if(shaders.begin(),shaders.end(),[&](auto &r)->bool{
-				return strcmp(r.pname,pshaderName[i]) == 0;
-			});
-			if(n == shaders.end()){
-				snprintf(Exception::buffer,sizeof(Exception::buffer),"Shader not found: %s.",pshaderName[i]);
-				throw Exception();
-			}
-			pshader[i] = &(*n);
+		return (*m).second;
+
+	ShaderModule *pshader[Pipeline::SHADER_MODULE_COUNT];
+	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		auto n = std::find_if(shaders.begin(),shaders.end(),[&](auto &r)->bool{
+			return strcmp(r.pname,pshaderName[i]) == 0;
+		});
+		if(n == shaders.end()){
+			snprintf(Exception::buffer,sizeof(Exception::buffer),"Shader not found: %s.",pshaderName[i]);
+			throw Exception();
 		}
-		pipelines.reserve(pipelines.size());
-		pPipeline = &pipelines.emplace_back(
-			pshader[Pipeline::SHADER_MODULE_VERTEX],
-			pshader[Pipeline::SHADER_MODULE_GEOMETRY],
-			pshader[Pipeline::SHADER_MODULE_FRAGMENT],pvertexBufferLayout,vertexBufferLayoutHash,this);
+		pshader[i] = &(*n);
 	}
+	Pipeline *pPipeline = new T(
+		pshader[Pipeline::SHADER_MODULE_VERTEX],
+		pshader[Pipeline::SHADER_MODULE_GEOMETRY],
+		pshader[Pipeline::SHADER_MODULE_FRAGMENT],pvertexBufferLayout,this);
+	pipelines.push_back(std::pair<size_t, Pipeline *>(hash,pPipeline));
+
 	return pPipeline;
 }
+
+template Pipeline * CompositorInterface::LoadPipeline<ClientPipeline>(const char *[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT,uint>> *);
+template Pipeline * CompositorInterface::LoadPipeline<TextPipeline>(const char *[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT,uint>> *);
 
 void CompositorInterface::ClearBackground(){
 	ClientFrame *pbackground1 = dynamic_cast<ClientFrame *>(pbackground);

@@ -7,7 +7,7 @@
 
 namespace Compositor{
 
-Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], class TextEngine *_ptextEngine) : Drawable(_ptextEngine->pcomp->LoadPipeline(pshaderName,&vertexBufferLayout),_ptextEngine->pcomp), ptextEngine(_ptextEngine){
+Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], class TextEngine *_ptextEngine) : Drawable(_ptextEngine->pcomp->LoadPipeline<TextPipeline>(pshaderName,&vertexBufferLayout),_ptextEngine->pcomp), ptextEngine(_ptextEngine){
 	//
 	phbBuf = hb_buffer_create();
 	hb_buffer_set_direction(phbBuf,HB_DIRECTION_LTR);
@@ -35,6 +35,10 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	pdata[2].pos = glm::vec2(+0.5f,0.5f);
 
 	pvertexBuffer->Unmap(pcommandBuffer);
+}
+
+void Text::Draw(const VkCommandBuffer *pcommandBuffer){
+	//
 }
 
 std::vector<std::pair<ShaderModule::INPUT, uint>> Text::vertexBufferLayout = {

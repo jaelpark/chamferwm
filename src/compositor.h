@@ -166,11 +166,11 @@ protected:
 	uint currentFrame;
 	uint imageIndex;
 
+	template<class T>
 	Pipeline * LoadPipeline(const char *[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT,uint>> *);
 
-	//all the resources are preloaded for now
 	std::vector<ShaderModule> shaders;
-	std::vector<ClientPipeline> pipelines;
+	std::vector<std::pair<size_t, Pipeline *>> pipelines; //hash, pipeline
 
 	std::vector<ClientFrame *> updateQueue;
 	//Scissoring regions based on client damage. Second (uint) is a bitmask for
