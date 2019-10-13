@@ -74,7 +74,7 @@ float ChamferMap(float2 p, float2 b, float r){
 	return length(max(d,0.0f))-r+min(max(d.x,d.y),0.0f);
 }
 
-float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD0) : SV_Target{
+float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 	float2 aspect = float2(1.0f,screen.x/screen.y);
 
 	float2 borderScalingScr = borderScaling*screen*aspect;

@@ -540,10 +540,22 @@ Buffer::Buffer(uint _size, VkBufferUsageFlagBits usage, const CompositorInterfac
 	stagingMemorySize = memoryRequirements.size;
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferCreateInfo.size = size;
-	bufferCreateInfo.usage = usage;//VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT|usage;//VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	if(vkCreateBuffer(pcomp->logicalDev,&bufferCreateInfo,0,&buffer) != VK_SUCCESS)
 		throw Exception("Failed to create a buffer.");
+
+	vkGetBufferMemoryRequirements(pcomp->logicalDev,buffer,&memoryRequirements);
+	
+	memoryAllocateInfo.allocationSize = memoryRequirements.size;
+	for(memoryAllocateInfo.memoryTypeIndex = 0; memoryAllocateInfo.memoryTypeIndex < physicalDeviceMemoryProps.memoryTypeCount; memoryAllocateInfo.memoryTypeIndex++){
+		if(memoryRequirements.memoryTypeBits & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+			break;
+	}
+
+	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&deviceMemory) != VK_SUCCESS)
+		throw Exception("Failed to allocate image memory.");
+	vkBindBufferMemory(pcomp->logicalDev,buffer,deviceMemory,0);
 }
 
 Buffer::~Buffer(){
@@ -563,7 +575,7 @@ const void * Buffer::Map() const{
 
 void Buffer::Unmap(const VkCommandBuffer *pcommandBuffer){
 	vkUnmapMemory(pcomp->logicalDev,stagingMemory);
-
+	
 	VkBufferMemoryBarrier bufferMemoryBarrier = {};
 	bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 	bufferMemoryBarrier.buffer = buffer;
@@ -584,7 +596,8 @@ void Buffer::Unmap(const VkCommandBuffer *pcommandBuffer){
 
 	bufferMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	bufferMemoryBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;//VK_ACCESS_SHADER_READ_BIT;
-	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,0,
+	//vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,0,
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,0,
 		0,0,1,&bufferMemoryBarrier,0,0);
 }
 
@@ -620,7 +633,7 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 				&& std::get<1>(r) == (VkFormat)preflectInputVars[i]->format;
 		});
 		if(m == semanticMap.end()){
-			if(preflectInputVars[i]->location != ~0u)
+			if((VkShaderStageFlagBits)reflectShaderModule.shader_stage == VK_SHADER_STAGE_VERTEX_BIT && preflectInputVars[i]->location != ~0u)
 				DebugPrintf(stdout,"warning: unrecognized semantic %s in %s at location %u.\n",preflectInputVars[i]->semantic,_pname,preflectInputVars[i]->location);
 			continue;
 		}
@@ -757,12 +770,11 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 			pvertexInputAttributeDescs[vertexAttributeDescCount].binding = _pvertexShader->inputs[i].binding;
 			pvertexInputAttributeDescs[vertexAttributeDescCount].format = std::get<1>(ShaderModule::semanticMap[_pvertexShader->inputs[i].semanticMapIndex]);
 			pvertexInputAttributeDescs[vertexAttributeDescCount].offset = m->second;
+			
+			inputStride += std::get<2>(ShaderModule::semanticMap[_pvertexShader->inputs[i].semanticMapIndex]);
 
 			++vertexAttributeDescCount;
 		}
-
-		for(auto &r : *pvertexBufferLayout)
-			inputStride += r.second;
 	}
 
 	//per-vertex data only, instancing not used
@@ -783,7 +795,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	uint stageCount = 0;
 	uint setCount = 0;
 	for(uint i = 0, stageBit[] = {VK_SHADER_STAGE_VERTEX_BIT,VK_SHADER_STAGE_GEOMETRY_BIT,VK_SHADER_STAGE_FRAGMENT_BIT}; i < SHADER_MODULE_COUNT; ++i){
-		if(!pshaderModule[i]->shaderModule)
+		if(!pshaderModule[i])
 			continue;
 		setCount += pshaderModule[i]->setCount;
 
@@ -846,7 +858,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	layoutCreateInfo.setLayoutCount = setCount;
 	layoutCreateInfo.pSetLayouts = pcombinedSets;
-	layoutCreateInfo.pushConstantRangeCount = 1;
+	layoutCreateInfo.pushConstantRangeCount = (bool)(pushConstantRange.stageFlags != 0);
 	layoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 	if(vkCreatePipelineLayout(pcomp->logicalDev,&layoutCreateInfo,0,&pipelineLayout) != VK_SUCCESS)
 		throw Exception("Failed to create a pipeline layout.");
@@ -973,7 +985,8 @@ VkPipelineRasterizationStateCreateInfo TextPipeline::rasterizationStateCreateInf
 };
 
 VkPipelineColorBlendAttachmentState TextPipeline::colorBlendAttachmentState = {
-	.blendEnable = VK_TRUE,
+	//.blendEnable = VK_TRUE,
+	.blendEnable = VK_FALSE,
 	//alpha blending
 	.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
 	.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,

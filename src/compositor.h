@@ -183,6 +183,8 @@ protected:
 
 	ColorFrame *pcolorBackground;
 	ColorFrame *pbackground;
+	class TextEngine *ptextEngine;
+	class Text *ptestText; //testing
 
 	VkSampler pointSampler;
 

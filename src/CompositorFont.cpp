@@ -26,19 +26,30 @@ Text::~Text(){
 void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	hb_buffer_reset(phbBuf);
 	hb_buffer_add_utf8(phbBuf,ptext,-1,0,-1);
+	hb_buffer_guess_segment_properties(phbBuf);
 	hb_shape(ptextEngine->phbFont,phbBuf,0,0);
 
 	Vertex *pdata = (Vertex*)pvertexBuffer->Map();
 
 	pdata[0].pos = glm::vec2(0.0f,-0.5f);
-	pdata[1].pos = glm::vec2(-0.5f,0.5f);
-	pdata[2].pos = glm::vec2(+0.5f,0.5f);
+	pdata[1].pos = glm::vec2(0.5f,0.5f);
+	pdata[2].pos = glm::vec2(-0.5f,0.5f);
 
 	pvertexBuffer->Unmap(pcommandBuffer);
 }
 
 void Text::Draw(const VkCommandBuffer *pcommandBuffer){
 	//
+	std::vector<std::pair<ShaderModule::VARIABLE, const void *>> varAddrs = {
+		//{ShaderModule::VARIABLE_FLAGS,&flags},
+	};
+	//BindShaderResources(&varAddrs,pcommandBuffer);
+
+	VkDeviceSize offset = 0;
+	vkCmdBindVertexBuffers(*pcommandBuffer,0,1,&pvertexBuffer->buffer,&offset);
+	vkCmdDraw(*pcommandBuffer,3,1,0,0);
+
+	passignedSet->fenceTag = pcomp->frameTag;
 }
 
 std::vector<std::pair<ShaderModule::INPUT, uint>> Text::vertexBufferLayout = {

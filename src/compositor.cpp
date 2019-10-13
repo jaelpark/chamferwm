@@ -3,6 +3,7 @@
 #include "backend.h"
 #include "CompositorResource.h"
 #include "compositor.h"
+#include "CompositorFont.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -24,7 +25,7 @@ Drawable::Drawable(Pipeline *pPipeline, CompositorInterface *_pcomp) : pcomp(_pc
 Drawable::~Drawable(){
 	for(PipelineDescriptorSet &pipelineDescSet : descSets)
 		for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-			if(pipelineDescSet.pdescSets[i])
+			if(pipelineDescSet.p->pshaderModule[i] && pipelineDescSet.pdescSets[i])
 				pcomp->ReleaseDescSets(pipelineDescSet.p->pshaderModule[i],pipelineDescSet.pdescSets[i]);
 }
 
@@ -686,6 +687,9 @@ void CompositorInterface::InitializeRenderEngine(){
 void CompositorInterface::DestroyRenderEngine(){
 	DebugPrintf(stdout,"Compositor cleanup\n");
 
+	//delete ptestText;
+	//delete ptextEngine;
+
 	for(TextureCacheEntry &textureCacheEntry : textureCache)
 		delete textureCacheEntry.ptexture;
 	
@@ -967,6 +971,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 	updateQueue.clear();
 
+	//ptestText->Set("afafwasdaw",&pcopyCommandBuffers[currentFrame]);
+
 	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to end command buffer recording.");
 
@@ -1020,6 +1026,16 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		pbackground->Draw(screenRect,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
 
 	}
+
+	// -------------------------------- test
+	/*VkRect2D scissor;
+	scissor.offset = {0,0};
+	scissor.extent = imageExtent;
+	vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
+
+	vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,ptestText->passignedSet->p->pipeline);
+	ptestText->Draw(&pcommandBuffers[currentFrame]);*/
+	// -------------------------------- test
 
 	//for(RenderObject &renderObject : renderQueue){
 	for(uint i = 0; i < renderQueue.size(); ++i){
@@ -1119,11 +1135,13 @@ void CompositorInterface::Present(){
 }
 
 //-vertex buffer layout is always fixed, since there is no predefined information on what shaders (and thus inputs) will be used on what vertex data
+//TODO: take out 'new Pipeline' from below, move it outside - no need to template this
 template<class T>
 Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT,uint>> *pvertexBufferLayout){
 	size_t hash = typeid(T).hash_code();
 	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i)
-		boost::hash_combine(hash,std::string(pshaderName[i]));
+		if(pshaderName[i])
+			boost::hash_combine(hash,std::string(pshaderName[i]));
 	if(pvertexBufferLayout)
 		boost::hash_range(hash,pvertexBufferLayout->begin(),pvertexBufferLayout->end());
 	
@@ -1133,8 +1151,10 @@ Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::S
 	if(m != pipelines.end())
 		return (*m).second;
 
-	ShaderModule *pshader[Pipeline::SHADER_MODULE_COUNT];
+	ShaderModule *pshader[Pipeline::SHADER_MODULE_COUNT] = {};
 	for(uint i = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
+		if(!pshaderName[i])
+			continue;
 		auto n = std::find_if(shaders.begin(),shaders.end(),[&](auto &r)->bool{
 			return strcmp(r.pname,pshaderName[i]) == 0;
 		});
@@ -1173,6 +1193,14 @@ void CompositorInterface::ClearBackground(){
 	screenRect.offset = {0,0};
 	screenRect.extent = imageExtent;
 	AddDamageRegion(&screenRect);
+
+	//------------------ testing
+	/*ptextEngine = new TextEngine(this);
+	static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
+		"text_vertex.spv",0,"text_fragment.spv"
+	};
+	ptestText = new Text(pshaderName,ptextEngine);*/
+	//------------------ testing
 }
 
 Texture * CompositorInterface::CreateTexture(uint w, uint h, uint flags){

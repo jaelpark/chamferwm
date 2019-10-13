@@ -74,6 +74,9 @@ custom_target('default_vertex',output:'default_vertex.spv',input:obj,command:inv
 obj = gen_vertex.process(['shaders/frame.hlsl'])
 custom_target('frame_vertex',output:'frame_vertex.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
 
+obj = gen_vertex.process(['shaders/text.hlsl'])
+custom_target('text_vertex',output:'text_vertex.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
+
 obj = gen_geometry.process(['shaders/default.hlsl'])
 custom_target('default_geometry',output:'default_geometry.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
 
@@ -85,6 +88,9 @@ custom_target('default_fragment',output:'default_fragment.spv',input:obj,command
 
 obj = gen_fragment.process(['shaders/frame.hlsl'])
 custom_target('frame_fragment',output:'frame_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
+
+obj = gen_fragment.process(['shaders/text.hlsl'])
+custom_target('text_fragment',output:'text_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
 
 obj = gen_fragment.process(['shaders/solid.hlsl'])
 custom_target('solid_fragment',output:'solid_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
