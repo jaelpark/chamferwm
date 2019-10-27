@@ -740,7 +740,8 @@ ShaderModule::~ShaderModule(){
 
 const std::vector<std::tuple<const char *, VkFormat, uint>> ShaderModule::semanticMap = {
 	{"POSITION",VK_FORMAT_R32G32_SFLOAT,8},
-	{"POSITION",VK_FORMAT_R32G32_UINT,8}
+	{"POSITION",VK_FORMAT_R32G32_UINT,8},
+	{"TEXCOORD",VK_FORMAT_R32G32_SFLOAT,8} //R16G16?
 };
 
 const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {

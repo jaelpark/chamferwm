@@ -1,10 +1,9 @@
 #ifndef COMPOSITOR_FONT_H
 #define COMPOSITOR_FONT_H
 
-//#include <ft2build.h>
-//#include FT_FREETYPE_H
 #include <hb.h>
 #include <hb-ft.h>
+//#include <freetype/ftcache.h>
 #include <vulkan/vulkan.h>
 
 namespace Compositor{
@@ -29,9 +28,20 @@ friend class Text;
 public:
 	TextEngine(class CompositorInterface *);
 	~TextEngine();
-
+	struct Glyph{
+		uint w;
+		uint h;
+		uint pitch;
+		glm::vec2 offset;
+		unsigned char *pbuffer;
+	};
+	Glyph * LoadGlyph(uint);
+private:
+	//static FT_Error FaceRequester(FTC_FaceID, FT_Library, FT_Pointer, FT_Face *);
 	class CompositorInterface *pcomp;
+	std::vector<std::pair<uint, Glyph>> glyphMap;
 	FT_Library library;
+	//FTC_Manager fontCacheManager;
 	FT_Face fontFace;
 	hb_font_t *phbFont;
 };

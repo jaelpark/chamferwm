@@ -1017,6 +1017,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	renderPassBeginInfo.pClearValues = 0;//&clearValue;
 	vkCmdBeginRenderPass(pcommandBuffers[currentFrame],&renderPassBeginInfo,VK_SUBPASS_CONTENTS_INLINE);
 
+	//clear manually since some parts of the buffer we want to retain based on damage
 	if(pbackground){
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,pbackground->passignedSet->p->pipeline);
 
@@ -1199,7 +1200,8 @@ void CompositorInterface::ClearBackground(){
 	static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
 		"text_vertex.spv",0,"text_fragment.spv"
 	};
-	ptestText = new Text(pshaderName,ptextEngine);*/
+	ptestText = new Text(pshaderName,ptextEngine);
+	ptestText->Set("hei",0);*/
 	//------------------ testing
 }
 
