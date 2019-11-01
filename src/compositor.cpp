@@ -1169,7 +1169,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pshaderName,_pcomp){
+X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(rect.w,rect.h,_pshaderName,_pcomp), pchpixels(0){
 	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 
 	windowPixmap = xcb_generate_id(pbackend->pcon);
@@ -1184,6 +1184,10 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 }
 
 X11ClientFrame::~X11ClientFrame(){
+	if(pchpixels){
+		xcb_shm_detach(pbackend->pcon,segment);
+		shmdt(pchpixels);
+	}
 	xcb_damage_destroy(pbackend->pcon,damage);
 	//
 	xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
@@ -1209,32 +1213,32 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 
 	/*struct timespec t1;
 	clock_gettime(CLOCK_MONOTONIC,&t1);*/
-
-	for(VkRect2D &rect1 : damageRegions){
-		sint shmid = shmget(IPC_PRIVATE,rect1.extent.width*rect1.extent.height*4,IPC_CREAT|0777);
+	if(!pchpixels){
+		uint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
 		if(shmid == -1){
 			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
 			return;
 		}
-		
+
 		xcb_shm_attach(pbackend->pcon,segment,shmid,0);
+
+		pchpixels = (unsigned char*)shmat(shmid,0,0);
+		shmctl(shmid,IPC_RMID,0);
+	}
+
+	for(VkRect2D &rect1 : damageRegions){
 		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
-		xcb_shm_detach(pbackend->pcon,segment);
 
 		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
 		xcb_flush(pbackend->pcon);
 
 		if(!pimageReply){
-			shmctl(shmid,IPC_RMID,0);
 			DebugPrintf(stderr,"No shared memory.\n");
 			return;
 		}
 
 		uint depth = pimageReply->depth;
 		free(pimageReply);
-
-		unsigned char *pchpixels = (unsigned char*)shmat(shmid,0,0);
-		shmctl(shmid,IPC_RMID,0);
 
 		for(uint y = 0; y < rect1.extent.height; ++y){
 			uint offsetDst = 4*(rect.w*(y+rect1.offset.y)+rect1.offset.x);
@@ -1246,14 +1250,11 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 					pdata[offsetDst+4*i+3] = 255;
 		}
 
-		shmdt(pchpixels);
-
 		VkRect2D screenRect;
 		screenRect.offset = {(sint)position.x+rect1.offset.x,(sint)position.y+rect1.offset.y};
 		screenRect.extent = rect1.extent;
 		pcomp->AddDamageRegion(&screenRect);
 	}
-
 	ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
 
 	/*struct timespec t3;
@@ -1269,6 +1270,12 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 
 void X11ClientFrame::AdjustSurface1(){
 	if(oldRect.w != rect.w || oldRect.h != rect.h){
+		if(pchpixels){
+			xcb_shm_detach(pbackend->pcon,segment);
+			shmdt(pchpixels);
+			pchpixels = 0;
+		}
+
 		xcb_free_pixmap(pbackend->pcon,windowPixmap);
 		xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 
@@ -1279,7 +1286,7 @@ void X11ClientFrame::AdjustSurface1(){
 		pcomp->AddDamageRegion(this);
 }
 
-X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_w,_h,_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
+X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_w,_h,_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap), pchpixels(0){
 	//
 	segment = xcb_generate_id(pcomp11->pbackend->pcon);
 
@@ -1290,6 +1297,10 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 }
 
 X11Background::~X11Background(){
+	if(pchpixels){
+		xcb_shm_detach(pcomp11->pbackend->pcon,segment);
+		shmdt(pchpixels);
+	}
 	//
 	VkRect2D screenRect;
 	screenRect.offset = {0,0};
@@ -1310,21 +1321,25 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 
 	unsigned char *pchpixels = xcb_get_image_data(pimageReply);*/
 
-	sint shmid = shmget(IPC_PRIVATE,w*h*4,IPC_CREAT|0777);
-	if(shmid == -1){
-		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
-		return;
+	if(!pchpixels){
+		sint shmid = shmget(IPC_PRIVATE,w*h*4,IPC_CREAT|0777);
+		if(shmid == -1){
+			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
+			return;
+		}
+		
+		xcb_shm_attach(pcomp11->pbackend->pcon,segment,shmid,0);
+
+		pchpixels = (unsigned char*)shmat(shmid,0,0);
+		shmctl(shmid,IPC_RMID,0);
 	}
-	
-	xcb_shm_attach(pcomp11->pbackend->pcon,segment,shmid,0);
+
 	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pcomp11->pbackend->pcon,pixmap,0,0,w,h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
-	xcb_shm_detach(pcomp11->pbackend->pcon,segment);
 
 	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
 	xcb_flush(pcomp11->pbackend->pcon);
 
 	if(!pimageReply){
-		shmctl(shmid,IPC_RMID,0);
 		DebugPrintf(stderr,"No shared memory.\n");
 		return;
 	}
@@ -1332,10 +1347,7 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	uint depth = pimageReply->depth;
 	free(pimageReply);
 
-	unsigned char *pchpixels = (unsigned char*)shmat(shmid,0,0);
-	shmctl(shmid,IPC_RMID,0);
-
-	unsigned char *pdata = (unsigned char *)ptexture->Map();
+	unsigned char *pdata = (unsigned char*)ptexture->Map();
 	memcpy(pdata,pchpixels,w*h*4);
 	if(depth != 32)
 		for(uint i = 0; i < w*h; ++i)
@@ -1344,8 +1356,6 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	
 	VkRect2D rect1 = {0,0,w,h};
 	ptexture->Unmap(pcommandBuffer,&rect1,1);
-
-	shmdt(pchpixels);
 
 	VkRect2D screenRect;
 	screenRect.offset = {0,0};

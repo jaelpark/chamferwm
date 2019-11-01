@@ -216,6 +216,7 @@ public:
 	xcb_shm_seg_t segment;
 	xcb_damage_damage_t damage;
 	std::vector<VkRect2D> damageRegions;
+	unsigned char *pchpixels;
 };
 
 class X11Background : public ClientFrame{
@@ -228,6 +229,7 @@ public:
 	xcb_pixmap_t pixmap;
 	xcb_shm_seg_t segment;
 	uint w, h;
+	unsigned char *pchpixels;
 };
 
 //Default compositor assumes XCB for its surface
