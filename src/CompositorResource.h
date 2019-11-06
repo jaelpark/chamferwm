@@ -27,7 +27,7 @@ public:
 	uint w, h;
 	uint formatIndex;
 
-	std::vector<VkBufferImageCopy> bufferImageCopyBuffer; //to avoid dynamic allocations each time texture is updated in multiple regions
+	std::vector<VkBufferImageCopy> bufferImageCopyBuffer; //to avoid repeated dynamic allocations each time texture is updated in multiple regions
 
 	static const std::vector<std::pair<VkFormat, uint>> formatSizeMap;
 };
