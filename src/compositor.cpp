@@ -1179,7 +1179,7 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
 
 	//attach to shared memory
-	uint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
+	sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
 	if(shmid == -1){
 		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
 		return;
@@ -1262,7 +1262,7 @@ void X11ClientFrame::AdjustSurface1(){
 		shmdt(pchpixels);
 
 		//attach
-		uint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
+		sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
 		if(shmid == -1){
 			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
 			return;
