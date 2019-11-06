@@ -1317,14 +1317,14 @@ void X11ClientFrame::AdjustSurface1(){
 		xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 
 		AdjustSurface(rect.w,rect.h);
+
+		ptexture->Detach();
+		ptexture->Attach(windowPixmap);
+
 		pcomp->AddDamageRegion(this);
 	}else
 	if(oldRect.x != rect.x || oldRect.y != rect.y)
 		pcomp->AddDamageRegion(this);
-
-	ptexture->Detach();
-
-	ptexture->Attach(windowPixmap);
 }
 
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_w,_h,_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
