@@ -182,7 +182,8 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkLayerProperties *playerProps = new VkLayerProperties[layerCount];
 	vkEnumerateInstanceLayerProperties(&layerCount,playerProps);
 
-	const char *players[] = {"VK_LAYER_LUNARG_standard_validation"};
+	//const char *players[] = {"VK_LAYER_LUNARG_standard_validation"};
+	const char *players[] = {"VK_LAYER_KHRONOS_validation"};
 	DebugPrintf(stdout,"Enumerating required layers\n");
 	uint layersFound = 0;
 	for(uint i = 0; i < layerCount; ++i)
@@ -225,6 +226,19 @@ void CompositorInterface::InitializeRenderEngine(){
 	appInfo.engineVersion = VK_MAKE_VERSION(0,0,1);
 	appInfo.apiVersion = VK_API_VERSION_1_0;
 
+	VkDebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfo = {};
+	debugUtilsMessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+	debugUtilsMessengerCreateInfo.messageSeverity
+		 = VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+		|VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+		|VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+		|VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+	debugUtilsMessengerCreateInfo.messageType
+		= VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+		|VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+		|VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+	debugUtilsMessengerCreateInfo.pfnUserCallback = ValidationLayerDebugCallback2;
+
 	VkInstanceCreateInfo instanceCreateInfo = {};
 	instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	instanceCreateInfo.pApplicationInfo = &appInfo;
@@ -239,6 +253,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	}
 	instanceCreateInfo.enabledExtensionCount = sizeof(pextensions)/sizeof(pextensions[0]);
 	instanceCreateInfo.ppEnabledExtensionNames = pextensions;
+	instanceCreateInfo.pNext = &debugUtilsMessengerCreateInfo;
 	if(vkCreateInstance(&instanceCreateInfo,0,&instance) != VK_SUCCESS)
 		throw Exception("Failed to create Vulkan instance.");
 	
@@ -1166,6 +1181,11 @@ void CompositorInterface::ReleaseDescSets(const ShaderModule *pshaderModule, VkD
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){
 	DebugPrintf(stderr,"validation layer: %s\n",pmsg);
+	return VK_FALSE;
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback2(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pdata, void *puserData){
+	DebugPrintf(stderr,"validation layer2: %s\n",pdata->pMessage);
 	return VK_FALSE;
 }
 

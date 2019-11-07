@@ -204,6 +204,7 @@ public:
 protected:
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char *, const char *, void *);
+	static VKAPI_ATTR VkBool32 VKAPI_CALL ValidationLayerDebugCallback2(VkDebugUtilsMessageSeverityFlagBitsEXT, VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT *, void *);
 };
 
 class X11ClientFrame : public Backend::X11Client, public ClientFrame{
