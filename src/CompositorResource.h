@@ -63,7 +63,23 @@ public:
 	const class X11Compositor *pcomp11;
 };
 
-class Texture : public TextureStaged, public TexturePixmap{
+class TextureSHM : virtual public TextureBase{
+public:
+	TextureSHM(uint, uint, const class CompositorInterface *);
+	virtual ~TextureSHM();
+	void Attach(unsigned char *);
+	void Detach();
+	void Update(const VkCommandBuffer *, const VkRect2D *, uint);
+
+	VkBuffer transferBuffer;
+	VkDeviceMemory transferMemory;
+	//VkImageLayout transferImageLayout;
+
+	std::vector<VkBufferImageCopy> bufferImageCopyBuffer;
+};
+
+//class Texture : public TextureStaged, public TexturePixmap{
+class Texture : public TextureStaged, public TextureSHM{
 public:
 	Texture(uint, uint, const class CompositorInterface *);
 	~Texture();

@@ -86,7 +86,7 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	time(&rt);
 	const struct tm *pti = localtime(&rt);
 
-	pf = fopen("/tmp/log1","a+");
+	//pf = fopen("/tmp/log1","a+");
 	char tbuf[256];
 	strftime(tbuf,sizeof(tbuf),"[chamferwm %F %T]",pti);
 	fprintf(pf,"%s ",tbuf);
@@ -96,7 +96,7 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	if(pf == stderr)
 		fprintf(pf,"Error: ");
 	vfprintf(pf,pfmt,args);
-	fclose(pf);
+	//fclose(pf);
 	va_end(args);
 }
 

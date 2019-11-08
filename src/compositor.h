@@ -67,6 +67,7 @@ class CompositorInterface{
 friend class TextureBase;
 friend class TextureStaged;
 friend class TexturePixmap;
+friend class TextureSHM;
 friend class Texture;
 friend class ShaderModule;
 friend class Pipeline;

@@ -367,7 +367,143 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D
 	transferImageLayout = transferImageMemoryBarrier.newLayout;
 }
 
-Texture::Texture(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TexturePixmap(_w,_h,_pcomp){
+TextureSHM::TextureSHM(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp){
+	//
+}
+
+TextureSHM::~TextureSHM(){
+	//
+}
+
+void TextureSHM::Attach(unsigned char *pchpixels){
+	/*VkPhysicalDeviceExternalBufferInfo physicalDeviceExternalBufferInfo = {};
+	physicalDeviceExternalBufferInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
+	physicalDeviceExternalBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	physicalDeviceExternalBufferInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
+	VkExternalBufferProperties externalBufferProps;
+	externalBufferProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
+	vkGetPhysicalDeviceExternalBufferProperties(pcomp->physicalDev,&physicalDeviceExternalBufferInfo,&externalBufferProps);
+	if(!(externalBufferProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT))
+		printf("!!!!!! shm import unsupported!\n");*/
+	
+	VkExternalMemoryBufferCreateInfo externalMemoryBufferCreateInfo = {};
+	externalMemoryBufferCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
+	externalMemoryBufferCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
+
+	VkBufferCreateInfo bufferCreateInfo = {};
+	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferCreateInfo.size = formatSizeMap[formatIndex].second*w*h;
+	bufferCreateInfo.size = (bufferCreateInfo.size-1)+4096-(bufferCreateInfo.size-1)%4096;
+	bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	bufferCreateInfo.pNext = &externalMemoryBufferCreateInfo;
+	if(vkCreateBuffer(pcomp->logicalDev,&bufferCreateInfo,0,&transferBuffer) != VK_SUCCESS)
+		throw Exception("Failed to create a transfer buffer.");
+
+	VkMemoryHostPointerPropertiesEXT memoryHostPointerProps;
+	memoryHostPointerProps.sType = VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT;
+	if(((PFN_vkGetMemoryHostPointerPropertiesEXT)vkGetInstanceProcAddr(pcomp->instance,"vkGetMemoryHostPointerPropertiesEXT"))(pcomp->logicalDev,VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,pchpixels,&memoryHostPointerProps) != VK_SUCCESS)
+		throw Exception("Failed to get memory host pointer properties.");
+	
+	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProps;
+	vkGetPhysicalDeviceMemoryProperties(pcomp->physicalDev,&physicalDeviceMemoryProps);
+
+	VkPhysicalDeviceExternalMemoryHostPropertiesEXT physicalDeviceExternalMemoryHostProps = {};
+	physicalDeviceExternalMemoryHostProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT;
+	
+	VkPhysicalDeviceProperties2 devProps;
+	devProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+	devProps.pNext = &physicalDeviceExternalMemoryHostProps;
+	vkGetPhysicalDeviceProperties2(pcomp->physicalDev,&devProps);
+
+	VkMemoryRequirements memoryRequirements;
+	vkGetBufferMemoryRequirements(pcomp->logicalDev,transferBuffer,&memoryRequirements);
+
+	printf("minImportedHostPointerAlignment: %ld, %ld\n",physicalDeviceExternalMemoryHostProps.minImportedHostPointerAlignment,memoryRequirements.size%physicalDeviceExternalMemoryHostProps.minImportedHostPointerAlignment); //TODO: evaluate on startup
+	
+	VkMemoryDedicatedAllocateInfo memoryDedicatedAllocateInfo = {};
+	memoryDedicatedAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
+	memoryDedicatedAllocateInfo.buffer = transferBuffer;
+
+	VkImportMemoryHostPointerInfoEXT importMemoryHostPointerInfo = {};
+	importMemoryHostPointerInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT;
+	importMemoryHostPointerInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
+	importMemoryHostPointerInfo.pHostPointer = pchpixels;
+	importMemoryHostPointerInfo.pNext = &memoryDedicatedAllocateInfo; //not necessary?
+
+	VkMemoryAllocateInfo memoryAllocateInfo = {};
+	memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memoryAllocateInfo.allocationSize = memoryRequirements.size;
+	memoryAllocateInfo.pNext = &importMemoryHostPointerInfo;
+	for(memoryAllocateInfo.memoryTypeIndex = 0;; memoryAllocateInfo.memoryTypeIndex++){
+		//if(memoryHostPointerProps.memoryTypeBits & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+		if((memoryRequirements.memoryTypeBits & memoryHostPointerProps.memoryTypeBits) & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+			break;
+	}
+	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&transferMemory) != VK_SUCCESS)
+		throw Exception("Failed to allocate transfer buffer memory.");
+	if(vkBindBufferMemory(pcomp->logicalDev,transferBuffer,transferMemory,0) != VK_SUCCESS)
+		throw Exception("Failed to bind staging buffer memory.");
+}
+
+void TextureSHM::Detach(){
+	//
+	vkFreeMemory(pcomp->logicalDev,transferMemory,0);
+	//vkDestroyImage(pcomp->logicalDev,transferImage,0);
+	vkDestroyBuffer(pcomp->logicalDev,transferBuffer,0);
+}
+
+void TextureSHM::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prects, uint rectCount){
+	//
+	VkImageSubresourceRange imageSubresourceRange = {};
+	imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageSubresourceRange.baseMipLevel = 0;
+	imageSubresourceRange.levelCount = 1;
+	imageSubresourceRange.baseArrayLayer = 0;
+	imageSubresourceRange.layerCount = 1;
+
+	//create in host stage (map), use in transfer stage
+	VkImageMemoryBarrier imageMemoryBarrier = {};
+	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageMemoryBarrier.image = image;
+	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
+	imageMemoryBarrier.srcAccessMask = 0;
+	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
+		0,0,0,0,1,&imageMemoryBarrier);
+
+	//transfer "stage"
+	bufferImageCopyBuffer.reserve(rectCount);
+	for(uint i = 0; i < rectCount; ++i){
+		bufferImageCopyBuffer[i].imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		bufferImageCopyBuffer[i].imageSubresource.mipLevel = 0;
+		bufferImageCopyBuffer[i].imageSubresource.baseArrayLayer = 0;
+		bufferImageCopyBuffer[i].imageSubresource.layerCount = 1;
+		bufferImageCopyBuffer[i].imageExtent.width = prects[i].extent.width;//w/4; //w
+		bufferImageCopyBuffer[i].imageExtent.height = prects[i].extent.height;//h
+		bufferImageCopyBuffer[i].imageExtent.depth = 1;
+		bufferImageCopyBuffer[i].imageOffset = (VkOffset3D){prects[i].offset.x,prects[i].offset.y,0};//(VkOffset3D){w/4,0,0}; //x,y
+		bufferImageCopyBuffer[i].bufferOffset = (w*prects[i].offset.y+prects[i].offset.x)*formatSizeMap[formatIndex].second;//w/4*4; //(w*y+x)*format
+		bufferImageCopyBuffer[i].bufferRowLength = w;
+		bufferImageCopyBuffer[i].bufferImageHeight = h;
+	}
+	vkCmdCopyBufferToImage(*pcommandBuffer,transferBuffer,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,rectCount,bufferImageCopyBuffer.data());
+
+	//create in transfer stage, use in fragment shader stage
+	imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,0,
+		0,0,0,0,1,&imageMemoryBarrier);
+	
+	imageLayout = imageMemoryBarrier.newLayout;
+}
+
+//Texture::Texture(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TexturePixmap(_w,_h,_pcomp){
+Texture::Texture(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureSHM(_w,_h,_pcomp){
 	//
 }
 

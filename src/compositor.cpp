@@ -383,7 +383,9 @@ void CompositorInterface::InitializeRenderEngine(){
 	const char *pdevExtensions[] = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
+		VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME, //needed?
 		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
+		VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
 		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
 		VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME
 		//VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
@@ -402,7 +404,6 @@ void CompositorInterface::InitializeRenderEngine(){
 			}
 	if(devExtFound < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]))
 		throw Exception("Could not find all required device extensions.");
-	//
 
 	VkDeviceCreateInfo devCreateInfo = {};
 	devCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -1195,12 +1196,12 @@ void CompositorInterface::ReleaseDescSets(const ShaderModule *pshaderModule, VkD
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char *playerPrefix, const char *pmsg, void *puserData){
-	DebugPrintf(stderr,"validation layer: %s\n",pmsg);
+	DebugPrintf(stdout,"validation layer: %s\n",pmsg);
 	return VK_FALSE;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback2(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pdata, void *puserData){
-	DebugPrintf(stderr,"validation layer2: %s\n",pdata->pMessage);
+	DebugPrintf(stdout,"validation layer2: %s\n",pdata->pMessage);
 	return VK_FALSE;
 }
 
@@ -1214,7 +1215,9 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
 
 	//attach to shared memory
-	sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
+	uint a = rect.w*rect.h*4;
+	sint shmid = shmget(IPC_PRIVATE,(a-1)+4096-(a-1)%4096,IPC_CREAT|0777);
+	//sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
 	if(shmid == -1){
 		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
 		return;
@@ -1224,17 +1227,19 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 
 	pchpixels = (unsigned char*)shmat(shmid,0,0);
 	shmctl(shmid,IPC_RMID,0);
+
+	ptexture->Attach(pchpixels);
 	//------
 
 	pcomp->AddDamageRegion(this);
-	ptexture->Attach(windowPixmap);
+	//ptexture->Attach(windowPixmap);
 }
 
 X11ClientFrame::~X11ClientFrame(){
+	ptexture->Detach();
+
 	xcb_shm_detach(pbackend->pcon,segment);
 	shmdt(pchpixels);
-
-	ptexture->Detach();
 
 	xcb_damage_destroy(pbackend->pcon,damage);
 
@@ -1290,8 +1295,23 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		pcomp->AddDamageRegion(&screenRect);
 	}
 	ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
-#endif
+
+#else
+	for(VkRect2D &rect1 : damageRegions){
+		//TODO: get image depth and choose attach format based on that
+		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
+		xcb_flush(pbackend->pcon);
+		free(pimageReply);
+
+		VkRect2D screenRect;
+		screenRect.offset = {(sint)position.x+rect1.offset.x,(sint)position.y+rect1.offset.y};
+		screenRect.extent = rect1.extent;
+		pcomp->AddDamageRegion(&screenRect);
+	}
+	
 	ptexture->Update(pcommandBuffer,damageRegions.data(),damageRegions.size());
+#endif
 
 	damageRegions.clear();
 }
@@ -1299,11 +1319,14 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 void X11ClientFrame::AdjustSurface1(){
 	if(oldRect.w != rect.w || oldRect.h != rect.h){
 		//detach
+		ptexture->Detach();
 		xcb_shm_detach(pbackend->pcon,segment);
 		shmdt(pchpixels);
 
 		//attach
-		sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
+		//sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
+		uint a = rect.w*rect.h*4;
+		sint shmid = shmget(IPC_PRIVATE,(a-1)+4096-(a-1)%4096,IPC_CREAT|0777);
 		if(shmid == -1){
 			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
 			return;
@@ -1318,8 +1341,8 @@ void X11ClientFrame::AdjustSurface1(){
 
 		AdjustSurface(rect.w,rect.h);
 
-		ptexture->Detach();
-		ptexture->Attach(windowPixmap);
+		//ptexture->Attach(windowPixmap);
+		ptexture->Attach(pchpixels);
 
 		pcomp->AddDamageRegion(this);
 	}else
