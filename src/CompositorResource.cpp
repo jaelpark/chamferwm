@@ -367,25 +367,15 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D
 	transferImageLayout = transferImageMemoryBarrier.newLayout;
 }
 
-TextureSHM::TextureSHM(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp){
+TextureHostPointer::TextureHostPointer(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp){
 	//
 }
 
-TextureSHM::~TextureSHM(){
+TextureHostPointer::~TextureHostPointer(){
 	//
 }
 
-void TextureSHM::Attach(unsigned char *pchpixels){
-	/*VkPhysicalDeviceExternalBufferInfo physicalDeviceExternalBufferInfo = {};
-	physicalDeviceExternalBufferInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
-	physicalDeviceExternalBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	physicalDeviceExternalBufferInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
-	VkExternalBufferProperties externalBufferProps;
-	externalBufferProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
-	vkGetPhysicalDeviceExternalBufferProperties(pcomp->physicalDev,&physicalDeviceExternalBufferInfo,&externalBufferProps);
-	if(!(externalBufferProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT))
-		printf("!!!!!! shm import unsupported!\n");*/
-	
+void TextureHostPointer::Attach(unsigned char *pchpixels){
 	VkExternalMemoryBufferCreateInfo externalMemoryBufferCreateInfo = {};
 	externalMemoryBufferCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
 	externalMemoryBufferCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
@@ -393,7 +383,7 @@ void TextureSHM::Attach(unsigned char *pchpixels){
 	VkBufferCreateInfo bufferCreateInfo = {};
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferCreateInfo.size = formatSizeMap[formatIndex].second*w*h;
-	bufferCreateInfo.size = (bufferCreateInfo.size-1)+4096-(bufferCreateInfo.size-1)%4096;
+	bufferCreateInfo.size = (bufferCreateInfo.size-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(bufferCreateInfo.size-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment;
 	bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	bufferCreateInfo.pNext = &externalMemoryBufferCreateInfo;
@@ -408,18 +398,10 @@ void TextureSHM::Attach(unsigned char *pchpixels){
 	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProps;
 	vkGetPhysicalDeviceMemoryProperties(pcomp->physicalDev,&physicalDeviceMemoryProps);
 
-	VkPhysicalDeviceExternalMemoryHostPropertiesEXT physicalDeviceExternalMemoryHostProps = {};
-	physicalDeviceExternalMemoryHostProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT;
-	
-	VkPhysicalDeviceProperties2 devProps;
-	devProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-	devProps.pNext = &physicalDeviceExternalMemoryHostProps;
-	vkGetPhysicalDeviceProperties2(pcomp->physicalDev,&devProps);
-
 	VkMemoryRequirements memoryRequirements;
 	vkGetBufferMemoryRequirements(pcomp->logicalDev,transferBuffer,&memoryRequirements);
 
-	printf("minImportedHostPointerAlignment: %ld, %ld\n",physicalDeviceExternalMemoryHostProps.minImportedHostPointerAlignment,memoryRequirements.size%physicalDeviceExternalMemoryHostProps.minImportedHostPointerAlignment); //TODO: evaluate on startup
+	printf("minImportedHostPointerAlignment: %ld, %ld\n",pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,memoryRequirements.size%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment);
 	
 	VkMemoryDedicatedAllocateInfo memoryDedicatedAllocateInfo = {};
 	memoryDedicatedAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
@@ -446,14 +428,14 @@ void TextureSHM::Attach(unsigned char *pchpixels){
 		throw Exception("Failed to bind staging buffer memory.");
 }
 
-void TextureSHM::Detach(){
+void TextureHostPointer::Detach(){
 	//
 	vkFreeMemory(pcomp->logicalDev,transferMemory,0);
 	//vkDestroyImage(pcomp->logicalDev,transferImage,0);
 	vkDestroyBuffer(pcomp->logicalDev,transferBuffer,0);
 }
 
-void TextureSHM::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prects, uint rectCount){
+void TextureHostPointer::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prects, uint rectCount){
 	//
 	VkImageSubresourceRange imageSubresourceRange = {};
 	imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -462,7 +444,6 @@ void TextureSHM::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *p
 	imageSubresourceRange.baseArrayLayer = 0;
 	imageSubresourceRange.layerCount = 1;
 
-	//create in host stage (map), use in transfer stage
 	VkImageMemoryBarrier imageMemoryBarrier = {};
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	imageMemoryBarrier.image = image;
@@ -503,7 +484,7 @@ void TextureSHM::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *p
 }
 
 //Texture::Texture(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TexturePixmap(_w,_h,_pcomp){
-Texture::Texture(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureSHM(_w,_h,_pcomp){
+Texture::Texture(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureHostPointer(_w,_h,_pcomp){
 	//
 }
 

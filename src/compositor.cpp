@@ -280,17 +280,39 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkPhysicalDevice *pdevices = new VkPhysicalDevice[devCount];
 	vkEnumeratePhysicalDevices(instance,&devCount,pdevices);
 
-	VkPhysicalDeviceProperties *pdevProps = new VkPhysicalDeviceProperties[devCount];
+	//VkPhysicalDeviceProperties *pdevProps = new VkPhysicalDeviceProperties[devCount];
+	VkPhysicalDeviceExternalMemoryHostPropertiesEXT *pPhysicalDeviceExternalMemoryHostProps = new VkPhysicalDeviceExternalMemoryHostPropertiesEXT[devCount];
+	VkPhysicalDeviceProperties2 *pdevProps = new VkPhysicalDeviceProperties2[devCount];
 	for(uint i = 0; i < devCount; ++i){
-		vkGetPhysicalDeviceProperties(pdevices[i],&pdevProps[i]);
+		//device properties
+		pPhysicalDeviceExternalMemoryHostProps[i].sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT;
+		pPhysicalDeviceExternalMemoryHostProps[i].pNext = 0;
+
+		pdevProps[i].sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		pdevProps[i].pNext = &pPhysicalDeviceExternalMemoryHostProps[i];
+		vkGetPhysicalDeviceProperties2(pdevices[i],&pdevProps[i]);
+		//vkGetPhysicalDeviceProperties(pdevices[i],&pdevProps[i]);
+
+		//device features
 		VkPhysicalDeviceFeatures devFeatures;
 		vkGetPhysicalDeviceFeatures(pdevices[i],&devFeatures);
 
+		//extra checks
+		VkPhysicalDeviceExternalBufferInfo physicalDeviceExternalBufferInfo = {};
+		physicalDeviceExternalBufferInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
+		physicalDeviceExternalBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		physicalDeviceExternalBufferInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
+		VkExternalBufferProperties externalBufferProps;
+		externalBufferProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
+		vkGetPhysicalDeviceExternalBufferProperties(pdevices[i],&physicalDeviceExternalBufferInfo,&externalBufferProps);
+		if((externalBufferProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) && (externalBufferProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) == 0 && (externalBufferProps.externalMemoryProperties.compatibleHandleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT))
+			printf("Host pointer import supported!\n");
+
 		printf("%c %u: %s\n\t.deviceID: %u\n\t.vendorID: %u\n\t.deviceType: %u\n",
 			i == physicalDevIndex?'*':' ',
-			i,pdevProps[i].deviceName,pdevProps[i].deviceID,pdevProps[i].vendorID,pdevProps[i].deviceType);
-		printf("  max push constant size: %u\n  max bound desc sets: %u\n  max viewports: %u\n  multi viewport: %u\n",
-			pdevProps[i].limits.maxPushConstantsSize,pdevProps[i].limits.maxBoundDescriptorSets,pdevProps[i].limits.maxViewports,devFeatures.multiViewport);
+			i,pdevProps[i].properties.deviceName,pdevProps[i].properties.deviceID,pdevProps[i].properties.vendorID,pdevProps[i].properties.deviceType);
+		printf("  max push constant size: %u\n  max bound desc sets: %u\n",
+			pdevProps[i].properties.limits.maxPushConstantsSize,pdevProps[i].properties.limits.maxBoundDescriptorSets);
 	}
 
 	if(physicalDevIndex >= devCount){
@@ -299,10 +321,12 @@ void CompositorInterface::InitializeRenderEngine(){
 	}
 
 	physicalDev = pdevices[physicalDevIndex];
-	physicalDevProps = pdevProps[physicalDevIndex];
+	physicalDevExternalMemoryHostProps = pPhysicalDeviceExternalMemoryHostProps[physicalDevIndex];
+	physicalDevProps = pdevProps[physicalDevIndex].properties;
 
 	delete []pdevices;
 	delete []pdevProps;
+	delete []pPhysicalDeviceExternalMemoryHostProps;
 
 	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDev,surface,&surfaceCapabilities);
@@ -383,7 +407,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	const char *pdevExtensions[] = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
-		VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME, //needed?
+		//VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
 		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
 		VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
 		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
@@ -1215,8 +1239,8 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
 
 	//attach to shared memory
-	uint a = rect.w*rect.h*4;
-	sint shmid = shmget(IPC_PRIVATE,(a-1)+4096-(a-1)%4096,IPC_CREAT|0777);
+	uint textureSize = rect.w*rect.h*4;
+	sint shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
 	//sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
 	if(shmid == -1){
 		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
@@ -1325,8 +1349,8 @@ void X11ClientFrame::AdjustSurface1(){
 
 		//attach
 		//sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
-		uint a = rect.w*rect.h*4;
-		sint shmid = shmget(IPC_PRIVATE,(a-1)+4096-(a-1)%4096,IPC_CREAT|0777);
+		uint textureSize = rect.w*rect.h*4;
+		sint shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
 		if(shmid == -1){
 			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
 			return;

@@ -67,7 +67,7 @@ class CompositorInterface{
 friend class TextureBase;
 friend class TextureStaged;
 friend class TexturePixmap;
-friend class TextureSHM;
+friend class TextureHostPointer;
 friend class Texture;
 friend class ShaderModule;
 friend class Pipeline;
@@ -108,6 +108,7 @@ protected:
 	VkDebugReportCallbackEXT debugReportCb;
 	VkPhysicalDevice physicalDev;
 	VkPhysicalDeviceProperties physicalDevProps;
+	VkPhysicalDeviceExternalMemoryHostPropertiesEXT physicalDevExternalMemoryHostProps;
 	VkDevice logicalDev;
 	enum QUEUE_INDEX{
 		QUEUE_INDEX_GRAPHICS,

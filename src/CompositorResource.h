@@ -63,10 +63,10 @@ public:
 	const class X11Compositor *pcomp11;
 };
 
-class TextureSHM : virtual public TextureBase{
+class TextureHostPointer : virtual public TextureBase{
 public:
-	TextureSHM(uint, uint, const class CompositorInterface *);
-	virtual ~TextureSHM();
+	TextureHostPointer(uint, uint, const class CompositorInterface *);
+	virtual ~TextureHostPointer();
 	void Attach(unsigned char *);
 	void Detach();
 	void Update(const VkCommandBuffer *, const VkRect2D *, uint);
@@ -79,7 +79,7 @@ public:
 };
 
 //class Texture : public TextureStaged, public TexturePixmap{
-class Texture : public TextureStaged, public TextureSHM{
+class Texture : public TextureStaged, public TextureHostPointer{
 public:
 	Texture(uint, uint, const class CompositorInterface *);
 	~Texture();
