@@ -668,7 +668,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DefaultCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Start();
 
 		wordexp_t expResult;
@@ -722,7 +722,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DebugCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Compositor::X11DebugCompositor::Start();
 
 		wordexp_t expResult;
@@ -810,6 +810,7 @@ int main(sint argc, const char **pargv){
 	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
+	args::Flag noHostMemoryImportOpt(group_comp,"noHostMemoryImport","Disable host shared memory import.",{"no-host-memory-import"},false);
 	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified.",{"shader-path"});
 
 	try{
@@ -827,6 +828,7 @@ int main(sint argc, const char **pargv){
 	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
 	Config::Loader::debugLayers = debugLayersOpt.Get();
 	Config::Loader::scissoring = !noScissoringOpt.Get();
+	Config::Loader::hostMemoryImport = !noHostMemoryImportOpt.Get();
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
 	pconfigLoader->Run(configPath?configPath.Get().c_str():0,"config.py");
@@ -837,6 +839,8 @@ int main(sint argc, const char **pargv){
 		Config::CompositorInterface::pcompositorInt->debugLayers = true;
 	if(noScissoringOpt.Get())
 		Config::CompositorInterface::pcompositorInt->scissoring = false;
+	if(noHostMemoryImportOpt.Get())
+		Config::CompositorInterface::pcompositorInt->hostMemoryImport = false;
 
 	RunBackend *pbackend;
 	try{

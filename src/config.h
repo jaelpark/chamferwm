@@ -160,6 +160,7 @@ public:
 	sint deviceIndex;
 	bool debugLayers;
 	bool scissoring;
+	bool hostMemoryImport;
 	bool enableAnimation;
 	float animationDuration;
 
@@ -193,6 +194,7 @@ public:
 	static sint deviceIndex;
 	static bool debugLayers;
 	static bool scissoring;
+	static bool hostMemoryImport;
 };
 
 }

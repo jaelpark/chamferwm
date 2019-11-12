@@ -569,7 +569,7 @@ BackendConfig::~BackendConfig(){
 	pbackendInt->pbackend = 0;
 }
 
-CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), enableAnimation(true), animationDuration(0.3f), pcompositor(0){
+CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), hostMemoryImport(Loader::hostMemoryImport), enableAnimation(true), animationDuration(0.3f), pcompositor(0){
 	//
 }
 
@@ -921,6 +921,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("deviceIndex",&CompositorInterface::deviceIndex)
 		.def_readwrite("debugLayers",&CompositorInterface::debugLayers)
 		.def_readwrite("scissoring",&CompositorInterface::scissoring)
+		.def_readwrite("hostMemoryImport",&CompositorInterface::hostMemoryImport)
 		.add_property("enableAnimation",
 			boost::python::make_function(
 			[](CompositorInterface &compositor){
@@ -1009,6 +1010,7 @@ void Loader::Run(const char *pfilePath, const char *pfileLabel){
 sint Loader::deviceIndex;
 bool Loader::debugLayers;
 bool Loader::scissoring;
+bool Loader::hostMemoryImport;
 
 }
 

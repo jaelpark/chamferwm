@@ -10,7 +10,7 @@ namespace Compositor{
 
 class TextureBase{
 public:
-	TextureBase(uint, uint, VkFormat, const class CompositorInterface *);
+	TextureBase(uint, uint, VkFormat, uint, const class CompositorInterface *);
 	virtual ~TextureBase();
 	//
 	uint w, h;
@@ -21,6 +21,10 @@ public:
 	VkImageView imageView;
 	VkDeviceMemory deviceMemory;
 
+	enum FLAG{
+		FLAG_IGNORE_ALPHA = 0x1
+	};
+
 	const class CompositorInterface *pcomp;
 
 	static const std::vector<std::pair<VkFormat, uint>> formatSizeMap;
@@ -29,7 +33,7 @@ public:
 //texture class for shader reads
 class TextureStaged : virtual public TextureBase{
 public:
-	TextureStaged(uint, uint, VkFormat, const class CompositorInterface *);
+	TextureStaged(uint, uint, VkFormat, uint, const class CompositorInterface *);
 	virtual ~TextureStaged();
 	const void * Map() const;
 	void Unmap(const VkCommandBuffer *, const VkRect2D *, uint);
@@ -40,13 +44,11 @@ public:
 	uint stagingMemorySize;
 
 	std::vector<VkBufferImageCopy> bufferImageCopyBuffer; //to avoid repeated dynamic allocations each time texture is updated in multiple regions
-
-	//const class CompositorInterface *pcomp;
 };
 
 class TexturePixmap : virtual public TextureBase{
 public:
-	TexturePixmap(uint, uint, const class CompositorInterface *);
+	TexturePixmap(uint, uint, uint, const class CompositorInterface *);
 	virtual ~TexturePixmap();
 	void Attach(xcb_pixmap_t);
 	void Detach();
@@ -65,15 +67,15 @@ public:
 
 class TextureHostPointer : virtual public TextureBase{
 public:
-	TextureHostPointer(uint, uint, const class CompositorInterface *);
+	TextureHostPointer(uint, uint, uint, const class CompositorInterface *);
 	virtual ~TextureHostPointer();
-	void Attach(unsigned char *);
-	void Detach();
+	bool Attach(unsigned char *);
+	void Detach(uint64);
 	void Update(const VkCommandBuffer *, const VkRect2D *, uint);
 
 	VkBuffer transferBuffer;
 	VkDeviceMemory transferMemory;
-	//VkImageLayout transferImageLayout;
+	std::vector<std::tuple<uint64, VkDeviceMemory, VkBuffer>> discards;
 
 	std::vector<VkBufferImageCopy> bufferImageCopyBuffer;
 };
@@ -81,7 +83,7 @@ public:
 //class Texture : public TextureStaged, public TexturePixmap{
 class Texture : public TextureStaged, public TextureHostPointer{
 public:
-	Texture(uint, uint, const class CompositorInterface *);
+	Texture(uint, uint, uint, const class CompositorInterface *);
 	~Texture();
 };
 

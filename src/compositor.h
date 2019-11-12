@@ -47,9 +47,10 @@ protected:
 class ClientFrame : public ColorFrame{
 friend class CompositorInterface;
 public:
-	ClientFrame(uint, uint, const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
+	ClientFrame(const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
+	void CreateSurface(uint, uint, uint);
 	void AdjustSurface(uint, uint);
 	enum SHADER_FLAG{
 		SHADER_FLAG_FOCUS = 0x1,
@@ -59,6 +60,7 @@ public:
 protected:
 	void UpdateDescSets();
 	Texture *ptexture;
+	uint textureFlags;
 	bool fullRegionUpdate;
 	bool animationCompleted;
 };
@@ -81,6 +83,7 @@ public:
 		uint deviceIndex;
 		bool debugLayers;
 		bool scissoring;
+		bool hostMemoryImport;
 		bool enableAnimation;
 		float animationDuration;
 	};
@@ -180,7 +183,7 @@ protected:
 	//Used textures get stored for potential reuse before they get destroyed.
 	//Many of the allocated window textures will initially have some common reoccuring size.
 	//The purpose of caching is also to avoid attempts to destroy resources that are currently used by the pipeline.
-	Texture * CreateTexture(uint, uint);
+	Texture * CreateTexture(uint, uint, uint);
 	void ReleaseTexture(Texture *);
 
 	struct TextureCacheEntry{
@@ -205,6 +208,7 @@ protected:
 	//config
 	bool debugLayers;
 	bool scissoring;
+	bool hostMemoryImport;
 
 public:
 	bool enableAnimation;
@@ -225,6 +229,7 @@ public:
 	xcb_shm_seg_t segment;
 	xcb_damage_damage_t damage;
 	std::vector<VkRect2D> damageRegions;
+	sint shmid;
 	unsigned char *pchpixels;
 };
 
@@ -238,6 +243,7 @@ public:
 	xcb_pixmap_t pixmap;
 	xcb_shm_seg_t segment;
 	uint w, h;
+	sint shmid;
 	unsigned char *pchpixels;
 };
 
