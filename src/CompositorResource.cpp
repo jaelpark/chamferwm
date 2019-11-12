@@ -431,7 +431,7 @@ bool TextureHostPointer::Attach(unsigned char *pchpixels){
 		return false;
 	}
 	if(vkBindBufferMemory(pcomp->logicalDev,transferBuffer,transferMemory,0) != VK_SUCCESS){
-		DebugPrintf(stderr,"Failed to bind staging buffer memory.");
+		DebugPrintf(stderr,"Failed to bind transfer buffer memory.");
 		vkFreeMemory(pcomp->logicalDev,transferMemory,0);
 		vkDestroyBuffer(pcomp->logicalDev,transferBuffer,0);
 		return false;
@@ -535,7 +535,8 @@ Buffer::Buffer(uint _size, VkBufferUsageFlagBits usage, const CompositorInterfac
 	}
 	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&stagingMemory) != VK_SUCCESS)
 		throw Exception("Failed to allocate staging buffer memory.");
-	vkBindBufferMemory(pcomp->logicalDev,stagingBuffer,stagingMemory,0);
+	if(vkBindBufferMemory(pcomp->logicalDev,stagingBuffer,stagingMemory,0) != VK_SUCCESS)
+		throw Exception("Failed to bind staging buffer memory.");
 
 	stagingMemorySize = memoryRequirements.size;
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -554,8 +555,9 @@ Buffer::Buffer(uint _size, VkBufferUsageFlagBits usage, const CompositorInterfac
 	}
 
 	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&deviceMemory) != VK_SUCCESS)
-		throw Exception("Failed to allocate image memory.");
-	vkBindBufferMemory(pcomp->logicalDev,buffer,deviceMemory,0);
+		throw Exception("Failed to allocate buffer memory.");
+	if(vkBindBufferMemory(pcomp->logicalDev,buffer,deviceMemory,0) != VK_SUCCESS)
+		throw Exception("Failed to bind buffer memory.");
 }
 
 Buffer::~Buffer(){
