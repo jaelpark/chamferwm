@@ -1303,6 +1303,8 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		rect1.offset = {0,0};
 		rect1.extent = {rect.w,rect.h};
 		damageRegions.push_back(rect1);
+
+		fullRegionUpdate = false;
 	}
 
 	if(!pcomp->hostMemoryImport){
@@ -1330,13 +1332,19 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
 
 	}else{
+		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,rect.w,rect.h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0); //need to get whole image
+
+		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
+		xcb_flush(pbackend->pcon);
+		free(pimageReply);
+
 		//printf("importing host\n");
 		for(VkRect2D &rect1 : damageRegions){
-			xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+			/*xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
 
 			xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
 			xcb_flush(pbackend->pcon);
-			free(pimageReply);
+			free(pimageReply);*/
 
 			VkRect2D screenRect;
 			screenRect.offset = {(sint)position.x+rect1.offset.x,(sint)position.y+rect1.offset.y};
@@ -1393,7 +1401,7 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 	//
 	//sint shmid = shmget(IPC_PRIVATE,w*h*4,IPC_CREAT|0777);
 	uint textureSize = w*h*4;
-	sint shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
+	shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
 	if(shmid == -1){
 		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
 		return;
@@ -1455,13 +1463,14 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	if(!pcomp->hostMemoryImport){
 		unsigned char *pdata = (unsigned char*)ptexture->Map();
 		memcpy(pdata,pchpixels,w*h*4);
-		fullRegionUpdate = false;
 		
 		ptexture->Unmap(pcommandBuffer,&screenRect,1);
 	
 	}else{
 		ptexture->Update(pcommandBuffer,&screenRect,1);
 	}
+
+	fullRegionUpdate = false;
 
 	pcomp->AddDamageRegion(&screenRect);
 }
