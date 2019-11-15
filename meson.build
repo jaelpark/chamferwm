@@ -33,6 +33,7 @@ vk = [
 
 python = [
 	dependency('python3'),
+	dependency('python3-embed'), #python 3.8
 	dependency('boost',modules:['system','filesystem','python3'])
 ]
 
