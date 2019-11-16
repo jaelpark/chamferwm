@@ -971,7 +971,9 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 	updateQueue.clear();
 
+	// -------------------------------- test
 	//ptestText->Set("afafwasdaw",&pcopyCommandBuffers[currentFrame]);
+	// -------------------------------- test
 
 	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to end command buffer recording.");
@@ -1200,8 +1202,7 @@ void CompositorInterface::ClearBackground(){
 	static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
 		"text_vertex.spv",0,"text_fragment.spv"
 	};
-	ptestText = new Text(pshaderName,ptextEngine);
-	ptestText->Set("hei",0);*/
+	ptestText = new Text(pshaderName,ptextEngine);*/
 	//------------------ testing
 }
 
@@ -1209,7 +1210,8 @@ Texture * CompositorInterface::CreateTexture(uint w, uint h, uint flags){
 	Texture *ptexture;
 
 	auto m = std::find_if(textureCache.begin(),textureCache.end(),[&](auto &r)->bool{
-		return r.ptexture->w == w && r.ptexture->h == h;
+		//return r.ptexture->w == w && r.ptexture->h == h;
+		return r.ptexture->w == w && r.ptexture->h == h && r.ptexture->flags == flags;
 	});
 	if(m != textureCache.end()){
 		ptexture = (*m).ptexture;
@@ -1326,12 +1328,20 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	pchpixels = (unsigned char*)shmat(shmid,0,0);
 	//shmctl(shmid,IPC_RMID,0);
 
+	xcb_flush(pbackend->pcon);
+	
 	//get image depth
 	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,1,1,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
 	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
-	xcb_flush(pbackend->pcon);
-	uint depth = pimageReply->depth;
-	free(pimageReply);
+
+	uint depth;
+	if(pimageReply){
+		depth = pimageReply->depth;
+		free(pimageReply);
+	}else{
+		DebugPrintf(stderr,"Failed to get SHM image. Assuming 24 bit depth.\n");
+		depth = 24;
+	}
 
 	uint flags = depth != 32?TextureBase::FLAG_IGNORE_ALPHA:0;
 	CreateSurface(rect.w,rect.h,flags);

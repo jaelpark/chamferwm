@@ -14,6 +14,7 @@ public:
 	virtual ~TextureBase();
 	//
 	uint w, h;
+	uint flags;
 	uint formatIndex;
 	VkImageLayout imageLayout;
 

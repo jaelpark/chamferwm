@@ -13,7 +13,7 @@
 
 namespace Compositor{
 
-TextureBase::TextureBase(uint _w, uint _h, VkFormat format, uint flags, const CompositorInterface *_pcomp) : w(_w), h(_h), imageLayout(VK_IMAGE_LAYOUT_UNDEFINED), pcomp(_pcomp){
+TextureBase::TextureBase(uint _w, uint _h, VkFormat format, uint _flags, const CompositorInterface *_pcomp) : w(_w), h(_h), flags(_flags), imageLayout(VK_IMAGE_LAYOUT_UNDEFINED), pcomp(_pcomp){
 	//
 	auto m = std::find_if(formatSizeMap.begin(),formatSizeMap.end(),[&](auto &r)->bool{
 		return r.first == format;
