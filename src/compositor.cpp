@@ -1209,6 +1209,10 @@ void CompositorInterface::ClearBackground(){
 Texture * CompositorInterface::CreateTexture(uint w, uint h, uint flags){
 	Texture *ptexture;
 
+	//should be larger than 0:
+	w = std::max(w,1u);
+	h = std::max(h,1u);
+
 	auto m = std::find_if(textureCache.begin(),textureCache.end(),[&](auto &r)->bool{
 		//return r.ptexture->w == w && r.ptexture->h == h;
 		return r.ptexture->w == w && r.ptexture->h == h && r.ptexture->flags == flags;
