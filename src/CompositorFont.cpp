@@ -36,14 +36,14 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 
 	//loop through codepoints, update texture atlas if necessary
 
-	//Vertex *pdata = (Vertex*)pvertexBuffer->Map();
+	Vertex *pdata = (Vertex*)pvertexBuffer->Map();
 
 	//test triangle
-	/*pdata[0].pos = glm::vec2(0.0f,-0.5f);
+	pdata[0].pos = glm::vec2(0.0f,-0.5f);
 	pdata[1].pos = glm::vec2(0.5f,0.5f);
-	pdata[2].pos = glm::vec2(-0.5f,0.5f);*/
+	pdata[2].pos = glm::vec2(-0.5f,0.5f);
 
-	glm::vec2 pos = glm::vec2(0.0f);
+	/*glm::vec2 pos = glm::vec2(0.0f);
 	for(uint i = 0; i < glyphCount; ++i){
 		glm::vec2 advance = glm::vec2(pglyphPos[i].x_advance,pglyphPos[i].y_advance)/64.0f;
 		glm::vec2 offset = glm::vec2(pglyphPos[i].x_offset,pglyphPos[i].y_offset)/64.0f;
@@ -59,9 +59,9 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 		//pdata[i].pos.y = 
 
 		pos += advance;
-	}
+	}*/
 
-	//pvertexBuffer->Unmap(pcommandBuffer);
+	pvertexBuffer->Unmap(pcommandBuffer);
 }
 
 void Text::Draw(const VkCommandBuffer *pcommandBuffer){
