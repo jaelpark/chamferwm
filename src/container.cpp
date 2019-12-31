@@ -247,6 +247,14 @@ void Container::SetFullscreen(bool toggle){
 	Translate();
 }
 
+void Container::SetStacked(bool toggle){
+	if(toggle)
+		flags |= FLAG_STACKED;
+	else flags &= ~FLAG_STACKED;
+
+	Translate();
+}
+
 Container * Container::GetNext(){
 	if(flags & FLAG_FLOATING)
 		return this;
@@ -354,6 +362,10 @@ void Container::TranslateRecursive(glm::vec2 posFullCanvas, glm::vec2 extFullCan
 	}
 
 	glm::vec2 position(p);
+	if(flags & FLAG_STACKED){
+		for(Container *pcontainer = pch; pcontainer; pcontainer = pcontainer->pnext)
+			pcontainer->TranslateRecursive(position,e,position,e);
+	}else
 	switch(layout){
 	default:
 	case LAYOUT_VSPLIT:

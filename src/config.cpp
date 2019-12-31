@@ -687,6 +687,12 @@ BOOST_PYTHON_MODULE(chamfer){
 				if(container.OnFullscreen(toggle))
 					container.pcontainer->SetFullscreen(toggle);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, bool>()))
+		.def("SetStacked",boost::python::make_function(
+			[](ContainerInterface &container, bool toggle){
+				if(!container.pcontainer)
+					return;
+				container.pcontainer->SetStacked(toggle);
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, bool>()))
 		.def("IsFloating",boost::python::make_function(
 			[](ContainerInterface &container){
 				if(!container.pcontainer){
@@ -826,6 +832,14 @@ BOOST_PYTHON_MODULE(chamfer){
 					return false;
 				}
 				return (container.pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) != 0;
+			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
+		.add_property("stacked",boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer){
+					PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
+					return false;
+				}
+				return (container.pcontainer->flags & WManager::Container::FLAG_STACKED) != 0;
 			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
 		.add_property("shaderFlags",
 			boost::python::make_function(

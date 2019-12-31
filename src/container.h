@@ -31,7 +31,8 @@ public:
 	enum FLAG{
 		FLAG_FLOATING = 0x1,
 		FLAG_NO_FOCUS = 0x2,
-		FLAG_FULLSCREEN = 0x4
+		FLAG_FULLSCREEN = 0x4,
+		FLAG_STACKED = 0x8
 	};
 	struct Setup{
 		glm::vec2 canvasOffset = glm::vec2(0.0f);
@@ -56,6 +57,7 @@ public:
 	Container * Collapse();
 	void Focus();
 	void SetFullscreen(bool);
+	void SetStacked(bool);
 	Container * GetNext();
 	Container * GetPrev();
 	Container * GetParent() const;

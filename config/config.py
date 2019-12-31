@@ -46,9 +46,9 @@ class Key(Enum):
 	LIFT_CONTAINER = auto()
 
 	LAYOUT = auto()
-	LAYOUT_STACKED = auto()
 	SPLIT_V = auto()
 	FULLSCREEN = auto()
+	STACK = auto()
 
 	CONTRACT_ROOT_RESET = auto()
 	CONTRACT_ROOT_LEFT = auto() #contract left side
@@ -229,10 +229,10 @@ class Backend(chamfer.Backend):
 
 			#layout, splits and fullscreen
 			self.BindKey(ord('e'),self.modMask,Key.LAYOUT.value);
-			self.BindKey(ord('d'),self.modMask,Key.LAYOUT_STACKED.value);
 			self.BindKey(latin1.XK_onehalf,self.modMask,Key.SPLIT_V.value);
 			self.BindKey(ord('v'),self.modMask,Key.SPLIT_V.value);
 			self.BindKey(ord('f'),self.modMask,Key.FULLSCREEN.value);
+			self.BindKey(ord('d'),self.modMask,Key.STACK.value);
 
 			#workspace dimensions
 			self.BindKey(ord('r'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RESET.value);
@@ -451,14 +451,6 @@ class Backend(chamfer.Backend):
 			}[parent.layout];
 			parent.ShiftLayout(layout);
 
-		elif keyId == Key.LAYOUT_STACKED.value:
-			pass;
-			#if parent is None:
-			#	return;
-			#for child in parent.IterChildren():
-			#	child.minSize = (child.minSize[0],0.95);
-			#parent.ShiftLayout(chamfer.layout.HSPLIT);
-
 		elif keyId == Key.SPLIT_V.value:
 			#TODO: add render flags property, bitwise OR them
 			focus.splitArmed = not focus.splitArmed;
@@ -466,6 +458,11 @@ class Backend(chamfer.Backend):
 		elif keyId == Key.FULLSCREEN.value:
 			print("setting fullscreen",flush=True);
 			focus.SetFullscreen(not focus.fullscreen);
+
+		elif keyId == Key.STACK.value:
+			if parent is None:
+				return;
+			parent.SetStacked(not parent.stacked);
 		
 		elif keyId == Key.CONTRACT_ROOT_RESET.value:
 			root = self.GetRoot();
