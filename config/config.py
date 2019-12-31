@@ -232,7 +232,7 @@ class Backend(chamfer.Backend):
 			self.BindKey(latin1.XK_onehalf,self.modMask,Key.SPLIT_V.value);
 			self.BindKey(ord('v'),self.modMask,Key.SPLIT_V.value);
 			self.BindKey(ord('f'),self.modMask,Key.FULLSCREEN.value);
-			self.BindKey(ord('d'),self.modMask,Key.STACK.value);
+			self.BindKey(ord('t'),self.modMask,Key.STACK.value);
 
 			#workspace dimensions
 			self.BindKey(ord('r'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RESET.value);
