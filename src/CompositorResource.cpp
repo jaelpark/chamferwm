@@ -970,6 +970,7 @@ TextPipeline::~TextPipeline(){
 VkPipelineInputAssemblyStateCreateInfo TextPipeline::inputAssemblyStateCreateInfo = {
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
 	.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+	//.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 	.primitiveRestartEnable = VK_FALSE
 };
 
@@ -977,7 +978,7 @@ VkPipelineRasterizationStateCreateInfo TextPipeline::rasterizationStateCreateInf
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 	.depthClampEnable = VK_FALSE,
 	.rasterizerDiscardEnable = VK_FALSE,
-	.polygonMode = VK_POLYGON_MODE_FILL,
+	.polygonMode = VK_POLYGON_MODE_LINE,//VK_POLYGON_MODE_FILL,
 	.cullMode = VK_CULL_MODE_NONE,
 	.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
 	.depthBiasEnable = VK_FALSE,

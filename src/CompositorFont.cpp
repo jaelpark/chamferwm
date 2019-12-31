@@ -15,11 +15,15 @@ Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], class TextEng
 	hb_buffer_set_script(phbBuf,HB_SCRIPT_LATIN);
 	hb_buffer_set_language(phbBuf,hb_language_from_string("en",-1));
 
+	glyphCount = 0;
+
 	pvertexBuffer = new Buffer(1024,VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,ptextEngine->pcomp);
+	pindexBuffer = new Buffer(1024,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,ptextEngine->pcomp);
 }
 
 Text::~Text(){
 	delete pvertexBuffer;
+	delete pindexBuffer;
 
 	hb_buffer_destroy(phbBuf);
 }
@@ -30,7 +34,6 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	hb_buffer_guess_segment_properties(phbBuf);
 	hb_shape(ptextEngine->phbFont,phbBuf,0,0);
 
-	uint glyphCount;
 	hb_glyph_info_t *pglyphInfo = hb_buffer_get_glyph_infos(phbBuf,&glyphCount);
 	hb_glyph_position_t *pglyphPos = hb_buffer_get_glyph_positions(phbBuf,&glyphCount);
 
@@ -39,11 +42,19 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	Vertex *pdata = (Vertex*)pvertexBuffer->Map();
 
 	//test triangle
-	pdata[0].pos = glm::vec2(0.0f,-0.5f);
+	/*pdata[0].pos = glm::vec2(0.0f,-0.5f);
 	pdata[1].pos = glm::vec2(0.5f,0.5f);
-	pdata[2].pos = glm::vec2(-0.5f,0.5f);
+	pdata[2].pos = glm::vec2(-0.5f,0.5f);*/
 
-	/*glm::vec2 pos = glm::vec2(0.0f);
+	//test quad
+	/*pdata[0].pos = glm::vec2(-0.5f,-0.5f);
+	pdata[1].pos = glm::vec2(-0.5f,0.5f);
+	pdata[2].pos = glm::vec2(0.5f,-0.5f);
+	pdata[3].pos = glm::vec2(0.5f,0.5f);*/
+
+	glm::vec2 scale = 2.0f/glm::vec2(ptextEngine->pcomp->imageExtent.width,ptextEngine->pcomp->imageExtent.height);
+
+	glm::vec2 pos = glm::vec2(0.0f);
 	for(uint i = 0; i < glyphCount; ++i){
 		glm::vec2 advance = glm::vec2(pglyphPos[i].x_advance,pglyphPos[i].y_advance)/64.0f;
 		glm::vec2 offset = glm::vec2(pglyphPos[i].x_offset,pglyphPos[i].y_offset)/64.0f;
@@ -55,13 +66,36 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 		//xy1.y = floorf(xy1.y);
 
 		printf("%.3f, %.3f - %.3f, %.3f\n",xy0.x,xy0.y,xy1.x,xy1.y);
-		//pdata[i].pos = 
-		//pdata[i].pos.y = 
+		pdata[4*i+0].pos = scale*xy0-1.0f+0.5f;
+		pdata[4*i+1].pos = scale*glm::vec2(xy1.x,xy0.y)-1.0f+0.5f;
+		pdata[4*i+2].pos = scale*glm::vec2(xy0.x,xy1.y)-1.0f+0.5f;
+		pdata[4*i+3].pos = scale*glm::vec2(xy1.x,xy1.y)-1.0f+0.5f;
 
 		pos += advance;
-	}*/
+	}
 
 	pvertexBuffer->Unmap(pcommandBuffer);
+
+	unsigned short *pindices = (unsigned short*)pindexBuffer->Map();
+
+	//test quad
+	/*pindices[0] = 0;
+	pindices[1] = 1;
+	pindices[2] = 2;
+	pindices[3] = 1;
+	pindices[4] = 2;
+	pindices[5] = 3;*/
+
+	for(uint i = 0; i < glyphCount; ++i){
+		pindices[6*i+0] = 4*i;
+		pindices[6*i+1] = 4*i+1;
+		pindices[6*i+2] = 4*i+2;
+		pindices[6*i+3] = 4*i+1;
+		pindices[6*i+4] = 4*i+2;
+		pindices[6*i+5] = 4*i+3;
+	}
+
+	pindexBuffer->Unmap(pcommandBuffer);
 }
 
 void Text::Draw(const VkCommandBuffer *pcommandBuffer){
@@ -73,7 +107,9 @@ void Text::Draw(const VkCommandBuffer *pcommandBuffer){
 
 	VkDeviceSize offset = 0;
 	vkCmdBindVertexBuffers(*pcommandBuffer,0,1,&pvertexBuffer->buffer,&offset);
-	vkCmdDraw(*pcommandBuffer,3,1,0,0);
+	vkCmdBindIndexBuffer(*pcommandBuffer,pindexBuffer->buffer,0,VK_INDEX_TYPE_UINT16);
+	//vkCmdDraw(*pcommandBuffer,3,1,0,0);
+	vkCmdDrawIndexed(*pcommandBuffer,6*glyphCount,1,0,0,0);
 
 	passignedSet->fenceTag = pcomp->frameTag;
 }

@@ -15,8 +15,10 @@ public:
 	void Set(const char *, const VkCommandBuffer *); //updates the vertex buffers
 	void Draw(const VkCommandBuffer *);
 	hb_buffer_t *phbBuf;
+	uint glyphCount;
 	class TextEngine *ptextEngine;
 	class Buffer *pvertexBuffer;
+	class Buffer *pindexBuffer;
 	struct Vertex{
 		glm::vec2 pos;
 	};// alignas(16);

@@ -687,8 +687,8 @@ void CompositorInterface::InitializeRenderEngine(){
 void CompositorInterface::DestroyRenderEngine(){
 	DebugPrintf(stdout,"Compositor cleanup\n");
 
-	//delete ptestText;
-	//delete ptextEngine;
+	/*delete ptestText;
+	delete ptextEngine;*/
 
 	for(TextureCacheEntry &textureCacheEntry : textureCache)
 		delete textureCacheEntry.ptexture;
