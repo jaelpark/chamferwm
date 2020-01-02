@@ -17,8 +17,8 @@ Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], class TextEng
 
 	glyphCount = 0;
 
-	pvertexBuffer = new Buffer(1024,VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,ptextEngine->pcomp);
-	pindexBuffer = new Buffer(1024,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,ptextEngine->pcomp);
+	pvertexBuffer = new Buffer(1024*4*sizeof(Vertex),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,ptextEngine->pcomp);
+	pindexBuffer = new Buffer(1024*6*2,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,ptextEngine->pcomp);
 }
 
 Text::~Text(){
@@ -56,26 +56,26 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 
 	glm::vec2 position(0.0f);
 	for(uint i = 0; i < glyphCount; ++i){
+		//glm::vec2 advance = glm::vec2(pglyphPos[i].x_advance>>6,pglyphPos[i].y_advance>>6);///64.0f;
+		//glm::vec2 offset = glm::vec2(pglyphPos[i].x_offset>>6,pglyphPos[i].y_offset>>6);///64.0f;
 		glm::vec2 advance = glm::vec2(pglyphPos[i].x_advance,pglyphPos[i].y_advance)/64.0f;
 		glm::vec2 offset = glm::vec2(pglyphPos[i].x_offset,pglyphPos[i].y_offset)/64.0f;
 
 		TextEngine::Glyph *pglyph = ptextEngine->LoadGlyph(pglyphInfo[i].codepoint);
-		glm::vec2 xy0 = position+offset+pglyph->offset;
+		glm::vec2 xy0 = position+offset+pglyph->offset; //+0.5f in Draw()
 		//xy0.y = floorf(xy0.y);
-		glm::vec2 xy1 = xy0+glm::vec2(pglyph->w,-(float)pglyph->h);
+		glm::vec2 xy1 = xy0+glm::vec2(pglyph->w,pglyph->h);
 		//xy1.y = floorf(xy1.y);
 
-		//printf("%.3f, %.3f - %.3f, %.3f\n",xy0.x,xy0.y,xy1.x,xy1.y);
-		pdata[4*i+0].pos = scale*xy0-1.0f+0.5f;
-		pdata[4*i+1].pos = scale*glm::vec2(xy1.x,xy0.y)-1.0f+0.5f;
-		pdata[4*i+2].pos = scale*glm::vec2(xy0.x,xy1.y)-1.0f+0.5f;
-		pdata[4*i+3].pos = scale*glm::vec2(xy1.x,xy1.y)-1.0f+0.5f;
+		pdata[4*i+0].pos = scale*xy0-1.0f;
+		pdata[4*i+1].pos = scale*glm::vec2(xy1.x,xy0.y)-1.0f;
+		pdata[4*i+2].pos = scale*glm::vec2(xy0.x,xy1.y)-1.0f;
+		pdata[4*i+3].pos = scale*glm::vec2(xy1.x,xy1.y)-1.0f;
 
-		//BUG!!!!!!!!!! texc not assigned yet
 		pdata[4*i+0].texc = pglyph->texc;//use posh to get sample location
-		pdata[4*i+1].texc = pglyph->texc;//+glm::uvec2(pglyph->w,0);
-		pdata[4*i+2].texc = pglyph->texc;//+glm::uvec2(pglyph->w,0);
-		pdata[4*i+3].texc = pglyph->texc;
+		pdata[4*i+1].texc = pglyph->texc+glm::uvec2(pglyph->w,0);
+		pdata[4*i+2].texc = pglyph->texc+glm::uvec2(0,pglyph->h);
+		pdata[4*i+3].texc = pglyph->texc+glm::uvec2(pglyph->w,pglyph->h);
 
 		position += advance;
 	}
@@ -104,10 +104,12 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	pindexBuffer->Unmap(pcommandBuffer);
 }
 
-void Text::Draw(const VkCommandBuffer *pcommandBuffer){
+void Text::Draw(const glm::uvec2 &pos, const VkCommandBuffer *pcommandBuffer){
 	//
+	glm::vec2 posh = 2.0f*(glm::vec2(pos)+0.5f)/glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);//-1.0f;
+	//glm::vec2 posh = 2.0f*(glm::vec2(0,10.0f)+0.5f)/glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);//-1.0f;
 	std::vector<std::pair<ShaderModule::VARIABLE, const void *>> varAddrs = {
-		//{ShaderModule::VARIABLE_FLAGS,&flags},
+		{ShaderModule::VARIABLE_XY0,&posh},
 	};
 	BindShaderResources(&varAddrs,pcommandBuffer);
 
@@ -115,8 +117,8 @@ void Text::Draw(const VkCommandBuffer *pcommandBuffer){
 	vkCmdBindVertexBuffers(*pcommandBuffer,0,1,&pvertexBuffer->buffer,&offset);
 	vkCmdBindIndexBuffer(*pcommandBuffer,pindexBuffer->buffer,0,VK_INDEX_TYPE_UINT16);
 	//vkCmdDraw(*pcommandBuffer,3,1,0,0);
-	//vkCmdDrawIndexed(*pcommandBuffer,6*glyphCount,1,0,0,0);
-	vkCmdDrawIndexed(*pcommandBuffer,6,1,0,0,0);
+	vkCmdDrawIndexed(*pcommandBuffer,6*glyphCount,1,0,0,0);
+	//vkCmdDrawIndexed(*pcommandBuffer,6,1,0,0,0);
 
 	passignedSet->fenceTag = pcomp->frameTag;
 }
@@ -155,7 +157,7 @@ std::vector<std::pair<ShaderModule::INPUT, uint>> Text::vertexBufferLayout = {
 	{ShaderModule::INPUT_TEXCOORD_UINT2,offsetof(Text::Vertex,texc)}
 };
 
-TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp), pfontAtlas(0), updateAtlas(false){
+TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp), pfontAtlas(0), fontAtlasSize(0), updateAtlas(false){
 	//TODO: use fontconfig library to load available fonts
 	if(FT_Init_FreeType(&library) != FT_Err_Ok)
 		throw Exception("Failed to initialize Freetype2.");
@@ -202,43 +204,29 @@ bool TextEngine::UpdateAtlas(const VkCommandBuffer *pcommandBuffer){
 		delete pfontAtlas;
 		//pcomp->ReleaseTexture(pfontAtlas);
 	}
-	
-	//uint m = (1+16*64)*ceilf(sqrtf(glyphMap.size()));
-	uint m = (1+(fontFace->size->metrics.height>>6))*ceilf(sqrtf(glyphMap.size())); // /64
-	//uint m = (1+16*282/64)*ceilf(sqrtf(glyphMap.size())); //https://www.freetype.org/freetype2/docs/glyphs/glyphs-2.html
-	m = ((m-1)/128+1)*128; //round up to nearest multiple of 128 to improve reuse of the texture
-	DebugPrintf(stdout,"Font Atlas: %lu glyphs, %ux%u\n",glyphMap.size(),m,m);
+
+	DebugPrintf(stdout,"Font Atlas: %lu glyphs, %ux%u\n",glyphMap.size(),fontAtlasSize,fontAtlasSize);
 
 	//pfontAtlas = pcomp->CreateTexture(m,m,0);
-	pfontAtlas = new TextureStaged(m,m,VK_FORMAT_R8_UNORM,&TextureBase::defaultComponentMapping,0,pcomp);
+	pfontAtlas = new TextureStaged(fontAtlasSize,fontAtlasSize,VK_FORMAT_R8_UNORM,&TextureBase::defaultComponentMapping,0,pcomp);
 
 	unsigned char *pdata = (unsigned char *)pfontAtlas->Map();
 
-	glm::uvec2 position(0);
 	for(uint i = 0, n = glyphMap.size(); i < n; ++i){
-		if(position.x+glyphMap[i].second.w >= m){
-			position.x = 0;
-			position.y += fontFace->size->metrics.height*64+1;
-		}
-
 		for(uint y = 0; y < glyphMap[i].second.h; ++y){
-			uint offsetDst = m*(y+position.y)+position.x;
+			uint offsetDst = fontAtlasSize*(glyphMap[i].second.texc.y+y)+glyphMap[i].second.texc.x;
 			uint offsetSrc = glyphMap[i].second.w*y;
-			memcpy(pdata+offsetDst,glyphMap[i].second.pbuffer+offsetSrc,glyphMap[i].second.pitch);//width
+			memcpy(pdata+offsetDst,glyphMap[i].second.pbuffer+offsetSrc,glyphMap[i].second.w);
 		}
-
-		position.x += glyphMap[i].second.w+1;
-
-		glyphMap[i].second.texc = position;
 	}
 
 	/*FILE *pf = fopen("/tmp/output.bin","wb");
-	fwrite(pdata,1,m*m,pf);
+	fwrite(pdata,1,fontAtlasSize*fontAtlasSize,pf);
 	fclose(pf);*/
 
 	VkRect2D atlasRect;
 	atlasRect.offset = {0,0};
-	atlasRect.extent = {m,m};
+	atlasRect.extent = {fontAtlasSize,fontAtlasSize};
 	pfontAtlas->Unmap(pcommandBuffer,&atlasRect,1);
 
 	return true;
@@ -250,7 +238,7 @@ TextEngine::Glyph * TextEngine::LoadGlyph(uint codePoint){
 	});
 	if(m != glyphMap.end())
 		return &(*m).second;
-	
+
 	FT_Load_Glyph(fontFace,codePoint,FT_LOAD_RENDER);
 	FT_Bitmap *pbitmap = &fontFace->glyph->bitmap;
 	
@@ -258,10 +246,32 @@ TextEngine::Glyph * TextEngine::LoadGlyph(uint codePoint){
 	glyph.w = pbitmap->width;
 	glyph.h = pbitmap->rows;
 	glyph.pitch = pbitmap->pitch;
-	glyph.offset = glm::vec2(fontFace->glyph->bitmap_left,fontFace->glyph->bitmap_top);
+	glyph.offset = glm::vec2(fontFace->glyph->bitmap_left,-fontFace->glyph->bitmap_top);
 	glyph.pbuffer = new unsigned char[pbitmap->rows*pbitmap->pitch];
 	memcpy(glyph.pbuffer,pbitmap->buffer,pbitmap->rows*pbitmap->pitch);
 	glyphMap.push_back(std::pair<uint, Glyph>(codePoint,glyph));
+
+	//uint m = (1+16*282/64)*ceilf(sqrtf(glyphMap.size())); //https://www.freetype.org/freetype2/docs/glyphs/glyphs-2.html
+	uint size = (1+(fontFace->size->metrics.height>>6))*ceilf(sqrtf(glyphMap.size())); // /64
+	size = ((size-1)/128+1)*128; //round up to nearest multiple of 128 to improve reuse of the texture
+
+	uint s;
+	if(size == fontAtlasSize){
+		s = glyphMap.size()-1;
+	}else{
+		//need to recalculate texcoord for every glyph
+		fontAtlasCursor = glm::uvec2(0);
+		fontAtlasSize = size;
+		s = 0;
+	}
+	for(uint i = s, n = glyphMap.size(); i < n; ++i){
+		if(fontAtlasCursor.x+glyphMap[i].second.w >= size){
+			fontAtlasCursor.x = 0;
+			fontAtlasCursor.y += (fontFace->size->metrics.height>>6)+1;
+		}
+		glyphMap[i].second.texc = fontAtlasCursor;
+		fontAtlasCursor.x += glyphMap[i].second.w+1;
+	}
 
 	updateAtlas = true;
 	

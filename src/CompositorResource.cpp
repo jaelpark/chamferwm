@@ -948,13 +948,13 @@ ClientPipeline::~ClientPipeline(){
 	//
 }
 
-VkPipelineInputAssemblyStateCreateInfo ClientPipeline::inputAssemblyStateCreateInfo = {
+const VkPipelineInputAssemblyStateCreateInfo ClientPipeline::inputAssemblyStateCreateInfo = {
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
 	.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST,//VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	.primitiveRestartEnable = VK_FALSE
 };
 
-VkPipelineRasterizationStateCreateInfo ClientPipeline::rasterizationStateCreateInfo = {
+const VkPipelineRasterizationStateCreateInfo ClientPipeline::rasterizationStateCreateInfo = {
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 	.depthClampEnable = VK_FALSE,
 	.rasterizerDiscardEnable = VK_FALSE,
@@ -968,7 +968,7 @@ VkPipelineRasterizationStateCreateInfo ClientPipeline::rasterizationStateCreateI
 	.lineWidth = 1.0f
 };
 
-VkPipelineColorBlendAttachmentState ClientPipeline::colorBlendAttachmentState = {
+const VkPipelineColorBlendAttachmentState ClientPipeline::colorBlendAttachmentState = {
 	.blendEnable = VK_TRUE,
 	//premultiplied alpha blending
 	.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
@@ -980,7 +980,7 @@ VkPipelineColorBlendAttachmentState ClientPipeline::colorBlendAttachmentState = 
 	.colorWriteMask = VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT
 };
 
-VkPipelineColorBlendStateCreateInfo ClientPipeline::colorBlendStateCreateInfo = {
+const VkPipelineColorBlendStateCreateInfo ClientPipeline::colorBlendStateCreateInfo = {
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
 	.logicOpEnable = VK_FALSE,
 	.logicOp = VK_LOGIC_OP_COPY,
@@ -997,14 +997,13 @@ TextPipeline::~TextPipeline(){
 	//
 }
 
-VkPipelineInputAssemblyStateCreateInfo TextPipeline::inputAssemblyStateCreateInfo = {
+const VkPipelineInputAssemblyStateCreateInfo TextPipeline::inputAssemblyStateCreateInfo = {
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
 	.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-	//.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 	.primitiveRestartEnable = VK_FALSE
 };
 
-VkPipelineRasterizationStateCreateInfo TextPipeline::rasterizationStateCreateInfo = {
+const VkPipelineRasterizationStateCreateInfo TextPipeline::rasterizationStateCreateInfo = {
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 	.depthClampEnable = VK_FALSE,
 	.rasterizerDiscardEnable = VK_FALSE,
@@ -1019,20 +1018,19 @@ VkPipelineRasterizationStateCreateInfo TextPipeline::rasterizationStateCreateInf
 	.lineWidth = 1.0f
 };
 
-VkPipelineColorBlendAttachmentState TextPipeline::colorBlendAttachmentState = {
-	//.blendEnable = VK_TRUE,
-	.blendEnable = VK_FALSE,
+const VkPipelineColorBlendAttachmentState TextPipeline::colorBlendAttachmentState = {
+	.blendEnable = VK_TRUE,
 	//alpha blending
 	.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
 	.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
 	.colorBlendOp = VK_BLEND_OP_ADD,
 	.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-	.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+	.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
 	.alphaBlendOp = VK_BLEND_OP_ADD,
 	.colorWriteMask = VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT
 };
 
-VkPipelineColorBlendStateCreateInfo TextPipeline::colorBlendStateCreateInfo = {
+const VkPipelineColorBlendStateCreateInfo TextPipeline::colorBlendStateCreateInfo = {
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
 	.logicOpEnable = VK_FALSE,
 	.logicOp = VK_LOGIC_OP_COPY,

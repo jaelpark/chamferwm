@@ -190,20 +190,20 @@ class ClientPipeline : public Pipeline{ //, public Desc
 public:
 	ClientPipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, const class CompositorInterface *);
 	~ClientPipeline();
-	static VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
-	static VkPipelineColorBlendAttachmentState colorBlendAttachmentState;
-	static VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
-	static VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
+	static const VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
+	static const VkPipelineColorBlendAttachmentState colorBlendAttachmentState;
+	static const VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
+	static const VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
 };
 
 class TextPipeline : public Pipeline{
 public:
 	TextPipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, const class CompositorInterface *);
 	~TextPipeline();
-	static VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
-	static VkPipelineColorBlendAttachmentState colorBlendAttachmentState;
-	static VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
-	static VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
+	static const VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
+	static const VkPipelineColorBlendAttachmentState colorBlendAttachmentState;
+	static const VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
+	static const VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
 };
 
 }

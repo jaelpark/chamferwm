@@ -1,14 +1,18 @@
 
 struct PS_INPUT{
 	float4 posh : SV_Position;
-	uint2 texc : TEXCOORD;
+	float2 texc : TEXCOORD;
 };
 
 #if defined(SHADER_STAGE_VS)
 
+[[vk::push_constant]] cbuffer cb{
+	float2 xy0;
+};
+
 void main(float2 pos : POSITION, uint2 texc : TEXCOORD, out PS_INPUT output){
-	output.posh = float4(pos,0,1.0f);
-	output.texc = texc;
+	output.posh = float4(xy0+pos,0,1.0f);
+	output.texc = float2(texc.x,texc.y);
 }
 
 #elif defined(SHADER_STAGE_PS)
@@ -17,10 +21,8 @@ void main(float2 pos : POSITION, uint2 texc : TEXCOORD, out PS_INPUT output){
 
 float4 main(PS_INPUT input) : SV_Target{
 	//
-	float c = fontAtlas.Load(float3(input.posh.xy-80,0));
-	return float4(c,c,c,1);
-	//return float4(1,c,0,1);
-	//return float4(saturate(input.posh.xy/255),0,1);
+	float c = fontAtlas.Load(float3(input.texc,0));
+	return float4(0,0,0,c);
 }
 
 #endif

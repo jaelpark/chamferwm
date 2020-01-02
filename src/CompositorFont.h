@@ -13,7 +13,7 @@ public:
 	Text(const char *[Pipeline::SHADER_MODULE_COUNT], class TextEngine *);
 	~Text();
 	void Set(const char *, const VkCommandBuffer *); //updates the vertex buffers
-	void Draw(const VkCommandBuffer *);
+	void Draw(const glm::uvec2 &, const VkCommandBuffer *);
 	void UpdateDescSets();
 protected:
 	hb_buffer_t *phbBuf;
@@ -53,6 +53,8 @@ private:
 	FT_Face fontFace;
 	hb_font_t *phbFont;
 	TextureStaged *pfontAtlas;
+	glm::uvec2 fontAtlasCursor;
+	uint fontAtlasSize;
 	bool updateAtlas;
 };
 

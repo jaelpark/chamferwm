@@ -1042,7 +1042,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
 
 	vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,ptestText->passignedSet->p->pipeline);
-	ptestText->Draw(&pcommandBuffers[currentFrame]);*/
+	//ptestText->Draw(glm::uvec2(10,1160),&pcommandBuffers[currentFrame]);
+	ptestText->Draw(glm::uvec2(10,2044/2),&pcommandBuffers[currentFrame]);*/
 	// -------------------------------- test
 
 	//for(RenderObject &renderObject : renderQueue){
