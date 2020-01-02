@@ -35,12 +35,6 @@ public:
 	boost::python::object GetFloatFocus() const;
 	void Move(boost::python::object);
 //public:
-	enum FLOAT{
-		FLOAT_AUTOMATIC,
-		FLOAT_ALWAYS,
-		FLOAT_NEVER
-	} floatingMode;
-
 	//temporary storage for deferred assignment (before container is created)
 	boost::python::tuple canvasOffset;
 	boost::python::tuple canvasExtent;
@@ -48,6 +42,12 @@ public:
 	boost::python::tuple size;
 	boost::python::tuple minSize;
 	boost::python::tuple maxSize;
+	enum FLOAT{
+		FLOAT_AUTOMATIC,
+		FLOAT_ALWAYS,
+		FLOAT_NEVER
+	} floatingMode;
+	WManager::Container::TITLEBAR titleBar;
 	//client variables
 	uint shaderUserFlags;
 	//--------------------------------

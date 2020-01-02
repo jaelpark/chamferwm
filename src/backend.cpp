@@ -155,6 +155,7 @@ void X11Client::UpdateTranslation(){
 	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN || pcontainer->flags & WManager::Container::FLAG_FLOATING))
 		coord += glm::vec4(pcontainer->margin*aspect,-2.0f*pcontainer->margin*aspect)*screen;
+	//TODO: add titlebar margin
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};

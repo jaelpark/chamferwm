@@ -34,6 +34,17 @@ public:
 		FLAG_FULLSCREEN = 0x4,
 		FLAG_STACKED = 0x8
 	};
+	enum LAYOUT{
+		LAYOUT_VSPLIT,
+		LAYOUT_HSPLIT,
+	};
+	enum TITLEBAR{
+		TITLEBAR_NONE,
+		TITLEBAR_LEFT,
+		TITLEBAR_TOP,
+		TITLEBAR_RIGHT,
+		TITLEBAR_BOTTOM
+	};
 	struct Setup{
 		glm::vec2 canvasOffset = glm::vec2(0.0f);
 		glm::vec2 canvasExtent = glm::vec2(0.0f);
@@ -44,6 +55,7 @@ public:
 		glm::vec2 minSize = glm::vec2(0.0f);
 		glm::vec2 maxSize = glm::vec2(1.0f);
 		uint flags = 0;
+		TITLEBAR titleBar = TITLEBAR_NONE;
 		/*enum INSERT{
 			INSERT_APPEND,
 			INSERT_REPARENT //always with client
@@ -73,10 +85,6 @@ public:
 	void Translate();
 	void StackRecursive();
 	void Stack();
-	enum LAYOUT{
-		LAYOUT_VSPLIT,
-		LAYOUT_HSPLIT,
-	};
 	void SetLayout(LAYOUT);
 
 	virtual void Focus1(){}// = 0;
@@ -112,6 +120,7 @@ public:
 
 	uint flags;
 	LAYOUT layout;
+	TITLEBAR titleBar;
 
 	static WManager::Container *ptreeFocus; //client focus, managed by Python
 	static std::deque<std::pair<WManager::Container *, struct timespec>> tiledFocusQueue;

@@ -18,7 +18,7 @@ Container::Container() : pParent(0), pch(0), pnext(0),
 	//scale(1.0f), p(0.0f), e(1.0f), margin(0.0f), minSize(0.0f), maxSize(1.0f), mode(MODE_TILED),
 	p(0.0f), posFullCanvas(0.0f), e(1.0f), extFullCanvas(1.0f), canvasOffset(0.0f), canvasExtent(0.0f),
 	margin(0.015f), size(1.0f), minSize(0.015f), maxSize(1.0f),
-	flags(0), layout(LAYOUT_VSPLIT){//, flags(0){
+	flags(0), layout(LAYOUT_VSPLIT), titleBar(TITLEBAR_NONE){//, flags(0){
 	//
 }
 
@@ -27,7 +27,7 @@ Container::Container(Container *_pParent, const Setup &setup) :
 	pclient(0),
 	canvasOffset(setup.canvasOffset), canvasExtent(setup.canvasExtent),
 	margin(setup.margin), size(setup.size), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
-	flags(setup.flags), layout(LAYOUT_VSPLIT){//, flags(setup.flags){
+	flags(setup.flags), layout(LAYOUT_VSPLIT), titleBar(setup.titleBar){//, flags(setup.flags){
 
 	if(flags & FLAG_FLOATING)
 		return;

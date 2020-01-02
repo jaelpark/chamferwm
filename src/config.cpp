@@ -17,8 +17,9 @@ size(boost::python::make_tuple(1.0f,1.0f)),
 minSize(boost::python::make_tuple(0.0f,0.0f)),
 maxSize(boost::python::make_tuple(1.0f,1.0f)),
 floatingMode(FLOAT_AUTOMATIC),
+titleBar(WManager::Container::TITLEBAR_NONE),
 shaderUserFlags(0),
-pcontainer(0){//,
+pcontainer(0){
 	//
 }
 
@@ -27,6 +28,9 @@ ContainerInterface::~ContainerInterface(){
 	shaderUpdateQueue.erase(this);
 }
 
+//Used to copy tuples and other python object values from the interface to setup struct. The user may set some values before the internal Container instance is created, and they must be propagated forward.
+//-CopySettingsSetup: propagate container specific properties
+//-DeferredPropertyTransfer: propagate client specific properties
 void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 	setup.canvasOffset.x = boost::python::extract<float>(canvasOffset[0])();
 	setup.canvasOffset.y = boost::python::extract<float>(canvasOffset[1])();
@@ -40,6 +44,7 @@ void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 	setup.minSize.y = boost::python::extract<float>(minSize[1])();
 	setup.maxSize.x = boost::python::extract<float>(maxSize[0])();
 	setup.maxSize.y = boost::python::extract<float>(maxSize[1])();
+	setup.titleBar = titleBar;
 }
 
 void ContainerInterface::DeferredPropertyTransfer(){
@@ -59,7 +64,6 @@ void ContainerInterface::OnSetupClient(){
 
 boost::python::object ContainerInterface::OnParent(){
 	//
-	//return BackendInterface::GetFocus1(); //TODO: sensible default
 	return boost::python::object();
 }
 
@@ -633,6 +637,13 @@ BOOST_PYTHON_MODULE(chamfer){
 		.value("VSPLIT",WManager::Container::LAYOUT_VSPLIT)
 		.value("HSPLIT",WManager::Container::LAYOUT_HSPLIT);
 
+	boost::python::enum_<WManager::Container::TITLEBAR>("titleBar")
+		.value("NONE",WManager::Container::TITLEBAR_NONE)
+		.value("LEFT",WManager::Container::TITLEBAR_LEFT)
+		.value("TOP",WManager::Container::TITLEBAR_TOP)
+		.value("RIGHT",WManager::Container::TITLEBAR_RIGHT)
+		.value("BOTTOM",WManager::Container::TITLEBAR_BOTTOM);
+
 	boost::python::class_<ContainerProxy,boost::noncopyable>("Container")
 		.def("OnSetupContainer",&ContainerInterface::OnSetupContainer)
 		.def("OnSetupClient",&ContainerInterface::OnSetupClient)
@@ -841,6 +852,22 @@ BOOST_PYTHON_MODULE(chamfer){
 				}
 				return (container.pcontainer->flags & WManager::Container::FLAG_STACKED) != 0;
 			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
+		.add_property("titleBar",boost::python::make_function(
+			// = NONE, LEFT, TOP, RIGHT, BOTTOM
+			//location, size (or use common font size)?
+			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return WManager::Container::TITLEBAR_NONE;
+				return container.pcontainer->titleBar;
+			},boost::python::default_call_policies(),boost::mpl::vector<WManager::Container::TITLEBAR, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, WManager::Container::TITLEBAR titleBar){
+				if(!container.pcontainer){
+					container.titleBar = titleBar;
+					return;
+				}
+				container.pcontainer->titleBar = titleBar;
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, WManager::Container::TITLEBAR>()))
 		.add_property("shaderFlags",
 			boost::python::make_function(
 			[](ContainerInterface &container){
