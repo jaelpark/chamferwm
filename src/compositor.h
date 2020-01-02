@@ -70,7 +70,7 @@ public:
 protected:
 	void UpdateDescSets();
 	Texture *ptexture;
-	uint textureFlags;
+	uint surfaceDepth;
 	bool fullRegionUpdate;
 	bool animationCompleted;
 };
@@ -203,6 +203,7 @@ protected:
 	//Many of the allocated window textures will initially have some common reoccuring size.
 	//The purpose of caching is also to avoid attempts to destroy resources that are currently used by the pipeline.
 	Texture * CreateTexture(uint, uint, uint);
+	//Texture * CreateTextureGeneric(uint, uint, VkFormat, uint);
 	void ReleaseTexture(Texture *);
 
 	struct TextureCacheEntry{

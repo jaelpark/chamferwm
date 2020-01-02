@@ -7,13 +7,12 @@
 #include <algorithm>
 #include <gbm.h>
 #include <unistd.h>
-#include <boost/container_hash/hash.hpp>
 
 #include "spirv_reflect.h"
 
 namespace Compositor{
 
-TextureBase::TextureBase(uint _w, uint _h, VkFormat format, uint _flags, const CompositorInterface *_pcomp) : w(_w), h(_h), flags(_flags), imageLayout(VK_IMAGE_LAYOUT_UNDEFINED), pcomp(_pcomp){
+TextureBase::TextureBase(uint _w, uint _h, VkFormat format, const VkComponentMapping *pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : w(_w), h(_h), flags(_flags), imageLayout(VK_IMAGE_LAYOUT_UNDEFINED), pcomp(_pcomp){
 	//
 	auto m = std::find_if(formatSizeMap.begin(),formatSizeMap.end(),[&](auto &r)->bool{
 		return r.first == format;
@@ -21,6 +20,7 @@ TextureBase::TextureBase(uint _w, uint _h, VkFormat format, uint _flags, const C
 	formatIndex = m-formatSizeMap.begin();
 
 	//DebugPrintf(stdout,"*** creating texture: %u, (%ux%u)\n",(*m).second,w,h);
+	componentMappingHash = GetComponentMappingHash(pcomponentMapping);
 
 	//image
 	VkImageCreateInfo imageCreateInfo = {};
@@ -65,10 +65,17 @@ TextureBase::TextureBase(uint _w, uint _h, VkFormat format, uint _flags, const C
 	imageViewCreateInfo.image = image;
 	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	imageViewCreateInfo.format = format;
-	imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_B;//VK_COMPONENT_SWIZZLE_IDENTITY;
-	imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_G;//VK_COMPONENT_SWIZZLE_IDENTITY;
-	imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_R;//VK_COMPONENT_SWIZZLE_IDENTITY;
-	imageViewCreateInfo.components.a = (flags & FLAG_IGNORE_ALPHA)?VK_COMPONENT_SWIZZLE_ONE:VK_COMPONENT_SWIZZLE_IDENTITY;
+	/*if(flags & FLAG_SWIZZLE_PIXMAP){
+		imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_B;//VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_G;//VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_R;//VK_COMPONENT_SWIZZLE_IDENTITY;
+	}else{
+		imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	}
+	imageViewCreateInfo.components.a = (flags & FLAG_IGNORE_ALPHA)?VK_COMPONENT_SWIZZLE_ONE:VK_COMPONENT_SWIZZLE_IDENTITY;*/
+	imageViewCreateInfo.components = *pcomponentMapping;
 	imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	imageViewCreateInfo.subresourceRange.levelCount = 1;
@@ -87,10 +94,18 @@ TextureBase::~TextureBase(){
 }
 
 const std::vector<std::pair<VkFormat, uint>> TextureBase::formatSizeMap = {
+	{VK_FORMAT_R8_UNORM,1},
 	{VK_FORMAT_R8G8B8A8_UNORM,4}
 };
 
-TextureStaged::TextureStaged(uint _w, uint _h, VkFormat _format, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,_format,_flags,_pcomp){
+const VkComponentMapping TextureBase::defaultComponentMapping = {
+	VK_COMPONENT_SWIZZLE_IDENTITY,
+	VK_COMPONENT_SWIZZLE_IDENTITY,
+	VK_COMPONENT_SWIZZLE_IDENTITY,
+	VK_COMPONENT_SWIZZLE_IDENTITY
+};
+
+TextureStaged::TextureStaged(uint _w, uint _h, VkFormat _format, const VkComponentMapping *_pcomponentMapping,uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,_format,_pcomponentMapping,_flags,_pcomp){
 	//
 	//staging buffer
 	VkBufferCreateInfo bufferCreateInfo = {};
@@ -184,7 +199,7 @@ void TextureStaged::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D 
 	imageLayout = imageMemoryBarrier.newLayout;
 }
 
-TexturePixmap::TexturePixmap(uint _w, uint _h, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_flags,_pcomp), transferImageLayout(VK_IMAGE_LAYOUT_PREINITIALIZED){
+TexturePixmap::TexturePixmap(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), transferImageLayout(VK_IMAGE_LAYOUT_PREINITIALIZED){
 	pcomp11 = dynamic_cast<const X11Compositor *>(pcomp);
 }
 
@@ -361,7 +376,21 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D
 	transferImageLayout = transferImageMemoryBarrier.newLayout;
 }
 
-TextureHostPointer::TextureHostPointer(uint _w, uint _h, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_flags,_pcomp){
+const VkComponentMapping TexturePixmap::pixmapComponentMapping = {
+	VK_COMPONENT_SWIZZLE_B,
+	VK_COMPONENT_SWIZZLE_G,
+	VK_COMPONENT_SWIZZLE_R,
+	VK_COMPONENT_SWIZZLE_IDENTITY
+};
+
+const VkComponentMapping TexturePixmap::pixmapComponentMapping24 = {
+	VK_COMPONENT_SWIZZLE_B,
+	VK_COMPONENT_SWIZZLE_G,
+	VK_COMPONENT_SWIZZLE_R,
+	VK_COMPONENT_SWIZZLE_ONE
+};
+
+TextureHostPointer::TextureHostPointer(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp){
 	//
 	discards.reserve(2);
 }
@@ -502,7 +531,7 @@ void TextureHostPointer::Update(const VkCommandBuffer *pcommandBuffer, const VkR
 }
 
 //Texture::Texture(uint _w, uint _h, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomp), TexturePixmap(_w,_h,_pcomp){
-Texture::Texture(uint _w, uint _h, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_flags,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_flags,_pcomp), TextureHostPointer(_w,_h,_flags,_pcomp){
+Texture::Texture(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TextureHostPointer(_w,_h,_pcomponentMapping,_flags,_pcomp){
 	//
 }
 
@@ -743,7 +772,8 @@ ShaderModule::~ShaderModule(){
 const std::vector<std::tuple<const char *, VkFormat, uint>> ShaderModule::semanticMap = {
 	{"POSITION",VK_FORMAT_R32G32_SFLOAT,8},
 	{"POSITION",VK_FORMAT_R32G32_UINT,8},
-	{"TEXCOORD",VK_FORMAT_R32G32_SFLOAT,8} //R16G16?
+	{"TEXCOORD",VK_FORMAT_R32G32_SFLOAT,8}, //R16G16?
+	{"TEXCOORD",VK_FORMAT_R32G32_UINT,8} //R16G16?
 };
 
 const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {
@@ -978,7 +1008,8 @@ VkPipelineRasterizationStateCreateInfo TextPipeline::rasterizationStateCreateInf
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 	.depthClampEnable = VK_FALSE,
 	.rasterizerDiscardEnable = VK_FALSE,
-	.polygonMode = VK_POLYGON_MODE_LINE,//VK_POLYGON_MODE_FILL,
+	.polygonMode = VK_POLYGON_MODE_FILL,
+	//.polygonMode = VK_POLYGON_MODE_LINE,
 	.cullMode = VK_CULL_MODE_NONE,
 	.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
 	.depthBiasEnable = VK_FALSE,

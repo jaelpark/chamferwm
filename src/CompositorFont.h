@@ -14,6 +14,8 @@ public:
 	~Text();
 	void Set(const char *, const VkCommandBuffer *); //updates the vertex buffers
 	void Draw(const VkCommandBuffer *);
+	void UpdateDescSets();
+protected:
 	hb_buffer_t *phbBuf;
 	uint glyphCount;
 	class TextEngine *ptextEngine;
@@ -21,6 +23,7 @@ public:
 	class Buffer *pindexBuffer;
 	struct Vertex{
 		glm::vec2 pos;
+		glm::uvec2 texc;
 	};// alignas(16);
 	static std::vector<std::pair<ShaderModule::INPUT, uint>> vertexBufferLayout;
 };
@@ -36,7 +39,10 @@ public:
 		uint pitch;
 		glm::vec2 offset;
 		unsigned char *pbuffer;
+		//texture atlas parameters
+		glm::uvec2 texc;
 	};
+	bool UpdateAtlas(const VkCommandBuffer *);
 	Glyph * LoadGlyph(uint);
 private:
 	//static FT_Error FaceRequester(FTC_FaceID, FT_Library, FT_Pointer, FT_Face *);
@@ -46,6 +52,8 @@ private:
 	//FTC_Manager fontCacheManager;
 	FT_Face fontFace;
 	hb_font_t *phbFont;
+	TextureStaged *pfontAtlas;
+	bool updateAtlas;
 };
 
 }

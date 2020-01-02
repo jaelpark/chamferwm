@@ -80,7 +80,8 @@ void Drawable::BindShaderResources(const std::vector<std::pair<ShaderModule::VAR
 		}
 	}
 
-	vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,passignedSet->p->pushConstantRange.stageFlags,passignedSet->p->pushConstantRange.offset,passignedSet->p->pushConstantRange.size,pushConstantBuffer);
+	if(passignedSet->p->pushConstantRange.size > 0)
+		vkCmdPushConstants(*pcommandBuffer,passignedSet->p->pipelineLayout,passignedSet->p->pushConstantRange.stageFlags,passignedSet->p->pushConstantRange.offset,passignedSet->p->pushConstantRange.size,pushConstantBuffer);
 }
 
 ColorFrame::ColorFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : Drawable(_pcomp->LoadPipeline<ClientPipeline>(pshaderName,0),_pcomp), shaderUserFlags(0), shaderFlags(0), oldShaderFlags(0){
@@ -126,11 +127,11 @@ ClientFrame::~ClientFrame(){
 	pcomp->ReleaseTexture(ptexture);
 }
 
-void ClientFrame::CreateSurface(uint w, uint h, uint flags){
+void ClientFrame::CreateSurface(uint w, uint h, uint depth){
 	pcomp->updateQueue.push_back(this);
 
-	textureFlags = flags;
-	ptexture = pcomp->CreateTexture(w,h,textureFlags);
+	surfaceDepth = depth;
+	ptexture = pcomp->CreateTexture(w,h,surfaceDepth);
 
 	UpdateDescSets();
 }
@@ -141,7 +142,7 @@ void ClientFrame::AdjustSurface(uint w, uint h){
 	pcomp->updateQueue.push_back(this);
 	fullRegionUpdate = true;
 
-	ptexture = pcomp->CreateTexture(w,h,textureFlags);
+	ptexture = pcomp->CreateTexture(w,h,surfaceDepth);
 	//In this case updating the descriptor sets would be enough, but we can't do that because of them being used currently by the pipeline.
 	if(!AssignPipeline(passignedSet->p))
 		throw Exception("Failed to assign a pipeline.");
@@ -972,7 +973,9 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	updateQueue.clear();
 
 	// -------------------------------- test
-	//ptestText->Set("afafwasdaw",&pcopyCommandBuffers[currentFrame]);
+	/*ptestText->Set("afafwasdaw!!??@ :D",&pcopyCommandBuffers[currentFrame]);
+	if(ptextEngine->UpdateAtlas(&pcopyCommandBuffers[currentFrame]))
+		ptestText->UpdateDescSets();*/
 	// -------------------------------- test
 
 	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
@@ -1029,6 +1032,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		pbackground->Draw(screenRect,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
 
 	}
+	
+	//TODO: stencil buffer optimization
 
 	// -------------------------------- test
 	/*VkRect2D scissor;
@@ -1206,7 +1211,33 @@ void CompositorInterface::ClearBackground(){
 	//------------------ testing
 }
 
-Texture * CompositorInterface::CreateTexture(uint w, uint h, uint flags){
+Texture * CompositorInterface::CreateTexture(uint w, uint h, uint surfaceDepth){
+	Texture *ptexture;
+
+	//should be larger than 0:
+	w = std::max(std::min(w,physicalDevProps.limits.maxImageDimension2D),1u);
+	h = std::max(std::min(h,physicalDevProps.limits.maxImageDimension2D),1u);
+
+	const VkComponentMapping *pcomponentMapping = surfaceDepth > 24?&TexturePixmap::pixmapComponentMapping:&TexturePixmap::pixmapComponentMapping24;
+	uint componentMappingHash = TextureBase::GetComponentMappingHash(pcomponentMapping);
+
+	auto m = std::find_if(textureCache.begin(),textureCache.end(),[&](auto &r)->bool{
+		//return r.ptexture->w == w && r.ptexture->h == h;
+		return r.ptexture->w == w && r.ptexture->h == h && r.ptexture->componentMappingHash == componentMappingHash;
+	});
+	if(m != textureCache.end()){
+		ptexture = (*m).ptexture;
+
+		std::iter_swap(m,textureCache.end()-1);
+		textureCache.pop_back();
+		printf("----------- found cached texture\n");
+
+	}else ptexture = new Texture(w,h,pcomponentMapping,0,this);
+
+	return ptexture;
+}
+
+/*Texture * CompositorInterface::CreateTextureGeneric(uint w, uint h, VkFormat format, uint flags){
 	Texture *ptexture;
 
 	//should be larger than 0:
@@ -1227,7 +1258,7 @@ Texture * CompositorInterface::CreateTexture(uint w, uint h, uint flags){
 	}else ptexture = new Texture(w,h,flags,this);
 
 	return ptexture;
-}
+}*/
 
 void CompositorInterface::ReleaseTexture(Texture *ptexture){
 	TextureCacheEntry textureCacheEntry;
@@ -1347,8 +1378,7 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 		depth = 24;
 	}
 
-	uint flags = depth != 32?TextureBase::FLAG_IGNORE_ALPHA:0;
-	CreateSurface(rect.w,rect.h,flags);
+	CreateSurface(rect.w,rect.h,depth);
 
 	if(pcomp->hostMemoryImport && !ptexture->Attach(pchpixels)){
 		DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
@@ -1496,7 +1526,7 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 	pchpixels = (unsigned char*)shmat(shmid,0,0);
 	//shmctl(shmid,IPC_RMID,0);
 
-	CreateSurface(w,h,TextureBase::FLAG_IGNORE_ALPHA);
+	CreateSurface(w,h,24);
 
 	if(pcomp->hostMemoryImport && !ptexture->Attach(pchpixels)){
 		DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
@@ -1751,7 +1781,7 @@ VkExtent2D X11Compositor::GetExtent() const{
 
 X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : DebugClient(pcontainer,_pcreateInfo), ClientFrame(_pshaderName,_pcomp){
 	//
-	CreateSurface(rect.w,rect.h,0);
+	CreateSurface(rect.w,rect.h,32);
 	pcomp->AddDamageRegion(this);
 }
 

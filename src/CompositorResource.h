@@ -10,31 +10,32 @@ namespace Compositor{
 
 class TextureBase{
 public:
-	TextureBase(uint, uint, VkFormat, uint, const class CompositorInterface *);
+	TextureBase(uint, uint, VkFormat, const VkComponentMapping *, uint, const class CompositorInterface *);
 	virtual ~TextureBase();
 	//
 	uint w, h;
 	uint flags;
 	uint formatIndex;
+	uint componentMappingHash;
 	VkImageLayout imageLayout;
 
 	VkImage image;
 	VkImageView imageView;
 	VkDeviceMemory deviceMemory;
 
-	enum FLAG{
-		FLAG_IGNORE_ALPHA = 0x1
-	};
-
 	const class CompositorInterface *pcomp;
 
+	static inline uint GetComponentMappingHash(const VkComponentMapping *pcomponentMapping){
+		return pcomponentMapping->r|((uint)pcomponentMapping->g<<8)|((uint)pcomponentMapping->b<<16)|((uint)pcomponentMapping->a<<24);
+	}
 	static const std::vector<std::pair<VkFormat, uint>> formatSizeMap;
+	static const VkComponentMapping defaultComponentMapping;
 };
 
 //texture class for shader reads
 class TextureStaged : virtual public TextureBase{
 public:
-	TextureStaged(uint, uint, VkFormat, uint, const class CompositorInterface *);
+	TextureStaged(uint, uint, VkFormat, const VkComponentMapping *, uint, const class CompositorInterface *);
 	virtual ~TextureStaged();
 	const void * Map() const;
 	void Unmap(const VkCommandBuffer *, const VkRect2D *, uint);
@@ -49,7 +50,7 @@ public:
 
 class TexturePixmap : virtual public TextureBase{
 public:
-	TexturePixmap(uint, uint, uint, const class CompositorInterface *);
+	TexturePixmap(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
 	virtual ~TexturePixmap();
 	void Attach(xcb_pixmap_t);
 	void Detach();
@@ -64,11 +65,14 @@ public:
 	sint dmafd;
 	struct gbm_bo *pgbmBufferObject;
 	const class X11Compositor *pcomp11;
+
+	static const VkComponentMapping pixmapComponentMapping;
+	static const VkComponentMapping pixmapComponentMapping24;
 };
 
 class TextureHostPointer : virtual public TextureBase{
 public:
-	TextureHostPointer(uint, uint, uint, const class CompositorInterface *);
+	TextureHostPointer(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
 	virtual ~TextureHostPointer();
 	bool Attach(unsigned char *);
 	void Detach(uint64);
@@ -84,7 +88,7 @@ public:
 //class Texture : public TextureStaged, public TexturePixmap{
 class Texture : public TextureStaged, public TextureHostPointer{
 public:
-	Texture(uint, uint, uint, const class CompositorInterface *);
+	Texture(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
 	~Texture();
 };
 
@@ -147,6 +151,8 @@ public:
 	enum INPUT{
 		INPUT_POSITION_SFLOAT2,
 		INPUT_POSITION_UINT2,
+		INPUT_TEXCOORD_SFLOAT2,
+		INPUT_TEXCOORD_UINT2,
 		INPUT_COUNT
 	};
 	static const std::vector<std::tuple<const char *, VkFormat, uint>> semanticMap;
