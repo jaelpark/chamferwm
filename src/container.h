@@ -56,10 +56,6 @@ public:
 		glm::vec2 maxSize = glm::vec2(1.0f);
 		uint flags = 0;
 		TITLEBAR titleBar = TITLEBAR_NONE;
-		/*enum INSERT{
-			INSERT_APPEND,
-			INSERT_REPARENT //always with client
-		} insert = INSERT_APPEND;*/
 	};
 	Container(); //root container
 	Container(Container *, const Setup &);
@@ -113,7 +109,7 @@ public:
 	glm::vec2 canvasExtent;
 
 	glm::vec2 margin;
-	//glm::vec2 titlePad;
+	glm::vec2 titlePad; //TODO: include in Setup? Supply font size params from main
 
 	glm::vec2 size; //size relative to the parent container
 	glm::vec2 minSize; //min size, relative to screen

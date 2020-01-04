@@ -17,7 +17,7 @@ Container::Container() : pParent(0), pch(0), pnext(0),
 	pclient(0),
 	//scale(1.0f), p(0.0f), e(1.0f), margin(0.0f), minSize(0.0f), maxSize(1.0f), mode(MODE_TILED),
 	p(0.0f), posFullCanvas(0.0f), e(1.0f), extFullCanvas(1.0f), canvasOffset(0.0f), canvasExtent(0.0f),
-	margin(0.015f), size(1.0f), minSize(0.015f), maxSize(1.0f),
+	margin(0.015f), titlePad(0.0f), size(1.0f), minSize(0.015f), maxSize(1.0f),
 	flags(0), layout(LAYOUT_VSPLIT), titleBar(TITLEBAR_NONE){//, flags(0){
 	//
 }
@@ -26,11 +26,31 @@ Container::Container(Container *_pParent, const Setup &setup) :
 	pParent(_pParent), pch(0), pnext(0),
 	pclient(0),
 	canvasOffset(setup.canvasOffset), canvasExtent(setup.canvasExtent),
-	margin(setup.margin), size(setup.size), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
+	margin(setup.margin), titlePad(0.0f), size(setup.size), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
 	flags(setup.flags), layout(LAYOUT_VSPLIT), titleBar(setup.titleBar){//, flags(setup.flags){
 
 	if(flags & FLAG_FLOATING)
 		return;
+
+
+	//----------------- temp
+	switch(titleBar){
+	case TITLEBAR_LEFT:
+		titlePad = glm::vec2(-0.3333f,0.0f);
+		break;
+	case TITLEBAR_RIGHT:
+		titlePad = glm::vec2(0.3333f,0.0f);
+		break;
+	case TITLEBAR_TOP:
+		titlePad = glm::vec2(0.0f,-0.3333f);
+		break;
+	case TITLEBAR_BOTTOM:
+		titlePad = glm::vec2(0.0f,0.3333f);
+		break;
+	default:
+		break;
+	}
+	//----------------- temp
 
 	//TODO: allow reparenting containers without client
 	if(pParent->pclient){

@@ -19,6 +19,7 @@ maxSize(boost::python::make_tuple(1.0f,1.0f)),
 floatingMode(FLOAT_AUTOMATIC),
 titleBar(WManager::Container::TITLEBAR_NONE),
 //titleBar(WManager::Container::TITLEBAR_TOP),
+//titleBar(WManager::Container::TITLEBAR_RIGHT),
 shaderUserFlags(0),
 pcontainer(0){
 	//

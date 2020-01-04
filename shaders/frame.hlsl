@@ -21,8 +21,8 @@ const float2 vertexPositions[4] = {
 	float2(1.0f,1.0f)
 };
 
-static float2 xy0_1 = xy0+min(titlePad,0.0f);
-static float2 xy1_1 = xy1+max(titlePad,0.0f);
+static float2 xy0_1 = xy0+min(2.0f*titlePad*float2(1.0f,screen.x/screen.y),0.0f);
+static float2 xy1_1 = xy1+max(2.0f*titlePad*float2(1.0f,screen.x/screen.y),0.0f);
 const float2 vertices[4] = {
 	xy0_1,
 	float2(xy1_1.x,xy0_1.y),
@@ -84,8 +84,8 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 
 	float2 a_content = screen*(0.5f*xy0+0.5f); //top-left corner in pixels
 
-	float2 xy0_1 = xy0+min(titlePad,0.0f);
-	float2 xy1_1 = xy1+max(titlePad,0.0f);
+	float2 xy0_1 = xy0+min(2.0f*titlePad*aspect,0.0f);
+	float2 xy1_1 = xy1+max(2.0f*titlePad*aspect,0.0f);
 
 	float2 a = screen*(0.5f*xy0_1+0.5f); //top-left corner in pixels
 	float2 b = screen*(0.5f*xy1_1+0.5f); //bottom-right corner in pixels

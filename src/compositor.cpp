@@ -768,12 +768,18 @@ void CompositorInterface::AddDamageRegion(const WManager::Client *pclient){
 		pclient->pcontainer->margin.x*(float)imageExtent.width,
 		pclient->pcontainer->margin.y*(float)imageExtent.width); //due to aspect, this must be *width
 	
+	glm::ivec2 titlePad = glm::ivec2(
+		pclient->pcontainer->titlePad.x*(float)imageExtent.width,
+		pclient->pcontainer->titlePad.y*(float)imageExtent.width);
+	glm::ivec2 titlePadOffset = glm::min(titlePad,glm::ivec2(0));
+	glm::ivec2 titlePadExtent = glm::max(titlePad,glm::ivec2(0));
+
 	VkRect2D rect1;
-	rect1.offset = {pclient->rect.x-margin.x,pclient->rect.y-margin.y};
-	rect1.extent = {pclient->rect.w+2*margin.x,pclient->rect.h+2*margin.y};
+	rect1.offset = {pclient->rect.x-margin.x+titlePadOffset.x,pclient->rect.y-margin.y+titlePadOffset.y};
+	rect1.extent = {pclient->rect.w+2*margin.x-titlePadOffset.x+titlePadExtent.x,pclient->rect.h+2*margin.y-titlePadOffset.y+titlePadExtent.y};
 	AddDamageRegion(&rect1);
-	rect1.offset = {pclient->oldRect.x-margin.x,pclient->oldRect.y-margin.y};
-	rect1.extent = {pclient->oldRect.w+2*margin.x,pclient->oldRect.h+2*margin.y};
+	rect1.offset = {pclient->oldRect.x-margin.x+titlePadOffset.x,pclient->oldRect.y-margin.y+titlePadOffset.y};
+	rect1.extent = {pclient->oldRect.w+2*margin.x-titlePadOffset.x+titlePadExtent.x,pclient->oldRect.h+2*margin.y-titlePadOffset.y+titlePadExtent.y};
 	AddDamageRegion(&rect1);
 }
 
@@ -1083,28 +1089,9 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			}
 		}*/
 
-		glm::vec2 titlePad;
-		switch(renderObject.pclient->pcontainer->titleBar){
-		case WManager::Container::TITLEBAR_LEFT:
-			titlePad = glm::vec2(-0.1f,0.0f);
-			break;
-		case WManager::Container::TITLEBAR_RIGHT:
-			titlePad = glm::vec2(0.1f,0.0f);
-			break;
-		case WManager::Container::TITLEBAR_TOP:
-			titlePad = glm::vec2(0.0f,-0.1f);
-			break;
-		case WManager::Container::TITLEBAR_BOTTOM:
-			titlePad = glm::vec2(0.0f,0.1f);
-			break;
-		default:
-			titlePad = glm::vec2(0.0f);
-			break;
-		}
-
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
-		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,titlePad,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
+		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclient->pcontainer->titlePad,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 	}
 
 	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);
@@ -1114,10 +1101,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 }
 
 void CompositorInterface::Present(){
-	/*uint imageIndex;
-	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS)
-		throw Exception("Failed to acquire a swap chain image.\n");*/
-	//
 	VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 	//VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
 	
