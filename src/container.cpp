@@ -32,7 +32,6 @@ Container::Container(Container *_pParent, const Setup &setup) :
 	if(flags & FLAG_FLOATING)
 		return;
 
-
 	//----------------- temp
 	switch(titleBar){
 	case TITLEBAR_LEFT:

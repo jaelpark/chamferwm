@@ -1430,19 +1430,15 @@ void DebugClient::UpdateTranslation(){
 	glm::vec4 screen(se.x,se.y,se.x,se.y);
 	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
 	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->margin*aspect,pcontainer->e-2.0f*pcontainer->margin*aspect)*screen;
-	glm::vec2 titlePad = glm::abs(pcontainer->titlePad)*aspect*glm::vec2(screen);
-	switch(pcontainer->titleBar){
-	case WManager::Container::TITLEBAR_LEFT:
-		coord.x += titlePad.x;
-	case WManager::Container::TITLEBAR_RIGHT:
-		coord.z -= titlePad.x;
-		break;
-	case WManager::Container::TITLEBAR_TOP:
-		coord.y += titlePad.y;
-	case WManager::Container::TITLEBAR_BOTTOM:
-		coord.w -= titlePad.y;
-		break;
-	}
+	glm::vec2 titlePad = pcontainer->titlePad*aspect*glm::vec2(screen);
+	//TODO: check if titlePad is larger than content
+	//if(titlePad.x > coord.z)
+	//
+	glm::vec2 titlePadOffset = glm::min(titlePad,glm::vec2(0.0f));
+	glm::vec2 titlePadExtent = glm::max(titlePad,glm::vec2(0.0f));
+
+	coord -= glm::vec4(titlePadOffset.x,titlePadOffset.y,titlePadExtent.x-titlePadOffset.x,titlePadExtent.y-titlePadOffset.y);
+
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
