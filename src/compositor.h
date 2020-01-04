@@ -42,7 +42,7 @@ friend class CompositorInterface;
 public:
 	ColorFrame(const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
 	virtual ~ColorFrame();
-	void Draw(const VkRect2D &, const glm::vec2 &, uint, const VkCommandBuffer *);
+	void Draw(const VkRect2D &, const glm::vec2 &, const glm::vec2 &, uint, const VkCommandBuffer *);
 protected:
 	struct timespec creationTime;
 	float time;
@@ -70,6 +70,7 @@ public:
 protected:
 	void UpdateDescSets();
 	Texture *ptexture;
+	//class Text *ptitle;
 	uint surfaceDepth;
 	bool fullRegionUpdate;
 	bool animationCompleted;
@@ -184,7 +185,7 @@ protected:
 	ColorFrame *pcolorBackground;
 	ColorFrame *pbackground;
 	class TextEngine *ptextEngine;
-	class Text *ptestText; //testing
+	//class Text *ptestText; //testing
 
 	VkSampler pointSampler;
 

@@ -113,6 +113,7 @@ public:
 	glm::vec2 canvasExtent;
 
 	glm::vec2 margin;
+	//glm::vec2 titlePad;
 
 	glm::vec2 size; //size relative to the parent container
 	glm::vec2 minSize; //min size, relative to screen

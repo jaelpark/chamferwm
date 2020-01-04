@@ -156,6 +156,18 @@ void X11Client::UpdateTranslation(){
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN || pcontainer->flags & WManager::Container::FLAG_FLOATING))
 		coord += glm::vec4(pcontainer->margin*aspect,-2.0f*pcontainer->margin*aspect)*screen;
 	//TODO: add titlebar margin
+	//-get text height from the text engine somehow
+	float titleMargin = 0.0f;
+	switch(pcontainer->titleBar){
+	case WManager::Container::TITLEBAR_LEFT:
+		coord.x += titleMargin;//text engine font height + titlebar margin
+		coord.z -= titleMargin;
+		break;
+	case WManager::Container::TITLEBAR_TOP:
+		coord.y += titleMargin;//text engine font height + titlebar margin
+		coord.w -= titleMargin;
+		break;
+	}
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
@@ -1418,6 +1430,19 @@ void DebugClient::UpdateTranslation(){
 	glm::vec4 screen(se.x,se.y,se.x,se.y);
 	glm::vec2 aspect = glm::vec2(1.0,screen.x/screen.y);
 	glm::vec4 coord = glm::vec4(pcontainer->p+pcontainer->margin*aspect,pcontainer->e-2.0f*pcontainer->margin*aspect)*screen;
+	float titleMargin = 0.1f*screen.x;
+	switch(pcontainer->titleBar){
+	case WManager::Container::TITLEBAR_LEFT:
+		coord.x += titleMargin;
+	case WManager::Container::TITLEBAR_RIGHT:
+		coord.z -= titleMargin;
+		break;
+	case WManager::Container::TITLEBAR_TOP:
+		coord.y += titleMargin;
+	case WManager::Container::TITLEBAR_BOTTOM:
+		coord.w -= titleMargin;
+		break;
+	}
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};

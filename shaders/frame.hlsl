@@ -21,11 +21,13 @@ const float2 vertexPositions[4] = {
 	float2(1.0f,1.0f)
 };
 
+static float2 xy0_1 = xy0+min(titlePad,0.0f);
+static float2 xy1_1 = xy1+max(titlePad,0.0f);
 const float2 vertices[4] = {
-	xy0,
-	float2(xy1.x,xy0.y),
-	float2(xy0.x,xy1.y),
-	xy1
+	xy0_1,
+	float2(xy1_1.x,xy0_1.y),
+	float2(xy0_1.x,xy1_1.y),
+	xy1_1
 };
 
 [maxvertexcount(4)]
@@ -36,7 +38,8 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 	float2 aspect = float2(1.0f,screen.x/screen.y);
 	float2 marginWidth = margin*aspect; //this results in borders half the gap size
 
-	marginWidth *= 8.0f; //stretch to make room for the effects (border + shadow)
+	//stretch to make room for the effects (border + shadow) - also includes screen space 2.0f
+	marginWidth *= 8.0f;
 
 	//expand the vertex into a quad
 	[unroll]
@@ -79,8 +82,13 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 
 	float2 borderScalingScr = borderScaling*screen*aspect;
 
-	float2 a = screen*(0.5f*xy0+0.5f); //top-left corner in pixels
-	float2 b = screen*(0.5f*xy1+0.5f); //bottom-right corner in pixels
+	float2 a_content = screen*(0.5f*xy0+0.5f); //top-left corner in pixels
+
+	float2 xy0_1 = xy0+min(titlePad,0.0f);
+	float2 xy1_1 = xy1+max(titlePad,0.0f);
+
+	float2 a = screen*(0.5f*xy0_1+0.5f); //top-left corner in pixels
+	float2 b = screen*(0.5f*xy1_1+0.5f); //bottom-right corner in pixels
 	float2 center = 0.5f*(a+b); //center location in pixels
 	float2 d1 = b-a; //d1: pixel extent of the window
 
@@ -131,7 +139,7 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 #endif //STOCK_FRAME_STYLE
 
 	//content region
-	float4 c = content.Load(float3(posh.xy-a,0));
+	float4 c = content.Load(float3(posh.xy-a_content,0));
 	return c;
 }
 

@@ -93,7 +93,7 @@ ColorFrame::~ColorFrame(){
 	//
 }
 
-void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, uint flags, const VkCommandBuffer *pcommandBuffer){
+void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm::vec2 &titlePad, uint flags, const VkCommandBuffer *pcommandBuffer){
 	time = timespec_diff(pcomp->frameTime,creationTime);
 
 	glm::vec2 imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
@@ -102,11 +102,16 @@ void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, uint flags
 		frame.offset.x+frame.extent.width,frame.offset.y+frame.extent.height};
 	frameVec = 2.0f*(frameVec+0.5f)/glm::vec4(imageExtent,imageExtent)-1.0f;
 
+	//TODO: expand also in gs
+	//glm::vec2 titlePad1 = 1.0f*glm::vec2(0.0f,-0.1f)*imageExtent.x/imageExtent;
+	//glm::vec2 titlePad1 = glm::vec2(0.1f,0.0f)*imageExtent.x/imageExtent;
+
 	std::vector<std::pair<ShaderModule::VARIABLE, const void *>> varAddrs = {
 		{ShaderModule::VARIABLE_XY0,&frameVec},
 		{ShaderModule::VARIABLE_XY1,&frameVec.z},
 		{ShaderModule::VARIABLE_SCREEN,&imageExtent},
 		{ShaderModule::VARIABLE_MARGIN,&margin},
+		{ShaderModule::VARIABLE_TITLEPAD,&titlePad},
 		{ShaderModule::VARIABLE_FLAGS,&flags},
 		{ShaderModule::VARIABLE_TIME,&time}
 	};
@@ -645,8 +650,6 @@ void CompositorInterface::InitializeRenderEngine(){
 	descPoolSizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 	descPoolSizes[1].descriptorCount = 16;
 
-	//TODO: pool memory management, probably a vector a pools
-	//- find_if, find the pool which still has sets available
 	VkDescriptorPoolCreateInfo descPoolCreateInfo = {};
 	descPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descPoolCreateInfo.poolSizeCount = sizeof(descPoolSizes)/sizeof(descPoolSizes[0]);
@@ -683,13 +686,15 @@ void CompositorInterface::InitializeRenderEngine(){
 	updateQueue.reserve(1024);
 	scissorRegions.reserve(32);
 	presentRectLayers.reserve(32);
+
+	ptextEngine = new TextEngine(this);
 }
 
 void CompositorInterface::DestroyRenderEngine(){
 	DebugPrintf(stdout,"Compositor cleanup\n");
 
-	/*delete ptestText;
-	delete ptextEngine;*/
+	//delete ptestText;
+	delete ptextEngine;
 
 	for(TextureCacheEntry &textureCacheEntry : textureCache)
 		delete textureCacheEntry.ptexture;
@@ -764,7 +769,6 @@ void CompositorInterface::AddDamageRegion(const WManager::Client *pclient){
 		pclient->pcontainer->margin.y*(float)imageExtent.width); //due to aspect, this must be *width
 	
 	VkRect2D rect1;
-	//rect1.offset = {(sint)pclient->position.x-margin.x,(sint)pclient->position.y-margin.y};
 	rect1.offset = {pclient->rect.x-margin.x,pclient->rect.y-margin.y};
 	rect1.extent = {pclient->rect.w+2*margin.x,pclient->rect.h+2*margin.y};
 	AddDamageRegion(&rect1);
@@ -1029,7 +1033,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		VkRect2D screenRect;
 		screenRect.offset = {0,0};
 		screenRect.extent = imageExtent;
-		pbackground->Draw(screenRect,glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
+		pbackground->Draw(screenRect,glm::vec2(0.0f),glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
 
 	}
 	
@@ -1079,10 +1083,28 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			}
 		}*/
 
+		glm::vec2 titlePad;
+		switch(renderObject.pclient->pcontainer->titleBar){
+		case WManager::Container::TITLEBAR_LEFT:
+			titlePad = glm::vec2(-0.1f,0.0f);
+			break;
+		case WManager::Container::TITLEBAR_RIGHT:
+			titlePad = glm::vec2(0.1f,0.0f);
+			break;
+		case WManager::Container::TITLEBAR_TOP:
+			titlePad = glm::vec2(0.0f,-0.1f);
+			break;
+		case WManager::Container::TITLEBAR_BOTTOM:
+			titlePad = glm::vec2(0.0f,0.1f);
+			break;
+		default:
+			titlePad = glm::vec2(0.0f);
+			break;
+		}
+
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
-		//renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.flags,&pcommandBuffers[currentFrame]);
-		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
+		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,titlePad,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 	}
 
 	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);
@@ -1204,8 +1226,7 @@ void CompositorInterface::ClearBackground(){
 	AddDamageRegion(&screenRect);
 
 	//------------------ testing
-	/*ptextEngine = new TextEngine(this);
-	static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
+	/*static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
 		"text_vertex.spv",0,"text_fragment.spv"
 	};
 	ptestText = new Text(pshaderName,ptextEngine);*/

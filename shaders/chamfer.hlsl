@@ -10,6 +10,7 @@
 	float2 xy1; //normalized bottom-right corner location
 	float2 screen; //screen pixel dimensions
 	float2 margin; //normalized gap margin in x and y directions
+	float2 titlePad; //title padding vector
 	uint flags; //flags such as whether client is focused
 	float time; //time in seconds since client creation
 };
