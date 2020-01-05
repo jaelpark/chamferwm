@@ -87,6 +87,7 @@ friend class Buffer;
 friend class ShaderModule;
 friend class Pipeline;
 friend class ClientPipeline;
+friend class FontAtlas;
 friend class Text;
 friend class TextEngine;
 friend class Drawable;

@@ -8,15 +8,6 @@
 
 namespace Compositor{
 
-struct FontAtlas{ //TODO: own class?
-	TextureStaged *ptexture;
-	std::vector<std::pair<uint, glm::uvec2>> glyphCollection;
-	glm::uvec2 fontAtlasCursor; //this is useless since Map() for the full region erases everything
-	uint size;
-	uint refCount;
-	uint64 releaseTag;
-};
-
 class Text : public Drawable{
 public:
 	Text(const char *[Pipeline::SHADER_MODULE_COUNT], class TextEngine *);
@@ -30,7 +21,7 @@ protected:
 	class TextEngine *ptextEngine;
 	class Buffer *pvertexBuffer;
 	class Buffer *pindexBuffer;
-	FontAtlas *pfontAtlas;
+	class FontAtlas *pfontAtlas;
 	struct Vertex{
 		glm::vec2 pos;
 		glm::uvec2 texc;
@@ -39,6 +30,7 @@ protected:
 };
 
 class TextEngine{
+friend class FontAtlas;
 friend class Text;
 public:
 	TextEngine(class CompositorInterface *);
@@ -50,11 +42,9 @@ public:
 		uint pitch;
 		glm::vec2 offset;
 		unsigned char *pbuffer;
-		//texture atlas parameters
-		//glm::uvec2 texc;
 	};
 	//FontAtlas * CreateAtlas(uint);
-	FontAtlas * CreateAtlas(hb_glyph_info_t *, uint);
+	FontAtlas * CreateAtlas(hb_glyph_info_t *, uint, const VkCommandBuffer *);
 	void ReleaseAtlas(FontAtlas *);
 	//bool UpdateAtlas(const VkCommandBuffer *);
 	//FontAtlas * LoadAtlas
@@ -63,7 +53,7 @@ private:
 	//static FT_Error FaceRequester(FTC_FaceID, FT_Library, FT_Pointer, FT_Face *);
 	class CompositorInterface *pcomp;
 	std::vector<Glyph> glyphMap;
-	std::vector<FontAtlas> fontAtlasMap;
+	std::vector<class FontAtlas *> fontAtlasMap;
 	//std::vector<std::pair<uint, Glyph>> glyphMap;
 	//std::vector<Text *> updateQueue; //keep track in order to update descriptor sets when needed
 	FT_Library library;
@@ -73,6 +63,26 @@ private:
 	//TextureStaged *pfontAtlas;
 	//glm::uvec2 fontAtlasCursor; //remove
 	//uint fontAtlasSize; //remove
+};
+
+class FontAtlas{
+public:
+	FontAtlas(uint, class TextEngine *);
+	~FontAtlas();
+	void Update(hb_glyph_info_t *, uint, const VkCommandBuffer *);
+	TextEngine *ptextEngine;
+	TextureStaged *ptexture;
+	struct GlyphEntry{
+		uint codepoint;
+		glm::uvec2 texc;
+		TextEngine::Glyph *pglyph;
+	};
+	//std::vector<std::pair<uint, glm::uvec2>> glyphCollection;
+	std::vector<GlyphEntry> glyphCollection;
+	glm::uvec2 fontAtlasCursor; //this is useless since Map() for the full region erases everything
+	uint size;
+	uint refCount;
+	uint64 releaseTag;
 };
 
 }

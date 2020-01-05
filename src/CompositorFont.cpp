@@ -8,60 +8,41 @@
 
 namespace Compositor{
 
-Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], class TextEngine *_ptextEngine) : Drawable(_ptextEngine->pcomp->LoadPipeline<TextPipeline>(pshaderName,&vertexBufferLayout),_ptextEngine->pcomp), ptextEngine(_ptextEngine), pfontAtlas(0){
+FontAtlas::FontAtlas(uint _size, TextEngine *_ptextEngine) : ptextEngine(_ptextEngine), size(_size), fontAtlasCursor(0), refCount(1), releaseTag(_ptextEngine->pcomp->frameTag){
 	//
-	phbBuf = hb_buffer_create();
-	hb_buffer_set_direction(phbBuf,HB_DIRECTION_LTR);
-	hb_buffer_set_script(phbBuf,HB_SCRIPT_LATIN);
-	hb_buffer_set_language(phbBuf,hb_language_from_string("en",-1));
-
-	glyphCount = 0;
-
-	pvertexBuffer = new Buffer(1024*4*sizeof(Vertex),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,ptextEngine->pcomp);
-	pindexBuffer = new Buffer(1024*6*2,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,ptextEngine->pcomp);
+	ptexture = new TextureStaged(size,size,VK_FORMAT_R8_UNORM,&TextureBase::defaultComponentMapping,0,ptextEngine->pcomp);
 }
 
-Text::~Text(){
-	delete pvertexBuffer;
-	delete pindexBuffer;
-
-	hb_buffer_destroy(phbBuf);
+FontAtlas::~FontAtlas(){
+	delete ptexture;
 }
 
-void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
-	hb_buffer_reset(phbBuf);
-	hb_buffer_add_utf8(phbBuf,ptext,-1,0,-1);
-	hb_buffer_guess_segment_properties(phbBuf);
-	hb_shape(ptextEngine->phbFont,phbBuf,0,0);
-
-	hb_glyph_info_t *pglyphInfo = hb_buffer_get_glyph_infos(phbBuf,&glyphCount);
-	hb_glyph_position_t *pglyphPos = hb_buffer_get_glyph_positions(phbBuf,&glyphCount);
-
-	//loop through codepoints, update texture atlas if necessary
-	pfontAtlas = ptextEngine->CreateAtlas(pglyphInfo,glyphCount);
-
-	//AssignPipeline(passignedSet->p); //todo: check if new texture
-	//if all glyphs were available, no need to rewrite the map.
-	UpdateDescSets();
+void FontAtlas::Update(hb_glyph_info_t *pglyphInfo, uint glyphCount, const VkCommandBuffer *pcommandBuffer){
 	for(uint i = 0; i < glyphCount; ++i)
-		if(std::find_if(pfontAtlas->glyphCollection.begin(),pfontAtlas->glyphCollection.end(),[&](auto r)->bool{
-			return r.first == pglyphInfo[i].codepoint;
-		}) == pfontAtlas->glyphCollection.end()){
+		if(std::find_if(glyphCollection.begin(),glyphCollection.end(),[&](auto r)->bool{
+			return r.codepoint == pglyphInfo[i].codepoint;
+		}) == glyphCollection.end()){
 			TextEngine::Glyph *pglyph = ptextEngine->LoadGlyph(pglyphInfo[i].codepoint);
-			if(pfontAtlas->fontAtlasCursor.x+pglyph->w >= pfontAtlas->size){
-				pfontAtlas->fontAtlasCursor.x = 0;
-				pfontAtlas->fontAtlasCursor.y += (ptextEngine->fontFace->size->metrics.height>>6)+1;
+			if(fontAtlasCursor.x+pglyph->w >= size){
+				fontAtlasCursor.x = 0;
+				fontAtlasCursor.y += (ptextEngine->fontFace->size->metrics.height>>6)+1;
 			}
-			pfontAtlas->glyphCollection.push_back(std::pair<uint, glm::uvec2>(pglyphInfo[i].codepoint,pfontAtlas->fontAtlasCursor));
-			pfontAtlas->fontAtlasCursor.x += pglyph->w+1;
+
+			GlyphEntry glyphEntry;
+			glyphEntry.codepoint = pglyphInfo[i].codepoint;
+			glyphEntry.texc = fontAtlasCursor;
+			glyphEntry.pglyph = pglyph;
+			glyphCollection.push_back(glyphEntry);
+
+			fontAtlasCursor.x += pglyph->w+1;
 		}
 
-	unsigned char *pdata = (unsigned char *)pfontAtlas->ptexture->Map();
+	unsigned char *pdata = (unsigned char *)ptexture->Map();
 
-	for(auto p : pfontAtlas->glyphCollection){
-		TextEngine::Glyph *pglyph = ptextEngine->LoadGlyph(p.first);
+	for(auto &glyphEntry : glyphCollection){
+		TextEngine::Glyph *pglyph = ptextEngine->LoadGlyph(glyphEntry.codepoint);
 		for(uint y = 0; y < pglyph->h; ++y){
-			uint offsetDst = pfontAtlas->size*(p.second.y+y)+p.second.x; //p.second <=> texc
+			uint offsetDst = size*(glyphEntry.texc.y+y)+glyphEntry.texc.x;
 			uint offsetSrc = pglyph->w*y;
 			memcpy(pdata+offsetDst,pglyph->pbuffer+offsetSrc,pglyph->w);
 		}
@@ -102,8 +83,48 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 
 	VkRect2D atlasRect;
 	atlasRect.offset = {0,0};
-	atlasRect.extent = {pfontAtlas->size,pfontAtlas->size};
-	pfontAtlas->ptexture->Unmap(pcommandBuffer,&atlasRect,1);
+	atlasRect.extent = {size,size};
+	ptexture->Unmap(pcommandBuffer,&atlasRect,1);
+}
+
+Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], TextEngine *_ptextEngine) : Drawable(_ptextEngine->pcomp->LoadPipeline<TextPipeline>(pshaderName,&vertexBufferLayout),_ptextEngine->pcomp), ptextEngine(_ptextEngine), pfontAtlas(0){
+	//
+	phbBuf = hb_buffer_create();
+	hb_buffer_set_direction(phbBuf,HB_DIRECTION_LTR);
+	hb_buffer_set_script(phbBuf,HB_SCRIPT_LATIN);
+	hb_buffer_set_language(phbBuf,hb_language_from_string("en",-1));
+
+	glyphCount = 0;
+
+	pvertexBuffer = new Buffer(1024*4*sizeof(Vertex),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,ptextEngine->pcomp);
+	pindexBuffer = new Buffer(1024*6*2,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,ptextEngine->pcomp);
+}
+
+Text::~Text(){
+	delete pvertexBuffer;
+	delete pindexBuffer;
+
+	hb_buffer_destroy(phbBuf);
+}
+
+void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
+	hb_buffer_reset(phbBuf);
+	hb_buffer_add_utf8(phbBuf,ptext,-1,0,-1);
+	hb_buffer_guess_segment_properties(phbBuf);
+	hb_shape(ptextEngine->phbFont,phbBuf,0,0);
+
+	hb_glyph_info_t *pglyphInfo = hb_buffer_get_glyph_infos(phbBuf,&glyphCount);
+	hb_glyph_position_t *pglyphPos = hb_buffer_get_glyph_positions(phbBuf,&glyphCount);
+
+	FontAtlas *pfontAtlas1 = ptextEngine->CreateAtlas(pglyphInfo,glyphCount,pcommandBuffer);
+	if(pfontAtlas1 != pfontAtlas){
+		pfontAtlas = pfontAtlas1;
+
+		AssignPipeline(passignedSet->p);
+		UpdateDescSets();
+	}
+
+	//pfontAtlas->Update(pglyphInfo,glyphCount,pcommandBuffer);
 
 	Vertex *pvertices = (Vertex*)pvertexBuffer->Map();
 
@@ -131,29 +152,25 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 
 	glm::vec2 position(0.0f);
 	for(uint i = 0; i < glyphCount; ++i){
-		//glm::vec2 advance = glm::vec2(pglyphPos[i].x_advance>>6,pglyphPos[i].y_advance>>6);///64.0f;
-		//glm::vec2 offset = glm::vec2(pglyphPos[i].x_offset>>6,pglyphPos[i].y_offset>>6);///64.0f;
 		glm::vec2 advance = glm::vec2(pglyphPos[i].x_advance,pglyphPos[i].y_advance)/64.0f;
 		glm::vec2 offset = glm::vec2(pglyphPos[i].x_offset,pglyphPos[i].y_offset)/64.0f;
 
-		TextEngine::Glyph *pglyph = ptextEngine->LoadGlyph(pglyphInfo[i].codepoint);
-		glm::vec2 xy0 = position+offset+pglyph->offset; //+0.5f in Draw()
-		glm::vec2 xy1 = xy0+glm::vec2(pglyph->w,pglyph->h);
-
 		auto m = std::find_if(pfontAtlas->glyphCollection.begin(),pfontAtlas->glyphCollection.end(),[&](auto r)->bool{
-			return r.first == pglyphInfo[i].codepoint;
+			return r.codepoint == pglyphInfo[i].codepoint;
 		});
-		glm::uvec2 texc = (*m).second;
+
+		glm::vec2 xy0 = position+offset+(*m).pglyph->offset; //+0.5f in Draw()
+		glm::vec2 xy1 = xy0+glm::vec2((*m).pglyph->w,(*m).pglyph->h);
 
 		pvertices[4*i+0].pos = scale*xy0-1.0f;
 		pvertices[4*i+1].pos = scale*glm::vec2(xy1.x,xy0.y)-1.0f;
 		pvertices[4*i+2].pos = scale*glm::vec2(xy0.x,xy1.y)-1.0f;
 		pvertices[4*i+3].pos = scale*glm::vec2(xy1.x,xy1.y)-1.0f;
 
-		pvertices[4*i+0].texc = texc;//use posh to get sample location
-		pvertices[4*i+1].texc = texc+glm::uvec2(pglyph->w,0);
-		pvertices[4*i+2].texc = texc+glm::uvec2(0,pglyph->h);
-		pvertices[4*i+3].texc = texc+glm::uvec2(pglyph->w,pglyph->h);
+		pvertices[4*i+0].texc = (*m).texc;//use posh to get sample location
+		pvertices[4*i+1].texc = (*m).texc+glm::uvec2((*m).pglyph->w,0);
+		pvertices[4*i+2].texc = (*m).texc+glm::uvec2(0,(*m).pglyph->h);
+		pvertices[4*i+3].texc = (*m).texc+glm::uvec2((*m).pglyph->w,(*m).pglyph->h);
 
 		position += advance;
 	}
@@ -235,7 +252,7 @@ std::vector<std::pair<ShaderModule::INPUT, uint>> Text::vertexBufferLayout = {
 	{ShaderModule::INPUT_TEXCOORD_UINT2,offsetof(Text::Vertex,texc)}
 };
 
-TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp){//, pfontAtlas(0), fontAtlasSize(0), updateAtlas(false){
+TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp){
 	//TODO: use fontconfig library to load available fonts
 	if(FT_Init_FreeType(&library) != FT_Err_Ok)
 		throw Exception("Failed to initialize Freetype2.");
@@ -258,8 +275,8 @@ TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp){//, pfontAtl
 }
 
 TextEngine::~TextEngine(){
-	for(auto &m : fontAtlasMap)
-		delete m.ptexture;
+	for(FontAtlas *pfontAtlas : fontAtlasMap)
+		delete pfontAtlas;
 	
 	for(auto &m : glyphMap)
 		delete []m.pbuffer;
@@ -271,45 +288,43 @@ TextEngine::~TextEngine(){
 	FT_Done_FreeType(library);
 }
 
-FontAtlas * TextEngine::CreateAtlas(hb_glyph_info_t *pglyphInfo, uint glyphCount){
+FontAtlas * TextEngine::CreateAtlas(hb_glyph_info_t *pglyphInfo, uint glyphCount, const VkCommandBuffer *pcommandBuffer){
 	//1. check if there's an atlas if all glyphs readily available
 	auto m1 = std::find_if(fontAtlasMap.begin(),fontAtlasMap.end(),[&](auto r)->bool{
 		//check if pglyphInfo array is a subset of the glyphCollection of the current font atlas
 		for(uint i = 0; i < glyphCount; ++i)
-			if(std::find_if(r.glyphCollection.begin(),r.glyphCollection.end(),[&](auto r1)->bool{
-				return pglyphInfo[i].codepoint == r1.first;
-			}) == r.glyphCollection.end())
+			if(std::find_if(r->glyphCollection.begin(),r->glyphCollection.end(),[&](auto r1)->bool{
+				return pglyphInfo[i].codepoint == r1.codepoint;
+			}) == r->glyphCollection.end())
 				return false;
 		return true;
 	});
 	if(m1 != fontAtlasMap.end()){
-		++(*m1).refCount;
-		return &(*m1);
+		++(*m1)->refCount;
+		return (*m1);
 	}
 	
 	//2. check if one of the atlases can be appended without resizing it
 	auto m2 = std::find_if(fontAtlasMap.begin(),fontAtlasMap.end(),[&](auto r)->bool{
-		uint size = (1+(fontFace->size->metrics.height>>6))*ceilf(sqrtf(r.glyphCollection.size()+glyphCount)); // /64
+		uint size = (1+(fontFace->size->metrics.height>>6))*ceilf(sqrtf(r->glyphCollection.size()+glyphCount)); // /64
 		size = ((size-1)/128+1)*128; //round up to nearest multiple of 128 to improve reuse of the texture
-		return size <= r.size;
+		return size <= r->size;
 	});
 	if(m2 != fontAtlasMap.end()){
-		++(*m2).refCount;
-		return &(*m2);
+		++(*m2)->refCount;
+		(*m2)->Update(pglyphInfo,glyphCount,pcommandBuffer);
+		return (*m2);
 	}
 
 	uint size = (1+(fontFace->size->metrics.height>>6))*ceilf(sqrtf(glyphCount)); // /64
 	size = ((size-1)/128+1)*128; //round up to nearest multiple of 128 to improve reuse of the texture
 
-	FontAtlas fontAtlas;
-	fontAtlas.ptexture = new TextureStaged(size,size,VK_FORMAT_R8_UNORM,&TextureBase::defaultComponentMapping,0,pcomp);
-	fontAtlas.fontAtlasCursor = glm::uvec2(0);
-	fontAtlas.size = size;
-	fontAtlas.refCount = 1;
-	fontAtlas.releaseTag = pcomp->frameTag;
-	fontAtlasMap.push_back(fontAtlas);
+	FontAtlas *pfontAtlas = new FontAtlas(size,this);
+	pfontAtlas->Update(pglyphInfo,glyphCount,pcommandBuffer);
 
-	return &fontAtlasMap.back();
+	fontAtlasMap.push_back(pfontAtlas);
+
+	return pfontAtlas;
 }
 
 void TextEngine::ReleaseAtlas(FontAtlas *pfontAtlas){
