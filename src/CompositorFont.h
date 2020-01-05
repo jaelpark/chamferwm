@@ -8,6 +8,15 @@
 
 namespace Compositor{
 
+struct FontAtlas{ //TODO: own class?
+	TextureStaged *ptexture;
+	std::vector<std::pair<uint, glm::uvec2>> glyphCollection;
+	glm::uvec2 fontAtlasCursor; //this is useless since Map() for the full region erases everything
+	uint size;
+	uint refCount;
+	uint64 releaseTag;
+};
+
 class Text : public Drawable{
 public:
 	Text(const char *[Pipeline::SHADER_MODULE_COUNT], class TextEngine *);
@@ -21,6 +30,7 @@ protected:
 	class TextEngine *ptextEngine;
 	class Buffer *pvertexBuffer;
 	class Buffer *pindexBuffer;
+	FontAtlas *pfontAtlas;
 	struct Vertex{
 		glm::vec2 pos;
 		glm::uvec2 texc;
@@ -34,28 +44,35 @@ public:
 	TextEngine(class CompositorInterface *);
 	~TextEngine();
 	struct Glyph{
+		uint codepoint;
 		uint w;
 		uint h;
 		uint pitch;
 		glm::vec2 offset;
 		unsigned char *pbuffer;
 		//texture atlas parameters
-		glm::uvec2 texc;
+		//glm::uvec2 texc;
 	};
-	bool UpdateAtlas(const VkCommandBuffer *);
+	//FontAtlas * CreateAtlas(uint);
+	FontAtlas * CreateAtlas(hb_glyph_info_t *, uint);
+	void ReleaseAtlas(FontAtlas *);
+	//bool UpdateAtlas(const VkCommandBuffer *);
+	//FontAtlas * LoadAtlas
 	Glyph * LoadGlyph(uint);
 private:
 	//static FT_Error FaceRequester(FTC_FaceID, FT_Library, FT_Pointer, FT_Face *);
 	class CompositorInterface *pcomp;
-	std::vector<std::pair<uint, Glyph>> glyphMap;
+	std::vector<Glyph> glyphMap;
+	std::vector<FontAtlas> fontAtlasMap;
+	//std::vector<std::pair<uint, Glyph>> glyphMap;
+	//std::vector<Text *> updateQueue; //keep track in order to update descriptor sets when needed
 	FT_Library library;
 	//FTC_Manager fontCacheManager;
 	FT_Face fontFace;
 	hb_font_t *phbFont;
-	TextureStaged *pfontAtlas;
-	glm::uvec2 fontAtlasCursor;
-	uint fontAtlasSize;
-	bool updateAtlas;
+	//TextureStaged *pfontAtlas;
+	//glm::uvec2 fontAtlasCursor; //remove
+	//uint fontAtlasSize; //remove
 };
 
 }

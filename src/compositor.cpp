@@ -122,12 +122,17 @@ void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm:
 	passignedSet->fenceTag = pcomp->frameTag;
 }
 
-ClientFrame::ClientFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : ColorFrame(pshaderName,_pcomp), fullRegionUpdate(true), animationCompleted(true){
+ClientFrame::ClientFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : ColorFrame(pshaderName,_pcomp), ptitle(0), fullRegionUpdate(true), animationCompleted(true){
 	//
 }
 
 ClientFrame::~ClientFrame(){
+	if(ptitle){
+		vkDeviceWaitIdle(pcomp->logicalDev); //!!!!!!!!!!!
+		delete ptitle;
+	}
 	pcomp->updateQueue.erase(std::remove(pcomp->updateQueue.begin(),pcomp->updateQueue.end(),this),pcomp->updateQueue.end());
+	pcomp->titleUpdateQueue.erase(std::remove(pcomp->titleUpdateQueue.begin(),pcomp->titleUpdateQueue.end(),this),pcomp->titleUpdateQueue.end());
 
 	pcomp->ReleaseTexture(ptexture);
 }
@@ -162,6 +167,18 @@ void ClientFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COU
 		throw Exception("Failed to assign a pipeline.");
 	
 	UpdateDescSets();
+}
+
+void ClientFrame::SetTitle(const char *ptext, const VkCommandBuffer *pcommandBuffer){
+	if(!ptitle){
+		static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
+			"text_vertex.spv",0,"text_fragment.spv"
+		};
+		ptitle = new Text(pshaderName,pcomp->ptextEngine);
+	}
+	//TODO: when title is changed or set, mark the title for update
+	//ptitle->Set(ptext,pcommandBuffer);
+	pcomp->titleUpdateQueue.push_back(this);
 }
 
 void ClientFrame::UpdateDescSets(){
@@ -684,6 +701,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	shaders.reserve(1024);
 	pipelines.reserve(1024);
 	updateQueue.reserve(1024);
+	titleUpdateQueue.reserve(1024);
 	scissorRegions.reserve(32);
 	presentRectLayers.reserve(32);
 
@@ -978,14 +996,19 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	if(pbackground1)
 		pbackground1->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 
+	//TODO: update only visible clients
 	for(ClientFrame *pclientFrame : updateQueue)
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 	updateQueue.clear();
 
+	/*for(ClientFrame *pclientFrame : titleUpdateQueue)
+		pclientFrame->ptitle->Set("debug title",&pcopyCommandBuffers[currentFrame]);
+	titleUpdateQueue.clear();*/
+
+	//ptextEngine->UpdateAtlas(&pcopyCommandBuffers[currentFrame]);
+
 	// -------------------------------- test
-	/*ptestText->Set("afafwasdaw!!??@ :D",&pcopyCommandBuffers[currentFrame]);
-	if(ptextEngine->UpdateAtlas(&pcopyCommandBuffers[currentFrame]))
-		ptestText->UpdateDescSets();*/
+	//ptestText->Set("afafwasdaw!!??@ :D",&pcopyCommandBuffers[currentFrame]);
 	// -------------------------------- test
 
 	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
@@ -1392,6 +1415,8 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	//ptexture->Attach(windowPixmap);
 
 	pcomp->AddDamageRegion(this);
+
+	//TODO: set title here if TITLEBAR is set
 }
 
 X11ClientFrame::~X11ClientFrame(){
@@ -1427,7 +1452,6 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	}
 
 	if(!pcomp->hostMemoryImport){
-		//printf("mapping memory\n");
 		unsigned char *pdata = (unsigned char *)ptexture->Map();
 
 		for(VkRect2D &rect1 : damageRegions){
@@ -1788,10 +1812,11 @@ X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const 
 	//
 	CreateSurface(rect.w,rect.h,32);
 	pcomp->AddDamageRegion(this);
+
+	SetTitle(0,0);
 }
 
 X11DebugClientFrame::~X11DebugClientFrame(){
-	//delete ptexture;
 	pcomp->AddDamageRegion(this);
 }
 

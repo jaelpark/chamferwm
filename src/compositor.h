@@ -62,6 +62,7 @@ public:
 	void CreateSurface(uint, uint, uint);
 	void AdjustSurface(uint, uint);
 	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
+	void SetTitle(const char *, const VkCommandBuffer *);
 	enum SHADER_FLAG{
 		SHADER_FLAG_FOCUS = 0x1,
 		SHADER_FLAG_FLOATING = 0x2,
@@ -70,7 +71,7 @@ public:
 protected:
 	void UpdateDescSets();
 	Texture *ptexture;
-	//class Text *ptitle;
+	class Text *ptitle;
 	uint surfaceDepth;
 	bool fullRegionUpdate;
 	bool animationCompleted;
@@ -174,6 +175,7 @@ protected:
 	std::vector<std::pair<size_t, Pipeline *>> pipelines; //hash, pipeline
 
 	std::vector<ClientFrame *> updateQueue;
+	std::vector<ClientFrame *> titleUpdateQueue;
 	//Scissoring regions based on client damage. Second (uint) is a bitmask for
 	//swap chain images, indicating which image has been updated so far. When
 	//all images have been updated, the region is removed from the list.
@@ -185,7 +187,7 @@ protected:
 	ColorFrame *pcolorBackground;
 	ColorFrame *pbackground;
 	class TextEngine *ptextEngine;
-	//class Text *ptestText; //testing
+	//class Text *ptestText;
 
 	VkSampler pointSampler;
 
