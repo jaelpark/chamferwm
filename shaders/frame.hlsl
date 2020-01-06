@@ -60,6 +60,7 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 const float borderScaling = 1.0f;
 const float4 borderColor = float4(0.0f,0.0f,0.0f,1.0f);
 const float4 focusColor = float4(1.0f,0.6f,0.33f,1.0f);
+const float4 titleBackground = float4(0.4f,0.4f,0.4f,1.0f);
 const float4 taskSelectColor = float4(0.957f,0.910f,0.824f,1.0f);
 
 [[vk::binding(0)]] Texture2D<float4> content;
@@ -81,8 +82,6 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 	float2 aspect = float2(1.0f,screen.x/screen.y);
 
 	float2 borderScalingScr = borderScaling*screen*aspect;
-
-	float2 a_content = screen*(0.5f*xy0+0.5f); //top-left corner in pixels
 
 	float2 xy0_1 = xy0+min(2.0f*titlePad*aspect,0.0f);
 	float2 xy1_1 = xy1+max(2.0f*titlePad*aspect,0.0f);
@@ -138,6 +137,13 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 	}
 #endif //STOCK_FRAME_STYLE
 
+	float2 a_content = screen*(0.5f*xy0+0.5f); //top-left corner in pixels, content area
+	float2 b_content = screen*(0.5f*xy1+0.5f); //bottom-right corner in pixels, content areaa
+	if(any(posh.xy < a_content) || any(posh.xy > screen*(0.5f*xy1+0.5f))){ //title region
+		if(flags & FLAGS_FOCUS)
+			return focusColor;
+		return titleBackground;
+	}
 	//content region
 	float4 c = content.Load(float3(posh.xy-a_content,0));
 	return c;

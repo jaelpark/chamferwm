@@ -13,7 +13,7 @@ public:
 	Text(const char *[Pipeline::SHADER_MODULE_COUNT], class TextEngine *);
 	~Text();
 	void Set(const char *, const VkCommandBuffer *); //updates the vertex buffers
-	void Draw(const glm::uvec2 &, const VkCommandBuffer *);
+	void Draw(const glm::uvec2 &, const glm::mat2x2 &, const VkCommandBuffer *);
 	void UpdateDescSets();
 protected:
 	hb_buffer_t *phbBuf;
@@ -49,6 +49,7 @@ public:
 	//bool UpdateAtlas(const VkCommandBuffer *);
 	//FontAtlas * LoadAtlas
 	Glyph * LoadGlyph(uint);
+	float GetFontSize() const;
 private:
 	//static FT_Error FaceRequester(FTC_FaceID, FT_Library, FT_Pointer, FT_Face *);
 	class CompositorInterface *pcomp;

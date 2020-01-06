@@ -107,6 +107,7 @@ Text::~Text(){
 	hb_buffer_destroy(phbBuf);
 }
 
+//TODO: text max length, terminate oversized text with '...'
 void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	hb_buffer_reset(phbBuf);
 	hb_buffer_add_utf8(phbBuf,ptext,-1,0,-1);
@@ -148,7 +149,7 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	pvertices[2].pos = glm::vec2(0.0f,-1.0f);
 	pvertices[3].pos = glm::vec2(0.0f,0.0f);*/
 
-	glm::vec2 scale = 2.0f/glm::vec2(ptextEngine->pcomp->imageExtent.width,ptextEngine->pcomp->imageExtent.height);
+	//glm::vec2 scale = 2.0f/glm::vec2(ptextEngine->pcomp->imageExtent.width,ptextEngine->pcomp->imageExtent.height);
 
 	glm::vec2 position(0.0f);
 	for(uint i = 0; i < glyphCount; ++i){
@@ -162,10 +163,14 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 		glm::vec2 xy0 = position+offset+(*m).pglyph->offset; //+0.5f in Draw()
 		glm::vec2 xy1 = xy0+glm::vec2((*m).pglyph->w,(*m).pglyph->h);
 
-		pvertices[4*i+0].pos = scale*xy0-1.0f;
+		pvertices[4*i+0].pos = xy0;
+		pvertices[4*i+1].pos = glm::vec2(xy1.x,xy0.y);
+		pvertices[4*i+2].pos = glm::vec2(xy0.x,xy1.y);
+		pvertices[4*i+3].pos = glm::vec2(xy1.x,xy1.y);
+		/*pvertices[4*i+0].pos = scale*xy0-1.0f;
 		pvertices[4*i+1].pos = scale*glm::vec2(xy1.x,xy0.y)-1.0f;
 		pvertices[4*i+2].pos = scale*glm::vec2(xy0.x,xy1.y)-1.0f;
-		pvertices[4*i+3].pos = scale*glm::vec2(xy1.x,xy1.y)-1.0f;
+		pvertices[4*i+3].pos = scale*glm::vec2(xy1.x,xy1.y)-1.0f;*/
 
 		pvertices[4*i+0].texc = (*m).texc;//use posh to get sample location
 		pvertices[4*i+1].texc = (*m).texc+glm::uvec2((*m).pglyph->w,0);
@@ -199,12 +204,17 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	pindexBuffer->Unmap(pcommandBuffer);
 }
 
-void Text::Draw(const glm::uvec2 &pos, const VkCommandBuffer *pcommandBuffer){
+void Text::Draw(const glm::uvec2 &pos, const glm::mat2x2 &transform, const VkCommandBuffer *pcommandBuffer){
 	//
-	glm::vec2 posh = 2.0f*(glm::vec2(pos)+0.5f)/glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);//-1.0f;
-	//glm::vec2 posh = 2.0f*(glm::vec2(0,10.0f)+0.5f)/glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);//-1.0f;
+	glm::vec2 imageExtent = glm::vec2(ptextEngine->pcomp->imageExtent.width,ptextEngine->pcomp->imageExtent.height);
+
+	glm::vec2 posh = 2.0f*(glm::vec2(pos)+0.5f)/glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height); //-1.0f in shader
+	//glm::mat2x2 transform = glm::mat2x2(0,1,-1,0);
+
 	std::vector<std::pair<ShaderModule::VARIABLE, const void *>> varAddrs = {
 		{ShaderModule::VARIABLE_XY0,&posh},
+		{ShaderModule::VARIABLE_TRANSFORM,&transform},
+		{ShaderModule::VARIABLE_SCREEN,&imageExtent}
 	};
 	BindShaderResources(&varAddrs,pcommandBuffer);
 
@@ -354,6 +364,11 @@ TextEngine::Glyph * TextEngine::LoadGlyph(uint codePoint){
 
 	return &glyphMap.back();
 }
+
+float TextEngine::GetFontSize() const{
+	return (float)(fontFace->size->metrics.height>>6)/(float)pcomp->imageExtent.width;
+}
+
 
 /*FT_Error TextEngine::FaceRequester(FTC_FaceID faceId, FT_Library library, FT_Pointer ptr, FT_Face *pfontFace){
 	//

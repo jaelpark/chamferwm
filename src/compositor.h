@@ -62,7 +62,7 @@ public:
 	void CreateSurface(uint, uint, uint);
 	void AdjustSurface(uint, uint);
 	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
-	void SetTitle(const char *, const VkCommandBuffer *);
+	void SetTitle(const char *);
 	enum SHADER_FLAG{
 		SHADER_FLAG_FOCUS = 0x1,
 		SHADER_FLAG_FLOATING = 0x2,
@@ -187,8 +187,10 @@ protected:
 
 	ColorFrame *pcolorBackground;
 	ColorFrame *pbackground;
+public:
 	class TextEngine *ptextEngine;
 	//class Text *ptestText;
+protected:
 
 	VkSampler pointSampler;
 

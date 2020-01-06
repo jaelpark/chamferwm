@@ -8,10 +8,12 @@ struct PS_INPUT{
 
 [[vk::push_constant]] cbuffer cb{
 	float2 xy0;
+	float2x2 transform;
+	float2 screen;
 };
 
 void main(float2 pos : POSITION, uint2 texc : TEXCOORD, out PS_INPUT output){
-	output.posh = float4(xy0+pos,0,1.0f);
+	output.posh = float4(xy0+2.0f*mul(transform,pos)/screen-1.0f,0,1.0f);
 	output.texc = float2(texc.x,texc.y);
 }
 

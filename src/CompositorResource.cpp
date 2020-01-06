@@ -705,7 +705,7 @@ ShaderModule::ShaderModule(const char *_pname, const Blob *pblob, const Composit
 				DebugPrintf(stdout,"warning: unrecognized variable %s in %s with offset %u.\n",preflectBlockVars[i]->members[j].name,_pname,preflectBlockVars[i]->members[j].offset);
 				continue;
 			}
-			//printf("---%s\n",preflectBlockVars[i]->members[j].name);
+			//printf("---%u: %s\n",j,preflectBlockVars[i]->members[j].name);
 			Variable &var = variables.emplace_back();
 			var.offset = preflectBlockVars[i]->members[j].offset;
 			var.variableMapIndex = m-variableMap.begin();
@@ -780,6 +780,7 @@ const std::vector<std::tuple<const char *, VkFormat, uint>> ShaderModule::semant
 const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {
 	{"xy0",8},
 	{"xy1",8},
+	{"transform",16},
 	{"screen",8},
 	{"margin",8},
 	{"titlePad",8},

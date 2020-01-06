@@ -75,6 +75,7 @@ void Drawable::BindShaderResources(const std::vector<std::pair<ShaderModule::VAR
 			});
 			if(m == pVarAddrs->end())
 				continue;
+			//printf("var: %s, +%u\n",std::get<0>(ShaderModule::variableMap[passignedSet->p->pshaderModule[i]->variables[j].variableMapIndex]),passignedSet->p->pshaderModule[i]->variables[j].offset);
 			memcpy(pushConstantBuffer+passignedSet->p->pshaderModule[i]->variables[j].offset,
 				m->second,std::get<1>(ShaderModule::variableMap[passignedSet->p->pshaderModule[i]->variables[j].variableMapIndex]));
 		}
@@ -169,7 +170,7 @@ void ClientFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COU
 	UpdateDescSets();
 }
 
-void ClientFrame::SetTitle(const char *ptext, const VkCommandBuffer *pcommandBuffer){
+void ClientFrame::SetTitle(const char *ptext){
 	if(!ptitle){
 		static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
 			"text_vertex.spv",0,"text_fragment.spv"
@@ -225,7 +226,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), hostMemoryImport(pconfig->hostMemoryImport), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration){
+CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), hostMemoryImport(pconfig->hostMemoryImport), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration){
 	//
 }
 
@@ -1001,11 +1002,9 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 	updateQueue.clear();
 
-	/*for(ClientFrame *pclientFrame : titleUpdateQueue)
+	for(ClientFrame *pclientFrame : titleUpdateQueue)
 		pclientFrame->ptitle->Set("debug title",&pcopyCommandBuffers[currentFrame]);
-	titleUpdateQueue.clear();*/
-
-	//ptextEngine->UpdateAtlas(&pcopyCommandBuffers[currentFrame]);
+	titleUpdateQueue.clear();
 
 	// -------------------------------- test
 	//ptestText->Set("afafwasdaw!!??@ :D",&pcopyCommandBuffers[currentFrame]);
@@ -1115,6 +1114,13 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
 		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclient->pcontainer->titlePad,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
+
+		if(renderObject.pclientFrame->ptitle){
+			//glm::uvec2 titlePosition = glm::uvec2(frame.offset.x+10,frame.offset.y+0);
+			glm::uvec2 titlePosition = glm::uvec2(frame.offset.x+10,frame.offset.y-10);
+			vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->ptitle->passignedSet->p->pipeline);
+			renderObject.pclientFrame->ptitle->Draw(titlePosition,renderObject.pclient->pcontainer->titleTransform,&pcommandBuffers[currentFrame]);
+		}
 	}
 
 	vkCmdEndRenderPass(pcommandBuffers[currentFrame]);
@@ -1265,29 +1271,6 @@ Texture * CompositorInterface::CreateTexture(uint w, uint h, uint surfaceDepth){
 	return ptexture;
 }
 
-/*Texture * CompositorInterface::CreateTextureGeneric(uint w, uint h, VkFormat format, uint flags){
-	Texture *ptexture;
-
-	//should be larger than 0:
-	w = std::max(std::min(w,physicalDevProps.limits.maxImageDimension2D),1u);
-	h = std::max(std::min(h,physicalDevProps.limits.maxImageDimension2D),1u);
-
-	auto m = std::find_if(textureCache.begin(),textureCache.end(),[&](auto &r)->bool{
-		//return r.ptexture->w == w && r.ptexture->h == h;
-		return r.ptexture->w == w && r.ptexture->h == h && r.ptexture->flags == flags;
-	});
-	if(m != textureCache.end()){
-		ptexture = (*m).ptexture;
-
-		std::iter_swap(m,textureCache.end()-1);
-		textureCache.pop_back();
-		printf("----------- found cached texture\n");
-
-	}else ptexture = new Texture(w,h,flags,this);
-
-	return ptexture;
-}*/
-
 void CompositorInterface::ReleaseTexture(Texture *ptexture){
 	TextureCacheEntry textureCacheEntry;
 	textureCacheEntry.ptexture = ptexture;
@@ -1416,7 +1399,7 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 
 	pcomp->AddDamageRegion(this);
 
-	//TODO: set title here if TITLEBAR is set
+	SetTitle(0);
 }
 
 X11ClientFrame::~X11ClientFrame(){
@@ -1813,7 +1796,7 @@ X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const 
 	CreateSurface(rect.w,rect.h,32);
 	pcomp->AddDamageRegion(this);
 
-	SetTitle(0,0);
+	SetTitle(0);
 }
 
 X11DebugClientFrame::~X11DebugClientFrame(){

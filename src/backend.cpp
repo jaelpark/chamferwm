@@ -155,19 +155,15 @@ void X11Client::UpdateTranslation(){
 	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN || pcontainer->flags & WManager::Container::FLAG_FLOATING))
 		coord += glm::vec4(pcontainer->margin*aspect,-2.0f*pcontainer->margin*aspect)*screen;
-	//TODO: add titlebar margin
-	//-get text height from the text engine somehow
-	float titleMargin = 0.0f;
-	switch(pcontainer->titleBar){
-	case WManager::Container::TITLEBAR_LEFT:
-		coord.x += titleMargin;//text engine font height + titlebar margin
-		coord.z -= titleMargin;
-		break;
-	case WManager::Container::TITLEBAR_TOP:
-		coord.y += titleMargin;//text engine font height + titlebar margin
-		coord.w -= titleMargin;
-		break;
-	}
+
+	glm::vec2 titlePad = pcontainer->titlePad*aspect*glm::vec2(screen);
+	//TODO: check if titlePad is larger than content
+	//if(titlePad.x > coord.z)
+	glm::vec2 titlePadOffset = glm::min(titlePad,glm::vec2(0.0f));
+	glm::vec2 titlePadExtent = glm::max(titlePad,glm::vec2(0.0f));
+
+	coord -= glm::vec4(titlePadOffset.x,titlePadOffset.y,titlePadExtent.x-titlePadOffset.x,titlePadExtent.y-titlePadOffset.y);
+
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};

@@ -3,6 +3,7 @@
 #include "backend.h"
 #include "CompositorResource.h"
 #include "compositor.h"
+#include "CompositorFont.h" //font size
 #include "config.h"
 
 #include <cstdlib>
@@ -113,11 +114,12 @@ public:
 		std::string wm_name;
 		std::string wm_class;
 		std::string shaderName[Compositor::Pipeline::SHADER_MODULE_COUNT];
+		//uint titleFontSize; //title font size in pixels
 		bool floating;
 	};
 
 	template<class T, class U>
-	Config::ContainerInterface & SetupContainer(ContainerCreateInfo *pcreateInfo){
+	Config::ContainerInterface & SetupContainer(const ContainerCreateInfo *pcreateInfo){
 		boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
 		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
 		if(!containerExtract.check())
@@ -138,7 +140,7 @@ public:
 	}
 
 	template<class T, class U>
-	Config::ContainerInterface & SetupContainer(WManager::Container *pParent, ContainerCreateInfo *pcreateInfo){
+	Config::ContainerInterface & SetupContainer(WManager::Container *pParent, const ContainerCreateInfo *pcreateInfo){
 		/*boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
 		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
 		if(!containerExtract.check())
@@ -157,10 +159,14 @@ public:
 		Config::ContainerInterface &containerInt = SetupContainer<T,U>(pcreateInfo);
 		containerInt.OnSetupContainer();
 
+		Compositor::CompositorInterface *pcompInt = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
+
 		WManager::Container::Setup setup;
 		if(containerInt.floatingMode == Config::ContainerInterface::FLOAT_ALWAYS ||
 			(containerInt.floatingMode != Config::ContainerInterface::FLOAT_NEVER && pcreateInfo && pcreateInfo->floating))
 			setup.flags = WManager::Container::FLAG_FLOATING;
+		if(pcompInt->ptextEngine)
+			setup.titlePad = pcompInt->ptextEngine->GetFontSize();
 		containerInt.CopySettingsSetup(setup);
 
 		if(!(setup.flags & WManager::Container::FLAG_FLOATING)){
@@ -346,12 +352,15 @@ public:
 		//config script should manage this (point to container which should be the
 		//parent of the new one), while also setting some of the parameters like border
 		//width and such.
+		//Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
+
 		ContainerCreateInfo containerCreateInfo;
 		containerCreateInfo.wm_name = pcreateInfo->pwmName->pstr;
 		containerCreateInfo.wm_class = pcreateInfo->pwmClass->pstr;
 		containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX] = "frame_vertex.spv";
 		containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY] = "frame_geometry.spv";
 		containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT] = "frame_fragment.spv";
+		//containerCreateInfo.titleFontSize = pcomp11?pcomp11->ptextEngine->GetFontSize():0;
 		containerCreateInfo.floating = (pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_FLOATING) != 0;
 
 		if(pcreateInfo->mode == Backend::X11Client::CreateInfo::CREATE_AUTOMATIC){
@@ -806,6 +815,7 @@ int main(sint argc, const char **pargv){
 
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
 	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
+	args::Flag expFeatures(group_comp,"expFeatures","Enable experimental features: host pointer import",{"experimental",'e'},false);
 	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
@@ -840,6 +850,10 @@ int main(sint argc, const char **pargv){
 		Config::CompositorInterface::pcompositorInt->scissoring = false;
 	if(noHostMemoryImportOpt.Get())
 		Config::CompositorInterface::pcompositorInt->hostMemoryImport = false;
+	
+	if(!expFeatures.Get())
+		Config::CompositorInterface::pcompositorInt->hostMemoryImport = false;
+	else DebugPrintf(stdout,"Experimental compositor features enabled.\n");
 
 	RunBackend *pbackend;
 	try{

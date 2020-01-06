@@ -56,6 +56,7 @@ public:
 		glm::vec2 maxSize = glm::vec2(1.0f);
 		uint flags = 0;
 		TITLEBAR titleBar = TITLEBAR_NONE;
+		float titlePad = 0.0f;
 	};
 	Container(); //root container
 	Container(Container *, const Setup &);
@@ -95,11 +96,6 @@ public:
 
 	Client *pclient;
 
-	//glm::vec2 scale;
-	// = 1.0f: default size, scale with the number of containers
-	// < 1.0f: smaller than default, leaving the unscaled parallel containers more space
-	//glm::vec2 adjustScale;
-
 	//absolute normalized coordinates
 	glm::vec2 p;
 	glm::vec2 posFullCanvas;
@@ -109,7 +105,8 @@ public:
 	glm::vec2 canvasExtent;
 
 	glm::vec2 margin;
-	glm::vec2 titlePad; //TODO: include in Setup? Supply font size params from main
+	glm::vec2 titlePad;
+	glm::mat2x2 titleTransform;
 
 	glm::vec2 size; //size relative to the parent container
 	glm::vec2 minSize; //min size, relative to screen
