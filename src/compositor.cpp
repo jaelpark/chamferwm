@@ -1115,9 +1115,23 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclient->pcontainer->titlePad,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 
-		if(renderObject.pclientFrame->ptitle){
-			//glm::uvec2 titlePosition = glm::uvec2(frame.offset.x+10,frame.offset.y+0);
-			glm::uvec2 titlePosition = glm::uvec2(frame.offset.x+10,frame.offset.y-10);
+		if(renderObject.pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && renderObject.pclientFrame->ptitle){
+			glm::uvec2 titlePosition;
+			switch(renderObject.pclient->pcontainer->titleBar){
+			case WManager::Container::TITLEBAR_LEFT:
+				titlePosition = glm::uvec2(frame.offset.x+(ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)+(uint)(renderObject.pclient->pcontainer->titlePad.x*(float)imageExtent.width),frame.offset.y+renderObject.pclientFrame->ptitle->GetTextLength());
+				break;
+			case WManager::Container::TITLEBAR_RIGHT:
+				titlePosition = glm::uvec2(frame.offset.x+frame.extent.width+(ptextEngine->fontFace->glyph->metrics.horiBearingY>>6),frame.offset.y-10+renderObject.pclientFrame->ptitle->GetTextLength());
+				break;
+			case WManager::Container::TITLEBAR_TOP:
+			default:
+				titlePosition = glm::uvec2(frame.offset.x+10,frame.offset.y+(ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)+(uint)(renderObject.pclient->pcontainer->titlePad.y*(float)imageExtent.width));
+				break;
+			case WManager::Container::TITLEBAR_BOTTOM:
+				titlePosition = glm::uvec2(frame.offset.x+10,frame.offset.y+frame.extent.height+(ptextEngine->fontFace->glyph->metrics.horiBearingY>>6));
+				break;
+			}
 			vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->ptitle->passignedSet->p->pipeline);
 			renderObject.pclientFrame->ptitle->Draw(titlePosition,renderObject.pclient->pcontainer->titleTransform,&pcommandBuffers[currentFrame]);
 		}
@@ -1399,7 +1413,8 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 
 	pcomp->AddDamageRegion(this);
 
-	SetTitle(0);
+	if(pcontainer->titleBar != WManager::Container::TITLEBAR_NONE)
+		SetTitle(0);
 }
 
 X11ClientFrame::~X11ClientFrame(){
@@ -1796,7 +1811,8 @@ X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const 
 	CreateSurface(rect.w,rect.h,32);
 	pcomp->AddDamageRegion(this);
 
-	SetTitle(0);
+	if(pcontainer->titleBar != WManager::Container::TITLEBAR_NONE)
+		SetTitle(0);
 }
 
 X11DebugClientFrame::~X11DebugClientFrame(){

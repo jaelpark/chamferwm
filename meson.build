@@ -42,6 +42,7 @@ python = [
 
 ft = [
 	dependency('freetype2'),
+	dependency('fontconfig'),
 	dependency('harfbuzz')
 ]
 

@@ -7,8 +7,8 @@ struct PS_INPUT{
 #if defined(SHADER_STAGE_VS)
 
 [[vk::push_constant]] cbuffer cb{
-	float2 xy0;
 	float2x2 transform;
+	float2 xy0;
 	float2 screen;
 };
 

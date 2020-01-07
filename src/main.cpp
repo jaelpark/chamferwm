@@ -360,7 +360,6 @@ public:
 		containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX] = "frame_vertex.spv";
 		containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY] = "frame_geometry.spv";
 		containerCreateInfo.shaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT] = "frame_fragment.spv";
-		//containerCreateInfo.titleFontSize = pcomp11?pcomp11->ptextEngine->GetFontSize():0;
 		containerCreateInfo.floating = (pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_FLOATING) != 0;
 
 		if(pcreateInfo->mode == Backend::X11Client::CreateInfo::CREATE_AUTOMATIC){

@@ -15,9 +15,12 @@ public:
 	void Set(const char *, const VkCommandBuffer *); //updates the vertex buffers
 	void Draw(const glm::uvec2 &, const glm::mat2x2 &, const VkCommandBuffer *);
 	void UpdateDescSets();
+	float GetTextLength() const;
+	float GetBaseline() const;
 protected:
 	hb_buffer_t *phbBuf;
 	uint glyphCount;
+	float textLength;
 	class TextEngine *ptextEngine;
 	class Buffer *pvertexBuffer;
 	class Buffer *pindexBuffer;
@@ -50,7 +53,7 @@ public:
 	//FontAtlas * LoadAtlas
 	Glyph * LoadGlyph(uint);
 	float GetFontSize() const;
-private:
+//private:
 	//static FT_Error FaceRequester(FTC_FaceID, FT_Library, FT_Pointer, FT_Face *);
 	class CompositorInterface *pcomp;
 	std::vector<Glyph> glyphMap;

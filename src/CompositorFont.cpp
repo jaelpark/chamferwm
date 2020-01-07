@@ -5,6 +5,7 @@
 #include "compositor.h"
 #include "CompositorFont.h"
 #include <algorithm>
+#include <fontconfig/fontconfig.h>
 
 namespace Compositor{
 
@@ -87,14 +88,12 @@ void FontAtlas::Update(hb_glyph_info_t *pglyphInfo, uint glyphCount, const VkCom
 	ptexture->Unmap(pcommandBuffer,&atlasRect,1);
 }
 
-Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], TextEngine *_ptextEngine) : Drawable(_ptextEngine->pcomp->LoadPipeline<TextPipeline>(pshaderName,&vertexBufferLayout),_ptextEngine->pcomp), ptextEngine(_ptextEngine), pfontAtlas(0){
+Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], TextEngine *_ptextEngine) : Drawable(_ptextEngine->pcomp->LoadPipeline<TextPipeline>(pshaderName,&vertexBufferLayout),_ptextEngine->pcomp), glyphCount(0), textLength(0.0f), ptextEngine(_ptextEngine), pfontAtlas(0){
 	//
 	phbBuf = hb_buffer_create();
 	hb_buffer_set_direction(phbBuf,HB_DIRECTION_LTR);
 	hb_buffer_set_script(phbBuf,HB_SCRIPT_LATIN);
 	hb_buffer_set_language(phbBuf,hb_language_from_string("en",-1));
-
-	glyphCount = 0;
 
 	pvertexBuffer = new Buffer(1024*4*sizeof(Vertex),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,ptextEngine->pcomp);
 	pindexBuffer = new Buffer(1024*6*2,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,ptextEngine->pcomp);
@@ -125,6 +124,9 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 		UpdateDescSets();
 	}
 
+	if(glyphCount == 0)
+		return;
+
 	//pfontAtlas->Update(pglyphInfo,glyphCount,pcommandBuffer);
 
 	Vertex *pvertices = (Vertex*)pvertexBuffer->Map();
@@ -151,6 +153,8 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 
 	//glm::vec2 scale = 2.0f/glm::vec2(ptextEngine->pcomp->imageExtent.width,ptextEngine->pcomp->imageExtent.height);
 
+	TextEngine::Glyph *plastGlyph;
+
 	glm::vec2 position(0.0f);
 	for(uint i = 0; i < glyphCount; ++i){
 		glm::vec2 advance = glm::vec2(pglyphPos[i].x_advance,pglyphPos[i].y_advance)/64.0f;
@@ -159,6 +163,7 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 		auto m = std::find_if(pfontAtlas->glyphCollection.begin(),pfontAtlas->glyphCollection.end(),[&](auto r)->bool{
 			return r.codepoint == pglyphInfo[i].codepoint;
 		});
+		plastGlyph = (*m).pglyph;
 
 		glm::vec2 xy0 = position+offset+(*m).pglyph->offset; //+0.5f in Draw()
 		glm::vec2 xy1 = xy0+glm::vec2((*m).pglyph->w,(*m).pglyph->h);
@@ -179,6 +184,7 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 
 		position += advance;
 	}
+	textLength = position.x+(float)plastGlyph->w;
 
 	pvertexBuffer->Unmap(pcommandBuffer);
 
@@ -257,13 +263,16 @@ void Text::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
+float Text::GetTextLength() const{
+	return textLength;
+}
+
 std::vector<std::pair<ShaderModule::INPUT, uint>> Text::vertexBufferLayout = {
 	{ShaderModule::INPUT_POSITION_SFLOAT2,offsetof(Text::Vertex,pos)},
 	{ShaderModule::INPUT_TEXCOORD_UINT2,offsetof(Text::Vertex,texc)}
 };
 
 TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp){
-	//TODO: use fontconfig library to load available fonts
 	if(FT_Init_FreeType(&library) != FT_Err_Ok)
 		throw Exception("Failed to initialize Freetype2.");
 	/*if(FTC_Manager_New(library,0,0,0,&FaceRequester,0,&fontCacheManager) != FT_Err_Ok)
@@ -273,10 +282,29 @@ TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp){
 	if(FTC_Manager_LookupFace(fontCacheManager,faceId,&fontFace) != FT_Err_Ok)
 		throw Exception("Failed to load font.");*/
 
-	//
-	if(FT_New_Face(library,"/usr/share/fonts/droid/DroidSans.ttf",0,&fontFace) != FT_Err_Ok)
+	FcConfig *pfontConfig = FcInitLoadConfigAndFonts();
+
+	FcPattern *pPattern = FcNameParse((const FcChar8*)"Droid Sans");
+	FcConfigSubstitute(pfontConfig,pPattern,FcMatchPattern);
+	FcDefaultSubstitute(pPattern);
+
+	FcResult result;
+	FcPattern *pPatternResult = FcFontMatch(pfontConfig,pPattern,&result);
+	if(!pPatternResult || result != FcResultMatch)
+		throw Exception("Could not find font.");
+	FcChar8 *pfileName;
+	if(FcPatternGetString(pPatternResult,FC_FILE,0,&pfileName) != FcResultMatch)
+		throw Exception("Could not find font.");
+	printf("Loaded font: %s\n",pfileName);
+	if(FT_New_Face(library,(const char*)pfileName,0,&fontFace) != FT_Err_Ok)
 		throw Exception("Failed to load font.");
-	//FT_Set_Char_Size(fontFace,0,50*64,96,96);
+
+	FcPatternDestroy(pPatternResult);
+	FcPatternDestroy(pPattern);
+
+	FcConfigDestroy(pfontConfig);
+
+	//
 	FT_Set_Char_Size(fontFace,0,16<<6,282,282); //*64
 	
 	phbFont = hb_ft_font_create(fontFace,0);
@@ -351,7 +379,7 @@ TextEngine::Glyph * TextEngine::LoadGlyph(uint codePoint){
 
 	FT_Load_Glyph(fontFace,codePoint,FT_LOAD_RENDER);
 	FT_Bitmap *pbitmap = &fontFace->glyph->bitmap;
-	
+
 	Glyph glyph;
 	glyph.codepoint = codePoint;
 	glyph.w = pbitmap->width;
