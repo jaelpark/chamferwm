@@ -72,6 +72,7 @@ protected:
 	void UpdateDescSets();
 	Texture *ptexture;
 	class Text *ptitle;
+	std::string title;
 	uint surfaceDepth;
 	bool fullRegionUpdate;
 	bool animationCompleted;
@@ -255,6 +256,7 @@ public:
 	~X11ClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	void AdjustSurface1();
+	void SetTitle1(const char *);
 	xcb_pixmap_t windowPixmap;
 	xcb_shm_seg_t segment;
 	xcb_damage_damage_t damage;
@@ -286,7 +288,6 @@ public:
 	~X11Compositor();
 	virtual void Start();
 	virtual void Stop();
-	//void SetupClient(const WManager::Client *);
 	bool FilterEvent(const Backend::X11Event *);
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
@@ -296,7 +297,6 @@ public:
 	const Backend::X11Backend *pbackend;
 	struct gbm_device *pgbmdev;
 	sint cardfd;
-	//X11Background *pbackground;
 	xcb_window_t overlay;
 protected:
 	sint compEventOffset;
@@ -313,6 +313,7 @@ public:
 	~X11DebugClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	void AdjustSurface1();
+	void SetTitle1(const char *);
 };
 
 class X11DebugCompositor : public X11Compositor{

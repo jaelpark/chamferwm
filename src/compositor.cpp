@@ -177,8 +177,7 @@ void ClientFrame::SetTitle(const char *ptext){
 		};
 		ptitle = new Text(pshaderName,pcomp->ptextEngine);
 	}
-	//TODO: when title is changed or set, mark the title for update
-	//ptitle->Set(ptext,pcommandBuffer);
+	title = ptext;
 	pcomp->titleUpdateQueue.push_back(this);
 }
 
@@ -1002,12 +1001,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	updateQueue.clear();
 
 	for(ClientFrame *pclientFrame : titleUpdateQueue)
-		pclientFrame->ptitle->Set("debug title",&pcopyCommandBuffers[currentFrame]);
+		pclientFrame->ptitle->Set(pclientFrame->title.c_str(),&pcopyCommandBuffers[currentFrame]);
 	titleUpdateQueue.clear();
-
-	// -------------------------------- test
-	//ptestText->Set("afafwasdaw!!??@ :D",&pcopyCommandBuffers[currentFrame]);
-	// -------------------------------- test
 
 	if(vkEndCommandBuffer(pcopyCommandBuffers[currentFrame]) != VK_SUCCESS)
 		throw Exception("Failed to end command buffer recording.");
@@ -1065,17 +1060,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	}
 	
 	//TODO: stencil buffer optimization
-
-	// -------------------------------- test
-	/*VkRect2D scissor;
-	scissor.offset = {0,0};
-	scissor.extent = imageExtent;
-	vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
-
-	vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,ptestText->passignedSet->p->pipeline);
-	//ptestText->Draw(glm::uvec2(10,1160),&pcommandBuffers[currentFrame]);
-	ptestText->Draw(glm::uvec2(10,2044/2),&pcommandBuffers[currentFrame]);*/
-	// -------------------------------- test
 
 	//for(RenderObject &renderObject : renderQueue){
 	for(uint i = 0; i < renderQueue.size(); ++i){
@@ -1249,13 +1233,6 @@ void CompositorInterface::ClearBackground(){
 	screenRect.offset = {0,0};
 	screenRect.extent = imageExtent;
 	AddDamageRegion(&screenRect);
-
-	//------------------ testing
-	/*static const char *pshaderName[Pipeline::SHADER_MODULE_COUNT] = {
-		"text_vertex.spv",0,"text_fragment.spv"
-	};
-	ptestText = new Text(pshaderName,ptextEngine);*/
-	//------------------ testing
 }
 
 Texture * CompositorInterface::CreateTexture(uint w, uint h, uint surfaceDepth){
@@ -1411,9 +1388,6 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	//ptexture->Attach(windowPixmap);
 
 	pcomp->AddDamageRegion(this);
-
-	if(pcontainer->titleBar != WManager::Container::TITLEBAR_NONE)
-		SetTitle(0);
 }
 
 X11ClientFrame::~X11ClientFrame(){
@@ -1535,6 +1509,10 @@ void X11ClientFrame::AdjustSurface1(){
 	}else
 	if(oldRect.x != rect.x || oldRect.y != rect.y)
 		pcomp->AddDamageRegion(this);
+}
+
+void X11ClientFrame::SetTitle1(const char *ptitle){
+	SetTitle(ptitle);
 }
 
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
@@ -1813,9 +1791,6 @@ X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const 
 	//
 	CreateSurface(rect.w,rect.h,32);
 	pcomp->AddDamageRegion(this);
-
-	if(pcontainer->titleBar != WManager::Container::TITLEBAR_NONE)
-		SetTitle(0);
 }
 
 X11DebugClientFrame::~X11DebugClientFrame(){
@@ -1850,6 +1825,10 @@ void X11DebugClientFrame::AdjustSurface1(){
 	}else
 	if(oldRect.x != rect.x || oldRect.y != rect.y)
 		pcomp->AddDamageRegion(this);
+}
+
+void X11DebugClientFrame::SetTitle1(const char *ptitle){
+	SetTitle(ptitle);
 }
 
 X11DebugCompositor::X11DebugCompositor(const Configuration *_pconfig, const Backend::X11Backend *pbackend) : X11Compositor(_pconfig,pbackend){

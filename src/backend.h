@@ -114,6 +114,7 @@ public:
 	X11Client(WManager::Container *, const CreateInfo *);
 	~X11Client();
 	virtual void AdjustSurface1(){};
+	virtual void SetTitle1(const char *){};
 	//virtual void SetFullscreen1(bool){};
 	void UpdateTranslation(); //manual mode update
 	void UpdateTranslation(const WManager::Rectangle *); //automatic mode update
@@ -249,6 +250,7 @@ public:
 	DebugClient(WManager::Container *, const CreateInfo *);
 	~DebugClient();
 	virtual void AdjustSurface1(){};
+	virtual void SetTitle1(const char *){};
 	void UpdateTranslation();
 	void Kill();
 	const X11Backend *pbackend;

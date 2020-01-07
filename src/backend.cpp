@@ -956,8 +956,17 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_get_property_reply_t *propertyReply1[2];
 			for(uint i = 0; i < 2; ++i)
 				propertyReply1[i] = xcb_get_property_reply(pcon,propertyCookie1[i],0);
-			BackendStringProperty wmName((const char *)xcb_get_property_value(propertyReply1[0]));
-			BackendStringProperty wmClass((const char *)xcb_get_property_value(propertyReply1[1]));
+
+			uint nameLen = xcb_get_property_value_length(propertyReply1[0]);
+			char *pwmName = mstrndup((const char *)xcb_get_property_value(propertyReply1[0]),nameLen);
+			pwmName[nameLen] = 0;
+
+			uint classLen = xcb_get_property_value_length(propertyReply1[1]);
+			char *pwmClass = mstrndup((const char *)xcb_get_property_value(propertyReply1[1]),classLen);
+			pwmClass[classLen] = 0;
+
+			BackendStringProperty wmName(pwmName);
+			BackendStringProperty wmClass(pwmClass);
 
 			static WManager::Client dummyClient(0); //base client being unavailable means that the client is stacked on top of everything else
 
@@ -980,10 +989,16 @@ sint Default::HandleEvent(bool forcePoll){
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_MANUAL));
 
+			if(pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && nameLen > 0)
+				pclient->SetTitle1(wmName.pstr);
+
 			StackClients();
 
 			//if(hintFlags & X11Client::CreateInfo::HINT_FULLSCREEN)
 				//SetFullscreen(pclient,true);
+
+			mstrfree(pwmName);
+			mstrfree(pwmClass);
 
 			for(uint i = 0; i < 2; ++i)
 				free(propertyReply1[i]);
@@ -1172,8 +1187,17 @@ sint Default::HandleEvent(bool forcePoll){
 				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
 				if(!propertyReply)
 					break; //TODO: get legacy XCB_ATOM_WM_NAME
-				BackendStringProperty prop((const char *)xcb_get_property_value(propertyReply));
+				uint nameLen = xcb_get_property_value_length(propertyReply);
+				char *pwmName = mstrndup((const char *)xcb_get_property_value(propertyReply),nameLen);
+				pwmName[nameLen] = 0;
+
+				BackendStringProperty prop(pwmName);
 				PropertyChange(pclient1,PROPERTY_ID_WM_NAME,&prop);
+
+				if(pclient1->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && nameLen > 0)
+					pclient1->SetTitle1(prop.pstr);
+
+				mstrfree(pwmName);
 
 				free(propertyReply);
 
@@ -1183,8 +1207,14 @@ sint Default::HandleEvent(bool forcePoll){
 				xcb_get_property_reply_t *propertyReply = xcb_get_property_reply(pcon,propertyCookie,0);
 				if(!propertyReply)
 					break;
-				BackendStringProperty prop((const char *)xcb_get_property_value(propertyReply));
+				uint classLen = xcb_get_property_value_length(propertyReply);
+				char *pwmClass = mstrndup((const char *)xcb_get_property_value(propertyReply),classLen);
+				pwmClass[classLen] = 0;
+
+				BackendStringProperty prop(pwmClass);
 				PropertyChange(pclient1,PROPERTY_ID_WM_CLASS,&prop);
+
+				mstrfree(pwmClass);
 
 				free(propertyReply);
 			}else
@@ -1558,6 +1588,8 @@ sint Debug::HandleEvent(bool forcePoll){
 				DebugClient *pclient = SetupClient(&createInfo);
 				if(!pclient)
 					break;
+				if(pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE)
+					pclient->SetTitle1("title");
 				clients.push_back(pclient);
 			}else
 			if(pev->detail == closeKeycode){
