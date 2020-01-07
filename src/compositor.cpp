@@ -1806,6 +1806,10 @@ VkExtent2D X11Compositor::GetExtent() const{
 	return e;
 }
 
+glm::vec2 X11Compositor::GetDPI() const{
+	return glm::vec2(25.4f*(float)pbackend->pscr->width_in_pixels/(float)pbackend->pscr->width_in_millimeters,25.4f*(float)pbackend->pscr->height_in_pixels/(float)pbackend->pscr->height_in_millimeters);
+}
+
 X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : DebugClient(pcontainer,_pcreateInfo), ClientFrame(_pshaderName,_pcomp){
 	//
 	CreateSurface(rect.w,rect.h,32);
@@ -1893,6 +1897,10 @@ void NullCompositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
 
 VkExtent2D NullCompositor::GetExtent() const{
 	return (VkExtent2D){0,0};
+}
+
+glm::vec2 NullCompositor::GetDPI() const{
+	return glm::vec2(0.0f);
 }
 
 }

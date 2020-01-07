@@ -334,8 +334,6 @@ public:
 	DefaultBackend(Config::BackendInterface *_pbackendInt) : Default(), RunBackend(new Config::X11ContainerConfig(this),_pbackendInt){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
-
-		//
 	}
 
 	~DefaultBackend(){

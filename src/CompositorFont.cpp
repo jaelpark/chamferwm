@@ -304,8 +304,8 @@ TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp){
 
 	FcConfigDestroy(pfontConfig);
 
-	//
-	FT_Set_Char_Size(fontFace,0,16<<6,282,282); //*64
+	glm::vec2 dpi = pcomp->GetDPI();
+	FT_Set_Char_Size(fontFace,0,16<<6,(uint)dpi.x,(uint)dpi.y);
 	
 	phbFont = hb_ft_font_create(fontFace,0);
 

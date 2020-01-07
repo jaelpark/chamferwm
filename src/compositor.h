@@ -124,6 +124,7 @@ protected:
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;
 	virtual VkExtent2D GetExtent() const = 0;
+	virtual glm::vec2 GetDPI() const = 0;
 	VkInstance instance;
 	VkSurfaceKHR surface;
 	VkDebugReportCallbackEXT debugReportCb;
@@ -288,6 +289,7 @@ public:
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
 	void SetBackgroundPixmap(const Backend::BackendPixmapProperty *);
 	VkExtent2D GetExtent() const;
+	glm::vec2 GetDPI() const;
 	const Backend::X11Backend *pbackend;
 	struct gbm_device *pgbmdev;
 	sint cardfd;
@@ -327,6 +329,7 @@ public:
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
 	VkExtent2D GetExtent() const;
+	glm::vec2 GetDPI() const;
 	Configuration config{ //dummy config
 		.deviceIndex = 0,
 		.debugLayers = false,

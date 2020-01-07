@@ -496,7 +496,7 @@ void Default::Start(){
 	if(!pscr)
 		throw Exception("Screen unavailable.");
 
-	DebugPrintf(stdout,"Screen size: %ux%u\n",pscr->width_in_pixels,pscr->height_in_pixels);
+	DebugPrintf(stdout,"Screen size: %ux%u (DPI: %fx%f)\n",pscr->width_in_pixels,pscr->height_in_pixels,25.4f*(float)pscr->width_in_pixels/(float)pscr->width_in_millimeters,0.0f);
 	//https://standards.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
 
 	//xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
@@ -1491,7 +1491,7 @@ void Debug::Start(){
 	if(!pscr)
 		throw Exception("Screen unavailable.");
 
-	DebugPrintf(stdout,"Screen size: %ux%u\n",pscr->width_in_pixels,pscr->height_in_pixels);
+	DebugPrintf(stdout,"Screen size: %ux%u (DPI: %fx%f)\n",pscr->width_in_pixels,pscr->height_in_pixels,25.4f*(float)pscr->width_in_pixels/(float)pscr->width_in_millimeters,25.4f*(float)pscr->height_in_pixels/(float)pscr->height_in_millimeters);
 
 	psymbols = xcb_key_symbols_alloc(pcon);
 
