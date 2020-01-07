@@ -165,6 +165,9 @@ public:
 	bool enableAnimation;
 	float animationDuration;
 
+	std::string fontName;
+	uint fontSize;
+
 	class CompositorConfig *pcompositor;
 
 	static void Bind(boost::python::object);

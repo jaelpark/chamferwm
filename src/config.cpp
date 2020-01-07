@@ -18,7 +18,6 @@ minSize(boost::python::make_tuple(0.0f,0.0f)),
 maxSize(boost::python::make_tuple(1.0f,1.0f)),
 floatingMode(FLOAT_AUTOMATIC),
 titleBar(WManager::Container::TITLEBAR_NONE),
-//titleBar(WManager::Container::TITLEBAR_TOP),
 shaderUserFlags(0),
 pcontainer(0){
 	//
@@ -576,7 +575,7 @@ BackendConfig::~BackendConfig(){
 	pbackendInt->pbackend = 0;
 }
 
-CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), hostMemoryImport(Loader::hostMemoryImport), enableAnimation(true), animationDuration(0.3f), pcompositor(0){
+CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), hostMemoryImport(Loader::hostMemoryImport), enableAnimation(true), animationDuration(0.3f), fontName("Monospace"), fontSize(18), pcompositor(0){
 	//
 }
 
@@ -996,6 +995,8 @@ BOOST_PYTHON_MODULE(chamfer){
 				}
 				dynamic_cast<Compositor::CompositorInterface *>(compositor.pcompositor)->animationDuration = animationDuration;
 			},boost::python::default_call_policies(),boost::mpl::vector<void, CompositorInterface &, float>()))
+		.def_readwrite("fontName",&CompositorInterface::fontName)
+		.def_readwrite("fontSize",&CompositorInterface::fontSize)
 		;
 	boost::python::def("BindCompositor",CompositorInterface::Bind);
 }

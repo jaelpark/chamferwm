@@ -104,6 +104,8 @@ public:
 		bool hostMemoryImport;
 		bool enableAnimation;
 		float animationDuration;
+		const char *pfontName;
+		uint fontSize;
 	};
 	CompositorInterface(const Configuration *);
 	virtual ~CompositorInterface();
@@ -190,7 +192,8 @@ protected:
 	ColorFrame *pbackground;
 public:
 	class TextEngine *ptextEngine;
-	//class Text *ptestText;
+	const char *pfontName;
+	uint fontSize;
 protected:
 
 	VkSampler pointSampler;
@@ -333,7 +336,12 @@ public:
 	Configuration config{ //dummy config
 		.deviceIndex = 0,
 		.debugLayers = false,
-		.scissoring = true
+		.scissoring = true,
+		.hostMemoryImport = true,
+		.enableAnimation = false,
+		.animationDuration = 0.3f,
+		.pfontName = "Monospace",
+		.fontSize = 18,
 	};
 };
 

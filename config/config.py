@@ -91,6 +91,8 @@ class Container(chamfer.Container):
 
 		self.splitArmed = False;
 
+		self.titleBar = chamfer.titleBar.TOP; #options for the title bar location are NONE, LEFT, TOP, RIGHT or BOTTOM
+
 		#if self.wm_class == "skype":
 		#	self.floatingMode = chamfer.floatingMode.NEVER;
 		if self.wm_class == "matplotlib":
@@ -607,6 +609,8 @@ chamfer.BindBackend(backend);
 
 compositor = Compositor();
 #compositor.deviceIndex = 0;
+#compositor.fontName = "Monospace";
+#compositor.fontSize = 32;
 chamfer.BindCompositor(compositor);
 
 pids = psutil.pids();

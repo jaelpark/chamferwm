@@ -35,8 +35,9 @@ protected:
 class TextEngine{
 friend class FontAtlas;
 friend class Text;
+friend class CompositorInterface;
 public:
-	TextEngine(class CompositorInterface *);
+	TextEngine(const char *, uint, class CompositorInterface *);
 	~TextEngine();
 	struct Glyph{
 		uint codepoint;
@@ -46,27 +47,17 @@ public:
 		glm::vec2 offset;
 		unsigned char *pbuffer;
 	};
-	//FontAtlas * CreateAtlas(uint);
 	FontAtlas * CreateAtlas(hb_glyph_info_t *, uint, const VkCommandBuffer *);
 	void ReleaseAtlas(FontAtlas *);
-	//bool UpdateAtlas(const VkCommandBuffer *);
-	//FontAtlas * LoadAtlas
 	Glyph * LoadGlyph(uint);
 	float GetFontSize() const;
-//private:
-	//static FT_Error FaceRequester(FTC_FaceID, FT_Library, FT_Pointer, FT_Face *);
+private:
 	class CompositorInterface *pcomp;
 	std::vector<Glyph> glyphMap;
 	std::vector<class FontAtlas *> fontAtlasMap;
-	//std::vector<std::pair<uint, Glyph>> glyphMap;
-	//std::vector<Text *> updateQueue; //keep track in order to update descriptor sets when needed
 	FT_Library library;
-	//FTC_Manager fontCacheManager;
 	FT_Face fontFace;
 	hb_font_t *phbFont;
-	//TextureStaged *pfontAtlas;
-	//glm::uvec2 fontAtlasCursor; //remove
-	//uint fontAtlasSize; //remove
 };
 
 class FontAtlas{

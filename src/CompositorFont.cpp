@@ -227,9 +227,7 @@ void Text::Draw(const glm::uvec2 &pos, const glm::mat2x2 &transform, const VkCom
 	VkDeviceSize offset = 0;
 	vkCmdBindVertexBuffers(*pcommandBuffer,0,1,&pvertexBuffer->buffer,&offset);
 	vkCmdBindIndexBuffer(*pcommandBuffer,pindexBuffer->buffer,0,VK_INDEX_TYPE_UINT16);
-	//vkCmdDraw(*pcommandBuffer,3,1,0,0);
 	vkCmdDrawIndexed(*pcommandBuffer,6*glyphCount,1,0,0,0);
-	//vkCmdDrawIndexed(*pcommandBuffer,6,1,0,0,0);
 
 	passignedSet->fenceTag = pcomp->frameTag;
 }
@@ -272,19 +270,13 @@ std::vector<std::pair<ShaderModule::INPUT, uint>> Text::vertexBufferLayout = {
 	{ShaderModule::INPUT_TEXCOORD_UINT2,offsetof(Text::Vertex,texc)}
 };
 
-TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp){
+TextEngine::TextEngine(const char *pfontName, uint fontSize, CompositorInterface *_pcomp) : pcomp(_pcomp){
 	if(FT_Init_FreeType(&library) != FT_Err_Ok)
 		throw Exception("Failed to initialize Freetype2.");
-	/*if(FTC_Manager_New(library,0,0,0,&FaceRequester,0,&fontCacheManager) != FT_Err_Ok)
-		throw Exception("Failed to create a font cache manager.");*/
-
-	/*static FTC_FaceID faceId = (FTC_FaceID)"DroidSans";
-	if(FTC_Manager_LookupFace(fontCacheManager,faceId,&fontFace) != FT_Err_Ok)
-		throw Exception("Failed to load font.");*/
 
 	FcConfig *pfontConfig = FcInitLoadConfigAndFonts();
 
-	FcPattern *pPattern = FcNameParse((const FcChar8*)"Droid Sans");
+	FcPattern *pPattern = FcNameParse((const FcChar8*)pfontName);
 	FcConfigSubstitute(pfontConfig,pPattern,FcMatchPattern);
 	FcDefaultSubstitute(pPattern);
 
@@ -301,11 +293,10 @@ TextEngine::TextEngine(CompositorInterface *_pcomp) : pcomp(_pcomp){
 
 	FcPatternDestroy(pPatternResult);
 	FcPatternDestroy(pPattern);
-
 	FcConfigDestroy(pfontConfig);
 
 	glm::vec2 dpi = pcomp->GetDPI();
-	FT_Set_Char_Size(fontFace,0,16<<6,(uint)dpi.x,(uint)dpi.y);
+	FT_Set_Char_Size(fontFace,0,fontSize<<6,(uint)dpi.x,(uint)dpi.y);
 	
 	phbFont = hb_ft_font_create(fontFace,0);
 
@@ -396,12 +387,6 @@ TextEngine::Glyph * TextEngine::LoadGlyph(uint codePoint){
 float TextEngine::GetFontSize() const{
 	return (float)(fontFace->size->metrics.height>>6)/(float)pcomp->imageExtent.width;
 }
-
-
-/*FT_Error TextEngine::FaceRequester(FTC_FaceID faceId, FT_Library library, FT_Pointer ptr, FT_Face *pfontFace){
-	//
-	return FT_New_Face(library,"/usr/share/fonts/droid/DroidSans.ttf",0,pfontFace);
-}*/
 
 }
 
