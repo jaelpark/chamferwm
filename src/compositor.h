@@ -210,11 +210,9 @@ protected:
 	std::vector<RenderObject> renderQueue;
 	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue;
 
-	//Used textures get stored for potential reuse before they get destroyed.
+	//Used textures get stored for potential reuse before they get destroyed and while waiting for the pipeline to get flushed.
 	//Many of the allocated window textures will initially have some common reoccuring size.
-	//The purpose of caching is also to avoid attempts to destroy resources that are currently used by the pipeline.
 	Texture * CreateTexture(uint, uint, uint);
-	//Texture * CreateTextureGeneric(uint, uint, VkFormat, uint);
 	void ReleaseTexture(Texture *);
 
 	struct TextureCacheEntry{

@@ -172,7 +172,7 @@ public:
 
 class Pipeline{
 public:
-	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, const VkPipelineInputAssemblyStateCreateInfo *, const VkPipelineRasterizationStateCreateInfo *, const VkPipelineDepthStencilStateCreateInfo *, const VkPipelineColorBlendStateCreateInfo *, const class CompositorInterface *);
+	Pipeline(ShaderModule *, ShaderModule *, ShaderModule *, const std::vector<std::pair<ShaderModule::INPUT, uint>> *, const VkPipelineInputAssemblyStateCreateInfo *, const VkPipelineRasterizationStateCreateInfo *, const VkPipelineDepthStencilStateCreateInfo *, const VkPipelineColorBlendStateCreateInfo *, const VkPipelineDynamicStateCreateInfo *, const class CompositorInterface *);
 	virtual ~Pipeline();
 
 	enum SHADER_MODULE{
@@ -195,6 +195,9 @@ public:
 	static const VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
 	static const VkPipelineColorBlendAttachmentState colorBlendAttachmentState;
 	static const VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo;
+	static const VkDynamicState dynamicStatesScissoring[1];
+	static const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo;
+	static const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfoScissoring;
 	static const VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
 };
 

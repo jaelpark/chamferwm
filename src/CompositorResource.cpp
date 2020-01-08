@@ -788,7 +788,7 @@ const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {
 	{"time",4}
 };
 
-Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const VkPipelineInputAssemblyStateCreateInfo *pinputAssemblyStateCreateInfo, const VkPipelineRasterizationStateCreateInfo *prasterizationStateCreateInfo, const VkPipelineDepthStencilStateCreateInfo *pdepthStencilStateCreateInfo, const VkPipelineColorBlendStateCreateInfo *pcolorBlendStateCreateInfo, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp){
+Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const VkPipelineInputAssemblyStateCreateInfo *pinputAssemblyStateCreateInfo, const VkPipelineRasterizationStateCreateInfo *prasterizationStateCreateInfo, const VkPipelineDepthStencilStateCreateInfo *pdepthStencilStateCreateInfo, const VkPipelineColorBlendStateCreateInfo *pcolorBlendStateCreateInfo, const VkPipelineDynamicStateCreateInfo *pdynamicStateCreateInfo, const CompositorInterface *_pcomp) : pshaderModule{_pvertexShader,_pgeometryShader,_pfragmentShader}, pcomp(_pcomp){
 	VkVertexInputAttributeDescription *pvertexInputAttributeDescs = new VkVertexInputAttributeDescription[_pvertexShader->inputs.size()];
 	uint vertexAttributeDescCount = 0;
 	uint inputStride = 0;
@@ -901,7 +901,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	
 	delete []pcombinedSets;
 
-	VkDynamicState dynamicStates[1] = {VK_DYNAMIC_STATE_SCISSOR};
+	/*VkDynamicState dynamicStates[1] = {VK_DYNAMIC_STATE_SCISSOR};
 
 	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
 	dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -912,7 +912,7 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	}else{
 		dynamicStateCreateInfo.pDynamicStates = 0;
 		dynamicStateCreateInfo.dynamicStateCount = 0;
-	}
+	}*/
 
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -925,7 +925,8 @@ Pipeline::Pipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader,
 	graphicsPipelineCreateInfo.pMultisampleState = &multisampleStateCreateInfo;
 	graphicsPipelineCreateInfo.pDepthStencilState = pdepthStencilStateCreateInfo;
 	graphicsPipelineCreateInfo.pColorBlendState = pcolorBlendStateCreateInfo;
-	graphicsPipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
+	//graphicsPipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
+	graphicsPipelineCreateInfo.pDynamicState = pdynamicStateCreateInfo;
 	graphicsPipelineCreateInfo.layout = pipelineLayout;
 	graphicsPipelineCreateInfo.renderPass = pcomp->renderPass;
 	graphicsPipelineCreateInfo.subpass = 0;
@@ -943,7 +944,7 @@ Pipeline::~Pipeline(){
 	vkDestroyPipelineLayout(pcomp->logicalDev,pipelineLayout,0);
 }
 
-ClientPipeline::ClientPipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const CompositorInterface *_pcomp) : Pipeline(_pvertexShader,_pgeometryShader,_pfragmentShader,pvertexBufferLayout,&inputAssemblyStateCreateInfo,&rasterizationStateCreateInfo,0,&colorBlendStateCreateInfo,_pcomp){
+ClientPipeline::ClientPipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const CompositorInterface *_pcomp) : Pipeline(_pvertexShader,_pgeometryShader,_pfragmentShader,pvertexBufferLayout,&inputAssemblyStateCreateInfo,&rasterizationStateCreateInfo,0,&colorBlendStateCreateInfo,_pcomp->scissoring?&dynamicStateCreateInfoScissoring:&dynamicStateCreateInfo,_pcomp){
 	//
 }
 
@@ -983,6 +984,24 @@ const VkPipelineColorBlendAttachmentState ClientPipeline::colorBlendAttachmentSt
 	.colorWriteMask = VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT
 };
 
+const VkDynamicState ClientPipeline::dynamicStatesScissoring[1] = {VK_DYNAMIC_STATE_SCISSOR};
+
+const VkPipelineDynamicStateCreateInfo ClientPipeline::dynamicStateCreateInfo = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+	.pNext = 0,
+	.flags = 0,
+	.dynamicStateCount = 0,
+	.pDynamicStates = 0
+};
+
+const VkPipelineDynamicStateCreateInfo ClientPipeline::dynamicStateCreateInfoScissoring = {
+	.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+	.pNext = 0,
+	.flags = 0,
+	.dynamicStateCount = 1,
+	.pDynamicStates = dynamicStatesScissoring
+};
+
 const VkPipelineColorBlendStateCreateInfo ClientPipeline::colorBlendStateCreateInfo = {
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
 	.logicOpEnable = VK_FALSE,
@@ -992,7 +1011,7 @@ const VkPipelineColorBlendStateCreateInfo ClientPipeline::colorBlendStateCreateI
 	.blendConstants = {0.0f,0.0f,0.0f,0.0f}
 };
 
-TextPipeline::TextPipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const CompositorInterface *_pcomp) : Pipeline(_pvertexShader,_pgeometryShader,_pfragmentShader,pvertexBufferLayout,&inputAssemblyStateCreateInfo,&rasterizationStateCreateInfo,0,&colorBlendStateCreateInfo,_pcomp){
+TextPipeline::TextPipeline(ShaderModule *_pvertexShader, ShaderModule *_pgeometryShader, ShaderModule *_pfragmentShader, const std::vector<std::pair<ShaderModule::INPUT, uint>> *pvertexBufferLayout, const CompositorInterface *_pcomp) : Pipeline(_pvertexShader,_pgeometryShader,_pfragmentShader,pvertexBufferLayout,&inputAssemblyStateCreateInfo,&rasterizationStateCreateInfo,0,&colorBlendStateCreateInfo,&ClientPipeline::dynamicStateCreateInfoScissoring,_pcomp){
 	//
 }
 

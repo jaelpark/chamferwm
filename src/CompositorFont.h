@@ -9,6 +9,7 @@
 namespace Compositor{
 
 class Text : public Drawable{
+friend class TextEngine;
 public:
 	Text(const char *[Pipeline::SHADER_MODULE_COUNT], class TextEngine *);
 	~Text();
@@ -23,7 +24,6 @@ protected:
 	float textLength;
 	class TextEngine *ptextEngine;
 	class Buffer *pvertexBuffer;
-	class Buffer *pindexBuffer;
 	class FontAtlas *pfontAtlas;
 	struct Vertex{
 		glm::vec2 pos;
@@ -49,12 +49,23 @@ public:
 	};
 	FontAtlas * CreateAtlas(hb_glyph_info_t *, uint, const VkCommandBuffer *);
 	void ReleaseAtlas(FontAtlas *);
+	Buffer * CreateVertexBuffer();
+	void ReleaseVertexBuffer(Buffer *);
+	void ReleaseCycle();
 	Glyph * LoadGlyph(uint);
 	float GetFontSize() const;
 private:
 	class CompositorInterface *pcomp;
+	Buffer *pindexBuffer; //shared index buffer between text objects
+	bool indexBufferMapped;
 	std::vector<Glyph> glyphMap;
 	std::vector<class FontAtlas *> fontAtlasMap;
+	struct VertexBufferCacheEntry{
+		Buffer *pvertexBuffer;
+		uint64 releaseTag;
+		struct timespec releaseTime;
+	};
+	std::vector<VertexBufferCacheEntry> vertexBufferCache;
 	FT_Library library;
 	FT_Face fontFace;
 	hb_font_t *phbFont;

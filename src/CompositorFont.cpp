@@ -95,13 +95,11 @@ Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], TextEngine *_
 	hb_buffer_set_script(phbBuf,HB_SCRIPT_LATIN);
 	hb_buffer_set_language(phbBuf,hb_language_from_string("en",-1));
 
-	pvertexBuffer = new Buffer(1024*4*sizeof(Vertex),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,ptextEngine->pcomp);
-	pindexBuffer = new Buffer(1024*6*2,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,ptextEngine->pcomp);
+	pvertexBuffer = ptextEngine->CreateVertexBuffer();
 }
 
 Text::~Text(){
-	delete pvertexBuffer;
-	delete pindexBuffer;
+	ptextEngine->ReleaseVertexBuffer(pvertexBuffer);
 
 	hb_buffer_destroy(phbBuf);
 }
@@ -151,10 +149,6 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	pvertices[2].pos = glm::vec2(0.0f,-1.0f);
 	pvertices[3].pos = glm::vec2(0.0f,0.0f);*/
 
-	//glm::vec2 scale = 2.0f/glm::vec2(ptextEngine->pcomp->imageExtent.width,ptextEngine->pcomp->imageExtent.height);
-
-	TextEngine::Glyph *plastGlyph;
-
 	glm::vec2 position(0.0f);
 	for(uint i = 0; i < glyphCount; ++i){
 		glm::vec2 advance = glm::vec2(pglyphPos[i].x_advance,pglyphPos[i].y_advance)/64.0f;
@@ -163,7 +157,6 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 		auto m = std::find_if(pfontAtlas->glyphCollection.begin(),pfontAtlas->glyphCollection.end(),[&](auto r)->bool{
 			return r.codepoint == pglyphInfo[i].codepoint;
 		});
-		plastGlyph = (*m).pglyph;
 
 		glm::vec2 xy0 = position+offset+(*m).pglyph->offset; //+0.5f in Draw()
 		glm::vec2 xy1 = xy0+glm::vec2((*m).pglyph->w,(*m).pglyph->h);
@@ -184,11 +177,15 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 
 		position += advance;
 	}
-	textLength = position.x+(float)plastGlyph->w;
-
 	pvertexBuffer->Unmap(pcommandBuffer);
 
-	unsigned short *pindices = (unsigned short*)pindexBuffer->Map();
+	textLength = position.x+(float)(ptextEngine->fontFace->size->metrics.max_advance>>6);
+
+	if(ptextEngine->indexBufferMapped)
+		return; //shared between all the Text objects, mapped only once
+	ptextEngine->indexBufferMapped = true;
+
+	unsigned short *pindices = (unsigned short*)ptextEngine->pindexBuffer->Map();
 
 	//test quad
 	/*pindices[0] = 0;
@@ -198,7 +195,8 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 	pindices[4] = 2;
 	pindices[5] = 3;*/
 
-	for(uint i = 0; i < glyphCount; ++i){
+	//for(uint i = 0; i < glyphCount; ++i){
+	for(uint i = 0; i < 1024; ++i){
 		pindices[6*i+0] = 4*i;
 		pindices[6*i+1] = 4*i+1;
 		pindices[6*i+2] = 4*i+2;
@@ -207,7 +205,7 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 		pindices[6*i+5] = 4*i+3;
 	}
 
-	pindexBuffer->Unmap(pcommandBuffer);
+	ptextEngine->pindexBuffer->Unmap(pcommandBuffer);
 }
 
 void Text::Draw(const glm::uvec2 &pos, const glm::mat2x2 &transform, const VkCommandBuffer *pcommandBuffer){
@@ -226,7 +224,7 @@ void Text::Draw(const glm::uvec2 &pos, const glm::mat2x2 &transform, const VkCom
 
 	VkDeviceSize offset = 0;
 	vkCmdBindVertexBuffers(*pcommandBuffer,0,1,&pvertexBuffer->buffer,&offset);
-	vkCmdBindIndexBuffer(*pcommandBuffer,pindexBuffer->buffer,0,VK_INDEX_TYPE_UINT16);
+	vkCmdBindIndexBuffer(*pcommandBuffer,ptextEngine->pindexBuffer->buffer,0,VK_INDEX_TYPE_UINT16);
 	vkCmdDrawIndexed(*pcommandBuffer,6*glyphCount,1,0,0,0);
 
 	passignedSet->fenceTag = pcomp->frameTag;
@@ -301,9 +299,16 @@ TextEngine::TextEngine(const char *pfontName, uint fontSize, CompositorInterface
 	phbFont = hb_ft_font_create(fontFace,0);
 
 	glyphMap.reserve(1024);
+
+	pindexBuffer = new Buffer(1024*6*2,VK_BUFFER_USAGE_INDEX_BUFFER_BIT,pcomp);
+	indexBufferMapped = false;
 }
 
 TextEngine::~TextEngine(){
+	delete pindexBuffer;
+
+	for(VertexBufferCacheEntry &vertexBufferCacheEntry : vertexBufferCache)
+		delete vertexBufferCacheEntry.pvertexBuffer;
 	for(FontAtlas *pfontAtlas : fontAtlasMap)
 		delete pfontAtlas;
 	
@@ -359,6 +364,39 @@ FontAtlas * TextEngine::CreateAtlas(hb_glyph_info_t *pglyphInfo, uint glyphCount
 void TextEngine::ReleaseAtlas(FontAtlas *pfontAtlas){
 	--pfontAtlas->refCount;
 	pfontAtlas->releaseTag = pcomp->frameTag;
+}
+
+Buffer * TextEngine::CreateVertexBuffer(){
+	Buffer *pvertexBuffer;
+
+	auto m = vertexBufferCache.begin();
+	if(m != vertexBufferCache.end()){
+		pvertexBuffer = (*m).pvertexBuffer;
+
+		std::iter_swap(m,vertexBufferCache.end()-1);
+		vertexBufferCache.pop_back();
+	}else pvertexBuffer = new Buffer(1024*4*sizeof(Text::Vertex),VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,pcomp);
+
+	return pvertexBuffer;
+}
+
+void TextEngine::ReleaseVertexBuffer(Buffer *pvertexBuffer){
+	VertexBufferCacheEntry vertexBufferCacheEntry;
+	vertexBufferCacheEntry.pvertexBuffer = pvertexBuffer;
+	vertexBufferCacheEntry.releaseTag = pcomp->frameTag;
+	clock_gettime(CLOCK_MONOTONIC,&vertexBufferCacheEntry.releaseTime);
+	
+	vertexBufferCache.push_back(vertexBufferCacheEntry);
+}
+
+void TextEngine::ReleaseCycle(){
+	//
+	vertexBufferCache.erase(std::remove_if(vertexBufferCache.begin(),vertexBufferCache.end(),[&](auto &vertexBufferCacheEntry)->bool{
+		if(pcomp->frameTag < vertexBufferCacheEntry.releaseTag+pcomp->swapChainImageCount+1 || timespec_diff(pcomp->frameTime,vertexBufferCacheEntry.releaseTime) < 5.0f)
+			return false;
+		delete vertexBufferCacheEntry.pvertexBuffer;
+		return true;
+	}),vertexBufferCache.end());
 }
 
 TextEngine::Glyph * TextEngine::LoadGlyph(uint codePoint){
