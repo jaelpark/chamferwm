@@ -9,7 +9,7 @@
 #include <xcb/shm.h>
 #include <xcb/dri3.h>
 
-struct gbm_device;
+//struct gbm_device;
 
 namespace Backend{
 class X11Backend;
@@ -293,8 +293,8 @@ public:
 	VkExtent2D GetExtent() const;
 	glm::vec2 GetDPI() const;
 	const Backend::X11Backend *pbackend;
-	struct gbm_device *pgbmdev;
-	sint cardfd;
+	/*struct gbm_device *pgbmdev;
+	sint cardfd;*/
 	xcb_window_t overlay;
 protected:
 	sint compEventOffset;

@@ -5,7 +5,7 @@
 #include "compositor.h"
 
 #include <algorithm>
-#include <gbm.h>
+//#include <gbm.h>
 #include <unistd.h>
 
 #include "spirv_reflect.h"
@@ -214,7 +214,7 @@ void TexturePixmap::Attach(xcb_pixmap_t pixmap){
 
 	dmafd = xcb_dri3_buffer_from_pixmap_reply_fds(pcomp11->pbackend->pcon,pbufferFromPixmapReply)[0]; //TODO: get all planes?
 
-	struct gbm_import_fd_data gbmImportFdData = {
+	/*struct gbm_import_fd_data gbmImportFdData = {
 		.fd = dmafd,
 		.width = w,
 		.height = h,
@@ -223,7 +223,7 @@ void TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	};
 	pgbmBufferObject = gbm_bo_import(pcomp11->pgbmdev,GBM_BO_IMPORT_FD,&gbmImportFdData,0);//GBM_BO_USE_LINEAR);
 	if(!pgbmBufferObject) //TODO: import once for the first buffer, assume same modifiers and format for all?
-		throw Exception("Failed to import GBM buffer object.");
+		throw Exception("Failed to import GBM buffer object.");*/
 
 	VkSubresourceLayout subresourceLayout = {};
 	subresourceLayout.offset = 0;
@@ -232,12 +232,10 @@ void TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	subresourceLayout.arrayPitch = subresourceLayout.size;
 	subresourceLayout.depthPitch = subresourceLayout.size;
 
-	uint64_t modifier = gbm_bo_get_modifier(pgbmBufferObject);
-	sint planeCount = gbm_bo_get_plane_count(pgbmBufferObject);
-	DebugPrintf(stdout,"Image modifier: %llu, plane count: %d\n",modifier,planeCount);
+	uint64_t modifier = 0;//gbm_bo_get_modifier(pgbmBufferObject);
+	/*sint planeCount = gbm_bo_get_plane_count(pgbmBufferObject);
+	DebugPrintf(stdout,"Image modifier: %llu, plane count: %d\n",modifier,planeCount);*/
 
-	//dmafd = gbm_bo_get_fd(pgbmBufferObject);
-	
 	VkImageDrmFormatModifierExplicitCreateInfoEXT imageDrmFormatModifierExpCreateInfo = {};
 	imageDrmFormatModifierExpCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_EXPLICIT_CREATE_INFO_EXT;
 	imageDrmFormatModifierExpCreateInfo.drmFormatModifier = modifier;//gbm_bo_get_modifier(pgbmBufferObject);
@@ -309,7 +307,7 @@ void TexturePixmap::Detach(){
 	vkFreeMemory(pcomp->logicalDev,transferMemory,0);
 	vkDestroyImage(pcomp->logicalDev,transferImage,0);
 
-	gbm_bo_destroy(pgbmBufferObject);
+	//gbm_bo_destroy(pgbmBufferObject);
 	close(dmafd);
 }
 

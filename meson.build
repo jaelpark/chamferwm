@@ -31,7 +31,7 @@ xcb = [
 
 vk = [
 	dependency('vulkan'),
-	dependency('gbm')
+	#dependency('gbm')
 ]
 
 python = [

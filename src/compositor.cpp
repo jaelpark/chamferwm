@@ -11,7 +11,7 @@
 #include <sys/shm.h>
 #include <boost/container_hash/hash.hpp>
 
-#include <gbm.h> //temp
+//#include <gbm.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -1694,7 +1694,7 @@ void X11Compositor::Start(){
 
 	InitializeRenderEngine();
 
-	char cardStr[256];
+	/*char cardStr[256];
 	snprintf(cardStr,sizeof(cardStr),"/dev/dri/card%u",physicalDevIndex);
 
 	cardfd = open(cardStr,O_RDWR|FD_CLOEXEC);
@@ -1704,7 +1704,7 @@ void X11Compositor::Start(){
 	}
 	pgbmdev = gbm_create_device(cardfd);
 	if(!pgbmdev)
-		throw Exception("Failed to create GBM device.");
+		throw Exception("Failed to create GBM device.");*/
 }
 
 void X11Compositor::Stop(){
@@ -1714,8 +1714,8 @@ void X11Compositor::Stop(){
 		delete pcolorBackground;
 	DestroyRenderEngine();
 
-	gbm_device_destroy(pgbmdev);
-	close(cardfd);
+	/*gbm_device_destroy(pgbmdev);
+	close(cardfd);*/
 
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_INPUT,0,0,XCB_XFIXES_REGION_NONE);

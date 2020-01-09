@@ -609,8 +609,8 @@ chamfer.BindBackend(backend);
 
 compositor = Compositor();
 #compositor.deviceIndex = 0;
-#compositor.fontName = "Monospace";
-#compositor.fontSize = 32;
+compositor.fontName = "Monospace";
+compositor.fontSize = 32;
 chamfer.BindCompositor(compositor);
 
 pids = psutil.pids();

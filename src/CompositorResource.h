@@ -4,7 +4,7 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_xcb.h>
 
-struct gbm_bo;
+//struct gbm_bo;
 
 namespace Compositor{
 
@@ -63,7 +63,7 @@ public:
 	std::vector<VkImageCopy> imageCopyBuffer;
 	
 	sint dmafd;
-	struct gbm_bo *pgbmBufferObject;
+	//struct gbm_bo *pgbmBufferObject;
 	const class X11Compositor *pcomp11;
 
 	static const VkComponentMapping pixmapComponentMapping;
