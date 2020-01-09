@@ -162,7 +162,24 @@ void X11Client::UpdateTranslation(){
 	glm::vec2 titlePadOffset = glm::min(titlePad,glm::vec2(0.0f));
 	glm::vec2 titlePadExtent = glm::max(titlePad,glm::vec2(0.0f));
 
-	coord -= glm::vec4(titlePadOffset.x,titlePadOffset.y,titlePadExtent.x-titlePadOffset.x,titlePadExtent.y-titlePadOffset.y);
+	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)){
+		coord -= glm::vec4(titlePadOffset.x,titlePadOffset.y,titlePadExtent.x-titlePadOffset.x,titlePadExtent.y-titlePadOffset.y);
+
+		glm::vec2 titleFrameOffset = glm::vec2(coord)+titlePadOffset;
+		if(titlePad.x > 1e-3f) //TODO: vectorize
+			titleFrameOffset.x += coord.z;
+		if(titlePad.y > 1e-3f)
+			titleFrameOffset.y += coord.w;
+		
+		glm::vec2 titleFrameExtent = glm::vec2(coord.z,coord.w);
+		glm::vec2 titlePadAbs = glm::abs(titlePad);
+		if(titlePadAbs.x > titlePadAbs.y)
+			titleFrameExtent.x = titlePadAbs.x;
+		else titleFrameExtent.y = titlePadAbs.y;
+		
+		titleRect = (WManager::Rectangle){titleFrameOffset.x,titleFrameOffset.y,titleFrameExtent.x,titleFrameExtent.y};
+		titlePad1 = titlePad;
+	}
 
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
@@ -1463,8 +1480,25 @@ void DebugClient::UpdateTranslation(){
 	glm::vec2 titlePadOffset = glm::min(titlePad,glm::vec2(0.0f));
 	glm::vec2 titlePadExtent = glm::max(titlePad,glm::vec2(0.0f));
 
-	coord -= glm::vec4(titlePadOffset.x,titlePadOffset.y,titlePadExtent.x-titlePadOffset.x,titlePadExtent.y-titlePadOffset.y);
-
+	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)){
+		coord -= glm::vec4(titlePadOffset.x,titlePadOffset.y,titlePadExtent.x-titlePadOffset.x,titlePadExtent.y-titlePadOffset.y);
+		
+		glm::vec2 titleFrameOffset = glm::vec2(coord)+titlePadOffset;
+		if(titlePad.x > 1e-3f) //TODO: vectorize
+			titleFrameOffset.x += coord.z;
+		if(titlePad.y > 1e-3f)
+			titleFrameOffset.y += coord.w;
+		
+		glm::vec2 titleFrameExtent = glm::vec2(coord.z,coord.w);
+		glm::vec2 titlePadAbs = glm::abs(titlePad);
+		if(titlePadAbs.x > titlePadAbs.y)
+			titleFrameExtent.x = titlePadAbs.x;
+		else titleFrameExtent.y = titlePadAbs.y;
+	
+		titleRect = (WManager::Rectangle){titleFrameOffset.x,titleFrameOffset.y,titleFrameExtent.x,titleFrameExtent.y};
+		titlePad1 = titlePad;
+	}
+	
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
 	rect = (WManager::Rectangle){coord.x,coord.y,coord.z,coord.w};
@@ -1589,7 +1623,7 @@ sint Debug::HandleEvent(bool forcePoll){
 				if(!pclient)
 					break;
 				if(pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE)
-					pclient->SetTitle1("title");
+					pclient->SetTitle1("a relatively long debug title which has no other purpose but to test the limits of title rendering");
 				clients.push_back(pclient);
 			}else
 			if(pev->detail == closeKeycode){

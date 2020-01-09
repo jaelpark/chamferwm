@@ -173,7 +173,6 @@ void ClientFrame::SetTitle(const char *ptext){
 	}
 	title = ptext;
 	pcomp->titleUpdateQueue.push_back(this);
-	//TODO: AddDamageRegion
 }
 
 void ClientFrame::UpdateDescSets(){
@@ -1095,27 +1094,40 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclient->pcontainer->titlePad,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 
-		if(renderObject.pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && renderObject.pclientFrame->ptitle){
-			//-TODO: scissor the title area, intersect with 'scissor'.
-			//-backend, UpdateTranslation(): store titlepad which can be used here (also instead of working with imageExtent)
-			glm::uvec2 titlePosition;
-			switch(renderObject.pclient->pcontainer->titleBar){
-			case WManager::Container::TITLEBAR_LEFT:
-				titlePosition = glm::uvec2(frame.offset.x+(ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)/2+(uint)(0.5f*renderObject.pclient->pcontainer->titlePad.x*(float)imageExtent.width),frame.offset.y+renderObject.pclientFrame->ptitle->GetTextLength());
-				break;
-			case WManager::Container::TITLEBAR_RIGHT:
-				titlePosition = glm::uvec2(frame.offset.x+frame.extent.width+(ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)/2+(uint)(0.5f*renderObject.pclient->pcontainer->titlePad.x*(float)imageExtent.width),frame.offset.y-10+renderObject.pclientFrame->ptitle->GetTextLength());
-				break;
-			case WManager::Container::TITLEBAR_TOP:
-			default:
-				titlePosition = glm::uvec2(frame.offset.x+10,frame.offset.y+(ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)/2+(uint)(0.5f*renderObject.pclient->pcontainer->titlePad.y*(float)imageExtent.width));
-				break;
-			case WManager::Container::TITLEBAR_BOTTOM:
-				titlePosition = glm::uvec2(frame.offset.x+10,frame.offset.y+frame.extent.height+(ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)/2+(uint)(0.5f*renderObject.pclient->pcontainer->titlePad.y*(float)imageExtent.width));
-				break;
+		if(renderObject.pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && !(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) && renderObject.pclientFrame->ptitle){
+
+			glm::uvec2 titlePosition = glm::uvec2(frame.offset.x,frame.offset.y);
+			if(renderObject.pclient->titlePad1.x > 1e-5)
+				titlePosition.x += frame.extent.width;
+			if(renderObject.pclient->titlePad1.y > 1e-5)
+				titlePosition.y += frame.extent.height;
+			glm::vec2 titlePadAbs = glm::abs(renderObject.pclient->titlePad1);
+			if(titlePadAbs.x > 1e-5){
+				titlePosition.x += (ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)/2;
+				titlePosition.y += renderObject.pclientFrame->ptitle->GetTextLength();
 			}
-			vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->ptitle->passignedSet->p->pipeline);
-			renderObject.pclientFrame->ptitle->Draw(titlePosition,renderObject.pclient->pcontainer->titleTransform,&pcommandBuffers[currentFrame]);
+			if(titlePadAbs.y > 1e-5)
+				titlePosition.y += (ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)/2;
+			titlePosition += 0.5f*renderObject.pclient->titlePad1;
+
+			//intersect the title region with scissor rectangle
+			glm::ivec2 titleRectOffset = glm::ivec2(renderObject.pclient->titleRect.x,renderObject.pclient->titleRect.y);
+			glm::ivec2 scissorOffset = glm::ivec2(scissor.offset.x,scissor.offset.y);
+			glm::ivec2 offset = glm::max(titleRectOffset,scissorOffset);
+			glm::ivec2 extent = glm::min(titleRectOffset+glm::ivec2(renderObject.pclient->titleRect.w,renderObject.pclient->titleRect.h),scissorOffset+glm::ivec2(scissor.extent.width,scissor.extent.height))-offset;
+
+			if(glm::all(glm::greaterThan(extent,glm::ivec2(0)))){
+				VkRect2D textFrame;
+				textFrame.offset = {offset.x,offset.y};
+				textFrame.extent = {extent.x,extent.y};
+
+				vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&textFrame);
+
+				vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->ptitle->passignedSet->p->pipeline);
+				renderObject.pclientFrame->ptitle->Draw(titlePosition,renderObject.pclient->pcontainer->titleTransform,&pcommandBuffers[currentFrame]);
+
+				vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);
+			}
 		}
 	}
 
@@ -1512,6 +1524,11 @@ void X11ClientFrame::AdjustSurface1(){
 
 void X11ClientFrame::SetTitle1(const char *ptitle){
 	SetTitle(ptitle);
+
+	VkRect2D rect;
+	rect.offset = {titleRect.x,titleRect.y};
+	rect.extent = {titleRect.w,titleRect.h};
+	pcomp->AddDamageRegion(&rect);
 }
 
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
@@ -1828,6 +1845,11 @@ void X11DebugClientFrame::AdjustSurface1(){
 
 void X11DebugClientFrame::SetTitle1(const char *ptitle){
 	SetTitle(ptitle);
+
+	VkRect2D rect;
+	rect.offset = {titleRect.x,titleRect.y};
+	rect.extent = {titleRect.w,titleRect.h};
+	pcomp->AddDamageRegion(&rect);
 }
 
 X11DebugCompositor::X11DebugCompositor(const Configuration *_pconfig, const Backend::X11Backend *pbackend) : X11Compositor(_pconfig,pbackend){

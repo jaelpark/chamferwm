@@ -21,7 +21,9 @@ public:
 	virtual void Kill(){}// = 0;
 	Rectangle rect; //pixel coordinates of the client
 	Rectangle oldRect; //to animate the transitions
+	Rectangle titleRect;
 	glm::vec2 position; //interpolated, animated rectangle
+	glm::vec2 titlePad1; //title pad in pixels
 	struct timespec translationTime;
 	class Container *pcontainer;
 };
