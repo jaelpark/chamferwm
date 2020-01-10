@@ -99,6 +99,8 @@ Text::Text(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], TextEngine *_
 }
 
 Text::~Text(){
+	if(pfontAtlas)
+		ptextEngine->ReleaseAtlas(pfontAtlas);
 	ptextEngine->ReleaseVertexBuffer(pvertexBuffer);
 
 	hb_buffer_destroy(phbBuf);
@@ -116,6 +118,8 @@ void Text::Set(const char *ptext, const VkCommandBuffer *pcommandBuffer){
 
 	FontAtlas *pfontAtlas1 = ptextEngine->CreateAtlas(pglyphInfo,glyphCount,pcommandBuffer);
 	if(pfontAtlas1 != pfontAtlas){
+		if(pfontAtlas)
+			ptextEngine->ReleaseAtlas(pfontAtlas);
 		pfontAtlas = pfontAtlas1;
 
 		AssignPipeline(passignedSet->p);
@@ -397,6 +401,13 @@ void TextEngine::ReleaseCycle(){
 		delete vertexBufferCacheEntry.pvertexBuffer;
 		return true;
 	}),vertexBufferCache.end());
+
+	fontAtlasMap.erase(std::remove_if(fontAtlasMap.begin(),fontAtlasMap.end(),[&](FontAtlas *pfontAtlas)->bool{
+		if(pcomp->frameTag < pfontAtlas->releaseTag+pcomp->swapChainImageCount+1 || pfontAtlas->refCount > 0)
+			return false;
+		delete pfontAtlas;
+		return true;
+	}),fontAtlasMap.end());
 }
 
 TextEngine::Glyph * TextEngine::LoadGlyph(uint codePoint){
