@@ -821,6 +821,8 @@ void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pcli
 }
 
 void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const WManager::Container *pfocus){
+	if(!pcontainer->pch)
+		return; //workaround a bug with stackQueue, need to fix this properly
 	for(const WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
 			ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
