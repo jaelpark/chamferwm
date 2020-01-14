@@ -9,6 +9,8 @@
 #include <xcb/shm.h>
 #include <xcb/dri3.h>
 
+#include <string>
+
 //struct gbm_device;
 
 namespace Backend{
