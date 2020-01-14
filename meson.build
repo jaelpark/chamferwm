@@ -96,5 +96,5 @@ custom_target('text_fragment',output:'text_fragment.spv',input:obj,command:invok
 obj = gen_fragment.process(['shaders/solid.hlsl'])
 custom_target('solid_fragment',output:'solid_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
 
-executable('chamfer',sources:src,include_directories:inc,dependencies:[xcb,vk,python,ft],cpp_args:['-std=c++17','-Wno-reorder'])
+executable('chamfer',sources:src,include_directories:inc,dependencies:[xcb,vk,python,ft],cpp_args:['-std=c++17','-Wno-reorder','-Wno-error=narrowing'])
 
