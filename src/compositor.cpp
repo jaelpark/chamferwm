@@ -59,7 +59,7 @@ bool Drawable::AssignPipeline(const Pipeline *prenderPipeline){
 }
 
 void Drawable::BindShaderResources(const std::vector<std::pair<ShaderModule::VARIABLE, const void *>> *pVarAddrs, const VkCommandBuffer *pcommandBuffer){
-	char alignas(16) pushConstantBuffer[128];
+	alignas(16) char pushConstantBuffer[128];
 	for(uint i = 0, p = 0; i < Pipeline::SHADER_MODULE_COUNT; ++i){
 		//bind descriptor sets
 		if(!passignedSet->p->pshaderModule[i])
