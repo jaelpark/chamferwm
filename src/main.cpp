@@ -101,6 +101,18 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	va_end(args);
 }
 
+class RunCompositor : public Config::CompositorConfig{
+public:
+	RunCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : proot(_proot), pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
+	virtual ~RunCompositor(){}
+	virtual void Present() = 0;
+	virtual bool IsAnimating() const = 0;
+	virtual void WaitIdle() = 0;
+protected:
+	WManager::Container *proot;
+	std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix;
+};
+
 class RunBackend : public Config::BackendConfig{
 public:
 	RunBackend(WManager::Container *_proot, Config::BackendInterface *_pbackendInt) : proot(_proot), pcomp(0), Config::BackendConfig(_pbackendInt){}
@@ -315,18 +327,6 @@ public:
 	std::vector<std::pair<const WManager::Client *, WManager::Client *>> stackAppendix;
 	//std::vector<WManager::Client *> desktopStack;
 	class RunCompositor *pcomp;
-};
-
-class RunCompositor : public Config::CompositorConfig{
-public:
-	RunCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : proot(_proot), pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
-	virtual ~RunCompositor(){}
-	virtual void Present() = 0;
-	virtual bool IsAnimating() const = 0;
-	virtual void WaitIdle() = 0;
-protected:
-	WManager::Container *proot;
-	std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix;
 };
 
 class DefaultBackend : public Backend::Default, public RunBackend{

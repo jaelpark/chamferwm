@@ -195,7 +195,7 @@ void ContainerInterface::UpdateShaders(){
 		const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
 			(*m)->vertexShader.size() > 0?(*m)->vertexShader.c_str():0,
 			(*m)->geometryShader.size() > 0?(*m)->geometryShader.c_str():0,
-			(*m)->fragmentShader.c_str() > 0?(*m)->fragmentShader.c_str():0
+			(*m)->fragmentShader.size() > 0?(*m)->fragmentShader.c_str():0
 		};
 		pclientFrame->SetShaders(pshaderName);
 
