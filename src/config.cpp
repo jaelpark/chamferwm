@@ -76,6 +76,10 @@ bool ContainerInterface::OnFullscreen(bool toggle){
 	return true;
 }
 
+void ContainerInterface::OnStack(bool toggle){
+	//
+}
+
 bool ContainerInterface::OnFocus(){
 	//
 	return true;
@@ -283,6 +287,20 @@ bool ContainerProxy::OnFullscreen(bool toggle){
 		}
 	}
 	return ContainerInterface::OnFullscreen(toggle);
+}
+
+void ContainerProxy::OnStack(bool toggle){
+	boost::python::override ovr = this->get_override("OnStack");
+	if(ovr){
+		try{
+			ovr(toggle);
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else ContainerInterface::OnStack(toggle);
 }
 
 bool ContainerProxy::OnFocus(){
@@ -650,6 +668,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("OnParent",&ContainerInterface::OnParent)
 		.def("OnCreate",&ContainerInterface::OnCreate)
 		.def("OnFullscreen",&ContainerInterface::OnFullscreen)
+		.def("OnStack",&ContainerInterface::OnStack)
 		.def("OnFocus",&ContainerInterface::OnFocus)
 		.def("OnPropertyChange",&ContainerInterface::OnPropertyChange)
 		.def("GetNext",&ContainerInterface::GetNext)
@@ -702,6 +721,9 @@ BOOST_PYTHON_MODULE(chamfer){
 			[](ContainerInterface &container, bool toggle){
 				if(!container.pcontainer)
 					return;
+				//for(WManager::Container *pcontainer = container.pcontainer->pch; pcontainer; pcontainer = pcontainer->pnext)
+					//pcontainer
+				container.OnStack(toggle);
 				container.pcontainer->SetStacked(toggle);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, bool>()))
 		.def("IsFloating",boost::python::make_function(
