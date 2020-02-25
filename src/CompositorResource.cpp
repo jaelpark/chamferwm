@@ -782,6 +782,7 @@ const std::vector<std::tuple<const char *, uint>> ShaderModule::variableMap = {
 	{"screen",8},
 	{"margin",8},
 	{"titlePad",8},
+	{"titleSpan",8},
 	{"flags",4},
 	{"time",4}
 };

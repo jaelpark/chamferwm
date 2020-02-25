@@ -94,7 +94,7 @@ ColorFrame::~ColorFrame(){
 	//
 }
 
-void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm::vec2 &titlePad, uint flags, const VkCommandBuffer *pcommandBuffer){
+void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm::vec2 &titlePad, const glm::vec2 &titleSpan, uint flags, const VkCommandBuffer *pcommandBuffer){
 	time = timespec_diff(pcomp->frameTime,creationTime);
 
 	glm::vec2 imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
@@ -109,6 +109,7 @@ void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm:
 		{ShaderModule::VARIABLE_SCREEN,&imageExtent},
 		{ShaderModule::VARIABLE_MARGIN,&margin},
 		{ShaderModule::VARIABLE_TITLEPAD,&titlePad},
+		{ShaderModule::VARIABLE_TITLESPAN,&titleSpan},
 		{ShaderModule::VARIABLE_FLAGS,&flags},
 		{ShaderModule::VARIABLE_TIME,&time}
 	};
@@ -811,6 +812,7 @@ void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pcli
 		renderObject.pclientFrame->shaderFlags =
 			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
 			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
+			//|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
 			|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 
@@ -835,7 +837,8 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 			renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
 			renderObject.pclientFrame->shaderFlags =
 				(pcont == pfocus || pcontainer == pfocus?ClientFrame::ClientFrame::SHADER_FLAG_FOCUS:0)
-				|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0) //probably not required here
+				//|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0) //probably not required here
+				|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
 				|renderObject.pclientFrame->shaderUserFlags;
 			renderQueue.push_back(renderObject);
 		}
@@ -906,6 +909,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderObject.pclientFrame->shaderFlags =
 			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
 			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
+			|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
 			|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 	}
@@ -928,6 +932,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderObject.pclientFrame->shaderFlags =
 			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
 			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
+			|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
 			|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 
@@ -944,6 +949,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderObject.pclientFrame->shaderFlags =
 			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
 			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
+			|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
 			|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 	}
@@ -1054,7 +1060,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		VkRect2D screenRect;
 		screenRect.offset = {0,0};
 		screenRect.extent = imageExtent;
-		pbackground->Draw(screenRect,glm::vec2(0.0f),glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
+		pbackground->Draw(screenRect,glm::vec2(0.0f),glm::vec2(0.0f),glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
 	}
 	
 	//TODO: stencil buffer optimization
@@ -1094,7 +1100,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
-		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclient->pcontainer->titlePad,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
+		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclient->pcontainer->titlePad,renderObject.pclient->pcontainer->titleSpan,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 
 		if(renderObject.pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && !(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) && renderObject.pclientFrame->ptitle){
 
@@ -1104,12 +1110,13 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			if(renderObject.pclient->titlePad1.y > 1e-5)
 				titlePosition.y += frame.extent.height;
 			glm::vec2 titlePadAbs = glm::abs(renderObject.pclient->titlePad1);
-			if(titlePadAbs.x > 1e-5){
+			if(titlePadAbs.x > titlePadAbs.y){
+				titlePosition.y += renderObject.pclient->titleStackOffset.y+renderObject.pclientFrame->ptitle->GetTextLength()-(renderObject.pclientFrame->ptitle->GetTextLength()-renderObject.pclient->titleFrameExtent.y);
 				titlePosition.x += (ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)/2;
-				titlePosition.y += renderObject.pclientFrame->ptitle->GetTextLength();
-			}
-			if(titlePadAbs.y > 1e-5)
+			}else{
+				titlePosition.x += renderObject.pclient->titleStackOffset.x;
 				titlePosition.y += (ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)/2;
+			}
 			titlePosition += 0.5f*renderObject.pclient->titlePad1;
 
 			//intersect the title region with scissor rectangle

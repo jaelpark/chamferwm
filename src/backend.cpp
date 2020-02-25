@@ -163,6 +163,21 @@ void X11Client::UpdateTranslation(){
 	glm::vec2 titlePadExtent = glm::max(titlePad,glm::vec2(0.0f));
 
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)){
+		auto m = std::find(pcontainer->pParent->stackQueue.begin(),pcontainer->pParent->stackQueue.end(),pcontainer);
+		
+		if(pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
+			uint stackIndex = m-pcontainer->pParent->stackQueue.begin();
+			float stackOffset = 1.0f/(float)std::max(pcontainer->pParent->stackQueue.size(),1lu);
+			pcontainer->titleSpan = glm::vec2((float)stackIndex*stackOffset,((float)stackIndex+1.0f)*stackOffset);
+
+			titleFrameExtent = glm::vec2(coord.z,coord.w)*stackOffset;
+			titleStackOffset = (float)stackIndex*titleFrameExtent;
+		}else{
+			pcontainer->titleSpan = glm::vec2(0.0f,1.0f);
+			titleFrameExtent = glm::vec2(coord.z,coord.w);
+			titleStackOffset = glm::vec2(0.0f);
+		}
+
 		coord -= glm::vec4(titlePadOffset.x,titlePadOffset.y,titlePadExtent.x-titlePadOffset.x,titlePadExtent.y-titlePadOffset.y);
 
 		glm::vec2 titleFrameOffset = glm::vec2(coord)+titlePadOffset;
@@ -171,11 +186,14 @@ void X11Client::UpdateTranslation(){
 		if(titlePad.y > 1e-3f)
 			titleFrameOffset.y += coord.w;
 		
-		glm::vec2 titleFrameExtent = glm::vec2(coord.z,coord.w);
 		glm::vec2 titlePadAbs = glm::abs(titlePad);
-		if(titlePadAbs.x > titlePadAbs.y)
+		if(titlePadAbs.x > titlePadAbs.y){
+			titleFrameOffset.y += titleStackOffset.y;
 			titleFrameExtent.x = titlePadAbs.x;
-		else titleFrameExtent.y = titlePadAbs.y;
+		}else{
+			titleFrameOffset.x += titleStackOffset.x;
+			titleFrameExtent.y = titlePadAbs.y;
+		}
 		
 		titleRect = (WManager::Rectangle){titleFrameOffset.x,titleFrameOffset.y,titleFrameExtent.x,titleFrameExtent.y};
 		titlePad1 = titlePad;
@@ -1481,6 +1499,18 @@ void DebugClient::UpdateTranslation(){
 	glm::vec2 titlePadExtent = glm::max(titlePad,glm::vec2(0.0f));
 
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)){
+		auto m = std::find(pcontainer->pParent->stackQueue.begin(),pcontainer->pParent->stackQueue.end(),pcontainer);
+		glm::vec2 titleFrameExtent;
+		if(pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
+			uint stackIndex = m-pcontainer->pParent->stackQueue.begin();
+			titleFrameExtent = glm::vec2(coord.z,coord.w)
+				/(float)std::max(pcontainer->pParent->stackQueue.size(),1lu);
+			titleStackOffset = (float)stackIndex*titleFrameExtent;
+		}else{
+			titleFrameExtent = glm::vec2(coord.z,coord.w);
+			titleStackOffset = glm::vec2(0.0f);
+		}
+
 		coord -= glm::vec4(titlePadOffset.x,titlePadOffset.y,titlePadExtent.x-titlePadOffset.x,titlePadExtent.y-titlePadOffset.y);
 		
 		glm::vec2 titleFrameOffset = glm::vec2(coord)+titlePadOffset;
@@ -1489,11 +1519,14 @@ void DebugClient::UpdateTranslation(){
 		if(titlePad.y > 1e-3f)
 			titleFrameOffset.y += coord.w;
 		
-		glm::vec2 titleFrameExtent = glm::vec2(coord.z,coord.w);
 		glm::vec2 titlePadAbs = glm::abs(titlePad);
-		if(titlePadAbs.x > titlePadAbs.y)
+		if(titlePadAbs.x > titlePadAbs.y){
+			titleFrameOffset.y += titleStackOffset.y;
 			titleFrameExtent.x = titlePadAbs.x;
-		else titleFrameExtent.y = titlePadAbs.y;
+		}else{
+			titleFrameOffset.x += titleStackOffset.x;
+			titleFrameExtent.y = titlePadAbs.y;
+		}
 	
 		titleRect = (WManager::Rectangle){titleFrameOffset.x,titleFrameOffset.y,titleFrameExtent.x,titleFrameExtent.y};
 		titlePad1 = titlePad;

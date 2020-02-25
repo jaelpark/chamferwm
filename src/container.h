@@ -24,6 +24,8 @@ public:
 	Rectangle titleRect;
 	glm::vec2 position; //interpolated, animated rectangle
 	glm::vec2 titlePad1; //title pad in pixels
+	glm::vec2 titleStackOffset;
+	glm::vec2 titleFrameExtent;
 	struct timespec translationTime;
 	class Container *pcontainer;
 };
@@ -108,6 +110,7 @@ public:
 
 	glm::vec2 margin;
 	glm::vec2 titlePad;
+	glm::vec2 titleSpan; //title span in normalized coords
 	glm::mat2x2 titleTransform;
 
 	glm::vec2 size; //size relative to the parent container

@@ -958,6 +958,7 @@ BOOST_PYTHON_MODULE(chamfer){
 	boost::python::enum_<Compositor::ClientFrame::SHADER_FLAG>("shaderFlag")
 		.value("FOCUS",Compositor::ClientFrame::SHADER_FLAG_FOCUS)
 		.value("FLOATING",Compositor::ClientFrame::SHADER_FLAG_FLOATING)
+		.value("STACKED",Compositor::ClientFrame::SHADER_FLAG_STACKED)
 		.value("USER_BIT",Compositor::ClientFrame::SHADER_FLAG_USER_BIT);
 	
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")
