@@ -290,7 +290,6 @@ public:
 	}
 
 	void ReleaseContainers(){
-		//TODO: cleanup clients that are not part of the hierarchy!
 		if(proot->pch)
 			ReleaseContainersRecursive(proot->pch);
 		for(auto &p : stackAppendix){
@@ -325,7 +324,6 @@ public:
 //protected:
 	WManager::Container *proot;
 	std::vector<std::pair<const WManager::Client *, WManager::Client *>> stackAppendix;
-	//std::vector<WManager::Client *> desktopStack;
 	class RunCompositor *pcomp;
 };
 

@@ -1369,7 +1369,8 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 
 	damage = xcb_generate_id(pbackend->pcon);
-	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
+	//xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
+	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_NON_EMPTY);
 
 	//attach to shared memory
 	uint textureSize = rect.w*rect.h*4;
@@ -1744,18 +1745,50 @@ bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 			return true;
 		}
 
-		if(pclient->rect.w < pev->area.x+pev->area.width || pclient->rect.h < pev->area.y+pev->area.height)
-			return true; //filter out outdated events after client shrink in size
-
 		X11ClientFrame *pclientFrame = dynamic_cast<X11ClientFrame *>(pclient);
+
+		xcb_xfixes_region_t region = xcb_generate_id(pbackend->pcon);
+		xcb_xfixes_create_region(pbackend->pcon,region,0,0);
+		xcb_damage_subtract(pbackend->pcon,pclientFrame->damage,0,region);
+
+		xcb_xfixes_fetch_region_cookie_t fetchRegionCookie = xcb_xfixes_fetch_region_unchecked(pbackend->pcon,region);
+		xcb_xfixes_destroy_region(pbackend->pcon,region);
+
+		xcb_xfixes_fetch_region_reply_t *pfetchRegionReply = xcb_xfixes_fetch_region_reply(pbackend->pcon,fetchRegionCookie,0);
+
+		uint count = xcb_xfixes_fetch_region_rectangles_length(pfetchRegionReply);
+		if(count > 0){
+			xcb_rectangle_t *prects = xcb_xfixes_fetch_region_rectangles(pfetchRegionReply);
+			for(uint i = 0; i < count; ++i){
+				if(pclient->rect.w >= prects[i].x+prects[i].width && pclient->rect.h >= prects[i].y+prects[i].height){
+					VkRect2D rect;
+					rect.offset = {prects[i].x,prects[i].y};
+					rect.extent = {prects[i].width,prects[i].height};
+					pclientFrame->damageRegions.push_back(rect);
+				}
+			}
+		}else{
+			if(pclient->rect.w >= pev->area.x+pev->area.width && pclient->rect.h >= pev->area.y+pev->area.height){
+				VkRect2D rect;
+				rect.offset = {pfetchRegionReply->extents.x,pfetchRegionReply->extents.y};
+				rect.extent = {pfetchRegionReply->extents.width,pfetchRegionReply->extents.height};
+				pclientFrame->damageRegions.push_back(rect);
+			}
+		}
+
+		free(pfetchRegionReply);
+
+		/*if(pclient->rect.w < pev->area.x+pev->area.width || pclient->rect.h < pev->area.y+pev->area.height)
+			return true; //filter out outdated events after client shrink in size*/
+
 		if(std::find(updateQueue.begin(),updateQueue.end(),pclientFrame) == updateQueue.end())
 			updateQueue.push_back(pclientFrame);
 
-		VkRect2D rect;
+		/*VkRect2D rect;
 		rect.offset = {pev->area.x,pev->area.y};
 		rect.extent = {pev->area.width,pev->area.height};
 		pclientFrame->damageRegions.push_back(rect);
-		//DebugPrintf(stdout,"DAMAGE_EVENT, %x, (%hd,%hd), (%hux%hu)\n",pev->drawable,pev->area.x,pev->area.y,pev->area.width,pev->area.height);
+		//DebugPrintf(stdout,"DAMAGE_EVENT, %x, (%hd,%hd), (%hux%hu)\n",pev->drawable,pev->area.x,pev->area.y,pev->area.width,pev->area.height);*/
 		
 		return true;
 	}
