@@ -220,7 +220,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), hostMemoryImport(pconfig->hostMemoryImport), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration), pfontName(pconfig->pfontName), fontSize(pconfig->fontSize){
+CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), unredirected(false), appFullscreen(false), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), hostMemoryImport(pconfig->hostMemoryImport), unredirOnFullscreen(pconfig->unredirOnFullscreen), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration), pfontName(pconfig->pfontName), fontSize(pconfig->fontSize){
 	//
 }
 
@@ -954,6 +954,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderQueue.push_back(renderObject);
 	}
 
+	appFullscreen = false;
 	playingAnimation = false;
 	clock_gettime(CLOCK_MONOTONIC,&frameTime);
 
@@ -984,10 +985,26 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 			renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
 
-		}else renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
+		}else{
+			renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
+			
+			if(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)
+				appFullscreen = true;
+		}
 
 		if(renderObject.pclientFrame->shaderFlags != renderObject.pclientFrame->oldShaderFlags)
 			AddDamageRegion(renderObject.pclient);
+	}
+
+	if(unredirOnFullscreen){
+		if(appFullscreen && !unredirected){
+			printf("************** unredirect\n");
+			unredirected = true;
+		}else
+		if(!appFullscreen && unredirected){
+			printf("************** redirect\n");
+			unredirected = false;
+		}
 	}
 	
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};

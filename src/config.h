@@ -164,6 +164,7 @@ public:
 	bool debugLayers;
 	bool scissoring;
 	bool hostMemoryImport;
+	bool unredirOnFullscreen;
 	bool enableAnimation;
 	float animationDuration;
 
@@ -201,6 +202,7 @@ public:
 	static bool debugLayers;
 	static bool scissoring;
 	static bool hostMemoryImport;
+	static bool unredirOnFullscreen;
 };
 
 }

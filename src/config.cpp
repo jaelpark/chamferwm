@@ -593,7 +593,7 @@ BackendConfig::~BackendConfig(){
 	pbackendInt->pbackend = 0;
 }
 
-CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), hostMemoryImport(Loader::hostMemoryImport), enableAnimation(true), animationDuration(0.3f), fontName("Monospace"), fontSize(18), pcompositor(0){
+CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), hostMemoryImport(Loader::hostMemoryImport), unredirOnFullscreen(Loader::unredirOnFullscreen), enableAnimation(true), animationDuration(0.3f), fontName("Monospace"), fontSize(18), pcompositor(0){
 	//
 }
 
@@ -988,6 +988,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("debugLayers",&CompositorInterface::debugLayers)
 		.def_readwrite("scissoring",&CompositorInterface::scissoring)
 		.def_readwrite("hostMemoryImport",&CompositorInterface::hostMemoryImport)
+		.def_readwrite("unredirOnFullscreen",&CompositorInterface::unredirOnFullscreen)
 		.add_property("enableAnimation",
 			boost::python::make_function(
 			[](CompositorInterface &compositor){
@@ -1079,6 +1080,7 @@ sint Loader::deviceIndex;
 bool Loader::debugLayers;
 bool Loader::scissoring;
 bool Loader::hostMemoryImport;
+bool Loader::unredirOnFullscreen;
 
 }
 

@@ -298,7 +298,7 @@ void X11Container::Focus1(){
 }
 
 void X11Container::Stack1(){
-	((X11Backend*)pbackend)->StackClients(); //hack, bypass const qualifier
+	const_cast<X11Backend *>(pbackend)->StackClients();
 }
 
 void X11Container::Fullscreen1(){
@@ -307,8 +307,6 @@ void X11Container::Fullscreen1(){
 	X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
 	if(flags & FLAG_FULLSCREEN){
 		xcb_change_property(pbackend->pcon,XCB_PROP_MODE_APPEND,pclient11->window,pbackend->ewmh._NET_WM_STATE,XCB_ATOM_ATOM,32,1,&pbackend->ewmh._NET_WM_STATE_FULLSCREEN);
-
-		//pclient11->SetFullscreen1(true);
 	}else{
 		xcb_grab_server(pbackend->pcon);
 		xcb_get_property_cookie_t propertyCookie = xcb_get_property(pbackend->pcon,false,pclient11->window,pbackend->ewmh._NET_WM_STATE,XCB_GET_PROPERTY_TYPE_ANY,0,4096);
@@ -335,8 +333,6 @@ void X11Container::Fullscreen1(){
 		delete []pNewAtoms;
 		free(propertyReply);
 		xcb_ungrab_server(pbackend->pcon);
-
-		//pclient11->SetFullscreen1(false);
 	}
 
 	xcb_flush(pbackend->pcon);

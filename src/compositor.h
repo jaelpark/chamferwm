@@ -106,6 +106,7 @@ public:
 		bool debugLayers;
 		bool scissoring;
 		bool hostMemoryImport;
+		bool unredirOnFullscreen;
 		bool enableAnimation;
 		float animationDuration;
 		const char *pfontName;
@@ -235,12 +236,15 @@ protected:
 	};
 	std::vector<DescSetCacheEntry> descSetCache;
 
+	bool unredirected;
+	bool appFullscreen; //at least one app is in fullscreen mode
 	bool playingAnimation;
 
 	//config
 	bool debugLayers;
 	bool scissoring;
 	bool hostMemoryImport;
+	bool unredirOnFullscreen;
 
 public:
 	bool enableAnimation;
