@@ -339,7 +339,6 @@ void CompositorInterface::InitializeRenderEngine(){
 		pdevProps[i].sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 		pdevProps[i].pNext = &pPhysicalDeviceExternalMemoryHostProps[i];
 		vkGetPhysicalDeviceProperties2(pdevices[i],&pdevProps[i]);
-		//vkGetPhysicalDeviceProperties(pdevices[i],&pdevProps[i]);
 
 		//device features
 		VkPhysicalDeviceFeatures devFeatures;
@@ -1392,7 +1391,6 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	//attach to shared memory
 	uint textureSize = rect.w*rect.h*4;
 	shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
-	//sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
 	if(shmid == -1){
 		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
 		return;
@@ -1400,7 +1398,6 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	segment = xcb_generate_id(pbackend->pcon);
 	xcb_shm_attach(pbackend->pcon,segment,shmid,0);
 	pchpixels = (unsigned char*)shmat(shmid,0,0);
-	//shmctl(shmid,IPC_RMID,0);
 
 	xcb_flush(pbackend->pcon);
 	
@@ -1490,14 +1487,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		xcb_flush(pbackend->pcon);
 		free(pimageReply);
 
-		//printf("importing host\n");
 		for(VkRect2D &rect1 : damageRegions){
-			/*xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
-
-			xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
-			xcb_flush(pbackend->pcon);
-			free(pimageReply);*/
-
 			VkRect2D screenRect;
 			screenRect.offset = {(sint)position.x+rect1.offset.x,(sint)position.y+rect1.offset.y};
 			screenRect.extent = rect1.extent;
@@ -1521,7 +1511,6 @@ void X11ClientFrame::AdjustSurface1(){
 		shmctl(shmid,IPC_RMID,0);
 
 		//attach
-		//sint shmid = shmget(IPC_PRIVATE,rect.w*rect.h*4,IPC_CREAT|0777);
 		uint textureSize = rect.w*rect.h*4;
 		shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
 		if(shmid == -1){
@@ -1530,14 +1519,12 @@ void X11ClientFrame::AdjustSurface1(){
 		}
 		xcb_shm_attach(pbackend->pcon,segment,shmid,0);
 		pchpixels = (unsigned char*)shmat(shmid,0,0);
-		//shmctl(shmid,IPC_RMID,0);
 
 		xcb_free_pixmap(pbackend->pcon,windowPixmap);
 		xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 
 		AdjustSurface(rect.w,rect.h);
 
-		//ptexture->Attach(windowPixmap);
 		if(pcomp->hostMemoryImport && !ptexture->Attach(pchpixels)){
 			DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
 			pcomp->hostMemoryImport = false;
@@ -1560,7 +1547,6 @@ void X11ClientFrame::SetTitle1(const char *ptitle){
 
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
 	//
-	//sint shmid = shmget(IPC_PRIVATE,w*h*4,IPC_CREAT|0777);
 	uint textureSize = w*h*4;
 	shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
 	if(shmid == -1){
@@ -1571,7 +1557,6 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 	xcb_shm_attach(pcomp11->pbackend->pcon,segment,shmid,0);
 
 	pchpixels = (unsigned char*)shmat(shmid,0,0);
-	//shmctl(shmid,IPC_RMID,0);
 
 	CreateSurface(w,h,24);
 
@@ -1645,7 +1630,6 @@ X11Compositor::~X11Compositor(){
 }
 
 void X11Compositor::Start(){
-
 	//compositor
 	if(!pbackend->QueryExtension("Composite",&compEventOffset,&compErrorOffset))
 		throw Exception("XCompositor unavailable.");
