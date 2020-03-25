@@ -988,16 +988,25 @@ sint Default::HandleEvent(bool forcePoll){
 			for(uint i = 0; i < 2; ++i)
 				propertyReply1[i] = xcb_get_property_reply(pcon,propertyCookie1[i],0);
 
-			uint nameLen = xcb_get_property_value_length(propertyReply1[0]);
-			char *pwmName = mstrndup((const char *)xcb_get_property_value(propertyReply1[0]),nameLen);
-			pwmName[nameLen] = 0;
+			char *pwmProperty[2];
+			uint pwmPropertyLen[2];
+			for(uint i = 0; i < 2; ++i){
+				if(!propertyReply1[i]){
+					pwmProperty[i] = (char*)"";
+					pwmPropertyLen[i] = 0;
+					continue;
+				}
+				pwmPropertyLen[i] = xcb_get_property_value_length(propertyReply1[i]);
+				if(pwmPropertyLen[i] <= 0){
+					pwmProperty[i] = (char*)"";
+					continue;
+				}
+				pwmProperty[i] = mstrndup((const char *)xcb_get_property_value(propertyReply1[i]),pwmPropertyLen[i]);
+				pwmProperty[pwmPropertyLen[i]] = 0;
+			}
 
-			uint classLen = xcb_get_property_value_length(propertyReply1[1]);
-			char *pwmClass = mstrndup((const char *)xcb_get_property_value(propertyReply1[1]),classLen);
-			pwmClass[classLen] = 0;
-
-			BackendStringProperty wmName(pwmName);
-			BackendStringProperty wmClass(pwmClass);
+			BackendStringProperty wmName(pwmProperty[0]);
+			BackendStringProperty wmClass(pwmProperty[1]);
 
 			static WManager::Client dummyClient(0); //base client being unavailable means that the client is stacked on top of everything else
 
@@ -1020,7 +1029,7 @@ sint Default::HandleEvent(bool forcePoll){
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_MANUAL));
 
-			if(pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && nameLen > 0)
+			if(pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && pwmPropertyLen[0] > 0)
 				pclient->SetTitle1(wmName.pstr);
 
 			StackClients();
@@ -1028,11 +1037,11 @@ sint Default::HandleEvent(bool forcePoll){
 			//if(hintFlags & X11Client::CreateInfo::HINT_FULLSCREEN)
 				//SetFullscreen(pclient,true);
 
-			mstrfree(pwmName);
-			mstrfree(pwmClass);
-
 			for(uint i = 0; i < 2; ++i)
-				free(propertyReply1[i]);
+				if(pwmPropertyLen[i] > 0){
+					mstrfree(pwmProperty[i]);
+					free(propertyReply1[i]);
+				}
 
 			netClientList.clear();
 			for(auto &p : clients)
@@ -1131,8 +1140,26 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_get_property_reply_t *propertyReply1[2];
 			for(uint i = 0; i < 2; ++i)
 				propertyReply1[i] = xcb_get_property_reply(pcon,propertyCookie1[i],0);
-			BackendStringProperty wmName((const char *)xcb_get_property_value(propertyReply1[0]));
-			BackendStringProperty wmClass((const char *)xcb_get_property_value(propertyReply1[1]));
+
+			char *pwmProperty[2];
+			uint pwmPropertyLen[2];
+			for(uint i = 0; i < 2; ++i){
+				if(!propertyReply1[i]){
+					pwmProperty[i] = (char*)"";
+					pwmPropertyLen[i] = 0;
+					continue;
+				}
+				pwmPropertyLen[i] = xcb_get_property_value_length(propertyReply1[i]);
+				if(pwmPropertyLen[i] <= 0){
+					pwmProperty[i] = (char*)"";
+					continue;
+				}
+				pwmProperty[i] = mstrndup((const char *)xcb_get_property_value(propertyReply1[i]),pwmPropertyLen[i]);
+				pwmProperty[pwmPropertyLen[i]] = 0;
+			}
+
+			BackendStringProperty wmName(pwmProperty[0]);
+			BackendStringProperty wmClass(pwmProperty[1]);
 
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
@@ -1151,7 +1178,10 @@ sint Default::HandleEvent(bool forcePoll){
 			StackClients();
 
 			for(uint i = 0; i < 2; ++i)
-				free(propertyReply1[i]);
+				if(pwmPropertyLen[i] > 0){
+					mstrfree(pwmProperty[i]);
+					free(propertyReply1[i]);
+				}
 
 			netClientList.clear();
 			for(auto &p : clients)
@@ -1219,6 +1249,10 @@ sint Default::HandleEvent(bool forcePoll){
 				if(!propertyReply)
 					break; //TODO: get legacy XCB_ATOM_WM_NAME
 				uint nameLen = xcb_get_property_value_length(propertyReply);
+				if(nameLen <= 0){
+					free(propertyReply);
+					break;
+				}
 				char *pwmName = mstrndup((const char *)xcb_get_property_value(propertyReply),nameLen);
 				pwmName[nameLen] = 0;
 
@@ -1229,7 +1263,6 @@ sint Default::HandleEvent(bool forcePoll){
 					pclient1->SetTitle1(prop.pstr);
 
 				mstrfree(pwmName);
-
 				free(propertyReply);
 
 			}else
@@ -1239,6 +1272,10 @@ sint Default::HandleEvent(bool forcePoll){
 				if(!propertyReply)
 					break;
 				uint classLen = xcb_get_property_value_length(propertyReply);
+				if(classLen <= 0){
+					free(propertyReply);
+					break;
+				}
 				char *pwmClass = mstrndup((const char *)xcb_get_property_value(propertyReply),classLen);
 				pwmClass[classLen] = 0;
 
@@ -1246,7 +1283,6 @@ sint Default::HandleEvent(bool forcePoll){
 				PropertyChange(pclient1,PROPERTY_ID_WM_CLASS,&prop);
 
 				mstrfree(pwmClass);
-
 				free(propertyReply);
 			}else
 			if(pev->atom == XA_WM_TRANSIENT_FOR){
