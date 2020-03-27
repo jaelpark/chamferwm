@@ -989,8 +989,10 @@ sint Default::HandleEvent(bool forcePoll){
 
 			for(uint i = 0; i < 2; ++i){
 				propertyReply1[i] = xcb_get_property_reply(pcon,propertyCookie1[i],0);
-				if(!propertyReply1[i])
+				if(!propertyReply1[i]){
+					pwmProperty[i] = 0;
 					continue;
+				}
 				uint propertyLen = xcb_get_property_value_length(propertyReply1[i]);
 				if(propertyLen <= 0){
 					pwmProperty[i] = 0;
@@ -1138,8 +1140,10 @@ sint Default::HandleEvent(bool forcePoll){
 
 			for(uint i = 0; i < 2; ++i){
 				propertyReply1[i] = xcb_get_property_reply(pcon,propertyCookie1[i],0);
-				if(!propertyReply1[i])
+				if(!propertyReply1[i]){
+					pwmProperty[i] = 0;
 					continue;
+				}
 				uint propertyLen = xcb_get_property_value_length(propertyReply1[i]);
 				if(propertyLen <= 0){
 					pwmProperty[i] = 0;
