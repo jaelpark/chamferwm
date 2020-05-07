@@ -53,6 +53,7 @@ public:
 	//client variables
 	uint shaderUserFlags;
 	//--------------------------------
+	std::string name;
 	std::string vertexShader;
 	std::string geometryShader;
 	std::string fragmentShader;
@@ -111,18 +112,31 @@ public:
 	~DebugContainerConfig();
 };
 
+/*class WorkspaceInterface{
+public:
+	WorkspaceInterface();
+	virtual ~WorkspaceInterface();
+};
+
+class WorkspaceProxy : public WorkspaceInterface, public boost::python::wrapper<WorkspaceInterface>{
+public:
+	WorkspaceProxy();
+	~WorkspaceProxy();
+};*/
+
 class BackendInterface{
 public:
 	BackendInterface();
 	virtual ~BackendInterface();
 	virtual void OnSetupKeys(bool);
 	virtual boost::python::object OnCreateContainer();
+	//virtual boost::python::object OnCreateWorkspace();
 	virtual void OnKeyPress(uint);
 	virtual void OnKeyRelease(uint);
 	virtual void OnTimer();
 	virtual void OnExit();
 	boost::python::object GetFocus();
-	boost::python::object GetRoot();
+	boost::python::object GetRoot(boost::python::object = boost::python::object());
 	void BindKey(uint, uint, uint);
 	void MapKey(uint, uint, uint);
 	void GrabKeyboard(bool);
@@ -142,6 +156,7 @@ public:
 	//
 	void OnSetupKeys(bool);
 	boost::python::object OnCreateContainer();
+	boost::python::object OnCreateWorkspace();
 	void OnKeyPress(uint);
 	void OnKeyRelease(uint);
 	void OnTimer();

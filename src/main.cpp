@@ -115,7 +115,10 @@ protected:
 
 class RunBackend : public Config::BackendConfig{
 public:
-	RunBackend(WManager::Container *_proot, Config::BackendInterface *_pbackendInt) : proot(_proot), pcomp(0), Config::BackendConfig(_pbackendInt){}
+	RunBackend(WManager::Container *_proot, Config::BackendInterface *_pbackendInt) : proot(_proot), pcomp(0), Config::BackendConfig(_pbackendInt){
+		proot->SetName("default");
+	}
+
 	virtual ~RunBackend(){}
 
 	void SetCompositor(class RunCompositor *pcomp){
@@ -139,6 +142,10 @@ public:
 
 		Config::ContainerInterface &containerInt = containerExtract();
 		containerInt.self = containerObject;
+
+		//OnParent() should do?
+		//GetRoot(param=current), if root by name is not found, create a new one
+		//containerInt.wsRootContainer = Config::BackendInterface::backendInt->GetRoot();
 
 		if(pcreateInfo){
 			containerInt.wm_name = pcreateInfo->wm_name;

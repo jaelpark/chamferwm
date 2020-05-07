@@ -32,6 +32,7 @@ ContainerInterface::~ContainerInterface(){
 //-CopySettingsSetup: propagate container specific properties
 //-DeferredPropertyTransfer: propagate client specific properties
 void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
+	setup.pname = name.c_str();
 	setup.canvasOffset.x = boost::python::extract<float>(canvasOffset[0])();
 	setup.canvasOffset.y = boost::python::extract<float>(canvasOffset[1])();
 	setup.canvasExtent.x = boost::python::extract<float>(canvasExtent[0])();
@@ -411,6 +412,22 @@ DebugContainerConfig::~DebugContainerConfig(){
 	//
 }
 
+/*WorkspaceInterface::WorkspaceInterface(){
+	//
+}
+
+WorkspaceInterface::~WorkspaceInterface(){
+	//
+}
+
+WorkspaceProxy::WorkspaceProxy() : WorkspaceInterface(){
+	//
+}
+
+WorkspaceProxy::~WorkspaceProxy(){
+	//
+}*/
+
 BackendInterface::BackendInterface() : pbackend(0){
 	//
 }
@@ -428,6 +445,11 @@ boost::python::object BackendInterface::OnCreateContainer(){
 	//TODO: should create a default instance here
 	return boost::python::object();
 }
+
+/*boost::python::object BackendInterface::OnCreateWorkspace(){
+	//TODO: should create a default instance here
+	return boost::python::object();
+}*/
 
 void BackendInterface::OnKeyPress(uint keyId){
 	//
@@ -452,13 +474,42 @@ boost::python::object BackendInterface::GetFocus(){
 	return boost::python::object();
 }
 
-boost::python::object BackendInterface::GetRoot(){
-	WManager::Container *pParent = WManager::Container::ptreeFocus;//pfocus;
+boost::python::object BackendInterface::GetRoot(boost::python::object nameObj){
+	WManager::Container *pParent = WManager::Container::ptreeFocus;
 	for(WManager::Container *pcontainer = pParent->pParent; pcontainer; pParent = pcontainer, pcontainer = pcontainer->pParent);
-	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pParent);
-	if(pcontainer1)
-		return pcontainer1->pcontainerInt->self;
-	return boost::python::object();
+
+	boost::python::extract<std::string> nameExtract(nameObj);
+	if(!nameExtract.check()){
+		ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pParent);
+		if(pcontainer1)
+			return pcontainer1->pcontainerInt->self;
+		return boost::python::object();
+	}
+	
+	const std::string &name = nameExtract();
+	WManager::Container *pcontainer = pParent;
+	do{
+		if(pcontainer->pname && strcmp(name.c_str(),pcontainer->pname) == 0){
+			//found, return
+			ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pcontainer);
+			if(pcontainer1)
+				return pcontainer1->pcontainerInt->self;
+			return boost::python::object();
+		}
+		pcontainer = pcontainer->pRootNext;
+	}while(pcontainer != pParent);
+
+	//not found, create a new one
+	if(!pbackend){
+		DebugPrintf(stderr,"error: no backend while executing GetRoot() (create container)");
+		return boost::python::object();
+	}
+	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
+	Config::X11ContainerConfig *pnewRoot = new Config::X11ContainerConfig(pbackend11);
+	pnewRoot->SetName(name.c_str());
+	pParent->AppendRoot(pnewRoot);
+
+	return pnewRoot->pcontainerInt->self;
 }
 
 void BackendInterface::BindKey(uint symbol, uint mask, uint keyId){
@@ -627,6 +678,8 @@ CompositorConfig::~CompositorConfig(){
 	pcompositorInt->pcompositor = 0;
 }
 
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(GetRootOvr,GetRoot,0,1)
+
 BOOST_PYTHON_MODULE(chamfer){
 	boost::python::scope().attr("MOD_MASK_1") = uint(XCB_MOD_MASK_1);
 	boost::python::scope().attr("MOD_MASK_2") = uint(XCB_MOD_MASK_2);
@@ -739,6 +792,21 @@ BOOST_PYTHON_MODULE(chamfer){
 				return container.pcontainer != 0;
 			},boost::python::default_call_policies(),boost::mpl::vector<bool, ContainerInterface &>()))
 		//.def_readwrite("canvasOffset",&ContainerInterface::canvasOffset)
+		.add_property("name",
+			boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer || !container.pcontainer->pname)
+					return container.name;
+				return std::string(container.pcontainer->pname);
+			},boost::python::default_call_policies(),boost::mpl::vector<std::string, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, std::string name){
+				container.name = name;
+				if(container.pcontainer){
+					container.pcontainer->SetName(name.c_str());
+					return;
+				}
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, std::string>()))
 		.add_property("canvasOffset",
 			boost::python::make_function(
 			[](ContainerInterface &container){
@@ -962,15 +1030,21 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("floatingMode",&ContainerInterface::floatingMode)
 		;
 	
+	/*boost::python::class_<WorkspaceProxy,boost::noncopyable>("Workspace")
+		//.def("OnSetupContainer",&ContainerInterface::OnSetupContainer)
+		;*/
+	
 	boost::python::class_<BackendProxy,boost::noncopyable>("Backend")
 		.def("OnSetupKeys",&BackendInterface::OnSetupKeys)
 		.def("OnCreateContainer",&BackendInterface::OnCreateContainer)
+		//.def("OnCreateWorkspace",&BackendInterface::OnCreateWorkspace)
 		.def("OnKeyPress",&BackendInterface::OnKeyPress)
 		.def("OnKeyRelease",&BackendInterface::OnKeyRelease)
 		.def("OnTimer",&BackendInterface::OnTimer)
 		.def("OnExit",&BackendInterface::OnExit)
 		.def("GetFocus",&BackendInterface::GetFocus)
-		.def("GetRoot",&BackendInterface::GetRoot)
+		//.def("GetRoot",&BackendInterface::GetRoot)
+		.def("GetRoot",&BackendInterface::GetRoot,GetRootOvr(boost::python::args("name")))
 		.def("BindKey",&BackendInterface::BindKey)
 		.def("MapKey",&BackendInterface::MapKey)
 		.def("GrabKeyboard",&BackendInterface::GrabKeyboard)

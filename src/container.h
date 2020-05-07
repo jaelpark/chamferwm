@@ -50,6 +50,7 @@ public:
 		TITLEBAR_BOTTOM
 	};
 	struct Setup{
+		const char *pname = 0;
 		glm::vec2 canvasOffset = glm::vec2(0.0f);
 		glm::vec2 canvasExtent = glm::vec2(0.0f);
 		//Border width can be set anytime before the client creation
@@ -65,6 +66,7 @@ public:
 	Container(); //root container
 	Container(Container *, const Setup &);
 	virtual ~Container();
+	void AppendRoot(Container *);
 	void Place(Container *);
 	Container * Remove();
 	Container * Collapse();
@@ -76,6 +78,7 @@ public:
 	Container * GetParent() const;
 	Container * GetFocus() const;
 	Container * GetRoot();
+	void SetName(const char *);
 	void SetSize(glm::vec2);
 
 	void MoveNext();
@@ -95,10 +98,12 @@ public:
 	Container *pParent;
 	Container *pch; //First children
 	Container *pnext; //Subsequent container in the parent container
+	Container *pRootNext; //Parallel workspace. To avoid bugs, pnext (null for root containers) will not be used for this.
 	std::deque<Container *> focusQueue;
 	std::deque<Container *> stackQueue;
 
 	Client *pclient;
+	char *pname; //name identifier for searches
 
 	//absolute normalized coordinates
 	glm::vec2 p;
@@ -125,6 +130,15 @@ public:
 	static std::deque<std::pair<WManager::Container *, struct timespec>> tiledFocusQueue;
 	static std::deque<WManager::Container *> floatFocusQueue;
 };
+
+/*class RootContainer : Container{
+public:
+	RootContainer(const char *);
+	virtual ~RootContainer();
+	void Link(RootContainer *);
+	RootContainer *pRootNext; //Parallel workspace. To avoid bugs, pnext (null for root containers) will not be used for this.
+	char *pname;
+};*/
 
 }
 

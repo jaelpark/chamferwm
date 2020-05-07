@@ -13,8 +13,9 @@ Client::~Client(){
 	//
 }
 
-Container::Container() : pParent(0), pch(0), pnext(0),
+Container::Container() : pParent(0), pch(0), pnext(0), pRootNext(this),
 	pclient(0),
+	pname(0),
 	//scale(1.0f), p(0.0f), e(1.0f), margin(0.0f), minSize(0.0f), maxSize(1.0f), mode(MODE_TILED),
 	p(0.0f), posFullCanvas(0.0f), e(1.0f), extFullCanvas(1.0f), canvasOffset(0.0f), canvasExtent(0.0f),
 	margin(0.015f), titlePad(0.0f), titleSpan(0.0f,1.0f), titleTransform(glm::mat2x2(1.0f)), size(1.0f), minSize(0.015f), maxSize(1.0f),
@@ -23,11 +24,15 @@ Container::Container() : pParent(0), pch(0), pnext(0),
 }
 
 Container::Container(Container *_pParent, const Setup &setup) :
-	pParent(_pParent), pch(0), pnext(0),
+	pParent(_pParent), pch(0), pnext(0), pRootNext(this),
 	pclient(0),
+	pname(0),
 	canvasOffset(setup.canvasOffset), canvasExtent(setup.canvasExtent),
 	margin(setup.margin), titlePad(0.0f), titleSpan(0.0f,1.0f), size(setup.size), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
 	flags(setup.flags), layout(LAYOUT_VSPLIT), titleBar(setup.titleBar){//, flags(setup.flags){
+
+	if(setup.pname)
+		SetName(setup.pname);
 
 	if(flags & FLAG_FLOATING)
 		return;
@@ -109,7 +114,13 @@ Container::Container(Container *_pParent, const Setup &setup) :
 }
 
 Container::~Container(){
-	//
+	if(pname)
+		mstrfree(pname);
+}
+
+void Container::AppendRoot(Container *pcontainer){
+	pcontainer->pRootNext = pRootNext;
+	pRootNext = pcontainer;
 }
 
 void Container::Place(Container *pParent1){
@@ -145,6 +156,11 @@ void Container::Place(Container *pParent1){
 Container * Container::Remove(){
 	if(flags & FLAG_FLOATING)
 		return this;
+	
+	Container *pRootPrev = pRootNext;
+	for(; pRootPrev->pRootNext != this; pRootPrev = pRootPrev->pRootNext);
+	pRootPrev->pRootNext = pRootNext;
+
 	Container *pbase = pParent, *pch1 = this; //remove all the split containers (although there should be only one)
 	for(; pbase->pParent; pch1 = pbase, pbase = pbase->pParent){
 		if(pbase->pch->pnext)
@@ -328,6 +344,12 @@ void Container::SetSize(glm::vec2 size1){
 			pcontainer->size *= (glm::vec2(1.0f)-size)/sizeSum;
 
 	pParent->Translate();
+}
+
+void Container::SetName(const char *_pname){
+	if(pname)
+		mstrfree(pname);
+	pname = mstrdup(_pname);
 }
 
 void Container::MoveNext(){
@@ -583,6 +605,14 @@ void Container::SetLayout(LAYOUT layout){
 WManager::Container *Container::ptreeFocus = 0; //initially set to root container as soon as it's created
 std::deque<std::pair<WManager::Container *, struct timespec>> Container::tiledFocusQueue;
 std::deque<WManager::Container *> Container::floatFocusQueue;
+
+/*RootContainer::RootContainer(const char *_pname) : Container(), pRootNext(0), pname(mstrdup(_pname)){
+	
+}
+
+RootContainer::~RootContainer(){
+	mstrfree(pname);
+}*/
 
 }
 
