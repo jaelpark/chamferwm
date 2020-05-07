@@ -349,7 +349,7 @@ void CompositorInterface::InitializeRenderEngine(){
 		physicalDeviceExternalBufferInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
 		physicalDeviceExternalBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		physicalDeviceExternalBufferInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
-		VkExternalBufferProperties externalBufferProps;
+		VkExternalBufferProperties externalBufferProps = {};
 		externalBufferProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
 		vkGetPhysicalDeviceExternalBufferProperties(pdevices[i],&physicalDeviceExternalBufferInfo,&externalBufferProps);
 		if((externalBufferProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) && (externalBufferProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) == 0 && (externalBufferProps.externalMemoryProperties.compatibleHandleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT))
@@ -714,6 +714,8 @@ void CompositorInterface::DestroyRenderEngine(){
 		delete m.second;
 	shaders.clear();
 
+	vkFreeCommandBuffers(logicalDev,commandPool,swapChainImageCount,pcommandBuffers);
+	vkFreeCommandBuffers(logicalDev,commandPool,swapChainImageCount,pcopyCommandBuffers);
 	delete []pcommandBuffers;
 	delete []pcopyCommandBuffers;
 	vkDestroyCommandPool(logicalDev,commandPool,0);
@@ -746,6 +748,10 @@ void CompositorInterface::DestroyRenderEngine(){
 
 	vkDestroySurfaceKHR(instance,surface,0);
 	vkDestroyInstance(instance,0);
+}
+
+void CompositorInterface::DestroySwapchain(){
+	//
 }
 
 void CompositorInterface::AddShader(const char *pname, const Blob *pblob){

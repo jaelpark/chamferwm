@@ -118,7 +118,9 @@ public:
 	virtual void Stop() = 0;
 protected:
 	void InitializeRenderEngine();
+	void InitializeSwapchain();
 	void DestroyRenderEngine();
+	void DestroySwapchain();
 	void AddShader(const char *, const Blob *);
 	void AddDamageRegion(const VkRect2D *);
 	void AddDamageRegion(const WManager::Client *);
