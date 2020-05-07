@@ -135,6 +135,7 @@ protected:
 	virtual VkExtent2D GetExtent() const = 0;
 	virtual glm::vec2 GetDPI() const = 0;
 	VkInstance instance;
+	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 	VkSurfaceKHR surface;
 	VkDebugReportCallbackEXT debugReportCb;
 	VkPhysicalDevice physicalDev;

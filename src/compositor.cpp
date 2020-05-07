@@ -375,7 +375,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	delete []pdevProps;
 	delete []pPhysicalDeviceExternalMemoryHostProps;
 
-	VkSurfaceCapabilitiesKHR surfaceCapabilities;
+	//VkSurfaceCapabilitiesKHR surfaceCapabilities;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDev,surface,&surfaceCapabilities);
 
 	uint formatCount;
@@ -546,9 +546,84 @@ void CompositorInterface::InitializeRenderEngine(){
 	if(vkCreateRenderPass(logicalDev,&renderPassCreateInfo,0,&renderPass) != VK_SUCCESS)
 		throw Exception("Failed to create a render pass.");
 	
-	imageExtent = GetExtent();
+	InitializeSwapchain();
 
-	//swap chain
+	//sampler
+	VkSamplerCreateInfo samplerCreateInfo = {};
+	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+	samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	samplerCreateInfo.anisotropyEnable = VK_FALSE;
+	samplerCreateInfo.maxAnisotropy = 1;
+	samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerCreateInfo.compareEnable = VK_FALSE;
+	samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerCreateInfo.mipLodBias = 0.0f;
+	samplerCreateInfo.minLod = 0.0f;
+	samplerCreateInfo.maxLod = 0.0f;
+	if(vkCreateSampler(logicalDev,&samplerCreateInfo,0,&pointSampler) != VK_SUCCESS)
+		throw Exception("Failed to create a sampler.");
+
+	//descriptor pool
+	//descriptors of this pool
+	/*VkDescriptorPoolSize descPoolSizes[2];
+	descPoolSizes[0] = (VkDescriptorPoolSize){};
+	descPoolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLER;//VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descPoolSizes[0].descriptorCount = 16;
+
+	descPoolSizes[1] = (VkDescriptorPoolSize){};
+	descPoolSizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	descPoolSizes[1].descriptorCount = 16;
+
+	VkDescriptorPoolCreateInfo descPoolCreateInfo = {};
+	descPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descPoolCreateInfo.poolSizeCount = sizeof(descPoolSizes)/sizeof(descPoolSizes[0]);
+	descPoolCreateInfo.pPoolSizes = descPoolSizes;
+	descPoolCreateInfo.maxSets = 16;
+	descPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	if(vkCreateDescriptorPool(logicalDev,&descPoolCreateInfo,0,&descPool) != VK_SUCCESS)
+		throw Exception("Failed to create a descriptor pool.");*/
+
+	//command pool and buffers
+	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
+	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex[QUEUE_INDEX_GRAPHICS];
+	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	if(vkCreateCommandPool(logicalDev,&commandPoolCreateInfo,0,&commandPool) != VK_SUCCESS)
+		throw Exception("Failed to create a command pool.");
+	
+	pcommandBuffers = new VkCommandBuffer[swapChainImageCount];
+	pcopyCommandBuffers = new VkCommandBuffer[swapChainImageCount];
+
+	VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
+	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	commandBufferAllocateInfo.commandPool = commandPool;
+	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	commandBufferAllocateInfo.commandBufferCount = swapChainImageCount;
+	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcommandBuffers) != VK_SUCCESS)
+		throw Exception("Failed to allocate command buffers.");
+	
+	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcopyCommandBuffers) != VK_SUCCESS)
+		throw Exception("Failed to allocate copy command buffer.");
+	
+	shaders.reserve(1024);
+	pipelines.reserve(1024);
+	updateQueue.reserve(1024);
+	titleUpdateQueue.reserve(1024);
+	scissorRegions.reserve(32);
+	presentRectLayers.reserve(32);
+
+	ptextEngine = new TextEngine(pfontName,fontSize,this);
+}
+
+void CompositorInterface::InitializeSwapchain(){
+	imageExtent = GetExtent();
+	
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	swapchainCreateInfo.surface = surface;
@@ -628,78 +703,6 @@ void CompositorInterface::InitializeRenderEngine(){
 			if(vkCreateSemaphore(logicalDev,&semaphoreCreateInfo,0,&psemaphore[i][j]) != VK_SUCCESS)
 				throw Exception("Failed to create a semaphore.");
 	}
-
-	//sampler
-	VkSamplerCreateInfo samplerCreateInfo = {};
-	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
-	samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
-	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	samplerCreateInfo.anisotropyEnable = VK_FALSE;
-	samplerCreateInfo.maxAnisotropy = 1;
-	samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-	samplerCreateInfo.compareEnable = VK_FALSE;
-	samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerCreateInfo.mipLodBias = 0.0f;
-	samplerCreateInfo.minLod = 0.0f;
-	samplerCreateInfo.maxLod = 0.0f;
-	if(vkCreateSampler(logicalDev,&samplerCreateInfo,0,&pointSampler) != VK_SUCCESS)
-		throw Exception("Failed to create a sampler.");
-
-	//descriptor pool
-	//descriptors of this pool
-	/*VkDescriptorPoolSize descPoolSizes[2];
-	descPoolSizes[0] = (VkDescriptorPoolSize){};
-	descPoolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLER;//VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descPoolSizes[0].descriptorCount = 16;
-
-	descPoolSizes[1] = (VkDescriptorPoolSize){};
-	descPoolSizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-	descPoolSizes[1].descriptorCount = 16;
-
-	VkDescriptorPoolCreateInfo descPoolCreateInfo = {};
-	descPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descPoolCreateInfo.poolSizeCount = sizeof(descPoolSizes)/sizeof(descPoolSizes[0]);
-	descPoolCreateInfo.pPoolSizes = descPoolSizes;
-	descPoolCreateInfo.maxSets = 16;
-	descPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-	if(vkCreateDescriptorPool(logicalDev,&descPoolCreateInfo,0,&descPool) != VK_SUCCESS)
-		throw Exception("Failed to create a descriptor pool.");*/
-
-	//command pool and buffers
-	VkCommandPoolCreateInfo commandPoolCreateInfo = {};
-	commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex[QUEUE_INDEX_GRAPHICS];
-	commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	if(vkCreateCommandPool(logicalDev,&commandPoolCreateInfo,0,&commandPool) != VK_SUCCESS)
-		throw Exception("Failed to create a command pool.");
-	
-	pcommandBuffers = new VkCommandBuffer[swapChainImageCount];
-	pcopyCommandBuffers = new VkCommandBuffer[swapChainImageCount];
-
-	VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
-	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	commandBufferAllocateInfo.commandPool = commandPool;
-	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	commandBufferAllocateInfo.commandBufferCount = swapChainImageCount;
-	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcommandBuffers) != VK_SUCCESS)
-		throw Exception("Failed to allocate command buffers.");
-	
-	if(vkAllocateCommandBuffers(logicalDev,&commandBufferAllocateInfo,pcopyCommandBuffers) != VK_SUCCESS)
-		throw Exception("Failed to allocate copy command buffer.");
-	
-	shaders.reserve(1024);
-	pipelines.reserve(1024);
-	updateQueue.reserve(1024);
-	titleUpdateQueue.reserve(1024);
-	scissorRegions.reserve(32);
-	presentRectLayers.reserve(32);
-
-	ptextEngine = new TextEngine(pfontName,fontSize,this);
 }
 
 void CompositorInterface::DestroyRenderEngine(){
@@ -726,6 +729,19 @@ void CompositorInterface::DestroyRenderEngine(){
 
 	vkDestroySampler(logicalDev,pointSampler,0);
 
+	DestroySwapchain();
+
+	vkDestroyRenderPass(logicalDev,renderPass,0);
+
+	vkDestroyDevice(logicalDev,0);
+
+	((PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance,"vkDestroyDebugReportCallbackEXT"))(instance,debugReportCb,0);
+
+	vkDestroySurfaceKHR(instance,surface,0);
+	vkDestroyInstance(instance,0);
+}
+
+void CompositorInterface::DestroySwapchain(){
 	for(uint i = 0; i < swapChainImageCount; ++i){
 		vkDestroyFence(logicalDev,pfence[i],0);
 		for(uint j = 0; j < SEMAPHORE_INDEX_COUNT; ++j)
@@ -739,19 +755,6 @@ void CompositorInterface::DestroyRenderEngine(){
 	delete []pswapChainImageViews;
 	delete []pswapChainImages;
 	vkDestroySwapchainKHR(logicalDev,swapChain,0);
-
-	vkDestroyRenderPass(logicalDev,renderPass,0);
-
-	vkDestroyDevice(logicalDev,0);
-
-	((PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance,"vkDestroyDebugReportCallbackEXT"))(instance,debugReportCb,0);
-
-	vkDestroySurfaceKHR(instance,surface,0);
-	vkDestroyInstance(instance,0);
-}
-
-void CompositorInterface::DestroySwapchain(){
-	//
 }
 
 void CompositorInterface::AddShader(const char *pname, const Blob *pblob){
@@ -856,9 +859,15 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 }
 
 bool CompositorInterface::PollFrameFence(){
-	if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS){
-		DebugPrintf(stderr,"Failed to acquire a swap chain image.\n");
-		return false;
+	for(uint i = 0; i < 3; ++i){
+		if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS){
+			DebugPrintf(stderr,"Failed to acquire a swap chain image. Attempting to recreate (%u/3)...\n",i+1);
+			WaitIdle();
+			DestroySwapchain();
+			InitializeSwapchain();
+			continue;
+		}
+		break;
 	}
 	
 	if(vkWaitForFences(logicalDev,1,&pfence[currentFrame],VK_TRUE,0) == VK_TIMEOUT)
