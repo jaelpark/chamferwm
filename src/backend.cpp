@@ -284,6 +284,23 @@ X11Container::~X11Container(){
 }
 
 void X11Container::Focus1(){
+	//during Focus1() the global treeFocus is still the previous focus
+	WManager::Container *pPrevRoot = WManager::Container::ptreeFocus->GetRoot();
+	WManager::Container *proot = GetRoot();
+	if(pPrevRoot != proot){
+		printf("Workspace switched.\n");
+		//recursive unmapping
+		X11Backend *pbackend11 = const_cast<X11Backend *>(pbackend);
+		pbackend11->ForEach(pPrevRoot,[](const WManager::Client *pclient)->void{
+			const X11Client *pclient11 = dynamic_cast<const X11Client *>(pclient);
+			xcb_unmap_window(pclient11->pbackend->pcon,pclient11->window);
+		});
+		//recursive mapping
+		pbackend11->ForEach(proot,[](const WManager::Client *pclient)->void{
+			const X11Client *pclient11 = dynamic_cast<const X11Client *>(pclient);
+			xcb_map_window(pclient11->pbackend->pcon,pclient11->window);
+		});
+	}
 	const xcb_window_t *pfocusWindow;
 	if(pclient){
 		X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
@@ -378,7 +395,7 @@ void X11Backend::StackRecursiveAppendix(const WManager::Client *pclient){
 		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
 		X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
 
-		uint values[1] = {XCB_STACK_MODE_ABOVE};
+		static uint values[1] = {XCB_STACK_MODE_ABOVE};
 		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 
 		StackRecursiveAppendix((*m).second);
@@ -392,7 +409,7 @@ void X11Backend::StackRecursive(const WManager::Container *pcontainer){
 		if(pcont->pclient){
 			X11Client *pclient11 = dynamic_cast<X11Client *>(pcont->pclient);
 
-			uint values[1] = {XCB_STACK_MODE_ABOVE};
+			static uint values[1] = {XCB_STACK_MODE_ABOVE};
 			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 		}
 		StackRecursive(pcont);
@@ -418,7 +435,7 @@ void X11Backend::StackClients(){
 
 		X11Client *pclient11 = dynamic_cast<X11Client *>(p.second);
 
-		uint values[1] = {XCB_STACK_MODE_ABOVE};
+		static uint values[1] = {XCB_STACK_MODE_ABOVE};
 		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 	}
 
@@ -435,7 +452,7 @@ void X11Backend::StackClients(){
 			
 		X11Client *pclient11 = dynamic_cast<X11Client *>((*m).second);
 
-		uint values[1] = {XCB_STACK_MODE_ABOVE};
+		static uint values[1] = {XCB_STACK_MODE_ABOVE};
 		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 
 		StackRecursiveAppendix((*m).second);
@@ -446,9 +463,26 @@ void X11Backend::StackClients(){
 	for(auto &p : appendixQueue){ //stack the remaining (untransient) windows
 		X11Client *pclient11 = dynamic_cast<X11Client *>(p.second);
 
-		uint values[1] = {XCB_STACK_MODE_ABOVE};
+		static uint values[1] = {XCB_STACK_MODE_ABOVE};
 		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 	}
+}
+
+void X11Backend::ForEachRecursive(const WManager::Container *pcontainer, void (*pf)(const WManager::Client *)){
+	for(WManager::Container *pcont : pcontainer->stackQueue){
+		if(pcont->pclient)
+			pf(pcont->pclient);
+		ForEachRecursive(pcont,pf);
+	}
+}
+
+void X11Backend::ForEach(const WManager::Container *proot, void (*pf)(const WManager::Client *)){
+	ForEachRecursive(proot,pf);
+
+	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix = GetStackAppendix();
+	for(auto &p : *pstackAppendix)
+		if(p.second->pcontainer->GetRoot() == proot)
+			pf(p.second);
 }
 
 void X11Backend::BindKey(uint symbol, uint mask, uint keyId){
@@ -1194,6 +1228,9 @@ sint Default::HandleEvent(bool forcePoll){
 				return p.first->window == pev->window;
 			});
 			if(m == clients.end())
+				break;
+
+			if((*m).first->pcontainer->GetRoot() != WManager::Container::ptreeFocus->GetRoot())
 				break;
 
 			result = 1;

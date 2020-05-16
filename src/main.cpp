@@ -116,7 +116,7 @@ protected:
 class RunBackend : public Config::BackendConfig{
 public:
 	RunBackend(WManager::Container *_proot, Config::BackendInterface *_pbackendInt) : proot(_proot), pcomp(0), Config::BackendConfig(_pbackendInt){
-		proot->SetName("default");
+		proot->SetName("1");
 	}
 
 	virtual ~RunBackend(){}
@@ -145,7 +145,6 @@ public:
 
 		//OnParent() should do?
 		//GetRoot(param=current), if root by name is not found, create a new one
-		//containerInt.wsRootContainer = Config::BackendInterface::backendInt->GetRoot();
 
 		if(pcreateInfo){
 			containerInt.wm_name = pcreateInfo->wm_name;

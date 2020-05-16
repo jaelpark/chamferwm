@@ -22,6 +22,10 @@ except ModuleNotFoundError:
 class ShaderFlag(Enum):
 	FOCUS_NEXT = chamfer.shaderFlag.USER_BIT<<0x0
 
+#Refer to the documentation
+#https://jaelpark.github.io/chamferwm-docs/bindings.html
+#for all the keybinding and how to setup them.
+
 class Key(Enum):
 	FOCUS_RIGHT = auto()
 	FOCUS_LEFT = auto()
@@ -65,6 +69,9 @@ class Key(Enum):
 	EXPAND_HORIZONTAL_LOCAL = auto()
 	EXPAND_VERTICAL = auto()
 	EXPAND_VERTICAL_LOCAL = auto()
+
+	WORKSPACE_1 = auto()
+	WORKSPACE_2 = auto()
 
 	KILL = auto()
 	LAUNCH_TERMINAL = auto()
@@ -265,6 +272,10 @@ class Backend(chamfer.Backend):
 			self.BindKey(ord('k'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT,Key.EXPAND_VERTICAL.value);
 			self.BindKey(latin1.XK_plus,self.modMask|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.EXPAND_VERTICAL_LOCAL.value);
 			self.BindKey(ord('k'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.EXPAND_VERTICAL_LOCAL.value);
+
+			#workspaces
+			self.BindKey(ord('1'),self.modMask,Key.WORKSPACE_1.value);
+			self.BindKey(ord('2'),self.modMask,Key.WORKSPACE_2.value);
 			
 			#kill + launching applications
 			self.BindKey(ord('q'),self.modMask|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
@@ -289,7 +300,7 @@ class Backend(chamfer.Backend):
 			self.BindKey(ord('q'),chamfer.MOD_MASK_CONTROL,Key.NOOP.value); #prevent madness while browsing the web 
 
 		else:
-			#debug only
+			#debug only (compositor testing mode)
 			self.BindKey(ord('h'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_LEFT.value);
 			self.BindKey(ord('k'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_UP.value);
 			self.BindKey(ord('l'),chamfer.MOD_MASK_SHIFT,Key.FOCUS_RIGHT.value);
@@ -516,6 +527,16 @@ class Backend(chamfer.Backend):
 			focus.canvasExtent = (focus.canvasExtent[0],focus.canvasExtent[1]+0.10);
 			focus.ShiftLayout(focus.layout);
 
+		elif keyId == Key.WORKSPACE_1.value:
+			print("workspace 1");
+			root = self.GetRoot("1");
+			root.Focus();
+
+		elif keyId == Key.WORKSPACE_2.value:
+			print("workspace 2");
+			root = self.GetRoot("2");
+			root.Focus();
+
 		elif keyId == Key.EXPAND_HORIZONTAL.value:
 			focus.size = (focus.size[0]+0.1,focus.size[1]);
 
@@ -618,21 +639,26 @@ pids = psutil.pids();
 pnames = [psutil.Process(pid).name() for pid in pids];
 pcmdls = [a for p in [psutil.Process(pid).cmdline() for pid in pids] for a in p];
 
-#set wallpaper with feh
+#---set wallpaper with feh
 #psutil.Popen(["feh","--no-fehbg","--image-bg","black","--bg-center","background.png"]);
 
+#---startup programs examples:
+#launch pulseaudio if installed
 #if not "pulseaudio" in pnames:
 #	print("starting pulseaudio...");
 #	psutil.Popen(["sleep 1.0; pulseaudio --start"],shell=True,stdout=None,stderr=None);
-#
+
+#launch notification system
 #if not "dunst" in pnames:
 #	print("starting dunst...");
 #	psutil.Popen(["dunst"],stdout=None,stderr=None);
-#
+
+#launch clipboard manager
 #if not any(["clipster" in p for p in pcmdls]):
 #	print("starting clipster..."); #clipboard manager
 #	psutil.Popen(["clipster","-d"],stdout=None,stderr=None);
-#
+
+#launch gestures daemon for touch devices
 #if not any(["libinput-gestures" in p for p in pcmdls]):
 #	print("starting libinput-gestures..."); #touchpad gestures
 #	psutil.Popen(["libinput-gestures-setup","start"],stdout=None,stderr=None);

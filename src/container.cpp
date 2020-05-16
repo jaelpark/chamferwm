@@ -271,8 +271,8 @@ void Container::Focus(){
 		GetRoot()->Stack();
 	}
 
-	ptreeFocus = this;
 	Focus1();
+	ptreeFocus = this;
 }
 
 void Container::SetFullscreen(bool toggle){
