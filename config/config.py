@@ -72,6 +72,7 @@ class Key(Enum):
 
 	WORKSPACE_1 = auto()
 	WORKSPACE_2 = auto()
+	WORKSPACE_3 = auto()
 
 	KILL = auto()
 	LAUNCH_TERMINAL = auto()
@@ -276,6 +277,7 @@ class Backend(chamfer.Backend):
 			#workspaces
 			self.BindKey(ord('1'),self.modMask,Key.WORKSPACE_1.value);
 			self.BindKey(ord('2'),self.modMask,Key.WORKSPACE_2.value);
+			self.BindKey(ord('3'),self.modMask,Key.WORKSPACE_3.value);
 			
 			#kill + launching applications
 			self.BindKey(ord('q'),self.modMask|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
@@ -536,6 +538,12 @@ class Backend(chamfer.Backend):
 		elif keyId == Key.WORKSPACE_2.value:
 			print("workspace 2");
 			root = self.GetRoot("2");
+			root.GetFocusDescend = Container.GetFocusDescend.__get__(root);
+			root.GetFocusDescend().Focus();
+
+		elif keyId == Key.WORKSPACE_3.value:
+			print("workspace 3");
+			root = self.GetRoot("3");
 			root.GetFocusDescend = Container.GetFocusDescend.__get__(root);
 			root.GetFocusDescend().Focus();
 
