@@ -71,7 +71,6 @@ public:
 	//virtual void SetupEnvironment() = 0;
 	virtual sint HandleEvent(bool) = 0;
 	virtual void MoveContainer(WManager::Container *, WManager::Container *) = 0;
-	virtual const WManager::Container * GetRoot() const = 0;
 	virtual const std::vector<std::pair<const WManager::Client *, WManager::Client *>> * GetStackAppendix() const = 0;
 	virtual void SortStackAppendix() = 0;
 protected:
@@ -158,7 +157,7 @@ public:
 	xcb_atom_t GetAtom(const char *) const;
 	void StackRecursiveAppendix(const WManager::Client *);
 	void StackRecursive(const WManager::Container *);
-	void StackClients();
+	void StackClients(const WManager::Container *);
 	void ForEachRecursive(WManager::Container *, void (*)(WManager::Client *));
 	void ForEach(WManager::Container *, void (*)(WManager::Client *));
 	void BindKey(uint, uint, uint);

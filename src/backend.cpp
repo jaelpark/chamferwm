@@ -319,7 +319,7 @@ void X11Container::Focus1(){
 }
 
 void X11Container::Stack1(){
-	const_cast<X11Backend *>(pbackend)->StackClients();
+	const_cast<X11Backend *>(pbackend)->StackClients(GetRoot());
 }
 
 void X11Container::Fullscreen1(){
@@ -424,10 +424,10 @@ void X11Backend::StackRecursive(const WManager::Container *pcontainer){
 	StackRecursiveAppendix(pcontainer->pclient);
 }
 
-void X11Backend::StackClients(){
+void X11Backend::StackClients(const WManager::Container *proot){
 	SortStackAppendix();
 
-	const WManager::Container *proot = GetRoot();
+	//const WManager::Container *proot = GetRoot();
 	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix = GetStackAppendix();
 
 	appendixQueue.clear();
@@ -1067,7 +1067,8 @@ sint Default::HandleEvent(bool forcePoll){
 			if(pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && strlen(wmName.pstr) > 0)
 				pclient->SetTitle1(wmName.pstr);
 
-			StackClients();
+			const WManager::Container *proot = pclient->pcontainer->GetRoot();
+			StackClients(proot);
 
 			//if(hintFlags & X11Client::CreateInfo::HINT_FULLSCREEN)
 				//SetFullscreen(pclient,true);
@@ -1213,7 +1214,8 @@ sint Default::HandleEvent(bool forcePoll){
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
 
-			StackClients();
+			const WManager::Container *proot = pclient->pcontainer->GetRoot();
+			StackClients(proot);
 
 			for(uint i = 0; i < 2; ++i){
 				if(propertyReply1[i])

@@ -143,9 +143,6 @@ public:
 		Config::ContainerInterface &containerInt = containerExtract();
 		containerInt.self = containerObject;
 
-		//OnParent() should do?
-		//GetRoot(param=current), if root by name is not found, create a new one
-
 		if(pcreateInfo){
 			containerInt.wm_name = pcreateInfo->wm_name;
 			containerInt.wm_class = pcreateInfo->wm_class;
@@ -530,10 +527,6 @@ public:
 		else Config::BackendInterface::pbackendInt->OnKeyRelease(keyId);
 	}
 
-	const WManager::Container * GetRoot() const{
-		return proot;
-	}
-
 	const std::vector<StackAppendixElement> * GetStackAppendix() const{
 		return &stackAppendix;
 	}
@@ -644,10 +637,6 @@ public:
 		if(down)
 			Config::BackendInterface::pbackendInt->OnKeyPress(keyId);
 		else Config::BackendInterface::pbackendInt->OnKeyRelease(keyId);
-	}
-
-	const WManager::Container * GetRoot() const{
-		return proot;
 	}
 
 	const std::vector<StackAppendixElement> * GetStackAppendix() const{
