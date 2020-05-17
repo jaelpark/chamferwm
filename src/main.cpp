@@ -130,7 +130,6 @@ public:
 		std::string wm_name;
 		std::string wm_class;
 		std::string shaderName[Compositor::Pipeline::SHADER_MODULE_COUNT];
-		//uint titleFontSize; //title font size in pixels
 		bool floating;
 	};
 
@@ -160,21 +159,6 @@ public:
 
 	template<class T, class U>
 	Config::ContainerInterface & SetupContainer(WManager::Container *pParent, const ContainerCreateInfo *pcreateInfo){
-		/*boost::python::object containerObject = Config::BackendInterface::pbackendInt->OnCreateContainer();
-		boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
-		if(!containerExtract.check())
-			throw Exception("OnCreateContainer(): Invalid container object returned.\n"); //TODO: create default
-
-		Config::ContainerInterface &containerInt = containerExtract();
-		containerInt.self = containerObject;
-
-		if(pcreateInfo){
-			containerInt.wm_name = pcreateInfo->wm_name;
-			containerInt.wm_class = pcreateInfo->wm_class;
-			containerInt.vertexShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_VERTEX];
-			containerInt.geometryShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_GEOMETRY];
-			containerInt.fragmentShader = pcreateInfo->shaderName[Compositor::Pipeline::SHADER_MODULE_FRAGMENT];
-		}*/
 		Config::ContainerInterface &containerInt = SetupContainer<T,U>(pcreateInfo);
 		containerInt.OnSetupContainer();
 
@@ -422,6 +406,7 @@ public:
 		RunBackend::MoveContainer<Config::X11ContainerConfig,DefaultBackend>(pcontainer,pdst);
 	}
 
+	//Called for spontaneous (client requested) fullscreen triggered by an event
 	void SetFullscreen(Backend::X11Client *pclient, bool toggle){
 		if(!pclient || pclient->pcontainer == proot)
 			return;
@@ -430,6 +415,7 @@ public:
 			pcontainer1->SetFullscreen(toggle);
 	}
 
+	//Called for spontaneous (client requested) focus triggered by an event
 	void SetFocus(Backend::X11Client *pclient){
 		if(!pclient || pclient->pcontainer == proot)
 			return;

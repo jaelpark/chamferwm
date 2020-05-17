@@ -120,7 +120,7 @@ void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm:
 	passignedSet->fenceTag = pcomp->frameTag;
 }
 
-ClientFrame::ClientFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : ColorFrame(pshaderName,_pcomp), ptitle(0), fullRegionUpdate(true), animationCompleted(true), enabled(true){
+ClientFrame::ClientFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : ColorFrame(pshaderName,_pcomp), ptitle(0), fullRegionUpdate(true), animationCompleted(true), enabled(false){
 	//
 }
 
@@ -1471,6 +1471,8 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 }
 
 void X11ClientFrame::AdjustSurface1(){
+	if(!enabled)
+		return;
 	if(oldRect.w != rect.w || oldRect.h != rect.h){
 		//detach
 		if(pcomp->hostMemoryImport)
@@ -1507,6 +1509,8 @@ void X11ClientFrame::AdjustSurface1(){
 }
 
 void X11ClientFrame::StartComposition1(){
+	if(enabled)
+		return;
 	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 
 	damage = xcb_generate_id(pbackend->pcon);
@@ -1546,9 +1550,12 @@ void X11ClientFrame::StartComposition1(){
 	}
 
 	pcomp->AddDamageRegion(this);
+	enabled = true;
 }
 
 void X11ClientFrame::StopComposition1(){
+	if(!enabled)
+		return;
 	if(pcomp->hostMemoryImport)
 		ptexture->Detach(pcomp->frameTag);
 
@@ -1561,9 +1568,10 @@ void X11ClientFrame::StopComposition1(){
 
 	xcb_free_pixmap(pbackend->pcon,windowPixmap);
 
-	pcomp->AddDamageRegion(this);
-
 	DestroySurface();
+
+	pcomp->AddDamageRegion(this);
+	enabled = false;
 }
 
 void X11ClientFrame::SetTitle1(const char *ptitle){
@@ -1920,13 +1928,19 @@ void X11DebugClientFrame::AdjustSurface1(){
 }
 
 void X11DebugClientFrame::StartComposition1(){
+	if(enabled)
+		return;
 	CreateSurface(rect.w,rect.h,32);
 	pcomp->AddDamageRegion(this);
+	enabled = true;
 }
 
 void X11DebugClientFrame::StopComposition1(){
+	if(!enabled)
+		return;
 	DestroySurface();
 	pcomp->AddDamageRegion(this);
+	enabled = false;
 }
 
 void X11DebugClientFrame::SetTitle1(const char *ptitle){

@@ -291,14 +291,18 @@ void X11Container::Focus1(){
 		printf("Workspace switched.\n");
 		//recursive unmapping
 		X11Backend *pbackend11 = const_cast<X11Backend *>(pbackend);
-		pbackend11->ForEach(pPrevRoot,[](const WManager::Client *pclient)->void{
-			const X11Client *pclient11 = dynamic_cast<const X11Client *>(pclient);
+		pbackend11->ForEach(pPrevRoot,[](WManager::Client *pclient)->void{
+			X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
 			xcb_unmap_window(pclient11->pbackend->pcon,pclient11->window);
+
+			pclient11->StopComposition1();
 		});
 		//recursive mapping
-		pbackend11->ForEach(proot,[](const WManager::Client *pclient)->void{
-			const X11Client *pclient11 = dynamic_cast<const X11Client *>(pclient);
+		pbackend11->ForEach(proot,[](WManager::Client *pclient)->void{
+			X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
 			xcb_map_window(pclient11->pbackend->pcon,pclient11->window);
+
+			pclient11->StartComposition1();
 		});
 	}
 	const xcb_window_t *pfocusWindow;
@@ -468,7 +472,7 @@ void X11Backend::StackClients(){
 	}
 }
 
-void X11Backend::ForEachRecursive(const WManager::Container *pcontainer, void (*pf)(const WManager::Client *)){
+void X11Backend::ForEachRecursive(WManager::Container *pcontainer, void (*pf)(WManager::Client *)){
 	for(WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient)
 			pf(pcont->pclient);
@@ -476,7 +480,7 @@ void X11Backend::ForEachRecursive(const WManager::Container *pcontainer, void (*
 	}
 }
 
-void X11Backend::ForEach(const WManager::Container *proot, void (*pf)(const WManager::Client *)){
+void X11Backend::ForEach(WManager::Container *proot, void (*pf)(WManager::Client *)){
 	ForEachRecursive(proot,pf);
 
 	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix = GetStackAppendix();
@@ -1118,9 +1122,14 @@ sint Default::HandleEvent(bool forcePoll){
 
 			//check if window already exists
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
-			if(pclient1)
+			if(pclient1){
+				//TODO: check if transient_for is in different root this time
+				pclient1->flags &= ~X11Client::FLAG_UNMAPPING;
+				/*if(pclient1->pcontainer->GetRoot() == WManager::Container::ptreeFocus->GetRoot())
+					pclient1->StartComposition1();*/
 				break;
-			
+			}
+
 			X11Client *pbaseClient = 0;
 
 			xcb_get_property_cookie_t propertyCookieTransientFor
@@ -1230,12 +1239,14 @@ sint Default::HandleEvent(bool forcePoll){
 			if(m == clients.end())
 				break;
 
-			if((*m).first->pcontainer->GetRoot() != WManager::Container::ptreeFocus->GetRoot())
-				break;
-
 			result = 1;
 
 			(*m).first->flags |= X11Client::FLAG_UNMAPPING;
+
+			//how to tell if window gets actually removed? handle destroy notify?
+			if((*m).first->pcontainer->GetRoot() != WManager::Container::ptreeFocus->GetRoot())
+				break;
+			
 			unmappingQueue.push_back((*m).first);
 
 			std::iter_swap(m,clients.end()-1);
@@ -1484,6 +1495,19 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_DESTROY_NOTIFY:{
 			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
 			DebugPrintf(stdout,"destroy notify, %x\n",pev->window);
+
+			/*auto m = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
+				return p.first->window == pev->window;
+			});
+			if(m == clients.end())
+				break;
+
+			unmappingQueue.push_back((*m).first);
+
+			std::iter_swap(m,clients.end()-1);
+			clients.pop_back();
+
+			result = 1;*/
 
 			/*configCache.erase(std::remove_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return p.first == pev->window;
