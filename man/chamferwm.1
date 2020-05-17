@@ -1,0 +1,1159 @@
+.\" Man page generated from reStructuredText.
+.
+.TH "CHAMFERWM" "1" "May 14, 2020" "" "chamferwm"
+.SH NAME
+chamferwm \- chamferwm git
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.sp
+Chamferwm is a dynamic tiling window manager with a built\-in Vulkan based compositor. Besides aiming to be a fully featured and highly configurable window manager, significant effort is put to provide a complete control over the appearance of the desktop. With its shader based customization system, Chamferwm enables rendering of arbitrary window decorations, borders and effects, maximizing the potential for visual personalization.
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+In case of open source graphics, the most recent version of Mesa is highly recommended. With older versions of Mesa, user may experience glitches or other graphical corruption.
+.UNINDENT
+.UNINDENT
+.sp
+\fBWARNING:\fP
+.INDENT 0.0
+.INDENT 3.5
+\fBVK_EXT_image_drm_format_modifier\fP, a vital Vulkan extension required to import DRM format modifiers from DMA buffers, is currently unavailable. As a result, Chamferwm must rely on shared memory access to read client window contents. Using shared memory access may be detrimental to performance at high client resolutions. This limination will persist for as long as the required extension remains unimplemented.
+.UNINDENT
+.UNINDENT
+.SH FEATURES
+.sp
+\fBWindow manager\fP:
+.INDENT 0.0
+.IP \(bu 2
+Dynamic horizontal and vertical tiling with gaps and stacking
+.IP \(bu 2
+Specify container size restrictions, overlap when necessary
+.IP \(bu 2
+Resize and translate individual containers in their place while keeping the surrounding layout
+.IP \(bu 2
+Floating containers and automatic dialog, dock, widget etc. handling
+.IP \(bu 2
+Yank and paste containers to move them within the tree hierarchy along with typical move operations
+.IP \(bu 2
+Configuration with python, scriptable behaviour with client and container specific callbacks
+.IP \(bu 2
+Fully keyboard controllable
+.UNINDENT
+.sp
+\fBCompositor\fP:
+.INDENT 0.0
+.IP \(bu 2
+Vulkan renderer
+.IP \(bu 2
+Arbitrary window decorations and borders with user supplied shaders
+.IP \(bu 2
+Per\-client materials
+.IP \(bu 2
+Optional, alternatively use any other external compositor
+.UNINDENT
+.INDENT 0.0
+.IP \(bu 2
+genindex
+.IP \(bu 2
+search
+.UNINDENT
+.SH SETUP AND RUNNING
+.SS Building with Meson
+.sp
+Install the following prerequisities:
+.INDENT 0.0
+.IP \(bu 2
+XCB libraries (\fIcore window management and X server interaction\fP)
+.IP \(bu 2
+Vulkan SDK (\fIcompositor\fP)
+.IP \(bu 2
+glm (\fIcompositor maths\fP)
+.IP \(bu 2
+Python 3.6+ and boost modules (\fIconfiguration API layer\fP)
+.IP \(bu 2
+python\-xlib (\fIconfiguration script, keysyms\fP)
+.IP \(bu 2
+meson and ninja (\fIbuild system\fP)
+.IP \(bu 2
+(git)
+.IP \(bu 2
+\fI\%shaderc Shader compiler\fP (\fIshader compiler\fP)
+.UNINDENT
+.sp
+Clone the source tree:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+git clone https://github.com/jaelpark/chamferwm.git
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Inside the source tree, create a build directory and run Meson to configure the build:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mkdir build
+meson \-\-buildtype=release build
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Move to the build directory and build:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+cd build
+ninja
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Once compiled, the build directory will contain the executable and shader objects (.spv files). Put the following line to your .xinitrc, with \fB/path/to/\fP replaced with the real location in filesystem.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+exec /path/to/build/chamfer \-\-config=/path/to/config/config.py \-\-shader\-path=/path/to/spv/shaders/
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS Installing from AUR
+.sp
+For Arch Linux, a PKGBUILD is available from \fI\%AUR\fP\&. The package from AUR will install a default configuration and the precompiled shaders to \fB/usr/share/chamfer/\fP\&. Copy the configuration to another location to make modifications. Once ready, put the following line to your .xinitrc:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+exec chamfer \-\-config=/usr/share/chamfer/config/config.py \-\-shader\-path=/usr/share/chamfer/shaders/
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+where the path to \fBconfig.py\fP should be changed if configuration was copied for modifications.
+.SS Starting
+.sp
+With the \fBexec\fP line in place in .xinitrc, X server together with Chamferwm may be started by running \fBstartx\fP\&.
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+When multiple rendering devices are available, make the choice with \fB\-\-device\-index=n\fP, where \fIn\fP is the zero\-based index of the device (default = 0).
+.UNINDENT
+.UNINDENT
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+NVIDIA users may have to add \fBOption "AllowSHMPixmaps" "1"\fP to their Xorg configuration.
+.UNINDENT
+.UNINDENT
+.sp
+To run the window manager without the integrated compositor, use
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+exec chamfer \-\-config=/path/to/config/config.py \-n
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+In this case, any other external compositor may be used.
+.SS Command line Arguments
+.INDENT 0.0
+.TP
+.B \-h\fP,\fB  \-\-help
+Display this help menu
+.TP
+.BI \-c \ path\fR,\fB \ \-\-config\fB= path
+Configuration Python script
+.UNINDENT
+.sp
+\fBBackend\fP
+.INDENT 0.0
+.TP
+.B \-d\fP,\fB  \-\-debug\-backend
+Create a test environment for the compositor engine without redirection. The application will not act as a window manager.
+.UNINDENT
+.sp
+\fBCompositor\fP
+.INDENT 0.0
+.TP
+.B \-n\fP,\fB  \-\-no\-compositor
+Disable compositor.
+.TP
+.B \-e\fP,\fB  \-\-experimental
+Enable experimental features: host pointer import
+.TP
+.BI \-\-device\-index\fB= id
+GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.
+.TP
+.B \-l\fP,\fB  \-\-debug\-layers
+Enable Vulkan debug layers.
+.TP
+.B \-\-no\-scissoring
+Disable scissoring optimization.
+.TP
+.B \-\-no\-host\-memory\-import
+Disable host shared memory import.
+.TP
+.B \-\-unredir\-on\-fullscreen
+Unredirect a fullscreen window bypassing the compositor to improve performance.
+.TP
+.BI \-\-shader\-path\fB= path
+Shader lookup path. SPIR\-V shader objects are identified by an ‘.spv’ extension. Multiple paths may be specified.
+.UNINDENT
+.SH KEY BINDINGS
+.sp
+The default key bindings are defined as follows. To change any of the key binding, or to define new ones, see config\-key\-bindings in the configuration section.
+.SS Movement and focus
+.INDENT 0.0
+.TP
+.B mod+h
+Focus container on left / Focus most recently used tiling container
+.TP
+.B mod+l
+Focus container on right / Focus most recently used tiling container
+.TP
+.B mod+k
+Focus container above / Focus most recently used tiling container
+.TP
+.B mod+j
+Focus container below / Focus most recently used tiling container
+.TP
+.B mod+a
+Focus parent
+.TP
+.B mod+s
+Focus child
+.TP
+.B Alt+Tab
+Focus most recently used floating container / Cycle floating containers in MRU order (while holding Alt)
+.TP
+.B Super+Tab
+Focus most recently used tiling containner / Cycle tiling containers in MRU order (while holding Super). A container focused more than 0.5 seconds is considered “used”.
+.TP
+.B mod+Shift+l
+Swap container to right
+.TP
+.B mod+Shift+h
+Swap container to left
+.TP
+.B mod+Shift+k
+Swap container above
+.TP
+.B mod+Shift+j
+Swap container below
+.UNINDENT
+.SS Advanced movement
+.INDENT 0.0
+.TP
+.B mod+y
+Mark container for movement
+.TP
+.B mod+Shift+y
+Mark next container for movement
+.TP
+.B mod+p
+Place marked containers under (as a child) of the currently focused container
+.TP
+.B mod+mouse1
+(\fIhardcoded\fP) Click to drag the client around (both tiled or floating). Dragging a tiled container will displace the container while keeping the surrounding layout.
+.UNINDENT
+.SS Gouping and parenting
+.INDENT 0.0
+.TP
+.B mod+w
+Group every sibling container of the currently focused container under a new parent next to the focus
+.UNINDENT
+.SS Layout, splits and fullscreen
+.INDENT 0.0
+.TP
+.B mod+e
+Shift layout between horizontal and vertical splitting
+.TP
+.B mod+t
+Stack or tab containers. Whether to stack or tab will depend on splitting mode (see above).
+.TP
+.B mod+v
+Create a vertical split. Launch application to place is under newly created branch. To place existing applications, mark and paste (mod+y, mod+p).
+.TP
+.B mod+onehalf
+–
+.TP
+.B mod+f
+Enter or leave fullscreen mode
+.UNINDENT
+.SS Workspace dimensions
+.SS Client dimensions
+.sp
+In Chamferwm, the size of the container can be adjusted in two ways: resize and adjust the size of the peers in the same parent container accordingly, or resize locally keeping the surrounding layout intact (may result in overlapping).
+.INDENT 0.0
+.TP
+.B mod+r
+Reset container size and placement (local size)
+.TP
+.B mod+minus, Super+j
+Decrease container size horizontally
+.TP
+.B mod+Control+minus, Super+Control+j
+Decrease container size horizontally (local resize, no layout adjustment)
+.TP
+.B mod+plus, Super+k
+Increase container size horizontally
+.TP
+.B mod+Control+plus, Super+Control+k
+Increase container size horizontally (local resize, no layout adjustment)
+.TP
+.B mod+Shift+minus, Super+Shift+j
+Decrease container size vertically
+.TP
+.B mod+Shift+Control+minus, Super+Shift+Control+j
+Decrease container size vertically (local resize, no layout adjustment)
+.TP
+.B mod+Shift+plus, Super+Shift+k
+Increase container size vertically
+.TP
+.B mod+Shift+Control+plus, Super+Shift+Control+k
+Increase container size vertically (local resize, no layout adjustment)
+.UNINDENT
+.SS Launching and closing applications
+.INDENT 0.0
+.TP
+.B mod+Shift+q
+Close client window
+.TP
+.B mod+Enter
+Launch terminal (default terminal needs to be set in the configuration)
+.TP
+.B Super+1
+Launch browser (default browser needs to be set in the configuration)
+.TP
+.B Super+2
+Launch browser with private window
+.UNINDENT
+.SS Audio, screen etc.
+.INDENT 0.0
+.TP
+.B XF86_AudioRaiseVolume
+Increase volume by 5% (controlled by PulseAudio \- requires pulsectl Python module by default).
+.TP
+.B XF86_AudioLowerVolume
+Decrease volume by 5%
+.TP
+.B XF86_MonBrightnessUp
+Increase screen brightness by 20% (requires xbacklight by default)
+.TP
+.B XF86_MonBrightnessDown
+Decrease screen brightness by 20%
+.TP
+.B Control+q
+No operation \- used to disable the highly harmful web browser quit shortcut
+.UNINDENT
+.SS Window Manager
+.INDENT 0.0
+.TP
+.B Alt+Shift+e
+(\fIhardcoded\fP) Exit Chamferwm
+.UNINDENT
+.SH CONFIGURATION
+.SS Configuration Files
+.sp
+The configuration of Chamferwm is managed through a Python script. The provided configuration script defines the necessary classes and routines for layout management and overall behaviour of the window manager. For basic customization, user may want to edit the default configuration script to (re)define key bindings and add calls to launch applications and such. More advanced configuration might enhance the window management through provided callbacks, set up shaders to customize visuals and introduce other means to alter the behaviour and provide features.
+.sp
+By default Chamferwm will look for the configuration in following locations:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+~/.config/chamfer/config.py
+~/.chamfer/config.py
+/usr/share/chamfer/config/config.py
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The path to the configuration script can also be given with \fB\-\-config=[path]\fP, which will override any previously found files.
+.sp
+In the official setup, a default configuration script has been installed to \fB/usr/share/chamfer/config/\fP as a starting point for customization. User may want to copy this file to the previously listed locations in order to start editing. Currently any modification will require a restart of the window managar to take effect.
+.sp
+\fBWARNING:\fP
+.INDENT 0.0
+.INDENT 3.5
+While the configuration API is still unstable, and new features are being added, default configuration will be subject to minor changes.
+.UNINDENT
+.UNINDENT
+.SS Changing shortcuts
+.sp
+Some typical operations have already been assigned a key combination in the provided default configuration. The bound operations are listed under \fBKey(Enum)\fP class, where an identifier has been given to each of them. The corresponding lines to define the actual key combinations can be found futher below, under a callback \fI\%chamfer.Backend.OnSetupKeys()\fP\&. For each binding, one finds
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+self.BindKey(symbol, mask, keyId)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Here \fIsymbol\fP is the keysym code for the desired key. A list of symbols can be found inside a header file \fB/usr/include/X11/keysymdef.h\fP, for example. \fImask\fP defines the modifier mask for the key combination. Possible modifiers are:
+.INDENT 0.0
+.IP \(bu 2
+chamfer.MOD_MASK_SHIFT
+.IP \(bu 2
+chamfer.MOD_MASK_CONTROL
+.IP \(bu 2
+chamfer.MOD_MASK_LOCK
+.IP \(bu 2
+chamfer.MOD_MASK_ANY
+.IP \(bu 2
+chamfer.MOD_MASK_1
+.IP \(bu 2
+chamfer.MOD_MASK_2
+.IP \(bu 2
+chamfer.MOD_MASK_3
+.IP \(bu 2
+chamfer.MOD_MASK_4
+.IP \(bu 2
+chamfer.MOD_MASK_5
+.UNINDENT
+.sp
+Run \fBxmodmap \-pm\fP to find out which key each of the mask corresponds to on your system. The last argument \fIkeyId\fP is the identifier defined under previously mentioned \fBKey(Enum)\fP\&. The identifier will be used to map a key press to an operation written in \fI\%chamfer.Backend.OnKeyPress()\fP and \fI\%chamfer.Backend.OnKeyRelease()\fP\&.
+.sp
+In order to change the key binding for launching a terminal emulator for example, one should look for a self explanatory definition \fBLAUNCH_TERMINAL\fP, and the corresponding \fI\%BindKey()\fP entry, for which the parameters should be changed.
+.SS Launching Applications
+.sp
+Setting up an application launcher in case of Chamferwm consists of two steps: 1) defining the key binding and 2) adding callback functionality (corresponding the key binding) to start the said application. In this example we set up a hotkey to launch a web browser.
+.sp
+\fB1. Application hotkey.\fP First step is to bind the key which we want to launch the browser. Our choice of key combination in this example is Super+1. We add the following line under callback \fI\%chamfer.Backend.OnSetupKeys()\fP already found in the default configuration as a method of \fI\%Backend\fP class:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+self.BindKey(ord(\(aq1\(aq),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER.value)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Here \fBchamfer.MOD_MASK_4\fP corresponds the modifier mask of the Super key. The last parameter takes our custom identifier of the hot key we are in process of defining. The identifier will be passed on to the key press callback \fI\%chamfer.Backend.OnKeyPress()\fP and it should be uniquely defined somewhere. We may define it using \fBenum.Enum\fP and \fBenum.auto()\fP so that it automatically receives an incremented unique value. In our default configuration we add:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+class Key(Enum):
+        ...
+        LAUNCH_BROWSER = auto()
+        ...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+\fB2. Launch procedure.\fP We launch the application using \fBpsutil\fP module’s \fBpsutil.Popen()\fP function. Under \fI\%chamfer.Backend.OnKeyPress()\fP callback we add a branch for our newly defined key identifier, in which we start our browser process:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+elif keyId == Key.LAUNCH_BROWSER.value:
+        psutil.Popen(["firefox"],stdout=None,stderr=None);
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Note that it is possible to configure applications to launch on start up while the window manager is being initialized. In this case simply put \fBpsutil.Popen()\fP somewhere in the global scope.
+.sp
+Any other functionality can be added similarly. Instead of calling \fBpsutil.Popen()\fP to launch a browser, any other routine can be written in place of this. Writing routines in Python inside the same configuration file eliminates the need for smaller separate utility scripts often placed to complement to configuration file itself.
+.SS Python API
+.sp
+\fBWARNING:\fP
+.INDENT 0.0
+.INDENT 3.5
+Chamferwm is work in progress, and the configuration API is subject to breaking changes. The default configuration file config.py may also undergo additions and minor refactoring.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class chamfer.Container
+The workspace in Chamferwm is arranged in containers. Containers are a construct to hold either a client window or a set of child containers. The concept of a \fIchild\fP container comes from a hierarchial approach: at the base of the tree, there exists a root container which is split into one or more child containers. The child containers may in turn be further split into child containers, or alternatively hold a single instance of a client window.
+.INDENT 7.0
+.INDENT 2.5
+[image]
+Container tree..UNINDENT
+.UNINDENT
+.INDENT 7.0
+.INDENT 2.5
+[image]
+Possible corresponding window arrangement..UNINDENT
+.UNINDENT
+.sp
+The \fI\%Container\fP class is a user implemented interface to define callbacks related to creation and initialization of the container and client window, and to handle events that might arise during window management.
+.INDENT 7.0
+.TP
+.B OnSetupContainer()
+Called to setup the container before it is created. One should setup \fI\%minSize\fP, \fI\%maxSize\fP and \fI\%floatingMode\fP here, if necessary.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnSetupClient()
+Called to setup the client before it is created. Can be especially used to assign the initial shaders \fI\%vertexShader\fP, \fI\%geometryShader\fP and \fI\%fragmentShader\fP\&.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnParent()
+Called to assign a parent for the container. The parent is assigned by returning the \fI\%Container\fP instance of the desired parent. Most of the time \fI\%OnParent()\fP is called upon creation of a new container, as it needs to be put into a parent container. In the default sample configuration, the parent of the operand will be the parent of the current focus (retrieved using \fI\%chamfer.Backend.GetFocus()\fP), resulting in the new container being placed next to the current focus.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnCreate()
+Called once the client has been created and mapped to the display. Typically the newly created client can now be focused by calling \fI\%Focus()\fP\&.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnFullscreen(toggle)
+Called to request permission to enter or exit fullscreen mode for this container depending on the value of \fItoggle\fP\&. The implementation should return true on permission granted, and false for permission denied. In addition, one may assign a different set of shaders that may better benefit the fullscreen mode, and perform other operations related to the preparations for the transition.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnStack(toggle)
+Called whenever containers under this container are stacked or unstacked, denoted by \fItoggle\fP\&.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnFocus()
+Called to request permission for focus, and to allow for any routines before it. This call may be a result of calling \fI\%Focus()\fP, or a client spontaneously requesting it. Returning true assigns the focus on this container.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnPropertyChange(propId)
+Called every time a client property has changed. This may refer to window title etc., given by \fIpropId\fP, which will have one of the values from \fI\%property\fP\&.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B GetNext()
+Get the next sibling container in the parent container.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B GetPrev()
+Get the previous sibling container in the parent container.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B GetParent()
+Retrieve the parent container.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B GetFocus()
+Get the focused container of the parent container. This will be one of the child containers of the operand.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B GetTiledFocus()
+Get the most recently focused tiled container. Successive calls on the return objects, for example \fBcontainer.GetTiledFocus().GetTiledFocus()...\fP, will retrieve the second most recent, third most recent and so on container.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B GetFloatFocus()
+Get the most recently focused floating container.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B GetAdjacent()
+\fIreserved\fP
+.UNINDENT
+.INDENT 7.0
+.TP
+.B MoveNext()
+Swap this and the next sibling container.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B MovePrev()
+Swap this and the previous sibling container.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B Move(container)
+Move this container under to a new parent, \fIcontainer\fP\&.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B Focus()
+Focus the container. If the container is in another workspace, a workspace switch will occur. Changing workspaces is also possible by focusing the root container of the target workspace.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B Kill()
+Close the client and kill the container.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B ShiftLayout(layout)
+Shift the container layout to a new \fIlayout\fP indicated by \fI\%layout\fP\&. Most prominently used to transition between vertical and horizontal container splittings. May also be used to force some of the changed container parameters to take effect, such as changes to \fI\%canvasOffset\fP etc., whicn for performance reasons will not result in an automatic update.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B SetFullscreen(toggle)
+Move this container to a fullscreen mode, or back to normal depending on the value of \fItoggle\fP (true, false).
+.UNINDENT
+.INDENT 7.0
+.TP
+.B SetStacked(toggle)
+Toggle container stacking inside this container. If \fI\%layout\fP is equal to \fI\%chamfer.layout.VSPLIT\fP, the containers will be tabbed, and can be cycled horizontally. Otherwise, the containers are stacked, and are vertically cycled.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B IsFloating()
+Returns true if this is a floating container.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B IsAlive()
+Returns true if the container still exists, i.e. it has not been removed.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B name
+Name label of the container. Workspaces are identified by their root container name label.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B canvasOffset
+Tiled container position offset. This is a tuple of two values between 0 and 1 for horizontal and vertical directions, indicating the position offset of the container in the units of full screen widths/heights. A value of zero implies no offset, while a value of 1 displaces the container one full screen width or height. As an example, a value of \fB(\-0.1,0)\fP implies a displacement of 10% of the screen width to the left.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B canvasExtent
+Tiled container size extension. See \fI\%canvasOffset\fP for details. In this case, a value of \fB(\-0.1,0)\fP would imply a contraction of 10% of the screen width towards the left side of the container. Likewise \fB(0,0.2)\fP expands the container vertically 20% of the screen height downwards.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B margin
+A tuple of two values, one for horizontal and vertical screen dimensions. A positive non\-zero value will apply a gap between the containers in order to give the compositor space to render the decorations around the client windows. The units are in full screen widths (and widths only, to preserve the aspect). Setting \fBmargin = (0.015,0.015)\fP would inset the container by 1.5% of the screen width horizontally and vertically.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B size
+A tuple of two values for the size of the container and space reserved in horizontal and vertical screen direction. The units are widths and heights of the parent container: for instance, a value of \fB(0.7,1)\fP reserves 70% of the total horizontal and 100% of the vertical space given by the parent. If only one container exists, the value will always be \fB(1,1)\fP\&. The value is automatically updated as the surrounding layout changes. For example, the first container will have a size of \fB(1,1)\fP\&. Creating a second container will split the space in half, giving both containers a size \fB(0.5,1)\fP (in case of vertical splitting). User may then adjust the size of one of the containers to \fB(0.7,1)\fP, which will automatically assign the other container a size \fB(0.3,1)\fP\&.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B minSize
+Minimum size that the container may shrink to while making space for other containers. A tuple of two values, one for the each dimension of the screen. The units are widths and heights of the full screen. \fBminSize\fP of \fB(0.3,0)\fP will always keep the container width at least 30% of the full screen width, while \fB(1,0)\fP will make the container always occupy the full width of the screen. In case the space within the parent container runs out, containers will automatically start overlapping each other in a stacking manner.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B maxSize
+Maximum size that the container may expand to when there is space available. See \fI\%minSize\fP for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B fullscreen
+Read only fullscreen status: true if this container is in fullscreen mode, false otherwise.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B stacked
+Read only container stacking status: true if containers inside this container are stacked.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B titleBar
+Title bar placement for this container, see \fI\%titleBar\fP\&.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B shaderFlags
+User supplied value that will be passed on to the shaders as a push constant. See \fI\%shaderFlag\fP for the list of bit flags automatically managed by Chamferwm. Note that all bits below \fI\%USER_BIT\fP are reserved for use by Chamferwm.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B wm_name
+Current title of the client window. Read only.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B wm_class
+Current class name of the client window. Read only.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B vertexShader
+File name of the vertex shader to be used to render this client. The name of the file will be matched to the files found in the shader lookup directories. Default \fBvertexShader = "default_vertex.spv"\fP\&.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B geometryShader
+File name of the geometry shader. See \fI\%vertexShader\fP for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B fragmentShader
+File name of the geometry shader. See \fI\%vertexShader\fP for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B layout
+Current tiling layout of the container. One of the values from \fI\%chamfer.layout\fP\&. Layout transitions are handled by calling \fI\%ShiftLayout()\fP with the desired new layout. By default, the container will be created in \fI\%chamfer.layout.VSPLIT\fP mode.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B floatingMode
+Determine in which mode (tiled or floating) the client shall be created. See \fI\%floatingMode\fP for possible values. Default = \fI\%AUTOMATIC\fP\&.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class chamfer.layout(enum.Enum)
+Possible values of \fI\%layout\fP and the \fIlayout\fP parameter of \fI\%ShiftLayout()\fP, dictating the splitting mode of the container.
+.INDENT 7.0
+.TP
+.B VSPLIT
+Implies a vertically split container. Containers will be placed in a horizontal row.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B HSPLIT
+Implies a horizontally split container. Containers will be placed in a vertical column.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class chamfer.floatingMode(enum.Enum)
+Possible values of \fI\%floatingMode\fP, dictating the mode in which the client shall be created.
+.INDENT 7.0
+.TP
+.B AUTOMATIC
+Whether the client will be created in a floating or tiled mode will be determined automatically from its client attributes.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B ALWAYS
+The client is always created in floating mode, regardless of its client attributes.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B NEVER
+The client is always created in a tiled container, regardless of its client attributes.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class chamfer.property
+Various client property identifiers.
+.INDENT 7.0
+.TP
+.B NAME
+Client window title.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B CLASS
+Client window class name.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class chamfer.titleBar
+Title bar placement. By default the title bars are placed on top of the client.
+.INDENT 7.0
+.TP
+.B NONE
+Hide title bar
+.UNINDENT
+.INDENT 7.0
+.TP
+.B LEFT
+Title bar placed at the left border of client
+.UNINDENT
+.INDENT 7.0
+.TP
+.B TOP
+Title bar placed at the left border of client
+.UNINDENT
+.INDENT 7.0
+.TP
+.B RIGHT
+Title bar placed at the left border of client
+.UNINDENT
+.INDENT 7.0
+.TP
+.B BOTTOM
+Title bar placed at the left border of client
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class chamfer.Backend
+A user implemented interface to define routines for various window management related events. Moreover, \fI\%Backend\fP provides methods for …
+.INDENT 7.0
+.TP
+.B OnSetupKeys(debug)
+Called as soon as the backend is initialized. Ideal for setting up the keybindings for example. \fIdebug\fP will tell if testing backend (not a real window manager) was created.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnCreateContainer()
+Called to request a new instance of \fI\%Container\fP\&. The implementation is expected to return an instance of this class.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnKeyPress(keyId)
+Called to report a press of a key that was mapped with either \fI\%Backend.BindKey()\fP or \fI\%Backend.MapKey()\fP\&. \fIkeyId\fP is the user chosen identifier for the reported key.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnKeyRelease(keyId)
+Called to report a release of a key. See \fI\%Backend.OnKeyPress()\fP\&.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnTimer()
+\fIreserved\fP
+.UNINDENT
+.INDENT 7.0
+.TP
+.B OnExit()
+Called when user quits the window manager.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B GetFocus()
+Get the currently focused container \fI\%chamfer.Container\fP\&.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B GetRoot(name=None)
+Get the root container \fI\%chamfer.Container\fP\&. If \fIname\fP is specified, return the root container belonging to that workspace. Otherwise return the root of the currently focused container. If workspace does not exist, it will be created.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B BindKey(symbol, mask, keyId)
+Bind key \fIsymbol\fP with modifier \fImask\fP\&. The key combination will be exclusive to Chamferwm, and won’t be reported to any of the clients. Whenever the bound key is pressed, \fI\%chamfer.Backend.OnKeyPress()\fP with \fIkeyId\fP is called. Likewise, \fI\%chamfer.Backend.OnKeyRelease()\fP is called when the pressed key is released.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B MapKey(symbol, mask, keyId)
+Unlike \fI\%chamfer.Backend.BindKey()\fP, mapped keys are not exclusive to Chamferwm, and not reported until \fI\%chamfer.Backend.GrabKeyboard()\fP is called. See \fI\%chamfer.Backend.GrabKeyboard()\fP for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B GrabKeyboard(enable)
+Once keyboard is grabbed, keys mapped using \fI\%chamfer.Backend.MapKey()\fP besides the other key bindings are reported. During this, no key input whatsoever will be reported to the clients. GrabKeyboard method is useful for implementing functionality such as \fItask switcher\fP, which could be operating for as long as some modifier key is being held down.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B chamfer.BindBackend(backend)
+Bind your instance of \fI\%Backend\fP class implementation, assigned by a call to \fI\%BindBackend()\fP\&. Should be done during initialization.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B chamfer.backend
+Bound backend class object used by Chamferwm. Read only attribute.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class chamfer.shaderFlag(enum.Enum)
+Bit flags for the shader push constant, accessible with \fI\%shaderFlags\fP\&.
+.INDENT 7.0
+.TP
+.B FOCUS
+Client focus bit, set automatically by Chamferwm.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B FLOATING
+Floating client bit, set automatically by Chamferwm.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B STACKED
+Stacked client bit, set automatically by Chamferwm.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B USER_BIT
+First bit reserved for user defined flags.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B class chamfer.Compositor
+A user implemented interface to define routines for various compositing related events.
+.INDENT 7.0
+.TP
+.B deviceIndex
+GPU to use by its index. By default the first device in the list of enumerated GPUs will be used. May be overriden by command line arguments.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B debugLayers
+Enable Vulkan debug layers. May be overriden by command line arguments.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B scissoring
+Enable or disable scissoring optimizations. By default the optimization is enabled. If during compositing missing regions or flickering occur, the scissoring optimization can be disabled. The option \fB\-\-no\-scissoring\fP forces this false.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B hostMemoryImport
+Host shared memory import support.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B unredirOnFullscreen
+Disable compositor while on fullscreen (not implemented).
+.UNINDENT
+.INDENT 7.0
+.TP
+.B enableAnimation
+Enable or disable transition and movement animations. Enabled by default.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B animationDuration
+Total duration of the transition and movement animations. Default 0.3 seconds.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B fontName
+Font face to use for title bars.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B fontSize
+Title bar font size in points.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B chamfer.BindCompositor(compositor)
+Bind your instance of \fI\%Compositor\fP class implementation. Should be done during initialization.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B chamfer.compositor
+Bound compositor class object used by Chamferwm, assigned by a call to \fI\%BindCompositor()\fP\&. Read only attribute.
+.UNINDENT
+.SH SHADERS AND APPEARANCE
+.sp
+Shaders give clients their appearance. They are responsible for rendering client contents and decorations such as borders and shadows. With the default shaders, the clients are rendered with black, slightly rounded (chamfered!) corners. The current focus is indicated by an orange dashed line around the borders. Alternatively, task switching indicator (Alt+Tab, Super+Tab) is shown in a much lighter variant.
+.sp
+This section describes how to deploy and edit shaders for Chamferwm to customize the appearance of the desktop. To make only basic changes to the stock appearance, such as color or border attributes, see \fI\%Basic Appearance\fP\&.
+.SS Shader Paths
+.sp
+Chamferwm will look for compiled shader objects from lookup directories specified by user. User will specify the shader lookup paths with command line parameter \fB\-\-shader\-path=[path]\fP\&. More than one path may be given. At least one path must be specificed as there are no preset locations. The following configuration is suggested:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+\-\-shader\-path=~/.local/share/chamfer/shaders \-\-shader\-path=~/.config/chamfer/shaders/ \-\-shader\-path=/usr/share/chamfer/shaders/
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Shaders in this case are SPIR\-V objects. From the given directories, Chamferwm will look for files with \fB\&.spv\fP extension. The path given first in the command line will have a higher priority to the next one, and between conflicting filenames the shader from the directory that was given first will be picked.
+.SS Basic Appearance
+.sp
+The appearance of clients and their effects such as decorations, borders and shadows is fully controlled by either adjusting the parameters of the given default shaders, or by designing custom solutions by modifying existing or creating new shaders. Since the appearance of the clients can be completely arbitrary and is dictated by the shaders only, there are no style specific configuration options in the configuration script such as color, border width or anything that might not be relevant to a custom design. Instead, these are intended to be defined directly within the shader source.
+.sp
+The look of the stock appearance of Chamferwm is given by the fragment shader portion of \fBframe.hlsl\fP (compiled \fBframe_fragment.spv\fP). By adjusting a set of constants defined in the HLSL source, user may control some of the basic features of the stock appearance:
+.INDENT 0.0
+.TP
+.B \fBborderScaling\fP
+Scaling constant for the width of the client border
+.TP
+.B \fBborderColor\fP
+Color of the client border
+.TP
+.B \fBfocusColor\fP
+Color of the focus indicator
+.TP
+.B \fBtitleBackground\fP
+Background color of a title bar for an unfocused client
+.TP
+.B \fBtaskSelectColor\fP
+Color of the task selection indicator
+.TP
+.B \fBSTOCK_FRAME_STYLE\fP
+Choose between different demo styles (= 1: chamfered edges, other: simple borders)
+.UNINDENT
+.sp
+In order to apply the changes, recompile the fragment shader using
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+glslc \-\-target\-env=vulkan \-fhlsl_functionality1 \-fshader\-stage=fragment \-x hlsl \-DSHADER_STAGE_PS \-o \- frame.hlsl | spirv\-opt \-O \-o frame_fragment.spv \-
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Once successfully compiled, the output object \fBframe_fragment.spv\fP can then be placed in one of the shader lookup directories.
+.SS Rendering Pipeline
+.sp
+Chamferwm requires three different shaders for its client rendering pipeline:
+.INDENT 0.0
+.IP 1. 3
+Vertex shader
+.IP 2. 3
+Geometry shader
+.IP 3. 3
+Fragment shader
+.UNINDENT
+.sp
+For each client, a single vertex is drawn. This vertex has no attributes, and the default vertex shader of Chamferwm simply passes it through to the geometry shader. From this single vertex the geometry shader then expands the necessary surfaces for the client according to the dimensions provided through the push constants. The following push constants are available, and are accessible in all shader stages:
+.sp
+Available push constants for client rendering pipeline
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+float2 xy0; //normalized top\-left corner location
+float2 xy1; //normalized bottom\-right corner location
+float2 screen; //screen pixel dimensions
+float2 margin; //normalized gap margin in x and y directions
+float2 titlePad; //A vector indicating the location and size of the titlebar if any
+uint flags; //flags such as whether client is focused
+float time; //time in seconds since client creation
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The shader may declare any number of variables from the above list. The order of declaration does not matter, but should be shared among all shader stages.
+.sp
+The actual appearance is given by the fragment shader. The fragment shader identifies the fragments rasterized from surfaces given by the geometry shader, and paints the shadow, the window border and the client contents on them. The results are alpha\-blended on previously rendered surfaces.
+.sp
+Text on the title bars and such is rendered using another pipeline, which defines a vertex shader and a fragment shader. A minimal vertex shader expects a position and a texture coordinate to sample the font atlas:
+.sp
+Available vertex attributes for text rendering pipeline
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+float2 pos : POSITION; //normalized point location
+uint2 texc : TEXCOORD; //texture pixel coordinates
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+In HLSL the attributes are identified using the semantics \fBPOSITION\fP, \fBTEXCOORD\fP etc. As with push constants, the vertex attributes may be declared as needed, and in any order. For text pipeline, following push constants are available:
+.sp
+Available push constants for text rendering pipeline
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+float2 xy0; //normalized baseline location at the beginning of the text
+float2 screen; //screen pixel dimensions
+float2x2 transform; //text transform matrix, generally for the rotation
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS Advanced Customization
+.sp
+The shader sources provided with Chamferwm can be found in the source tree. The provided shaders are written in HLSL, although any other language that compiles to SPIR\-V, such as GLSL may be used. Following shader sources are provided:
+.INDENT 0.0
+.TP
+.B chamfer.hlsl
+Common definitions, and the push constants defined according to \fI\%Available push constants for client rendering pipeline\fP\&.
+.TP
+.B default.hlsl
+Basic shaders to draw clients without any decorations or effects. Good starting point for new designs.
+.TP
+.B frame.hlsl
+Shaders to draw clients with border and shadow. Stock look of Chamferwm.
+.TP
+.B solid.hlsl
+Simple fragment shader to fill with solid color. Mostly used to draw solid color backgrounds when wallpaper is not set.
+.TP
+.B text.hlsl
+Vertex and fragment shader for text rendering
+.UNINDENT
+.sp
+Some of the sources contain portions for more than one shader stage, guarded by preprocessing directives. The build system for Chamferwm preprocesses and compiles the sources into one or more SPIR\-V objects. User may also manually invoke a shader compiler (such as \fBglslc\fP also used by default) in order to deploy any modifications and additions:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+glslc \-\-target\-env=vulkan \-fhlsl_functionality1 \-fshader\-stage=fragment \-x hlsl \- fragment_shader.hlsl | spirv\-opt \-O \-o fragment_shader.spv \-
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+to compile a fragment shader \fBfragment_shader.hlsl\fP written in HLSL into a SPIR\-V object \fBfragment_shader.spv\fP as an example. Here \fBspirv\-opt\fP is used to performed the optimization as a post\-processing step, as \fBglslc\fP does not preserve the reflection information during optimization. The output object should be placed into one of the command line provided shader lookup directories for it to become available.
+.sp
+The details on how to write shaders are beyond the scope of this manual. However, user may use the provided \fBdefault.hlsl\fP, which contains all the relevant shader stages in their simplest form to be used with Chamferwm, as a starting point.
+.sp
+In order to use shaders found in the lookup directories, they must be assigned to a client in the configuration script. See \fBchamfer.Container.vertexShader\fP and the respective attributes for geometry and fragment shaders on how to do this. All attributes must point to a valid shader object.
+.SH AUTHOR
+Jasper Parkkila
+.SH COPYRIGHT
+2019, Jasper Parkkila
+.\" Generated by docutils manpage writer.
+.
