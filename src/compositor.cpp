@@ -129,8 +129,6 @@ ClientFrame::~ClientFrame(){
 		delete ptitle;
 	pcomp->updateQueue.erase(std::remove(pcomp->updateQueue.begin(),pcomp->updateQueue.end(),this),pcomp->updateQueue.end());
 	pcomp->titleUpdateQueue.erase(std::remove(pcomp->titleUpdateQueue.begin(),pcomp->titleUpdateQueue.end(),this),pcomp->titleUpdateQueue.end());
-
-	pcomp->ReleaseTexture(ptexture);
 }
 
 void ClientFrame::CreateSurface(uint w, uint h, uint depth){
@@ -155,6 +153,11 @@ void ClientFrame::AdjustSurface(uint w, uint h){
 	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
 
 	UpdateDescSets();
+}
+
+void ClientFrame::DestroySurface(){
+	//
+	pcomp->ReleaseTexture(ptexture);
 }
 
 void ClientFrame::SetShaders(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT]){
@@ -1397,64 +1400,13 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 
 	windowPixmap = xcb_generate_id(pbackend->pcon);
-	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 
-	damage = xcb_generate_id(pbackend->pcon);
-	//xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_RAW_RECTANGLES);
-	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_NON_EMPTY);
-
-	//attach to shared memory
-	uint textureSize = rect.w*rect.h*4;
-	shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
-	if(shmid == -1){
-		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
-		return;
-	}
-	segment = xcb_generate_id(pbackend->pcon);
-	xcb_shm_attach(pbackend->pcon,segment,shmid,0);
-	pchpixels = (unsigned char*)shmat(shmid,0,0);
-
-	xcb_flush(pbackend->pcon);
-	
-	//get image depth
-	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,1,1,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
-	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
-
-	uint depth;
-	if(pimageReply){
-		depth = pimageReply->depth;
-		free(pimageReply);
-	}else{
-		DebugPrintf(stderr,"Failed to get SHM image. Assuming 24 bit depth.\n");
-		depth = 24;
-	}
-
-	CreateSurface(rect.w,rect.h,depth);
-
-	if(pcomp->hostMemoryImport && !ptexture->Attach(pchpixels)){
-		DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-		pcomp->hostMemoryImport = false;
-	}
-	//ptexture->Attach(windowPixmap);
-
-	pcomp->AddDamageRegion(this);
+	StartComposition1();
 }
 
 X11ClientFrame::~X11ClientFrame(){
-	if(pcomp->hostMemoryImport)
-		ptexture->Detach(pcomp->frameTag);
-
-	xcb_shm_detach(pbackend->pcon,segment);
-	shmdt(pchpixels);
-
-	shmctl(shmid,IPC_RMID,0);
-
-	xcb_damage_destroy(pbackend->pcon,damage);
-
+	StopComposition1();
 	xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
-	xcb_free_pixmap(pbackend->pcon,windowPixmap);
-
-	pcomp->AddDamageRegion(this);
 }
 
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
@@ -1549,6 +1501,66 @@ void X11ClientFrame::AdjustSurface1(){
 	}else
 	if(oldRect.x != rect.x || oldRect.y != rect.y)
 		pcomp->AddDamageRegion(this);
+}
+
+void X11ClientFrame::StartComposition1(){
+	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
+
+	damage = xcb_generate_id(pbackend->pcon);
+	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_NON_EMPTY);
+
+	//attach to shared memory
+	uint textureSize = rect.w*rect.h*4;
+	shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
+	if(shmid == -1){
+		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
+		return;
+	}
+	segment = xcb_generate_id(pbackend->pcon);
+	xcb_shm_attach(pbackend->pcon,segment,shmid,0);
+	pchpixels = (unsigned char*)shmat(shmid,0,0);
+
+	xcb_flush(pbackend->pcon);
+	
+	//get image depth
+	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,1,1,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
+
+	uint depth;
+	if(pimageReply){
+		depth = pimageReply->depth;
+		free(pimageReply);
+	}else{
+		DebugPrintf(stderr,"Failed to get SHM image. Assuming 24 bit depth.\n");
+		depth = 24;
+	}
+
+	CreateSurface(rect.w,rect.h,depth);
+
+	if(pcomp->hostMemoryImport && !ptexture->Attach(pchpixels)){
+		DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
+		pcomp->hostMemoryImport = false;
+	}
+
+	pcomp->AddDamageRegion(this);
+}
+
+void X11ClientFrame::StopComposition1(){
+	if(pcomp->hostMemoryImport)
+		ptexture->Detach(pcomp->frameTag);
+
+	xcb_shm_detach(pbackend->pcon,segment);
+	shmdt(pchpixels);
+
+	shmctl(shmid,IPC_RMID,0);
+
+	xcb_damage_destroy(pbackend->pcon,damage);
+
+	xcb_free_pixmap(pbackend->pcon,windowPixmap);
+
+	pcomp->AddDamageRegion(this);
+
+	DestroySurface();
 }
 
 void X11ClientFrame::SetTitle1(const char *ptitle){
@@ -1823,7 +1835,6 @@ void X11Compositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
 	xcbSurfaceCreateInfo.pNext = 0;
 	xcbSurfaceCreateInfo.connection = pbackend->pcon; //pcon
 	xcbSurfaceCreateInfo.window = overlay;
-	//if(((PFN_vkCreateXcbSurfaceKHR)vkGetInstanceProcAddr(instance,"vkCreateXcbSurfaceKHR"))(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS)
 	if(vkCreateXcbSurfaceKHR(instance,&xcbSurfaceCreateInfo,0,psurface) != VK_SUCCESS)
 		throw("Failed to create KHR surface.");
 }
@@ -1863,12 +1874,11 @@ glm::vec2 X11Compositor::GetDPI() const{
 
 X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : DebugClient(pcontainer,_pcreateInfo), ClientFrame(_pshaderName,_pcomp){
 	//
-	CreateSurface(rect.w,rect.h,32);
-	pcomp->AddDamageRegion(this);
+	StartComposition1();
 }
 
 X11DebugClientFrame::~X11DebugClientFrame(){
-	pcomp->AddDamageRegion(this);
+	StopComposition1();
 }
 
 void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
@@ -1899,6 +1909,16 @@ void X11DebugClientFrame::AdjustSurface1(){
 	}else
 	if(oldRect.x != rect.x || oldRect.y != rect.y)
 		pcomp->AddDamageRegion(this);
+}
+
+void X11DebugClientFrame::StartComposition1(){
+	CreateSurface(rect.w,rect.h,32);
+	pcomp->AddDamageRegion(this);
+}
+
+void X11DebugClientFrame::StopComposition1(){
+	DestroySurface();
+	pcomp->AddDamageRegion(this);
 }
 
 void X11DebugClientFrame::SetTitle1(const char *ptitle){

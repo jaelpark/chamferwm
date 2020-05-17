@@ -114,6 +114,8 @@ public:
 	X11Client(WManager::Container *, const CreateInfo *);
 	~X11Client();
 	virtual void AdjustSurface1(){};
+	virtual void StartComposition1(){};
+	virtual void StopComposition1(){};
 	virtual void SetTitle1(const char *){};
 	//virtual void SetFullscreen1(bool){};
 	void UpdateTranslation(); //manual mode update

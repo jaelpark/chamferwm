@@ -63,6 +63,7 @@ public:
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	void CreateSurface(uint, uint, uint);
 	void AdjustSurface(uint, uint);
+	void DestroySurface();
 	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
 	void SetTitle(const char *);
 	enum SHADER_FLAG{ //+config
@@ -264,6 +265,8 @@ public:
 	~X11ClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	void AdjustSurface1();
+	void StartComposition1();
+	void StopComposition1();
 	void SetTitle1(const char *);
 	xcb_pixmap_t windowPixmap;
 	xcb_shm_seg_t segment;
@@ -321,6 +324,8 @@ public:
 	~X11DebugClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	void AdjustSurface1();
+	void StartComposition1();
+	void StopComposition1();
 	void SetTitle1(const char *);
 };
 
