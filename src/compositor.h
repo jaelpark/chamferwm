@@ -57,6 +57,7 @@ protected:
 
 class ClientFrame : public ColorFrame{
 friend class CompositorInterface;
+friend class X11Compositor;
 public:
 	ClientFrame(const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
 	virtual ~ClientFrame();
@@ -78,6 +79,7 @@ protected:
 	class Text *ptitle;
 	std::string title;
 	uint surfaceDepth;
+	bool enabled; //in use and ready to draw
 	bool fullRegionUpdate;
 	bool animationCompleted;
 };
@@ -216,7 +218,9 @@ protected:
 		//uint flags;
 	};
 	std::vector<RenderObject> renderQueue;
-	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue;
+
+	typedef std::tuple<const WManager::Client *, WManager::Client *, ClientFrame *> AppendixQueueElement;
+	std::deque<AppendixQueueElement> appendixQueue;
 
 	//Used textures get stored for potential reuse before they get destroyed and while waiting for the pipeline to get flushed.
 	//Many of the allocated window textures will initially have some common reoccuring size.

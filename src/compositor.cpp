@@ -120,7 +120,7 @@ void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm:
 	passignedSet->fenceTag = pcomp->frameTag;
 }
 
-ClientFrame::ClientFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : ColorFrame(pshaderName,_pcomp), ptitle(0), fullRegionUpdate(true), animationCompleted(true){
+ClientFrame::ClientFrame(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : ColorFrame(pshaderName,_pcomp), ptitle(0), fullRegionUpdate(true), animationCompleted(true), enabled(true){
 	//
 }
 
@@ -812,13 +812,13 @@ void CompositorInterface::WaitIdle(){
 
 void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pclient, const WManager::Container *pfocus){
 	auto s = [&](auto &p)->bool{
-		return pclient == p.first;
+		return pclient == std::get<0>(p);
 	};
 	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
 		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
 		RenderObject renderObject;
-		renderObject.pclient = (*m).second;
-		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
+		renderObject.pclient = std::get<1>(*m);
+		renderObject.pclientFrame = std::get<2>(*m);
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
 		renderObject.pclientFrame->shaderFlags =
 			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
@@ -827,7 +827,7 @@ void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pcli
 			|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 
-		CreateRenderQueueAppendix((*m).second,pfocus);
+		CreateRenderQueueAppendix(std::get<1>(*m),pfocus);
 
 		m = appendixQueue.erase(m);
 	}
@@ -839,7 +839,7 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 	for(const WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
 			ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
-			if(!pclientFrame)
+			if(!pclientFrame || !pclientFrame->enabled)
 				continue;
 			
 			RenderObject renderObject;
@@ -914,14 +914,17 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 	renderQueue.clear();
 	appendixQueue.clear();
 	for(auto &p : *pstackAppendix){
+		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(p.second);
+		if(!pclientFrame || !pclientFrame->enabled)
+			continue;
 		if(p.first){
-			appendixQueue.push_back(p);
+			appendixQueue.push_back(AppendixQueueElement(p.first,p.second,pclientFrame));
 			continue;
 		}
 		//desktop features are placed first
 		RenderObject renderObject;
 		renderObject.pclient = p.second;
-		renderObject.pclientFrame = dynamic_cast<ClientFrame *>(p.second);
+		renderObject.pclientFrame = pclientFrame;
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
 		renderObject.pclientFrame->shaderFlags =
 			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
@@ -935,7 +938,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 	for(auto m = appendixQueue.begin(); m != appendixQueue.end();){
 		auto k = std::find_if(appendixQueue.begin(),appendixQueue.end(),[&](auto &p)->bool{
-			return (*m).first == p.second;
+			return std::get<0>(*m) == std::get<1>(p);
 		});
 		if(k != appendixQueue.end()){
 			++m;
@@ -943,8 +946,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		}
 			
 		RenderObject renderObject;
-		renderObject.pclient = (*m).second;
-		renderObject.pclientFrame = dynamic_cast<ClientFrame *>((*m).second);
+		renderObject.pclient = std::get<1>(*m);
+		renderObject.pclientFrame = std::get<2>(*m);
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
 		renderObject.pclientFrame->shaderFlags =
 			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
@@ -953,15 +956,15 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			|renderObject.pclientFrame->shaderUserFlags;
 		renderQueue.push_back(renderObject);
 
-		CreateRenderQueueAppendix((*m).second,pfocus);
+		CreateRenderQueueAppendix(std::get<1>(*m),pfocus);
 
 		m = appendixQueue.erase(m);
 	}
 
 	for(auto &p : appendixQueue){ //push the remaining (untransient) windows to the end of the queue
 		RenderObject renderObject;
-		renderObject.pclient = p.second;
-		renderObject.pclientFrame = dynamic_cast<ClientFrame *>(p.second);
+		renderObject.pclient = std::get<1>(p);
+		renderObject.pclientFrame = std::get<2>(p);
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
 		renderObject.pclientFrame->shaderFlags =
 			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
@@ -1783,6 +1786,11 @@ bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 		xcb_xfixes_destroy_region(pbackend->pcon,region);
 
 		xcb_xfixes_fetch_region_reply_t *pfetchRegionReply = xcb_xfixes_fetch_region_reply(pbackend->pcon,fetchRegionCookie,0);
+
+		if(!pclientFrame->enabled){
+			free(pfetchRegionReply);
+			return true;
+		}
 
 		uint count = xcb_xfixes_fetch_region_rectangles_length(pfetchRegionReply);
 		if(count > 0){

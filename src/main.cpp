@@ -101,16 +101,17 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	va_end(args);
 }
 
+typedef std::pair<const WManager::Client *, WManager::Client *> StackAppendixElement;
 class RunCompositor : public Config::CompositorConfig{
 public:
-	RunCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : proot(_proot), pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
+	RunCompositor(WManager::Container *_proot, std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : proot(_proot), pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
 	virtual bool IsAnimating() const = 0;
 	virtual void WaitIdle() = 0;
 protected:
 	WManager::Container *proot;
-	std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix;
+	std::vector<StackAppendixElement> *pstackAppendix;
 };
 
 class RunBackend : public Config::BackendConfig{
@@ -329,7 +330,7 @@ public:
 
 //protected:
 	WManager::Container *proot;
-	std::vector<std::pair<const WManager::Client *, WManager::Client *>> stackAppendix;
+	std::vector<StackAppendixElement> stackAppendix;
 	class RunCompositor *pcomp;
 };
 
@@ -376,7 +377,7 @@ public:
 			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo,pshaderName);
 
 			if(pclient11) //in some cases the window is found to be unmanageable
-				stackAppendix.push_back(std::pair<const WManager::Client *, WManager::Client *>(pcreateInfo->pstackClient,pclient11));
+				stackAppendix.push_back(StackAppendixElement(pcreateInfo->pstackClient,pclient11));
 			return pclient11;
 
 		}else{
@@ -393,7 +394,7 @@ public:
 			Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo,pshaderName);
 			containerInt.pcontainer->pclient = pclient11;
 			if(containerInt.pcontainer->flags & WManager::Container::FLAG_FLOATING)
-				stackAppendix.push_back(std::pair<const WManager::Client *, WManager::Client *>(pcreateInfo->pstackClient,pclient11));
+				stackAppendix.push_back(StackAppendixElement(pcreateInfo->pstackClient,pclient11));
 
 			containerInt.DeferredPropertyTransfer();
 			containerInt.OnCreate();
@@ -547,12 +548,12 @@ public:
 		return proot;
 	}
 
-	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> * GetStackAppendix() const{
+	const std::vector<StackAppendixElement> * GetStackAppendix() const{
 		return &stackAppendix;
 	}
 
 	void SortStackAppendix(){
-		std::sort(stackAppendix.begin(),stackAppendix.end(),[&](std::pair<const WManager::Client *, WManager::Client *> &a, std::pair<const WManager::Client *, WManager::Client *> &b)->bool{
+		std::sort(stackAppendix.begin(),stackAppendix.end(),[&](StackAppendixElement &a, StackAppendixElement &b)->bool{
 			for(auto *p : WManager::Container::floatFocusQueue){
 				if(p == a.second->pcontainer)
 					return true;
@@ -663,7 +664,7 @@ public:
 		return proot;
 	}
 
-	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> * GetStackAppendix() const{
+	const std::vector<StackAppendixElement> * GetStackAppendix() const{
 		return &stackAppendix;
 	}
 
@@ -678,7 +679,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DefaultCompositor(WManager::Container *_proot, std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Start();
 
 		wordexp_t expResult;
@@ -731,7 +732,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(WManager::Container *_proot, std::vector<std::pair<const WManager::Client *, WManager::Client *>> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DebugCompositor(WManager::Container *_proot, std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
 		Compositor::X11DebugCompositor::Start();
 
 		wordexp_t expResult;
