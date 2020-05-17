@@ -280,10 +280,14 @@ public:
 	}
 
 	void ReleaseContainers(){
-		//TODO: release all containers from all roots!
-		WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
-		if(proot->pch)
-			ReleaseContainersRecursive(proot->pch);
+		WManager::Container *pRootNext = proot1->pRootNext;
+		do{
+			if(pRootNext->pch)
+				ReleaseContainersRecursive(pRootNext->pch);
+
+			pRootNext = pRootNext->pRootNext;
+		}while(pRootNext != proot1);
+
 		for(auto &p : stackAppendix){
 			const Config::ContainerConfig *pcontainer1 = dynamic_cast<const Config::ContainerConfig *>(p.second->pcontainer);
 			if(pcontainer1 && pcontainer1->pcontainerInt->pcontainer == p.second->pcontainer)
@@ -328,7 +332,13 @@ public:
 
 	~DefaultBackend(){
 		Stop();
-		delete proot1;
+		WManager::Container *pRootNext = proot1->pRootNext;
+		do{
+			WManager::Container *pRootNext2 = pRootNext->pRootNext;
+			delete pRootNext;
+
+			pRootNext = pRootNext2;
+		}while(pRootNext != proot1);
 	}
 
 	void DefineBindings(){
@@ -565,7 +575,13 @@ public:
 
 	~DebugBackend(){
 		Stop();
-		delete proot1;
+		WManager::Container *pRootNext = proot1->pRootNext;
+		do{
+			WManager::Container *pRootNext2 = pRootNext->pRootNext;
+			delete pRootNext;
+
+			pRootNext = pRootNext2;
+		}while(pRootNext != proot1);
 	}
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
