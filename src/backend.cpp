@@ -288,7 +288,7 @@ void X11Container::Focus1(){
 	WManager::Container *pPrevRoot = WManager::Container::ptreeFocus->GetRoot();
 	WManager::Container *proot = GetRoot();
 	if(pPrevRoot != proot){
-		printf("Workspace switched.\n");
+		printf("Workspace switched [%p] -> [%p].\n",pPrevRoot,proot);
 		//recursive unmapping
 		X11Backend *pbackend11 = const_cast<X11Backend *>(pbackend);
 		pbackend11->ForEach(pPrevRoot,[](WManager::Client *pclient)->void{
@@ -863,7 +863,6 @@ sint Default::HandleEvent(bool forcePoll){
 			}
 			break;
 		case XCB_MAP_REQUEST:{
-			//TODO: use xprop to identify windows that don't behave as expected.
 			xcb_map_request_event_t *pev = (xcb_map_request_event_t*)pevent;
 			if(pev->window == ewmh_window){
 				xcb_map_window(pcon,pev->window);

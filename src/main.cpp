@@ -104,20 +104,20 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 typedef std::pair<const WManager::Client *, WManager::Client *> StackAppendixElement;
 class RunCompositor : public Config::CompositorConfig{
 public:
-	RunCompositor(WManager::Container *_proot, std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : proot(_proot), pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
+	RunCompositor(WManager::Container *_proot, std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : proot1(_proot), pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
 	virtual bool IsAnimating() const = 0;
 	virtual void WaitIdle() = 0;
 protected:
-	WManager::Container *proot;
+	WManager::Container *proot1;
 	std::vector<StackAppendixElement> *pstackAppendix;
 };
 
 class RunBackend : public Config::BackendConfig{
 public:
-	RunBackend(WManager::Container *_proot, Config::BackendInterface *_pbackendInt) : proot(_proot), pcomp(0), Config::BackendConfig(_pbackendInt){
-		proot->SetName("1");
+	RunBackend(WManager::Container *_proot, Config::BackendInterface *_pbackendInt) : proot1(_proot), pcomp(0), Config::BackendConfig(_pbackendInt){
+		proot1->SetName("1");
 	}
 
 	virtual ~RunBackend(){}
@@ -191,6 +191,7 @@ public:
 			containerInt.pcontainer = pcontainer;
 
 		}else{
+			WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
 			T *pcontainer = new T(&containerInt,proot,setup,static_cast<U*>(this));
 			containerInt.pcontainer = pcontainer;
 		}
@@ -201,6 +202,7 @@ public:
 	template<class T, class U>
 	void MoveContainer(WManager::Container *pcontainer, WManager::Container *pdst){
 		//
+		WManager::Container *proot = pcontainer->GetRoot();
 		PrintTree(proot,0);
 		printf("-----------\n");
 
@@ -278,6 +280,8 @@ public:
 	}
 
 	void ReleaseContainers(){
+		//TODO: release all containers from all roots!
+		WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
 		if(proot->pch)
 			ReleaseContainersRecursive(proot->pch);
 		for(auto &p : stackAppendix){
@@ -310,7 +314,7 @@ public:
 	}
 
 //protected:
-	WManager::Container *proot;
+	WManager::Container *proot1;
 	std::vector<StackAppendixElement> stackAppendix;
 	class RunCompositor *pcomp;
 };
@@ -324,7 +328,7 @@ public:
 
 	~DefaultBackend(){
 		Stop();
-		delete proot;
+		delete proot1;
 	}
 
 	void DefineBindings(){
@@ -355,6 +359,7 @@ public:
 			const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
 				containerInt.vertexShader.c_str(),containerInt.geometryShader.c_str(),containerInt.fragmentShader.c_str()
 			};
+			WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot(); //TODO: stack's root?
 			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo,pshaderName);
 
 			if(pclient11) //in some cases the window is found to be unmanageable
@@ -405,7 +410,7 @@ public:
 
 	//Called for spontaneous (client requested) fullscreen triggered by an event
 	void SetFullscreen(Backend::X11Client *pclient, bool toggle){
-		if(!pclient || pclient->pcontainer == proot)
+		if(!pclient || pclient->pcontainer == pclient->pcontainer->GetRoot())
 			return;
 		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
 		if(pcontainer1->pcontainerInt->OnFullscreen(toggle))
@@ -414,7 +419,7 @@ public:
 
 	//Called for spontaneous (client requested) focus triggered by an event
 	void SetFocus(Backend::X11Client *pclient){
-		if(!pclient || pclient->pcontainer == proot)
+		if(!pclient || pclient->pcontainer == pclient->pcontainer->GetRoot())
 			return;
 		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
 		if(pcontainer1->pcontainerInt->OnFocus())
@@ -430,7 +435,7 @@ public:
 				pcomp11->SetBackgroundPixmap(pPixmapProperty);
 			return;
 		}
-		if(pclient->pcontainer == proot)
+		if(pclient->pcontainer == pclient->pcontainer->GetRoot())
 			return;
 		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
 		if(id == PROPERTY_ID_WM_NAME){
@@ -464,6 +469,7 @@ public:
 		if(n2 != WManager::Container::floatFocusQueue.end())
 			WManager::Container::floatFocusQueue.erase(n2);
 
+		WManager::Container *proot = pclient->pcontainer->GetRoot();
 		PrintTree(proot,0);
 
 		WManager::Client *pbase = pclient;
@@ -559,7 +565,7 @@ public:
 
 	~DebugBackend(){
 		Stop();
-		delete proot;
+		delete proot1;
 	}
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
@@ -593,6 +599,7 @@ public:
 		});
 		if(m != stackAppendix.end())
 			stackAppendix.erase(m);
+		WManager::Container *proot = pclient->pcontainer->GetRoot();
 		if(pclient->pcontainer == proot){
 			delete pclient;
 			return;
@@ -690,6 +697,7 @@ public:
 		if(!PollFrameFence())
 			return;
 
+		WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
 		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
 		Compositor::X11Compositor::Present();
 	}
@@ -742,7 +750,8 @@ public:
 		Config::ContainerInterface::UpdateShaders();
 		if(!PollFrameFence())
 			return;
-
+		
+		WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
 		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
 		Compositor::X11DebugCompositor::Present();
 	}
@@ -847,7 +856,7 @@ int main(sint argc, const char **pargv){
 		return 1;
 	}
 
-	WManager::Container::ptreeFocus = pbackend->proot;
+	WManager::Container::ptreeFocus = pbackend->proot1;
 
 	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
 
@@ -857,8 +866,8 @@ int main(sint argc, const char **pargv){
 			pcomp = new NullCompositor(Config::CompositorInterface::pcompositorInt);
 		else
 		if(debugBackend.Get())
-			pcomp = new DebugCompositor(pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths,Config::CompositorInterface::pcompositorInt);
-		else pcomp = new DefaultCompositor(pbackend->proot,&pbackend->stackAppendix,pbackend11,shaderPaths,Config::CompositorInterface::pcompositorInt);
+			pcomp = new DebugCompositor(pbackend->proot1,&pbackend->stackAppendix,pbackend11,shaderPaths,Config::CompositorInterface::pcompositorInt);
+		else pcomp = new DefaultCompositor(pbackend->proot1,&pbackend->stackAppendix,pbackend11,shaderPaths,Config::CompositorInterface::pcompositorInt);
 
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());

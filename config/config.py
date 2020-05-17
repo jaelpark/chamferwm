@@ -530,12 +530,14 @@ class Backend(chamfer.Backend):
 		elif keyId == Key.WORKSPACE_1.value:
 			print("workspace 1");
 			root = self.GetRoot("1");
-			root.Focus();
+			root.GetFocusDescend = Container.GetFocusDescend.__get__(root); #RootContainer does not have GetFocusDescend, so we will add it now
+			root.GetFocusDescend().Focus();
 
 		elif keyId == Key.WORKSPACE_2.value:
 			print("workspace 2");
 			root = self.GetRoot("2");
-			root.Focus();
+			root.GetFocusDescend = Container.GetFocusDescend.__get__(root);
+			root.GetFocusDescend().Focus();
 
 		elif keyId == Key.EXPAND_HORIZONTAL.value:
 			focus.size = (focus.size[0]+0.1,focus.size[1]);
