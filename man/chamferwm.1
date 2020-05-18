@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "CHAMFERWM" "1" "May 17, 2020" "" "chamferwm"
+.TH "CHAMFERWM" "1" "May 18, 2020" "" "chamferwm"
 .SH NAME
 chamferwm \- chamferwm git
 .
@@ -273,7 +273,7 @@ Focus child
 Focus most recently used floating container / Cycle floating containers in MRU order (while holding Alt)
 .TP
 .B Super+Tab
-Focus most recently used tiling containner / Cycle tiling containers in MRU order (while holding Super). A container focused more than 0.5 seconds is considered "used".
+Focus most recently used tiling containner / Cycle tiling containers in MRU order (while holding Super). A container focused more than 0.5 seconds is considered “used”.
 .TP
 .B mod+Shift+l
 Swap container to right
@@ -321,7 +321,7 @@ Stack or tab containers. Whether to stack or tab will depend on splitting mode (
 Create a vertical split. Launch application to place is under newly created branch. To place existing applications, mark and paste (mod+y, mod+p).
 .TP
 .B mod+onehalf
-Create a vertical split \-\- see above.
+Create a vertical split – see above.
 .TP
 .B mod+f
 Enter or leave fullscreen mode
@@ -337,9 +337,12 @@ Switch to workspace 2.
 .TP
 .B mod+3
 Switch to workspace 3.
+.TP
+.B mod+4
+Switch to workspace 4.
 .UNINDENT
 .sp
-\fIMore to be defined later; work in progress.\fP
+Note that any number of workspaces can be set up in the config, and the workspaces are not limited to the preset four.
 .SS Client dimensions
 .sp
 In Chamferwm, the size of the container can be adjusted in two ways: resize and adjust the size of the peers in the same parent container accordingly, or resize locally keeping the surrounding layout intact (may result in overlapping).
