@@ -94,6 +94,7 @@ public:
 	virtual void Focus1(){}// = 0;
 	virtual void Stack1(){}// = 0;
 	virtual void Fullscreen1(){}
+	virtual void Name1(){}
 
 	Container *pParent;
 	Container *pch; //First children
@@ -104,6 +105,7 @@ public:
 
 	Client *pclient;
 	char *pname; //name identifier for searches
+	//uint rootIndex; //index of the virtual desktop (for ewmh)
 
 	//absolute normalized coordinates
 	glm::vec2 p;
@@ -126,9 +128,10 @@ public:
 	LAYOUT layout;
 	TITLEBAR titleBar;
 
-	static WManager::Container *ptreeFocus; //client focus, managed by Python
-	static std::deque<std::pair<WManager::Container *, struct timespec>> tiledFocusQueue;
-	static std::deque<WManager::Container *> floatFocusQueue;
+	static Container *ptreeFocus; //client focus, managed by Python
+	static std::vector<Container *> rootContainers;
+	static std::deque<std::pair<Container *, struct timespec>> tiledFocusQueue;
+	static std::deque<Container *> floatFocusQueue;
 };
 
 /*class RootContainer : Container{

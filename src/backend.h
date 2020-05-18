@@ -137,6 +137,7 @@ public:
 	void Focus1();
 	void Stack1();
 	void Fullscreen1();
+	void Name1();
 	const X11Backend *pbackend;
 };
 
