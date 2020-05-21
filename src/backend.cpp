@@ -272,13 +272,7 @@ void X11Client::Kill(){
 }
 
 X11Container::X11Container(X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
-	//root container created, update ewmh atoms
-	//_NET_DESKOP_NAMES
-	Name1();
-
-	uint values[1] = {WManager::Container::rootContainers.size()};
-	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
-	xcb_flush(pbackend->pcon);
+	//
 }
 
 X11Container::X11Container(WManager::Container *_pParent, const WManager::Container::Setup &_setup, X11Backend *_pbackend) : WManager::Container(_pParent,_setup), pbackend(_pbackend){
@@ -287,14 +281,6 @@ X11Container::X11Container(WManager::Container *_pParent, const WManager::Contai
 
 X11Container::~X11Container(){
 	//
-	if(pParent)
-		return;
-	
-	Name1();
-	
-	uint values[1] = {WManager::Container::rootContainers.size()-1};
-	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
-	xcb_flush(pbackend->pcon);
 }
 
 void X11Container::Focus1(){
@@ -318,10 +304,6 @@ void X11Container::Focus1(){
 
 			pclient11->StartComposition1();
 		});
-
-		auto m = std::find(WManager::Container::rootContainers.begin(),WManager::Container::rootContainers.end(),proot);
-		uint values[1] = {m-WManager::Container::rootContainers.begin()};
-		xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
 	}
 	const xcb_window_t *pfocusWindow;
 	if(pclient){
@@ -375,26 +357,6 @@ void X11Container::Fullscreen1(){
 	}
 
 	xcb_flush(pbackend->pcon);
-}
-
-void X11Container::Name1(){
-	if(pParent)
-		return;
-
-	uint desktopNamesLen = 0;
-	for(auto &m : WManager::Container::rootContainers)
-		desktopNamesLen += m->pname?strlen(m->pname)+1:1;
-	char *pdesktopNames = new char[desktopNamesLen];
-	char *p = pdesktopNames;
-	for(auto &m : WManager::Container::rootContainers)
-		if(m->pname){
-			strcpy(p,m->pname);
-			p += strlen(m->pname)+1;
-		}else *p++ = 0;
-	
-	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_DESKTOP_NAMES,XCB_ATOM_STRING,8,desktopNamesLen,pdesktopNames);
-
-	delete []pdesktopNames;
 }
 
 X11Backend::X11Backend() : lastTime(XCB_CURRENT_TIME){
@@ -666,7 +628,6 @@ void Default::Start(){
 		//TODO: _NET_CLIENT_LIST_STACKING
 		ewmh._NET_CURRENT_DESKTOP,
 		ewmh._NET_NUMBER_OF_DESKTOPS,
-		ewmh._NET_DESKTOP_NAMES,
 		ewmh._NET_DESKTOP_VIEWPORT,
 		ewmh._NET_DESKTOP_GEOMETRY,
 		ewmh._NET_ACTIVE_WINDOW
@@ -681,7 +642,6 @@ void Default::Start(){
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
 	values[0] = 1;
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_NAMES,XCB_ATOM_STRING,8,2,"1");
 	values[0] = 0;
 	values[1] = 0;
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
@@ -1413,9 +1373,6 @@ sint Default::HandleEvent(bool forcePoll){
 					printf("urgency!\n");
 				}
 			}else
-			/*if(pev->type == ewmh._NET_CURRENT_DESKTOP){
-				//for root window
-			else*/
 			if(pev->type == ewmh._NET_ACTIVE_WINDOW){
 				SetFocus(pclient1);
 			}else
