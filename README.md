@@ -22,6 +22,7 @@ Window manager:
  - Specify container size restrictions, overlap when necessary
  - Resize and translate individual containers in their place while keeping the surrounding layout
  - Floating containers and automatic dialog, dock, widget etc. handling
+ - Multiple named workspaces
  - Yank and paste containers to move them within the tree hierarchy along with typical move operations
  - Configuration with python, scriptable behaviour with client and container specific callbacks
  - Fully keyboard controllable
