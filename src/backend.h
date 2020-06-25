@@ -232,6 +232,7 @@ protected:
 	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
 	virtual void SetFullscreen(X11Client *, bool) = 0;
 	virtual void SetFocus(X11Client *) = 0;
+	virtual void Enter(X11Client *) = 0;
 	virtual void PropertyChange(X11Client *, PROPERTY_ID, const BackendProperty *) = 0;
 	virtual void DestroyClient(X11Client *) = 0;
 private:

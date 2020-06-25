@@ -163,6 +163,10 @@ class Container(chamfer.Container):
 	def OnFocus(self):
 		return True;
 
+	#called when window is stacked or unstacked
+	def OnStack(self, toggle):
+		pass;
+
 	#called every time a client property has changed (title etc.)
 	def OnPropertyChange(self, propId):
 		try:
