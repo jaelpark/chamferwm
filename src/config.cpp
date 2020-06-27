@@ -86,6 +86,10 @@ bool ContainerInterface::OnFocus(){
 	return true;
 }
 
+void ContainerInterface::OnEnter(){
+	//
+}
+
 void ContainerInterface::OnPropertyChange(PROPERTY_ID id){
 	//
 }
@@ -319,6 +323,20 @@ bool ContainerProxy::OnFocus(){
 	return ContainerInterface::OnFocus();
 }
 
+void ContainerProxy::OnEnter(){
+	boost::python::override ovr = this->get_override("OnEnter");
+	if(ovr){
+		try{
+			ovr();
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else ContainerInterface::OnEnter();
+}
+
 void ContainerProxy::OnPropertyChange(PROPERTY_ID id){
 	boost::python::override ovr = this->get_override("OnPropertyChange");
 	if(ovr){
@@ -330,7 +348,7 @@ void ContainerProxy::OnPropertyChange(PROPERTY_ID id){
 			boost::python::handle_exception();
 			PyErr_Clear();
 		}
-	}else return ContainerInterface::OnPropertyChange(id);
+	}else ContainerInterface::OnPropertyChange(id);
 }
 
 ContainerConfig::ContainerConfig(ContainerInterface *_pcontainerInt, Backend::X11Backend *_pbackend) : pcontainerInt(_pcontainerInt), pbackend(_pbackend){
@@ -723,6 +741,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("OnFullscreen",&ContainerInterface::OnFullscreen)
 		.def("OnStack",&ContainerInterface::OnStack)
 		.def("OnFocus",&ContainerInterface::OnFocus)
+		.def("OnEnter",&ContainerInterface::OnEnter)
 		.def("OnPropertyChange",&ContainerInterface::OnPropertyChange)
 		.def("GetNext",&ContainerInterface::GetNext)
 		.def("GetPrev",&ContainerInterface::GetPrev)

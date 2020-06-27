@@ -1482,9 +1482,11 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_enter_notify_event_t *pev = (xcb_enter_notify_event_t*)pevent;
 			lastTime = pev->time;
 
-			/*X11Client *pclient1 = FindClient(pev->event,MODE_UNDEFINED);
+			X11Client *pclient1 = FindClient(pev->event,MODE_UNDEFINED);
 			if(!pclient1)
-				break;*/
+				break;
+
+			Enter(pclient1);
 
 			DebugPrintf(stdout,"enter %x\n",pev->event);
 			}

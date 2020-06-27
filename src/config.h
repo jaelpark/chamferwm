@@ -27,6 +27,7 @@ public:
 	virtual bool OnFullscreen(bool);
 	virtual void OnStack(bool);
 	virtual bool OnFocus();
+	virtual void OnEnter();
 	virtual void OnPropertyChange(PROPERTY_ID);
 	boost::python::object GetNext() const;
 	boost::python::object GetPrev() const;
@@ -78,6 +79,7 @@ public:
 	bool OnFullscreen(bool);
 	void OnStack(bool);
 	bool OnFocus();
+	void OnEnter();
 	void OnPropertyChange(PROPERTY_ID);
 };
 
