@@ -18,7 +18,7 @@ typedef long long int sint64;
 
 void DebugPrintf(FILE *, const char *, ...);
 
-#define mstrdup(s) strcpy(new char[strlen(s+1)],s)
+#define mstrdup(s) strcpy(new char[strlen(s)+1],s)
 #define mstrndup(s,n) strncpy(new char[n+1],s,n)
 #define mstrfree(s) delete []s
 
