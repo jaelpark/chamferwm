@@ -74,6 +74,7 @@ class Key(Enum):
 	WORKSPACE_2 = auto()
 	WORKSPACE_3 = auto()
 	WORKSPACE_4 = auto()
+	WORKSPACE_NOCOMP = auto()
 
 	KILL = auto()
 	LAUNCH_TERMINAL = auto()
@@ -284,6 +285,7 @@ class Backend(chamfer.Backend):
 			self.BindKey(ord('2'),self.modMask,Key.WORKSPACE_2.value);
 			self.BindKey(ord('3'),self.modMask,Key.WORKSPACE_3.value);
 			self.BindKey(ord('4'),self.modMask,Key.WORKSPACE_4.value);
+			self.BindKey(ord('0'),self.modMask,Key.WORKSPACE_NOCOMP.value);
 			
 			#kill + launching applications
 			self.BindKey(ord('q'),self.modMask|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
@@ -539,6 +541,11 @@ class Backend(chamfer.Backend):
 			wsName = str(keyId-Key.WORKSPACE_1.value+1);
 			root = self.GetRoot(wsName);
 			root.GetFocusDescend = Container.GetFocusDescend.__get__(root); #RootContainer does not have GetFocusDescend, so we will add it now
+			root.GetFocusDescend().Focus();
+
+		elif keyId == Key.WORKSPACE_NOCOMP.value:
+			root = self.GetRoot("nocomp");
+			root.GetFocusDescend = Container.GetFocusDescend.__get__(root);
 			root.GetFocusDescend().Focus();
 
 		elif keyId == Key.EXPAND_HORIZONTAL.value:

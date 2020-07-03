@@ -288,20 +288,29 @@ void X11Container::Focus1(){
 	WManager::Container *pPrevRoot = WManager::Container::ptreeFocus->GetRoot();
 	WManager::Container *proot = GetRoot();
 	if(pPrevRoot != proot){
-		printf("Workspace switched [%p] -> [%p].\n",pPrevRoot,proot);
+		printf("Workspace switched [%s] -> [%s].\n",pPrevRoot->pname,proot->pname);
 		//recursive unmapping
 		X11Backend *pbackend11 = const_cast<X11Backend *>(pbackend);
-		pbackend11->ForEach(pPrevRoot,[](WManager::Client *pclient)->void{
+		pbackend11->ForEach(pPrevRoot,[](WManager::Container *proot1, WManager::Client *pclient)->void{
 			X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
 			xcb_unmap_window(pclient11->pbackend->pcon,pclient11->window);
 
 			pclient11->StopComposition1();
 		});
 		//recursive mapping
-		pbackend11->ForEach(proot,[](WManager::Client *pclient)->void{
+		pbackend11->ForEach(proot,[](WManager::Container *proot1, WManager::Client *pclient)->void{
 			X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
 			xcb_map_window(pclient11->pbackend->pcon,pclient11->window);
 
+			//test if nocomp ws
+			//true: unmap overlay, unredirected = true
+			//false: check if unredirected == true, map the overlay, unredirected = false
+			/*if(strcmp(proot1->pname,"nocomp") == 0){ //todo: flag for nocomp
+				pclient11->Unredirect1();
+				//TODO: Unredirect1() needs to trigger suspend on compositor
+				//unredir
+			}*/
+			//
 			pclient11->StartComposition1();
 		});
 	}
@@ -472,21 +481,21 @@ void X11Backend::StackClients(const WManager::Container *proot){
 	}
 }
 
-void X11Backend::ForEachRecursive(WManager::Container *pcontainer, void (*pf)(WManager::Client *)){
+void X11Backend::ForEachRecursive(WManager::Container *proot, WManager::Container *pcontainer, void (*pf)(WManager::Container *, WManager::Client *)){
 	for(WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient)
-			pf(pcont->pclient);
-		ForEachRecursive(pcont,pf);
+			pf(proot,pcont->pclient);
+		ForEachRecursive(proot,pcont,pf);
 	}
 }
 
-void X11Backend::ForEach(WManager::Container *proot, void (*pf)(WManager::Client *)){
-	ForEachRecursive(proot,pf);
+void X11Backend::ForEach(WManager::Container *proot, void (*pf)(WManager::Container *, WManager::Client *)){
+	ForEachRecursive(proot,proot,pf);
 
 	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix = GetStackAppendix();
 	for(auto &p : *pstackAppendix)
 		if(p.second->pcontainer->GetRoot() == proot)
-			pf(p.second);
+			pf(proot,p.second);
 }
 
 void X11Backend::BindKey(uint symbol, uint mask, uint keyId){

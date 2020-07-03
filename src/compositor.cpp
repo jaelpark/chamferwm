@@ -131,6 +131,10 @@ ClientFrame::~ClientFrame(){
 	pcomp->titleUpdateQueue.erase(std::remove(pcomp->titleUpdateQueue.begin(),pcomp->titleUpdateQueue.end(),this),pcomp->titleUpdateQueue.end());
 }
 
+void ClientFrame::Exclude(bool exclude){
+	//
+}
+
 void ClientFrame::CreateSurface(uint w, uint h, uint depth){
 	pcomp->updateQueue.push_back(this);
 
@@ -223,7 +227,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), unredirected(false), appFullscreen(false), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), hostMemoryImport(pconfig->hostMemoryImport), unredirOnFullscreen(pconfig->unredirOnFullscreen), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration), pfontName(pconfig->pfontName), fontSize(pconfig->fontSize){
+CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), pfsApp(0), pfsAppPrev(0), frameApproval(false), unredirected(false), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), hostMemoryImport(pconfig->hostMemoryImport), unredirOnFullscreen(pconfig->unredirOnFullscreen), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration), pfontName(pconfig->pfontName), fontSize(pconfig->fontSize){
 	//
 }
 
@@ -237,7 +241,6 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkLayerProperties *playerProps = new VkLayerProperties[layerCount];
 	vkEnumerateInstanceLayerProperties(&layerCount,playerProps);
 
-	//const char *players[] = {"VK_LAYER_LUNARG_standard_validation"};
 	const char *players[] = {"VK_LAYER_KHRONOS_validation"};
 	DebugPrintf(stdout,"Enumerating required layers\n");
 	uint layersFound = 0;
@@ -839,7 +842,9 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 	for(const WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
 			ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
-			if(!pclientFrame || !pclientFrame->enabled)
+			if(!pclientFrame || (!pclientFrame->enabled && pclientFrame != pfsApp))
+			//if(!pclientFrame || (!pclientFrame->enabled
+			//	&& (!unredirected && !(pcont->pclient->flags & WManager::Container::FLAG_FULLSCREEN) && !pclientFrame->enabled)))
 				continue;
 			
 			RenderObject renderObject;
@@ -862,6 +867,27 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 }
 
 bool CompositorInterface::PollFrameFence(){
+	if(unredirOnFullscreen){
+		if(pfsApp && !unredirected){
+			printf("************** unredirect\n");
+			pfsApp->Exclude(true);
+
+			pfsAppPrev = pfsApp;
+			Suspend();
+		}else
+		if(!pfsApp && unredirected){
+			printf("************** redirect\n");
+			pfsAppPrev->Exclude(false);
+
+			pfsAppPrev = 0; //needed here?
+			Resume();
+		}
+	}
+
+	frameApproval = false;
+	if(unredirected)
+		return true; //let the program proceed to GenerateCommandBuffers (without frameApproval), where the redirection state will be evaluated
+	
 	for(uint i = 0; i < 3; ++i){
 		if(vkAcquireNextImageKHR(logicalDev,swapChain,std::numeric_limits<uint64_t>::max(),psemaphore[currentFrame][SEMAPHORE_INDEX_IMAGE_AVAILABLE],0,&imageIndex) != VK_SUCCESS){
 			DebugPrintf(stderr,"Failed to acquire a swap chain image. Attempting to recreate (%u/3)...\n",i+1);
@@ -903,6 +929,7 @@ bool CompositorInterface::PollFrameFence(){
 
 	ptextEngine->ReleaseCycle();
 
+	frameApproval = true;
 	return true;
 }
 
@@ -974,7 +1001,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderQueue.push_back(renderObject);
 	}
 
-	appFullscreen = false;
+	pfsApp = 0;
+
 	playingAnimation = false;
 	clock_gettime(CLOCK_MONOTONIC,&frameTime);
 
@@ -1009,23 +1037,15 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 			renderObject.pclient->position = glm::vec2(renderObject.pclient->rect.x,renderObject.pclient->rect.y);
 			
 			if(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)
-				appFullscreen = true;
+				pfsApp = renderObject.pclientFrame;
 		}
 
 		if(renderObject.pclientFrame->shaderFlags != renderObject.pclientFrame->oldShaderFlags)
 			AddDamageRegion(renderObject.pclient);
 	}
 
-	if(unredirOnFullscreen){
-		if(appFullscreen && !unredirected){
-			printf("************** unredirect\n");
-			unredirected = true;
-		}else
-		if(!appFullscreen && unredirected){
-			printf("************** redirect\n");
-			unredirected = false;
-		}
-	}
+	if(unredirected || !frameApproval)
+		return;
 	
 	VkCommandBufferBeginInfo commandBufferBeginInfo = {};
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1038,8 +1058,11 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		pbackground1->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 
 	//TODO: update only visible clients
-	for(ClientFrame *pclientFrame : updateQueue)
+	for(ClientFrame *pclientFrame : updateQueue){
+		//if(pclientFrame == pfsAppPrev)
+		//	continue; //no content yet
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
+	}
 	updateQueue.clear();
 
 	for(ClientFrame *pclientFrame : titleUpdateQueue)
@@ -1184,6 +1207,9 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 }
 
 void CompositorInterface::Present(){
+	if(unredirected || !frameApproval)
+		return;
+	
 	VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 	//VkPipelineStageFlags pipelineStageFlags[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
 	
@@ -1400,7 +1426,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 }
 
 X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(_pshaderName,_pcomp){
-	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
+	//xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
+	Redirect1();
 
 	windowPixmap = xcb_generate_id(pbackend->pcon);
 
@@ -1409,7 +1436,8 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 
 X11ClientFrame::~X11ClientFrame(){
 	StopComposition1();
-	xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
+	Unredirect1();
+	//xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 }
 
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
@@ -1470,6 +1498,16 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	damageRegions.clear();
 }
 
+void X11ClientFrame::Exclude(bool exclude){
+	if(exclude){
+		StopComposition1();
+		Unredirect1();
+	}else{
+		Redirect1();
+		StartComposition1();
+	}
+}
+
 void X11ClientFrame::AdjustSurface1(){
 	if(!enabled)
 		return;
@@ -1506,6 +1544,11 @@ void X11ClientFrame::AdjustSurface1(){
 	}else
 	if(oldRect.x != rect.x || oldRect.y != rect.y)
 		pcomp->AddDamageRegion(this);
+}
+
+void X11ClientFrame::Redirect1(){
+	//
+	xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 }
 
 void X11ClientFrame::StartComposition1(){
@@ -1551,6 +1594,11 @@ void X11ClientFrame::StartComposition1(){
 
 	pcomp->AddDamageRegion(this);
 	enabled = true;
+}
+
+void X11ClientFrame::Unredirect1(){
+	//
+	xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 }
 
 void X11ClientFrame::StopComposition1(){
@@ -1774,6 +1822,22 @@ void X11Compositor::Stop(){
 	xcb_flush(pbackend->pcon);
 }
 
+void X11Compositor::Resume(){
+	if(!unredirected)
+		return;
+	xcb_map_window(pbackend->pcon,overlay);
+	xcb_flush(pbackend->pcon);
+	unredirected = false;
+}
+
+void X11Compositor::Suspend(){
+	if(unredirected)
+		return;
+	xcb_unmap_window(pbackend->pcon,overlay);
+	xcb_flush(pbackend->pcon);
+	unredirected = true;
+}
+
 bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 	if(pevent->pevent->response_type == XCB_DAMAGE_NOTIFY+damageEventOffset){
 		xcb_damage_notify_event_t *pev = (xcb_damage_notify_event_t*)pevent->pevent;
@@ -1927,12 +1991,20 @@ void X11DebugClientFrame::AdjustSurface1(){
 		pcomp->AddDamageRegion(this);
 }
 
+void X11DebugClientFrame::Redirect1(){
+	//
+}
+
 void X11DebugClientFrame::StartComposition1(){
 	if(enabled)
 		return;
 	CreateSurface(rect.w,rect.h,32);
 	pcomp->AddDamageRegion(this);
 	enabled = true;
+}
+
+void X11DebugClientFrame::Unredirect1(){
+	//
 }
 
 void X11DebugClientFrame::StopComposition1(){
@@ -1970,6 +2042,14 @@ void X11DebugCompositor::Stop(){
 	DestroyRenderEngine();
 }
 
+void X11DebugCompositor::Resume(){
+	//
+}
+
+void X11DebugCompositor::Suspend(){
+	//
+}
+
 NullCompositor::NullCompositor() : CompositorInterface(&config){
 	//
 }
@@ -1986,6 +2066,13 @@ void NullCompositor::Stop(){
 	//
 }
 
+void NullCompositor::Resume(){
+	//
+}
+
+void NullCompositor::Suspend(){
+	//
+}
 bool NullCompositor::CheckPresentQueueCompatibility(VkPhysicalDevice physicalDev, uint queueFamilyIndex) const{
 	return true;
 }

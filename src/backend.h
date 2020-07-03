@@ -113,7 +113,9 @@ public:
 	X11Client(WManager::Container *, const CreateInfo *);
 	~X11Client();
 	virtual void AdjustSurface1(){};
+	virtual void Redirect1(){};
 	virtual void StartComposition1(){};
+	virtual void Unredirect1(){};
 	virtual void StopComposition1(){};
 	virtual void SetTitle1(const char *){};
 	//virtual void SetFullscreen1(bool){};
@@ -158,8 +160,8 @@ public:
 	void StackRecursiveAppendix(const WManager::Client *);
 	void StackRecursive(const WManager::Container *);
 	void StackClients(const WManager::Container *);
-	void ForEachRecursive(WManager::Container *, void (*)(WManager::Client *));
-	void ForEach(WManager::Container *, void (*)(WManager::Client *));
+	void ForEachRecursive(WManager::Container *, WManager::Container *, void (*)(WManager::Container *, WManager::Client *));
+	void ForEach(WManager::Container *, void (*)(WManager::Container *, WManager::Client *));
 	void BindKey(uint, uint, uint);
 	void MapKey(uint, uint, uint);
 	void GrabKeyboard(bool);

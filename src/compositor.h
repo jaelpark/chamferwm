@@ -62,6 +62,7 @@ public:
 	ClientFrame(const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
+	virtual void Exclude(bool);
 	void CreateSurface(uint, uint, uint);
 	void AdjustSurface(uint, uint);
 	void DestroySurface();
@@ -117,8 +118,10 @@ public:
 	};
 	CompositorInterface(const Configuration *);
 	virtual ~CompositorInterface();
-	virtual void Start() = 0;
-	virtual void Stop() = 0;
+	virtual void Start() = 0; //initialize and start for the first time
+	virtual void Stop() = 0; //stop and cleanup
+	virtual void Resume() = 0; //resume after suspension
+	virtual void Suspend() = 0; //suspend (unredirection, for example)
 protected:
 	void InitializeRenderEngine();
 	void InitializeSwapchain();
@@ -244,8 +247,10 @@ protected:
 	};
 	std::vector<DescSetCacheEntry> descSetCache;
 
+	ClientFrame *pfsApp; //fullscreen state app for the current frame (for unredirection)
+	ClientFrame *pfsAppPrev; //fullscreen state app during previous frame (for unredirection)
+	bool frameApproval;
 	bool unredirected;
-	bool appFullscreen; //at least one app is in fullscreen mode
 	bool playingAnimation;
 
 	//config
@@ -268,8 +273,11 @@ public:
 	X11ClientFrame(WManager::Container *, const Backend::X11Client::CreateInfo *, const char *[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *);
 	~X11ClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
+	void Exclude(bool);
 	void AdjustSurface1();
+	void Redirect1();
 	void StartComposition1();
+	void Unredirect1();
 	void StopComposition1();
 	void SetTitle1(const char *);
 	xcb_pixmap_t windowPixmap;
@@ -303,6 +311,8 @@ public:
 	~X11Compositor();
 	virtual void Start();
 	virtual void Stop();
+	virtual void Resume();
+	virtual void Suspend();
 	bool FilterEvent(const Backend::X11Event *);
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
@@ -328,7 +338,9 @@ public:
 	~X11DebugClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	void AdjustSurface1();
+	void Redirect1();
 	void StartComposition1();
+	void Unredirect1();
 	void StopComposition1();
 	void SetTitle1(const char *);
 };
@@ -339,6 +351,8 @@ public:
 	~X11DebugCompositor();
 	void Start();
 	void Stop();
+	void Resume();
+	void Suspend();
 };
 
 class NullCompositor : public CompositorInterface{
@@ -347,6 +361,8 @@ public:
 	~NullCompositor();
 	void Start();
 	void Stop();
+	void Resume();
+	void Suspend();
 	bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const;
 	void CreateSurfaceKHR(VkSurfaceKHR *) const;
 	VkExtent2D GetExtent() const;
