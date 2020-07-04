@@ -91,8 +91,9 @@ public:
 	void Stack();
 	void SetLayout(LAYOUT);
 
-	virtual void Focus1(){}// = 0;
-	virtual void Stack1(){}// = 0;
+	virtual void Focus1(){}
+	virtual void Place1(WManager::Container *){}
+	virtual void Stack1(){}
 	virtual void Fullscreen1(){}
 
 	Container *pParent;

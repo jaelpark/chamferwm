@@ -327,6 +327,26 @@ void X11Container::Focus1(){
 	xcb_flush(pbackend->pcon);
 }
 
+void X11Container::Place1(WManager::Container *pOrigParent){
+	WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
+	if(pOrigParent->GetRoot() != proot){
+		if(GetRoot() == proot){
+			X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
+			xcb_map_window(pclient11->pbackend->pcon,pclient11->window);
+
+			pclient11->StartComposition1();
+
+		}
+	}else{
+		if(GetRoot() != proot){
+			X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
+			xcb_unmap_window(pclient11->pbackend->pcon,pclient11->window);
+
+			pclient11->StopComposition1();
+		}
+	}
+}
+
 void X11Container::Stack1(){
 	const_cast<X11Backend *>(pbackend)->StackClients(GetRoot());
 }

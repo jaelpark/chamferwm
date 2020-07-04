@@ -137,6 +137,7 @@ public:
 	X11Container(WManager::Container *, const WManager::Container::Setup &, class X11Backend *);
 	virtual ~X11Container();
 	void Focus1();
+	void Place1(WManager::Container *);
 	void Stack1();
 	void Fullscreen1();
 	const X11Backend *pbackend;

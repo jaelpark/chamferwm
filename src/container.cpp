@@ -127,6 +127,7 @@ void Container::Place(Container *pParent1){
 	//TODO: reparent the floating container
 	if(flags & FLAG_FLOATING)
 		return;
+	WManager::Container *pOrigParent = pParent;
 	pParent = pParent1;
 	if(pParent->focusQueue.size() > 0){
 		//place next to the focused container
@@ -151,6 +152,8 @@ void Container::Place(Container *pParent1){
 	
 	GetRoot()->Stack();
 	pParent->Translate();
+
+	Place1(pOrigParent);
 }
 
 Container * Container::Remove(){
