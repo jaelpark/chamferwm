@@ -225,7 +225,8 @@ public:
 		WManager::Container *pNewParent = premoved->pParent;
 
 		WManager::Container *pcollapsed = 0;
-		if(pNewParent != proot)
+		//if(pNewParent != proot)
+		if(pNewParent->pParent) //new parent might also be a root
 			pcollapsed = pNewParent->Collapse();
 		if(!pcollapsed && pNewParent->pch)
 			pcollapsed = pNewParent->pch->Collapse();
@@ -236,7 +237,8 @@ public:
 		}
 
 		pcollapsed = 0;
-		if(pOrigParent != proot)
+		//if(pOrigParent != proot)
+		if(pOrigParent->pParent)
 			pcollapsed = pOrigParent->Collapse();
 		if(!pcollapsed && pOrigParent->pch)
 			pcollapsed = pOrigParent->pch->Collapse();
