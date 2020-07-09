@@ -1058,11 +1058,8 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		pbackground1->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 
 	//TODO: update only visible clients
-	for(ClientFrame *pclientFrame : updateQueue){
-		//if(pclientFrame == pfsAppPrev)
-		//	continue; //no content yet
+	for(ClientFrame *pclientFrame : updateQueue)
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
-	}
 	updateQueue.clear();
 
 	for(ClientFrame *pclientFrame : titleUpdateQueue)
@@ -1441,6 +1438,11 @@ X11ClientFrame::~X11ClientFrame(){
 }
 
 void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
+	//
+	damageRegions.erase(std::remove_if(damageRegions.begin(),damageRegions.end(),[&](const VkRect2D &rect1)->bool{
+		return rect.w < rect1.offset.x+rect1.extent.width || rect.h < rect1.offset.y+rect1.extent.height;
+	}),damageRegions.end());
+
 	if(!fullRegionUpdate && damageRegions.size() == 0)
 		return;
 
