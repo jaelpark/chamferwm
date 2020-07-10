@@ -575,12 +575,14 @@ const char *X11Backend::pcursorStrs[CURSOR_COUNT] = {
 	"left_ptr"
 };
 
-Default::Default() : X11Backend(), pdragClient(0){
+Default::Default(bool _standaloneComp) : X11Backend(), pdragClient(0), standaloneComp(_standaloneComp){
 	//
 	clock_gettime(CLOCK_MONOTONIC,&eventTimer);
 	pollTimer.tv_sec = 0;
 	pollTimer.tv_nsec = 0;
 	//polling = false;
+
+	printf("------standalone comp: %u\n",standaloneComp);
 }
 
 Default::~Default(){

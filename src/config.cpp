@@ -446,7 +446,7 @@ WorkspaceProxy::~WorkspaceProxy(){
 	//
 }*/
 
-BackendInterface::BackendInterface() : pbackend(0){
+BackendInterface::BackendInterface() : standaloneComp(Loader::standaloneComp), pbackend(0){
 	//
 }
 
@@ -1067,6 +1067,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("BindKey",&BackendInterface::BindKey)
 		.def("MapKey",&BackendInterface::MapKey)
 		.def("GrabKeyboard",&BackendInterface::GrabKeyboard)
+		.def_readwrite("standaloneCompositor",&BackendInterface::standaloneComp)
 		;
 	boost::python::def("BindBackend",BackendInterface::Bind);
 
@@ -1168,6 +1169,8 @@ void Loader::Run(const char *pfilePath, const char *pfileLabel){
 	}
 	fclose(pf);
 }
+
+bool Loader::standaloneComp;
 
 sint Loader::deviceIndex;
 bool Loader::debugLayers;

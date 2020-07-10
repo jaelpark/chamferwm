@@ -220,7 +220,7 @@ protected:
 
 class Default : public X11Backend{
 public:
-	Default();
+	Default(bool);
 	virtual ~Default();
 	void Start();
 	void Stop();
@@ -249,6 +249,7 @@ private:
 	std::vector<xcb_window_t> netClientList; //used only to update the property - not maintained
 	X11Client *pdragClient;
 	sint dragRootX, dragRootY;
+	bool standaloneComp;
 };
 
 class DebugClient : public WManager::Client{
