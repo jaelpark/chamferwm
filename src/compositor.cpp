@@ -856,7 +856,7 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 				|renderObject.pclientFrame->shaderUserFlags;
 			renderQueue.push_back(renderObject);
 		}
-		CreateRenderQueue(pcont,pfocus);
+		CreateRenderQueue(pcont,pcontainer == pfocus?pcont:pfocus);
 	}
 
 	if(!pcontainer->pclient)
