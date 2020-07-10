@@ -843,8 +843,6 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 		if(pcont->pclient){
 			ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
 			if(!pclientFrame || (!pclientFrame->enabled && pclientFrame != pfsApp))
-			//if(!pclientFrame || (!pclientFrame->enabled
-			//	&& (!unredirected && !(pcont->pclient->flags & WManager::Container::FLAG_FULLSCREEN) && !pclientFrame->enabled)))
 				continue;
 			
 			RenderObject renderObject;
@@ -869,17 +867,17 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 bool CompositorInterface::PollFrameFence(){
 	if(unredirOnFullscreen){
 		if(pfsApp && !unredirected){
-			printf("************** unredirect\n");
+			DebugPrintf(stdout,"unredirect %p\n",pfsApp);
 			pfsApp->Exclude(true);
-
 			pfsAppPrev = pfsApp;
 			Suspend();
 		}else
 		if(!pfsApp && unredirected){
-			printf("************** redirect\n");
-			pfsAppPrev->Exclude(false);
-
-			pfsAppPrev = 0; //needed here?
+			DebugPrintf(stdout,"redirect %p\n",pfsAppPrev);
+			if(pfsAppPrev){ //may have been closed before leaving fullscreen
+				pfsAppPrev->Exclude(false);
+				pfsAppPrev = 0;
+			}
 			Resume();
 		}
 	}
@@ -1434,6 +1432,9 @@ X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X
 X11ClientFrame::~X11ClientFrame(){
 	StopComposition1();
 	Unredirect1();
+
+	if(this == pcomp->pfsAppPrev)
+		pcomp->pfsAppPrev = 0;
 	//xcb_composite_unredirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 }
 

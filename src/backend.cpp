@@ -11,7 +11,6 @@
 #include <xcb/xcb_icccm.h>
 #include <xcb/xcb_util.h>
 
-//#include <X11/X.h>
 typedef xcb_atom_t Atom;
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
@@ -126,6 +125,12 @@ X11Event::~X11Event(){
 X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend), flags(0){
 	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_PROPERTY_CHANGE|XCB_EVENT_MASK_FOCUS_CHANGE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
+
+	const xcb_atom_t allowedActions[] = {
+		pbackend->ewmh._NET_WM_ACTION_CLOSE,
+		pbackend->ewmh._NET_WM_ACTION_FULLSCREEN
+	};
+	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,window,pbackend->ewmh._NET_WM_ALLOWED_ACTIONS,XCB_ATOM_ATOM,32,sizeof(allowedActions)/sizeof(allowedActions[0]),allowedActions);
 
 	if(pcreateInfo->mode == CreateInfo::CREATE_CONTAINED && !(pcontainer->flags & WManager::Container::FLAG_FLOATING)){
 		UpdateTranslation();
@@ -319,6 +324,10 @@ void X11Container::Focus1(){
 		X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
 		pfocusWindow = &pclient11->window;
 
+		//TODO: how to handle Container::FLAG_NO_FOCUS?
+		//if(ProtocolSupport(pbackend->atoms[X11Backend::ATOM_WM_TAKE_FOCUS]))
+			//send take focus
+
 	}else pfocusWindow = &pbackend->ewmh_window;
 
 	xcb_set_input_focus(pbackend->pcon,XCB_INPUT_FOCUS_POINTER_ROOT,*pfocusWindow,pbackend->lastTime);
@@ -456,7 +465,6 @@ void X11Backend::StackRecursive(const WManager::Container *pcontainer){
 void X11Backend::StackClients(const WManager::Container *proot){
 	SortStackAppendix();
 
-	//const WManager::Container *proot = GetRoot();
 	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix = GetStackAppendix();
 
 	appendixQueue.clear();
@@ -560,7 +568,7 @@ void X11Backend::GrabKeyboard(bool enable){
 
 const char *X11Backend::patomStrs[ATOM_COUNT] = {
 	//"CHAMFER_ALARM",
-	"WM_PROTOCOLS","WM_DELETE_WINDOW","ESETROOT_PMAP_ID","_X_ROOTPMAP_ID"
+	"WM_PROTOCOLS","WM_DELETE_WINDOW","WM_TAKE_FOCUS","ESETROOT_PMAP_ID","_X_ROOTPMAP_ID"
 };
 
 const char *X11Backend::pcursorStrs[CURSOR_COUNT] = {
@@ -1154,8 +1162,6 @@ sint Default::HandleEvent(bool forcePoll){
 			if(pclient1){
 				//TODO: check if transient_for is in different root this time
 				pclient1->flags &= ~X11Client::FLAG_UNMAPPING;
-				/*if(pclient1->pcontainer->GetRoot() == WManager::Container::ptreeFocus->GetRoot())
-					pclient1->StartComposition1();*/
 				break;
 			}
 
@@ -1273,7 +1279,6 @@ sint Default::HandleEvent(bool forcePoll){
 
 			(*m).first->flags |= X11Client::FLAG_UNMAPPING;
 
-			//how to tell if window gets actually removed? handle destroy notify?
 			if((*m).first->pcontainer->GetRoot() != WManager::Container::ptreeFocus->GetRoot())
 				break;
 			
@@ -1458,8 +1463,6 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_button_press_event_t *pev = (xcb_button_press_event_t*)pevent;
 			//
 			X11Client *pclient11 = FindClient(pev->event,MODE_UNDEFINED);
-			/*if(!pclient11 || !(pclient11->pcontainer->flags & WManager::Container::FLAG_FLOATING))
-				break;*/
 			if(!pclient11 || pclient11->flags & X11Client::FLAG_UNMAPPING)
 				break;
 
