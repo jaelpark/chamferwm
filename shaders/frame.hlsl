@@ -55,7 +55,7 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 
 #include "chamfer.hlsl"
 
-#define STOCK_FRAME_STYLE 1 //select between two stock styles (1: chamfered edges, other: basic rectangle borders)
+#define STOCK_FRAME_STYLE 0 //select between two stock styles (1: chamfered edges, other: basic rectangle borders)
 
 const float borderScaling = 1.0f;
 const float4 borderColor = float4(0.0f,0.0f,0.0f,1.0f);
@@ -136,6 +136,7 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 		return borderColor;
 	}
 #endif //STOCK_FRAME_STYLE
+
 	float2 a_content = screen*(0.5f*xy0+0.5f); //top-left corner in pixels, content area
 	float2 b_content = screen*(0.5f*xy1+0.5f); //bottom-right corner in pixels, content areaa
 	if(any(posh.xy < a_content) || any(posh.xy > b_content)){ //title region

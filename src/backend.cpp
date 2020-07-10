@@ -581,8 +581,6 @@ Default::Default(bool _standaloneComp) : X11Backend(), pdragClient(0), standalon
 	pollTimer.tv_sec = 0;
 	pollTimer.tv_nsec = 0;
 	//polling = false;
-
-	printf("------standalone comp: %u\n",standaloneComp);
 }
 
 Default::~Default(){
@@ -617,11 +615,12 @@ void Default::Start(){
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	
-	DefineBindings();
+	if(!standaloneComp)
+		DefineBindings();
 
 	xcb_flush(pcon);
 
-	uint values[2] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
+	uint values[2] = {(!standaloneComp?XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT:0)
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_EXPOSURE
@@ -1510,6 +1509,7 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_FOCUS_IN:{
 			xcb_focus_in_event_t *pev = (xcb_focus_in_event_t*)pevent;
 			printf("XCB_FOCUS_IN: *** focus %x\n",pev->event);
+			//TODO: standaloneComp: set focus. All clients share the same container
 			}
 			break;
 		case XCB_ENTER_NOTIFY:{
