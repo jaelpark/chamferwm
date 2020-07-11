@@ -605,12 +605,8 @@ void Default::Start(){
 	DebugPrintf(stdout,"Screen size: %ux%u (DPI: %fx%f)\n",pscr->width_in_pixels,pscr->height_in_pixels,25.4f*(float)pscr->width_in_pixels/(float)pscr->width_in_millimeters,0.0f);
 	//https://standards.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
 
-	//xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
 	psymbols = xcb_key_symbols_alloc(pcon);
 
-	//testKeycode = SymbolToKeycode(XK_X,psymbols);
-	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,testKeycode,
-	//	XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	exitKeycode = SymbolToKeycode(XK_E,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
@@ -660,46 +656,70 @@ void Default::Start(){
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,ewmh_window,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
 
 	//https://specifications.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
-	const xcb_atom_t supportedAtoms[] = {
-		ewmh._NET_WM_NAME,
-		ewmh._NET_CLIENT_LIST,
-		//TODO: _NET_CLIENT_LIST_STACKING
-		ewmh._NET_CURRENT_DESKTOP,
-		ewmh._NET_NUMBER_OF_DESKTOPS,
-		ewmh._NET_DESKTOP_VIEWPORT,
-		ewmh._NET_DESKTOP_GEOMETRY,
-		ewmh._NET_ACTIVE_WINDOW
-	};
+	if(standaloneComp){
+		//send an internal map notification to let the compositor know about the existing windows
+		xcb_query_tree_cookie_t queryTreeCookie = xcb_query_tree(pcon,pscr->root);
+		xcb_query_tree_reply_t *pqueryTreeReply = xcb_query_tree_reply(pcon,queryTreeCookie,0);
+		xcb_window_t *pchs = xcb_query_tree_children(pqueryTreeReply);
+		for(uint i = 0, n = xcb_query_tree_children_length(pqueryTreeReply); i < n; ++i){
+			char buffer[32];
 
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTED,XCB_ATOM_ATOM,32,sizeof(supportedAtoms)/sizeof(supportedAtoms[0]),supportedAtoms);
+			xcb_map_notify_event_t *pev = (xcb_map_notify_event_t*)buffer;
+			pev->event = pchs[i];
+			pev->window = pchs[i];
+			pev->response_type = XCB_MAP_NOTIFY;
+			pev->override_redirect = true;
 
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,0,0);
-	values[0] = 0;
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
-	values[0] = 1;
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
-	values[0] = 0;
-	values[1] = 0;
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
-	values[0] = pscr->width_in_pixels;
-	values[1] = pscr->height_in_pixels;
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_ACTIVE_WINDOW,XCB_ATOM_WINDOW,32,1,&ewmh_window);
+			xcb_send_event(pcon,false,ewmh_window,XCB_EVENT_MASK_NO_EVENT,buffer);
+		}
+		free(pqueryTreeReply);
 
-	xcb_map_window(pcon,ewmh_window);
+		xcb_flush(pcon);
 
+	}else{
+
+		const xcb_atom_t supportedAtoms[] = {
+			ewmh._NET_WM_NAME,
+			ewmh._NET_CLIENT_LIST,
+			//TODO: _NET_CLIENT_LIST_STACKING
+			ewmh._NET_CURRENT_DESKTOP,
+			ewmh._NET_NUMBER_OF_DESKTOPS,
+			ewmh._NET_DESKTOP_VIEWPORT,
+			ewmh._NET_DESKTOP_GEOMETRY,
+			ewmh._NET_ACTIVE_WINDOW
+		};
+
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTED,XCB_ATOM_ATOM,32,sizeof(supportedAtoms)/sizeof(supportedAtoms[0]),supportedAtoms);
+
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,0,0);
+		values[0] = 0;
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
+		values[0] = 1;
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
+		values[0] = 0;
+		values[1] = 0;
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
+		values[0] = pscr->width_in_pixels;
+		values[1] = pscr->height_in_pixels;
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_ACTIVE_WINDOW,XCB_ATOM_WINDOW,32,1,&ewmh_window);
+	
+		pcursorctx = 0;
+		if(xcb_cursor_context_new(pcon,pscr,&pcursorctx) >= 0){
+			for(uint i = 0; i < CURSOR_COUNT; ++i)
+				cursors[i] = xcb_cursor_load_cursor(pcursorctx,pcursorStrs[i]);
+		
+			xcb_change_window_attributes(pcon,pscr->root,XCB_CW_CURSOR,&cursors[CURSOR_POINTER]);
+		}
+	}
+	
 	values[0] = XCB_STACK_MODE_BELOW;
 	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 
-	pcursorctx = 0;
-	if(xcb_cursor_context_new(pcon,pscr,&pcursorctx) >= 0){
-		for(uint i = 0; i < CURSOR_COUNT; ++i)
-			cursors[i] = xcb_cursor_load_cursor(pcursorctx,pcursorStrs[i]);
-	
-		xcb_change_window_attributes(pcon,pscr->root,XCB_CW_CURSOR,&cursors[CURSOR_POINTER]);
-	}
+	xcb_map_window(pcon,ewmh_window);
+
 }
 
 void Default::Stop(){
