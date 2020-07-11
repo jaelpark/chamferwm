@@ -802,6 +802,8 @@ sint Default::HandleEvent(bool forcePoll){
 		switch(pevent->response_type & 0x7f){
 		case XCB_CREATE_NOTIFY:{
 			xcb_create_notify_event_t *pev = (xcb_create_notify_event_t*)pevent;
+			if(pev->override_redirect)
+				break;
 
 			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			
@@ -1142,8 +1144,8 @@ sint Default::HandleEvent(bool forcePoll){
 				netClientList.push_back(p.first->window);
 			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
 
-			xcb_grab_button(pcon,0,pev->window,XCB_EVENT_MASK_BUTTON_PRESS,//|XCB_EVENT_MASK_BUTTON_RELEASE,
-				XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,1,XCB_MOD_MASK_1);
+			if(!standaloneComp)
+				xcb_grab_button(pcon,0,pev->window,XCB_EVENT_MASK_BUTTON_PRESS,XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,1,XCB_MOD_MASK_1);
 	
 			//check fullscreen
 		
@@ -1152,6 +1154,8 @@ sint Default::HandleEvent(bool forcePoll){
 			break;
 		case XCB_CONFIGURE_NOTIFY:{
 			xcb_configure_notify_event_t *pev = (xcb_configure_notify_event_t*)pevent;
+			if(pev->override_redirect)
+				break;
 
 			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			
@@ -1173,7 +1177,7 @@ sint Default::HandleEvent(bool forcePoll){
 			break;
 		case XCB_MAP_NOTIFY:{
 			xcb_map_notify_event_t *pev = (xcb_map_notify_event_t*)pevent;
-			if(pev->window == ewmh_window)
+			if(pev->override_redirect || pev->window == ewmh_window)
 				break;
 
 			result = 1;
@@ -1552,24 +1556,6 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_DESTROY_NOTIFY:{
 			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
 			DebugPrintf(stdout,"destroy notify, %x\n",pev->window);
-
-			/*auto m = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
-				return p.first->window == pev->window;
-			});
-			if(m == clients.end())
-				break;
-
-			unmappingQueue.push_back((*m).first);
-
-			std::iter_swap(m,clients.end()-1);
-			clients.pop_back();
-
-			result = 1;*/
-
-			/*configCache.erase(std::remove_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return p.first == pev->window;
-			}));*/
-			//
 			}
 			break;
 		case 0:
