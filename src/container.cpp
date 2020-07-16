@@ -249,6 +249,10 @@ Container * Container::Collapse(){
 void Container::Focus(){
 	if(flags & FLAG_NO_FOCUS)
 		return;
+	
+	Focus1();
+	ptreeFocus = this;
+
 	if(flags & FLAG_FLOATING){
 		floatFocusQueue.erase(std::remove(floatFocusQueue.begin(),floatFocusQueue.end(),this),floatFocusQueue.end());
 		floatFocusQueue.push_back(this);
@@ -274,8 +278,6 @@ void Container::Focus(){
 		GetRoot()->Stack();
 	}
 
-	Focus1();
-	ptreeFocus = this;
 }
 
 void Container::SetFullscreen(bool toggle){

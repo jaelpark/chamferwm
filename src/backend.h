@@ -158,8 +158,8 @@ public:
 	virtual ~X11Backend();
 	bool QueryExtension(const char *, sint *, sint *) const;
 	xcb_atom_t GetAtom(const char *) const;
-	void StackRecursiveAppendix(const WManager::Client *);
-	void StackRecursive(const WManager::Container *);
+	void StackRecursiveAppendix(const WManager::Client *, const WManager::Container *);
+	void StackRecursive(const WManager::Container *, const WManager::Container *);
 	void StackClients(const WManager::Container *);
 	void ForEachRecursive(WManager::Container *, WManager::Container *, void (*)(WManager::Container *, WManager::Client *));
 	void ForEach(WManager::Container *, void (*)(WManager::Container *, WManager::Client *));
@@ -194,7 +194,11 @@ protected:
 	xcb_ewmh_connection_t ewmh;
 	xcb_window_t ewmh_window;
 	
-	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue;
+public:
+	typedef std::tuple<WManager::Client *, bool> ClientStackElement;
+	std::deque<ClientStackElement> clientStack;
+protected:
+	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue; //no need to store, rather keep it here to avoid repeated construction
 
 	enum ATOM{
 		//ATOM_CHAMFER_ALARM,
@@ -224,7 +228,6 @@ public:
 	virtual ~Default();
 	void Start();
 	void Stop();
-	//void SetupEnvironment();
 	sint HandleEvent(bool);
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
@@ -283,7 +286,6 @@ public:
 	virtual ~Debug();
 	void Start();
 	void Stop();
-	//void SetupEnvironment();
 	sint HandleEvent(bool);
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:

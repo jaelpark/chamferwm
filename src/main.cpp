@@ -722,8 +722,7 @@ public:
 		if(!PollFrameFence())
 			return;
 
-		WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
-		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
+		GenerateCommandBuffers(&pbackend->clientStack);
 		Compositor::X11Compositor::Present();
 	}
 
@@ -776,8 +775,7 @@ public:
 		if(!PollFrameFence())
 			return;
 		
-		WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
-		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
+		GenerateCommandBuffers(&pbackend->clientStack);
 		Compositor::X11DebugCompositor::Present();
 	}
 
