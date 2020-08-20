@@ -230,6 +230,15 @@ public:
 			pcollapsed = pNewParent->Collapse();
 		if(!pcollapsed && pNewParent->pch)
 			pcollapsed = pNewParent->pch->Collapse();
+
+		if(WManager::Container::ptreeFocus == pcollapsed){
+			WManager::Container *pNewFocus = proot;
+			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
+			Config::X11ContainerConfig *pNewFocus1 = dynamic_cast<Config::X11ContainerConfig *>(pNewFocus);
+			if(pNewFocus1->pcontainerInt->OnFocus())
+				pNewFocus1->Focus();
+		}
+
 		if(pcollapsed){
 			if(pcollapsed->pch)
 				ReleaseContainersRecursive(pcollapsed->pch);
@@ -514,7 +523,7 @@ public:
 		if(!pcollapsed && pOrigParent->pch)
 			pcollapsed = pOrigParent->pch->Collapse();
 
-		if(WManager::Container::ptreeFocus == pclient->pcontainer){
+		if(WManager::Container::ptreeFocus == pclient->pcontainer || WManager::Container::ptreeFocus == pcollapsed){
 			WManager::Container *pNewFocus = proot;
 			//for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():pcontainer->pch);
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
@@ -637,7 +646,7 @@ public:
 		if(!pcollapsed && premoved->pParent->pch) //check if pch is alive, in this case this wasn't the last container
 			pcollapsed = premoved->pParent->pch->Collapse();
 
-		if(WManager::Container::ptreeFocus == pclient->pcontainer){
+		if(WManager::Container::ptreeFocus == pclient->pcontainer || WManager::Container::ptreeFocus == pcollapsed){
 			WManager::Container *pNewFocus = proot;
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
 			Config::DebugContainerConfig *pNewFocus1 = dynamic_cast<Config::DebugContainerConfig *>(pNewFocus);
