@@ -835,7 +835,7 @@ int main(sint argc, const char **pargv){
 
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
 	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
-	args::Flag expFeatures(group_comp,"expFeatures","Enable experimental features: host pointer import",{"experimental",'e'},false);
+	args::Flag expFeatures(group_comp,"expFeatures","Enable experimental features",{"experimental",'e'},false);
 	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
@@ -875,9 +875,8 @@ int main(sint argc, const char **pargv){
 	if(unredirOnFullscreenOpt.Get())
 		Config::CompositorInterface::pcompositorInt->unredirOnFullscreen = true;
 	
-	if(!expFeatures.Get())
-		Config::CompositorInterface::pcompositorInt->hostMemoryImport = false;
-	else DebugPrintf(stdout,"Experimental compositor features enabled.\n");
+	if(expFeatures.Get())
+		DebugPrintf(stdout,"Experimental compositor features enabled.\n");
 
 	RunBackend *pbackend;
 	try{

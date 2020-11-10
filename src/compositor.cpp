@@ -1464,6 +1464,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		for(VkRect2D &rect1 : damageRegions){
 			xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
 
+			//wait for the buffers to get updated before copying them
 			xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
 			xcb_flush(pbackend->pcon);
 			free(pimageReply);
@@ -1484,6 +1485,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	}else{
 		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,rect.w,rect.h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0); //need to get whole image
 
+		//wait for the buffers to get updated before copying them
 		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
 		xcb_flush(pbackend->pcon);
 		free(pimageReply);
