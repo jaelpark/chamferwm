@@ -168,10 +168,12 @@ void X11Client::UpdateTranslation(){
 	glm::vec2 titlePadExtent = glm::max(titlePad,glm::vec2(0.0f));
 
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)){
-		auto m = std::find(pcontainer->pParent->stackQueue.begin(),pcontainer->pParent->stackQueue.end(),pcontainer);
+		stackIndex = 0;
+		for(WManager::Container *pcontainer1 = pcontainer->pParent->pch; pcontainer1; ++stackIndex, pcontainer1 = pcontainer1->pnext)
+			if(pcontainer1 == pcontainer)
+				break;
 		
 		if(pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
-			stackIndex = m-pcontainer->pParent->stackQueue.begin();
 			float stackOffset = 1.0f/(float)std::max((unsigned long)pcontainer->pParent->stackQueue.size(),1lu);
 			pcontainer->titleSpan = glm::vec2((float)stackIndex*stackOffset,((float)stackIndex+1.0f)*stackOffset);
 
