@@ -26,6 +26,7 @@ public:
 	glm::vec2 titlePad1; //title pad in pixels
 	glm::vec2 titleStackOffset;
 	glm::vec2 titleFrameExtent;
+	uint stackIndex;
 	struct timespec translationTime;
 	class Container *pcontainer;
 };

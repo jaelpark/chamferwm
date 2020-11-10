@@ -171,7 +171,7 @@ void X11Client::UpdateTranslation(){
 		auto m = std::find(pcontainer->pParent->stackQueue.begin(),pcontainer->pParent->stackQueue.end(),pcontainer);
 		
 		if(pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
-			uint stackIndex = m-pcontainer->pParent->stackQueue.begin();
+			stackIndex = m-pcontainer->pParent->stackQueue.begin();
 			float stackOffset = 1.0f/(float)std::max((unsigned long)pcontainer->pParent->stackQueue.size(),1lu);
 			pcontainer->titleSpan = glm::vec2((float)stackIndex*stackOffset,((float)stackIndex+1.0f)*stackOffset);
 
@@ -1620,7 +1620,7 @@ void DebugClient::UpdateTranslation(){
 		auto m = std::find(pcontainer->pParent->stackQueue.begin(),pcontainer->pParent->stackQueue.end(),pcontainer);
 		glm::vec2 titleFrameExtent;
 		if(pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
-			uint stackIndex = m-pcontainer->pParent->stackQueue.begin();
+			stackIndex = m-pcontainer->pParent->stackQueue.begin();
 			titleFrameExtent = glm::vec2(coord.z,coord.w)
 				/(float)std::max((unsigned long)pcontainer->pParent->stackQueue.size(),1lu);
 			titleStackOffset = (float)stackIndex*titleFrameExtent;

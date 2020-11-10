@@ -94,7 +94,7 @@ ColorFrame::~ColorFrame(){
 	//
 }
 
-void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm::vec2 &titlePad, const glm::vec2 &titleSpan, uint flags, const VkCommandBuffer *pcommandBuffer){
+void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm::vec2 &titlePad, const glm::vec2 &titleSpan, uint stackIndex, uint flags, const VkCommandBuffer *pcommandBuffer){
 	time = timespec_diff(pcomp->frameTime,creationTime);
 
 	glm::vec2 imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
@@ -110,6 +110,7 @@ void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm:
 		{ShaderModule::VARIABLE_MARGIN,&margin},
 		{ShaderModule::VARIABLE_TITLEPAD,&titlePad},
 		{ShaderModule::VARIABLE_TITLESPAN,&titleSpan},
+		{ShaderModule::VARIABLE_STACKINDEX,&stackIndex},
 		{ShaderModule::VARIABLE_FLAGS,&flags},
 		{ShaderModule::VARIABLE_TIME,&time}
 	};
@@ -1115,7 +1116,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		VkRect2D screenRect;
 		screenRect.offset = {0,0};
 		screenRect.extent = imageExtent;
-		pbackground->Draw(screenRect,glm::vec2(0.0f),glm::vec2(0.0f),glm::vec2(0.0f),0,&pcommandBuffers[currentFrame]);
+		pbackground->Draw(screenRect,glm::vec2(0.0f),glm::vec2(0.0f),glm::vec2(0.0f),0,0,&pcommandBuffers[currentFrame]);
 	}
 	
 	//TODO: stencil buffer optimization
@@ -1155,7 +1156,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
-		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclient->pcontainer->titlePad,renderObject.pclient->pcontainer->titleSpan,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
+		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclient->pcontainer->titlePad,renderObject.pclient->pcontainer->titleSpan,renderObject.pclient->stackIndex,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 
 		if(renderObject.pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && !(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) && renderObject.pclientFrame->ptitle){
 

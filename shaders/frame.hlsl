@@ -60,7 +60,7 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 const float borderScaling = 1.0f;
 const float4 borderColor = float4(0.0f,0.0f,0.0f,1.0f);
 const float4 focusColor = float4(1.0f,0.6f,0.33f,1.0f);
-const float4 titleBackground = float4(0.4f,0.4f,0.4f,1.0f);
+const float4 titleBackground[2] = {float4(0.4f,0.4f,0.4f,1.0f),float4(0.5,0.5,0.5,1.0f)};
 const float4 taskSelectColor = float4(0.957f,0.910f,0.824f,1.0f);
 
 [[vk::binding(0)]] Texture2D<float4> content;
@@ -137,15 +137,15 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 	}
 #endif //STOCK_FRAME_STYLE
 	float2 a_content = screen*(0.5f*xy0+0.5f); //top-left corner in pixels, content area
-	float2 b_content = screen*(0.5f*xy1+0.5f); //bottom-right corner in pixels, content areaa
+	float2 b_content = screen*(0.5f*xy1+0.5f); //bottom-right corner in pixels, content area
 	if(any(posh.xy < a_content) || any(posh.xy > b_content)){ //title region
-		bool1 tb = abs(titlePad.x) < abs(titlePad.y);
+		bool1 tb = abs(titlePad.x) < abs(titlePad.y); //check whether the title bar is horizontal or vertical
 		bool2 sb = posh < (a+(b-a)*titleSpan.x) || posh > (a+(b-a)*titleSpan.y);
 		if((tb && sb[0]) || (!tb && sb[1]))
-			discard;
+			discard; //clear the region to show the titles of the clients stacked under
 		if(flags & FLAGS_FOCUS)
 			return focusColor;
-		return titleBackground;
+		return titleBackground[stackIndex%2];
 	}
 	//content region
 	float4 c = content.Load(float3(posh.xy-a_content,0));

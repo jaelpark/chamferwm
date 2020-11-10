@@ -13,6 +13,7 @@
 	float2 margin; //normalized gap margin in x and y directions
 	float2 titlePad; //title padding vector
 	float2 titleSpan; //title span when tabbing or stacking
+	uint stackIndex; //index of the client in a tabbed stack
 	uint flags; //flags such as whether client is focused
 	float time; //time in seconds since client creation
 };

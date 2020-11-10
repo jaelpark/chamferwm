@@ -44,7 +44,7 @@ friend class CompositorInterface;
 public:
 	ColorFrame(const char *[Pipeline::SHADER_MODULE_COUNT], class CompositorInterface *);
 	virtual ~ColorFrame();
-	void Draw(const VkRect2D &, const glm::vec2 &, const glm::vec2 &, const glm::vec2 &, uint, const VkCommandBuffer *);
+	void Draw(const VkRect2D &, const glm::vec2 &, const glm::vec2 &, const glm::vec2 &, uint, uint, const VkCommandBuffer *);
 protected:
 	struct timespec creationTime;
 	float time;
