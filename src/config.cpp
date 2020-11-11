@@ -732,6 +732,8 @@ BOOST_PYTHON_MODULE(chamfer){
 		.value("TOP",WManager::Container::TITLEBAR_TOP)
 		.value("RIGHT",WManager::Container::TITLEBAR_RIGHT)
 		.value("BOTTOM",WManager::Container::TITLEBAR_BOTTOM);
+		//.value("AUTO_TOP_LEFT",WManager::Container::TITLEBAR_AUTO_TOP_LEFT)
+		//.value("AUTO_BOTTOM_RIGHT",WManager::Container::TITLEBAR_AUTO_BOTTOM_RIGHT);
 
 	boost::python::class_<ContainerProxy,boost::noncopyable>("Container")
 		.def("OnSetupContainer",&ContainerInterface::OnSetupContainer)
@@ -975,7 +977,7 @@ BOOST_PYTHON_MODULE(chamfer){
 					container.titleBar = titleBar;
 					return;
 				}
-				container.pcontainer->titleBar = titleBar;
+				container.pcontainer->SetTitlebar(titleBar);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, WManager::Container::TITLEBAR>()))
 		.add_property("shaderFlags",
 			boost::python::make_function(

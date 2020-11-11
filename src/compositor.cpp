@@ -1159,7 +1159,6 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclient->pcontainer->titlePad,renderObject.pclient->pcontainer->titleSpan,renderObject.pclient->stackIndex,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 
 		if(renderObject.pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && !(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) && renderObject.pclientFrame->ptitle){
-
 			glm::uvec2 titlePosition = glm::uvec2(frame.offset.x,frame.offset.y);
 			if(renderObject.pclient->titlePad1.x > 1e-5)
 				titlePosition.x += frame.extent.width;
@@ -1189,6 +1188,7 @@ void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proo
 				vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&textFrame);
 
 				vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->ptitle->passignedSet->p->pipeline);
+				//renderObject.pclientFrame->ptitle->Draw(titlePosition,(renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED)?renderObject.pclient->pcontainer->pParent->titleTransform:renderObject.pclient->pcontainer->titleTransform,&pcommandBuffers[currentFrame]);
 				renderObject.pclientFrame->ptitle->Draw(titlePosition,renderObject.pclient->pcontainer->titleTransform,&pcommandBuffers[currentFrame]);
 
 				vkCmdSetScissor(pcommandBuffers[currentFrame],0,1,&scissor);

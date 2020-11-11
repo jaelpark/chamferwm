@@ -18,7 +18,7 @@ Container::Container() : pParent(0), pch(0), pnext(0), pRootNext(this),
 	pname(0),
 	//scale(1.0f), p(0.0f), e(1.0f), margin(0.0f), minSize(0.0f), maxSize(1.0f), mode(MODE_TILED),
 	p(0.0f), posFullCanvas(0.0f), e(1.0f), extFullCanvas(1.0f), canvasOffset(0.0f), canvasExtent(0.0f),
-	margin(0.015f), titlePad(0.0f), titleSpan(0.0f,1.0f), titleTransform(glm::mat2x2(1.0f)), size(1.0f), minSize(0.015f), maxSize(1.0f),
+	margin(0.015f), titlePad(0.0f), titleSpan(0.0f,1.0f), titleTransform(glm::mat2x2(1.0f)), absTitlePad(0.0f), size(1.0f), minSize(0.015f), maxSize(1.0f),
 	flags(0), layout(LAYOUT_VSPLIT), titleBar(TITLEBAR_NONE){//, flags(0){
 	//
 }
@@ -28,7 +28,7 @@ Container::Container(Container *_pParent, const Setup &setup) :
 	pclient(0),
 	pname(0),
 	canvasOffset(setup.canvasOffset), canvasExtent(setup.canvasExtent),
-	margin(setup.margin), titlePad(0.0f), titleSpan(0.0f,1.0f), size(setup.size), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
+	margin(setup.margin), titlePad(0.0f), titleSpan(0.0f,1.0f), titleTransform(glm::mat2x2(1.0f)), absTitlePad(setup.titlePad), size(setup.size), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
 	flags(setup.flags), layout(LAYOUT_VSPLIT), titleBar(setup.titleBar){//, flags(setup.flags){
 
 	if(setup.pname)
@@ -37,25 +37,7 @@ Container::Container(Container *_pParent, const Setup &setup) :
 	if(flags & FLAG_FLOATING)
 		return;
 
-	switch(titleBar){
-	case TITLEBAR_LEFT:
-		titlePad = glm::vec2(-setup.titlePad,0.0f);
-		titleTransform = glm::mat2x2(0,-1,1,0);
-		break;
-	case TITLEBAR_RIGHT:
-		titlePad = glm::vec2(setup.titlePad,0.0f);
-		titleTransform = glm::mat2x2(0,-1,1,0);
-		break;
-	case TITLEBAR_TOP:
-		titlePad = glm::vec2(0.0f,-setup.titlePad);
-		titleTransform = glm::mat2x2(1.0f);
-		break;
-	case TITLEBAR_BOTTOM:
-		titlePad = glm::vec2(0.0f,setup.titlePad);
-	default:
-		titleTransform = glm::mat2x2(1.0f);
-		break;
-	}
+	SetTitlebar(titleBar,false);
 
 	//TODO: allow reparenting containers without client
 	if(pParent->pclient){
@@ -347,6 +329,33 @@ void Container::SetSize(glm::vec2 size1){
 			pcontainer->size *= (glm::vec2(1.0f)-size)/sizeSum;
 
 	pParent->Translate();
+}
+
+void Container::SetTitlebar(TITLEBAR titleBar, bool translate){
+	switch(titleBar){
+	case TITLEBAR_LEFT:
+		titlePad = glm::vec2(-absTitlePad,0.0f);
+		titleTransform = glm::mat2x2(0,-1,1,0);
+		break;
+	case TITLEBAR_RIGHT:
+		titlePad = glm::vec2(absTitlePad,0.0f);
+		titleTransform = glm::mat2x2(0,-1,1,0);
+		break;
+	case TITLEBAR_TOP:
+		titlePad = glm::vec2(0.0f,-absTitlePad);
+		titleTransform = glm::mat2x2(1.0f);
+		break;
+	case TITLEBAR_BOTTOM:
+		titlePad = glm::vec2(0.0f,absTitlePad);
+	default:
+		titleTransform = glm::mat2x2(1.0f);
+		break;
+	}
+
+	this->titleBar = titleBar;
+
+	if(translate)
+		pParent->Translate();
 }
 
 void Container::SetName(const char *_pname){

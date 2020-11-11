@@ -49,6 +49,8 @@ public:
 		TITLEBAR_TOP,
 		TITLEBAR_RIGHT,
 		TITLEBAR_BOTTOM
+		//TITLEBAR_AUTO_TOP_LEFT,
+		//TITLEBAR_AUTO_BOTTOM_RIGHT,
 	};
 	struct Setup{
 		const char *pname = 0;
@@ -81,6 +83,7 @@ public:
 	Container * GetRoot();
 	void SetName(const char *);
 	void SetSize(glm::vec2);
+	void SetTitlebar(TITLEBAR, bool = true);
 
 	void MoveNext();
 	void MovePrev();
@@ -119,6 +122,7 @@ public:
 	glm::vec2 titlePad;
 	glm::vec2 titleSpan; //title span in normalized coords
 	glm::mat2x2 titleTransform;
+	float absTitlePad;
 
 	glm::vec2 size; //size relative to the parent container
 	glm::vec2 minSize; //min size, relative to screen

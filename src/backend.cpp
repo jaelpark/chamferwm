@@ -160,6 +160,8 @@ void X11Client::UpdateTranslation(){
 	glm::vec4 coord = glm::vec4(pcontainer->p,pcontainer->e)*screen;
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN || pcontainer->flags & WManager::Container::FLAG_FLOATING))
 		coord += glm::vec4(pcontainer->margin*aspect,-2.0f*pcontainer->margin*aspect)*screen;
+	
+	//WManager::Container *pstackContainer = (pcontainer->pParent->flags & WManager::Container::FLAG_STACKED)?pcontainer->pParent:pcontainer;
 
 	glm::vec2 titlePad = pcontainer->titlePad*aspect*glm::vec2(screen);
 	//TODO: check if titlePad is larger than content
