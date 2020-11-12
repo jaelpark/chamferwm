@@ -354,7 +354,7 @@ void Container::SetTitlebar(TITLEBAR titleBar, bool translate){
 
 	this->titleBar = titleBar;
 
-	if(translate)
+	if(translate && pParent)
 		pParent->Translate();
 }
 
