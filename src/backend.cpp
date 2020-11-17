@@ -322,6 +322,12 @@ void X11Container::Focus1(){
 			//
 			pclient11->StartComposition1();
 		});
+
+		auto m = std::find(WManager::Container::rootQueue.begin(),WManager::Container::rootQueue.end(),proot);
+		if(m != WManager::Container::rootQueue.end()){
+			uint values[1] = {m-WManager::Container::rootQueue.begin()};
+			xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
+		}
 	}
 	const xcb_window_t *pfocusWindow;
 	if(pclient){
@@ -1383,11 +1389,31 @@ sint Default::HandleEvent(bool forcePoll){
 			break;
 		case XCB_CLIENT_MESSAGE:{
 			xcb_client_message_event_t *pev = (xcb_client_message_event_t*)pevent;
-			/*if(pev->window == ewmh_window){
-				if(pev->type == atoms[X11Backend::ATOM_CHAMFER_ALARM])
-					TimerEvent();
+			if(pev->window == pscr->root || pev->window == ewmh_window){
+				if(pev->type == ewmh._NET_CURRENT_DESKTOP){
+					//
+					uint desktopIndex = pev->data.data32[0];
+					printf("set desktop: %u\n",desktopIndex);
+					if(desktopIndex >= WManager::Container::rootQueue.size()){
+						char name[32];
+						snprintf(name,sizeof(name),"%u",desktopIndex+1);
+						CreateWorkspace(name)->Focus();
+						break;
+					}
+					//
+					WManager::Container *pcontainer = WManager::Container::rootQueue[desktopIndex];
+					for(WManager::Container *pcontainer1 = pcontainer->GetFocus(); pcontainer1; pcontainer = pcontainer1, pcontainer1 = pcontainer1->GetFocus());
+
+					if(pcontainer->pclient){
+						X11Client *pclient11 = dynamic_cast<X11Client *>(pcontainer->pclient);
+						SetFocus(pclient11);
+					}else pcontainer->Focus();
+				}
+				//if(pev->type == atoms[X11Backend::ATOM_CHAMFER_ALARM])
+				//	TimerEvent();
 				break;
-			}*/
+			}
+
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
 			if(!pclient1 || pclient1->flags & X11Client::FLAG_UNMAPPING)
 				break;

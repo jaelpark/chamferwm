@@ -198,6 +198,7 @@ class Container(chamfer.Container):
 			return target.GetParent();
 		
 	def GetFocusDescend(self):
+		#get the focused container in this container tree
 		container = self;
 		while container.GetFocus() is not None:
 			container = container.GetFocus();

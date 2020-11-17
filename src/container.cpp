@@ -21,6 +21,8 @@ Container::Container() : pParent(0), pch(0), pnext(0), pRootNext(this),
 	margin(0.015f), titlePad(0.0f), titleSpan(0.0f,1.0f), titleTransform(glm::mat2x2(1.0f)), absTitlePad(0.0f), size(1.0f), minSize(0.015f), maxSize(1.0f),
 	flags(0), layout(LAYOUT_VSPLIT), titleBar(TITLEBAR_NONE){//, flags(0){
 	//
+	//This constructor creates a root container, since no parent is given.
+	rootQueue.push_back(this);
 }
 
 Container::Container(Container *_pParent, const Setup &setup) :
@@ -98,6 +100,7 @@ Container::Container(Container *_pParent, const Setup &setup) :
 Container::~Container(){
 	if(pname)
 		mstrfree(pname);
+	rootQueue.erase(std::remove(rootQueue.begin(),rootQueue.end(),this),rootQueue.end());
 }
 
 void Container::AppendRoot(Container *pcontainer){
@@ -362,6 +365,7 @@ void Container::SetName(const char *_pname){
 	if(pname)
 		mstrfree(pname);
 	pname = mstrdup(_pname);
+	printf("created workspace '%s'\n",pname);
 }
 
 void Container::MoveNext(){
@@ -617,6 +621,7 @@ void Container::SetLayout(LAYOUT layout){
 WManager::Container *Container::ptreeFocus = 0; //initially set to root container as soon as it's created
 std::deque<std::pair<WManager::Container *, struct timespec>> Container::tiledFocusQueue;
 std::deque<WManager::Container *> Container::floatFocusQueue;
+std::deque<WManager::Container *> Container::rootQueue;
 
 /*RootContainer::RootContainer(const char *_pname) : Container(), pRootNext(0), pname(mstrdup(_pname)){
 	

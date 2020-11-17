@@ -429,6 +429,14 @@ public:
 		RunBackend::MoveContainer<Config::X11ContainerConfig,DefaultBackend>(pcontainer,pdst);
 	}
 
+	WManager::Container * CreateWorkspace(const char *pname){
+		WManager::Container *plastRoot = WManager::Container::rootQueue.back();
+		Config::X11ContainerConfig *pnewRoot = new Config::X11ContainerConfig(this);
+		pnewRoot->SetName(pname);
+		plastRoot->AppendRoot(pnewRoot);
+		return pnewRoot;
+	}
+
 	//Called for spontaneous (client requested) fullscreen triggered by an event
 	void SetFullscreen(Backend::X11Client *pclient, bool toggle){
 		if(!pclient || pclient->pcontainer == pclient->pcontainer->GetRoot())

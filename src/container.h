@@ -119,8 +119,8 @@ public:
 	glm::vec2 canvasExtent;
 
 	glm::vec2 margin;
-	glm::vec2 titlePad;
-	glm::vec2 titleSpan; //title span in normalized coords
+	glm::vec2 titlePad; //title size either horizontally or vertically - depends on font size
+	glm::vec2 titleSpan; //title span in normalized coords: region that the title bar spans
 	glm::mat2x2 titleTransform;
 	float absTitlePad;
 
@@ -135,6 +135,7 @@ public:
 	static WManager::Container *ptreeFocus; //client focus, managed by Python
 	static std::deque<std::pair<WManager::Container *, struct timespec>> tiledFocusQueue;
 	static std::deque<WManager::Container *> floatFocusQueue;
+	static std::deque<WManager::Container *> rootQueue; //Root container queue in the order of creation. Mainly used for EWMH
 };
 
 /*class RootContainer : Container{

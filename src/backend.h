@@ -235,6 +235,7 @@ protected:
 		PROPERTY_ID_TRANSIENT_FOR,
 	};
 	virtual X11Client * SetupClient(const X11Client::CreateInfo *) = 0;
+	virtual WManager::Container * CreateWorkspace(const char *) = 0;
 	virtual void SetFullscreen(X11Client *, bool) = 0;
 	virtual void SetFocus(X11Client *) = 0;
 	virtual void Enter(X11Client *) = 0;
