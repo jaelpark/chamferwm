@@ -282,6 +282,8 @@ void X11Client::Kill(){
 
 X11Container::X11Container(X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
 	//
+	uint values[1] = {WManager::Container::rootQueue.size()};
+	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
 }
 
 X11Container::X11Container(WManager::Container *_pParent, const WManager::Container::Setup &_setup, X11Backend *_pbackend) : WManager::Container(_pParent,_setup), pbackend(_pbackend){
@@ -290,6 +292,7 @@ X11Container::X11Container(WManager::Container *_pParent, const WManager::Contai
 
 X11Container::~X11Container(){
 	//
+	//_NET_NUMBER_OF_DESKTOPS would be decremented here, but at the moment removal of created workspaces isn't supported
 }
 
 void X11Container::Focus1(){
@@ -675,6 +678,7 @@ void Default::Start(){
 		//TODO: _NET_CLIENT_LIST_STACKING
 		ewmh._NET_CURRENT_DESKTOP,
 		ewmh._NET_NUMBER_OF_DESKTOPS,
+		//ewmh._NET_NUMBER_OF_DESKTOPS
 		ewmh._NET_DESKTOP_VIEWPORT,
 		ewmh._NET_DESKTOP_GEOMETRY,
 		ewmh._NET_ACTIVE_WINDOW,
@@ -690,6 +694,7 @@ void Default::Start(){
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
 	values[0] = 1;
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
+	//xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_NAMES,XCB_ATOM_STRING,8,0,0);
 	values[0] = 0; //viewport x
 	values[1] = 0; //viewport y
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);

@@ -104,20 +104,19 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 typedef std::pair<const WManager::Client *, WManager::Client *> StackAppendixElement;
 class RunCompositor : public Config::CompositorConfig{
 public:
-	RunCompositor(WManager::Container *_proot, std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : proot1(_proot), pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
+	RunCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
 	virtual bool IsAnimating() const = 0;
 	virtual void WaitIdle() = 0;
 protected:
-	WManager::Container *proot1;
 	std::vector<StackAppendixElement> *pstackAppendix;
 };
 
 class RunBackend : public Config::BackendConfig{
 public:
-	RunBackend(WManager::Container *_proot, Config::BackendInterface *_pbackendInt) : proot1(_proot), pcomp(0), Config::BackendConfig(_pbackendInt){
-		proot1->SetName("1");
+	RunBackend(Config::BackendInterface *_pbackendInt) : pcomp(0), Config::BackendConfig(_pbackendInt){
+		//
 	}
 
 	virtual ~RunBackend(){}
@@ -291,13 +290,16 @@ public:
 	}
 
 	void ReleaseContainers(){
-		WManager::Container *pRootNext = proot1->pRootNext;
-		do{
-			if(pRootNext->pch)
-				ReleaseContainersRecursive(pRootNext->pch);
+		if(!WManager::Container::rootQueue.empty()){
+			WManager::Container *proot1 = WManager::Container::rootQueue.front();
+			WManager::Container *pRootNext = proot1->pRootNext;
+			do{
+				if(pRootNext->pch)
+					ReleaseContainersRecursive(pRootNext->pch);
 
-			pRootNext = pRootNext->pRootNext;
-		}while(pRootNext != proot1);
+				pRootNext = pRootNext->pRootNext;
+			}while(pRootNext != proot1);
+		}
 
 		for(auto &p : stackAppendix){
 			const Config::ContainerConfig *pcontainer1 = dynamic_cast<const Config::ContainerConfig *>(p.second->pcontainer);
@@ -329,27 +331,29 @@ public:
 	}
 
 //protected:
-	WManager::Container *proot1;
 	std::vector<StackAppendixElement> stackAppendix;
 	class RunCompositor *pcomp;
 };
 
 class DefaultBackend : public Backend::Default, public RunBackend{
 public:
-	DefaultBackend(Config::BackendInterface *_pbackendInt) : Default(), RunBackend(new Config::X11ContainerConfig(this),_pbackendInt){
+	DefaultBackend(Config::BackendInterface *_pbackendInt) : Default(), RunBackend(_pbackendInt){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
 
 	~DefaultBackend(){
 		Stop();
-		WManager::Container *pRootNext = proot1->pRootNext;
-		do{
-			WManager::Container *pRootNext2 = pRootNext->pRootNext;
-			delete pRootNext;
+		if(!WManager::Container::rootQueue.empty()){
+			WManager::Container *proot1 = WManager::Container::rootQueue.front();
+			WManager::Container *pRootNext = proot1->pRootNext;
+			do{
+				WManager::Container *pRootNext2 = pRootNext->pRootNext;
+				delete pRootNext;
 
-			pRootNext = pRootNext2;
-		}while(pRootNext != proot1);
+				pRootNext = pRootNext2;
+			}while(pRootNext != proot1);
+		}
 	}
 
 	void DefineBindings(){
@@ -594,20 +598,23 @@ public:
 //TODO: some of these functions can be templated and shared with the DefaultBackend
 class DebugBackend : public Backend::Debug, public RunBackend{
 public:
-	DebugBackend(Config::BackendInterface *_pbackendInt) : Debug(), RunBackend(new Config::DebugContainerConfig(this),_pbackendInt){
+	DebugBackend(Config::BackendInterface *_pbackendInt) : Debug(), RunBackend(_pbackendInt){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
 
 	~DebugBackend(){
 		Stop();
-		WManager::Container *pRootNext = proot1->pRootNext;
-		do{
-			WManager::Container *pRootNext2 = pRootNext->pRootNext;
-			delete pRootNext;
+		if(!WManager::Container::rootQueue.empty()){
+			WManager::Container *proot1 = WManager::Container::rootQueue.front();
+			WManager::Container *pRootNext = proot1->pRootNext;
+			do{
+				WManager::Container *pRootNext2 = pRootNext->pRootNext;
+				delete pRootNext;
 
-			pRootNext = pRootNext2;
-		}while(pRootNext != proot1);
+				pRootNext = pRootNext2;
+			}while(pRootNext != proot1);
+		}
 	}
 
 	Backend::DebugClient * SetupClient(const Backend::DebugClient::CreateInfo *pcreateInfo){
@@ -703,7 +710,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(WManager::Container *_proot, std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DefaultCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
 		Start();
 
 		wordexp_t expResult;
@@ -757,7 +764,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(WManager::Container *_proot, std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_proot,_pstackAppendix,_pcompositorInt){
+	DebugCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
 		Compositor::X11DebugCompositor::Start();
 
 		wordexp_t expResult;
@@ -811,7 +818,7 @@ public:
 
 class NullCompositor : public Compositor::NullCompositor, public RunCompositor{
 public:
-	NullCompositor(Config::CompositorInterface *_pcompositorInt) : Compositor::NullCompositor(), RunCompositor(0,0,_pcompositorInt){
+	NullCompositor(Config::CompositorInterface *_pcompositorInt) : Compositor::NullCompositor(), RunCompositor(0,_pcompositorInt){
 		Start();
 	}
 
@@ -886,20 +893,24 @@ int main(sint argc, const char **pargv){
 	if(expFeatures.Get())
 		DebugPrintf(stdout,"Experimental compositor features enabled.\n");
 
-	RunBackend *pbackend;
+	Backend::X11Backend *pbackend11;
 	try{
-		if(debugBackend.Get())
-			pbackend = new DebugBackend(Config::BackendInterface::pbackendInt);
-		else pbackend = new DefaultBackend(Config::BackendInterface::pbackendInt);
+		if(debugBackend.Get()){
+			pbackend11 = new DebugBackend(Config::BackendInterface::pbackendInt);
+			WManager::Container::ptreeFocus = new Config::DebugContainerConfig(pbackend11); //self registered
+		}else{
+			pbackend11 = new DefaultBackend(Config::BackendInterface::pbackendInt);
+			WManager::Container::ptreeFocus = new Config::X11ContainerConfig(pbackend11); //self registered
+		}
 
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
 		return 1;
 	}
 
-	WManager::Container::ptreeFocus = pbackend->proot1;
+	WManager::Container::ptreeFocus->SetName("1");
 
-	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
+	RunBackend *pbackend = dynamic_cast<RunBackend *>(pbackend11);
 
 	RunCompositor *pcomp;
 	try{
@@ -907,8 +918,8 @@ int main(sint argc, const char **pargv){
 			pcomp = new NullCompositor(Config::CompositorInterface::pcompositorInt);
 		else
 		if(debugBackend.Get())
-			pcomp = new DebugCompositor(pbackend->proot1,&pbackend->stackAppendix,pbackend11,shaderPaths,Config::CompositorInterface::pcompositorInt);
-		else pcomp = new DefaultCompositor(pbackend->proot1,&pbackend->stackAppendix,pbackend11,shaderPaths,Config::CompositorInterface::pcompositorInt);
+			pcomp = new DebugCompositor(&pbackend->stackAppendix,pbackend11,shaderPaths,Config::CompositorInterface::pcompositorInt);
+		else pcomp = new DefaultCompositor(&pbackend->stackAppendix,pbackend11,shaderPaths,Config::CompositorInterface::pcompositorInt);
 
 	}catch(Exception e){
 		DebugPrintf(stderr,"%s\n",e.what());
