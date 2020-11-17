@@ -683,6 +683,11 @@ void Default::Start(){
 		ewmh._NET_DESKTOP_GEOMETRY,
 		ewmh._NET_ACTIVE_WINDOW,
 		ewmh._NET_WORKAREA,
+		ewmh._NET_WM_STATE,
+		ewmh._NET_WM_STATE_FULLSCREEN,
+		ewmh._NET_WM_STATE_DEMANDS_ATTENTION,
+		ewmh._NET_ACTIVE_WINDOW,
+		ewmh._NET_CLOSE_WINDOW
 	};
 
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
