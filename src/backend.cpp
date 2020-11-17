@@ -629,11 +629,11 @@ void Default::Start(){
 
 	xcb_flush(pcon);
 
-	uint values[2] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
+	uint values[4] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_EXPOSURE
-		|XCB_EVENT_MASK_PROPERTY_CHANGE,0}; //[2] for later use
+		|XCB_EVENT_MASK_PROPERTY_CHANGE,0,0,0}; //[2] for later use
 	xcb_void_cookie_t cookie = xcb_change_window_attributes_checked(pcon,pscr->root,XCB_CW_EVENT_MASK,values);
 	xcb_generic_error_t *perr = xcb_request_check(pcon,cookie);
 
@@ -677,7 +677,8 @@ void Default::Start(){
 		ewmh._NET_NUMBER_OF_DESKTOPS,
 		ewmh._NET_DESKTOP_VIEWPORT,
 		ewmh._NET_DESKTOP_GEOMETRY,
-		ewmh._NET_ACTIVE_WINDOW
+		ewmh._NET_ACTIVE_WINDOW,
+		ewmh._NET_WORKAREA,
 	};
 
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
@@ -689,13 +690,18 @@ void Default::Start(){
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
 	values[0] = 1;
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
+	values[0] = 0; //viewport x
+	values[1] = 0; //viewport y
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
+	values[0] = pscr->width_in_pixels; //geometry x
+	values[1] = pscr->height_in_pixels; //geometry y
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_GEOMETRY,XCB_ATOM_CARDINAL,32,2,values);
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_ACTIVE_WINDOW,XCB_ATOM_WINDOW,32,1,&ewmh_window);
 	values[0] = 0;
 	values[1] = 0;
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
-	values[0] = pscr->width_in_pixels;
-	values[1] = pscr->height_in_pixels;
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_ACTIVE_WINDOW,XCB_ATOM_WINDOW,32,1,&ewmh_window);
+	values[2] = pscr->width_in_pixels;
+	values[3] = pscr->height_in_pixels;
+	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_WORKAREA,XCB_ATOM_CARDINAL,32,4,values);
 
 	xcb_map_window(pcon,ewmh_window);
 
