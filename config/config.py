@@ -518,25 +518,30 @@ class Backend(chamfer.Backend):
 			root.ShiftLayout(root.layout);
 
 		elif keyId == Key.CONTRACT_RESET.value:
-			focus.canvasOffset = (0.0,0.0);
-			focus.canvasExtent = (0.0,0.0);
-			focus.ShiftLayout(focus.layout);
+			container = parent if (parent is not None) and parent.stacked else focus;
+			container.canvasOffset = (0.0,0.0);
+			container.canvasExtent = (0.0,0.0);
+			container.ShiftLayout(container.layout);
 
 		elif keyId == Key.CONTRACT_HORIZONTAL.value:
-			focus.size = (focus.size[0]-0.1,focus.size[1]);
+			container = parent if (parent is not None) and parent.stacked else focus;
+			container.size = (container.size[0]-0.1,container.size[1]);
 
 		elif keyId == Key.CONTRACT_HORIZONTAL_LOCAL.value:
-			focus.canvasOffset = (focus.canvasOffset[0]+0.05,focus.canvasOffset[1]);
-			focus.canvasExtent = (focus.canvasExtent[0]+0.10,focus.canvasExtent[1]);
-			focus.ShiftLayout(focus.layout);
+			container = parent if (parent is not None) and parent.stacked else focus;
+			container.canvasOffset = (container.canvasOffset[0]+0.05,container.canvasOffset[1]);
+			container.canvasExtent = (container.canvasExtent[0]+0.10,container.canvasExtent[1]);
+			container.ShiftLayout(container.layout);
 
 		elif keyId == Key.CONTRACT_VERTICAL.value:
-			focus.size = (focus.size[0],focus.size[1]-0.1);
+			container = parent if (parent is not None) and parent.stacked else focus;
+			container.size = (container.size[0],container.size[1]-0.1);
 
 		elif keyId == Key.CONTRACT_VERTICAL_LOCAL.value:
-			focus.canvasOffset = (focus.canvasOffset[0],focus.canvasOffset[1]+0.05);
-			focus.canvasExtent = (focus.canvasExtent[0],focus.canvasExtent[1]+0.10);
-			focus.ShiftLayout(focus.layout);
+			container = parent if (parent is not None) and parent.stacked else focus;
+			container.canvasOffset = (container.canvasOffset[0],container.canvasOffset[1]+0.05);
+			container.canvasExtent = (container.canvasExtent[0],container.canvasExtent[1]+0.10);
+			container.ShiftLayout(container.layout);
 
 		elif keyId in [Key.WORKSPACE_1.value,Key.WORKSPACE_2.value,Key.WORKSPACE_3.value,Key.WORKSPACE_4.value]:
 			wsName = str(keyId-Key.WORKSPACE_1.value+1);
@@ -550,20 +555,24 @@ class Backend(chamfer.Backend):
 			root.GetFocusDescend().Focus();
 
 		elif keyId == Key.EXPAND_HORIZONTAL.value:
-			focus.size = (focus.size[0]+0.1,focus.size[1]);
+			container = parent if (parent is not None) and parent.stacked else focus;
+			container.size = (container.size[0]+0.1,container.size[1]);
 
 		elif keyId == Key.EXPAND_HORIZONTAL_LOCAL.value:
-			focus.canvasOffset = (focus.canvasOffset[0]-0.05,focus.canvasOffset[1]);
-			focus.canvasExtent = (focus.canvasExtent[0]-0.10,focus.canvasExtent[1]);
-			focus.ShiftLayout(focus.layout);
+			container = parent if (parent is not None) and parent.stacked else focus;
+			container.canvasOffset = (container.canvasOffset[0]-0.05,container.canvasOffset[1]);
+			container.canvasExtent = (container.canvasExtent[0]-0.10,container.canvasExtent[1]);
+			container.ShiftLayout(container.layout);
 
 		elif keyId == Key.EXPAND_VERTICAL.value:
-			focus.size = (focus.size[0],focus.size[1]+0.1);
+			container = parent if (parent is not None) and parent.stacked else focus;
+			container.size = (container.size[0],container.size[1]+0.1);
 
 		elif keyId == Key.EXPAND_VERTICAL_LOCAL.value:
-			focus.canvasOffset = (focus.canvasOffset[0],focus.canvasOffset[1]-0.05);
-			focus.canvasExtent = (focus.canvasExtent[0],focus.canvasExtent[1]-0.10);
-			focus.ShiftLayout(focus.layout);
+			container = parent if (parent is not None) and parent.stacked else focus;
+			container.canvasOffset = (container.canvasOffset[0],container.canvasOffset[1]-0.05);
+			container.canvasExtent = (container.canvasExtent[0],container.canvasExtent[1]-0.10);
+			container.ShiftLayout(container.layout);
 
 		elif keyId == Key.KILL.value:
 			focus.Kill();
