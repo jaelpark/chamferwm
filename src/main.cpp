@@ -434,8 +434,6 @@ public:
 	}
 
 	void FloatContainer(WManager::Container *pcontainer){
-		//remove container and destroy it
-		//take the client and setup a new floating container
 		auto n1 = std::find_if(WManager::Container::tiledFocusQueue.begin(),WManager::Container::tiledFocusQueue.end(),[&](auto &p)->bool{
 			return p.first == pcontainer;
 		});
@@ -449,22 +447,19 @@ public:
 		PrintTree(proot,0);
 		printf("-----------\n");
 
-		/*WManager::Client *pbase = pcontainer->pclient;
+		WManager::Client *pbase = pcontainer->pclient;
 		auto m = std::find_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
 			return pbase == p.second;
 		});
 		if(m != stackAppendix.end()){
 			stackAppendix.erase(m);
-		//if(pcontainer->flags){
 			//TODO: call OnParent
-			WManager::Container::Setup setup;
-			dynamic_cast<Config::ContainerConfig *>(pcontainer)->pcontainerInt->CopySettingsSetup(setup);
 
-			//pcontainer->Initialize(proot,setup);
-			//TODO: call container constructor
-			//focus
+			pcontainer->flags &= ~WManager::Container::FLAG_FLOATING;
+			pcontainer->Place(proot);
+
 			return;
-		}*/
+		}
 		WManager::Container *premoved = pcontainer->Remove();
 		WManager::Container *pOrigParent = premoved->pParent;
 
