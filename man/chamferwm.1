@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "CHAMFERWM" "1" "May 18, 2020" "" "chamferwm"
+.TH "CHAMFERWM" "1" "Nov 22, 2020" "" "chamferwm"
 .SH NAME
 chamferwm \- chamferwm git
 .
@@ -225,7 +225,7 @@ Create a test environment for the compositor engine without redirection. The app
 Disable compositor.
 .TP
 .B \-e\fP,\fB  \-\-experimental
-Enable experimental features: host pointer import
+Enable experimental features
 .TP
 .BI \-\-device\-index\fB= id
 GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.
@@ -243,7 +243,7 @@ Disable host shared memory import.
 Unredirect a fullscreen window bypassing the compositor to improve performance.
 .TP
 .BI \-\-shader\-path\fB= path
-Shader lookup path. SPIR\-V shader objects are identified by an ‘.spv’ extension. Multiple paths may be specified.
+Shader lookup path. SPIR\-V shader objects are identified by an \(aq.spv\(aq extension. Multiple paths may be specified.
 .UNINDENT
 .SH KEY BINDINGS
 .sp
@@ -317,6 +317,12 @@ Shift layout between horizontal and vertical splitting
 .B mod+t
 Stack or tab containers. Whether to stack or tab will depend on splitting mode (see above).
 .TP
+.B mod+Control+Shift+h
+Stack container with the container to the left
+.TP
+.B mod+Control+Shift+l
+Stack container with the container to the right
+.TP
 .B mod+v
 Create a vertical split. Launch application to place is under newly created branch. To place existing applications, mark and paste (mod+y, mod+p).
 .TP
@@ -325,6 +331,9 @@ Create a vertical split – see above.
 .TP
 .B mod+f
 Enter or leave fullscreen mode
+.TP
+.B mod+Space
+Toggle between floating and tiled modes
 .UNINDENT
 .SS Workspaces
 .INDENT 0.0
@@ -670,13 +679,18 @@ Toggle container stacking inside this container. If \fI\%layout\fP is equal to \
 .UNINDENT
 .INDENT 7.0
 .TP
+.B SetFloating(toggle)
+Toggle between tiled and floating modes.
+.UNINDENT
+.INDENT 7.0
+.TP
 .B IsFloating()
 Returns true if this is a floating container.
 .UNINDENT
 .INDENT 7.0
 .TP
 .B IsAlive()
-Returns true if the container still exists, i.e. it has not been removed.
+Returns true if the container still exists, i.e. it has not been removed. Use of a removed container will raise an exception.
 .UNINDENT
 .INDENT 7.0
 .TP
