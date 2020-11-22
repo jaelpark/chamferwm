@@ -26,6 +26,7 @@ public:
 	};
 	virtual bool OnFullscreen(bool);
 	virtual void OnStack(bool);
+	virtual void OnFloat(bool);
 	virtual bool OnFocus();
 	virtual void OnEnter();
 	virtual void OnPropertyChange(PROPERTY_ID);
@@ -78,6 +79,7 @@ public:
 	void OnCreate();
 	bool OnFullscreen(bool);
 	void OnStack(bool);
+	void OnFloat(bool);
 	bool OnFocus();
 	void OnEnter();
 	void OnPropertyChange(PROPERTY_ID);

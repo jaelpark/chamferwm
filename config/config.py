@@ -53,6 +53,9 @@ class Key(Enum):
 	SPLIT_V = auto()
 	FULLSCREEN = auto()
 	STACK = auto()
+	STACK_RIGHT = auto()
+	STACK_LEFT = auto()
+	FLOAT = auto()
 
 	CONTRACT_ROOT_RESET = auto()
 	CONTRACT_ROOT_LEFT = auto() #contract left side
@@ -250,6 +253,9 @@ class Backend(chamfer.Backend):
 			self.BindKey(ord('v'),self.modMask,Key.SPLIT_V.value);
 			self.BindKey(ord('f'),self.modMask,Key.FULLSCREEN.value);
 			self.BindKey(ord('t'),self.modMask,Key.STACK.value);
+			self.BindKey(ord('l'),self.modMask|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.STACK_RIGHT.value);
+			self.BindKey(ord('h'),self.modMask|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.STACK_LEFT.value);
+			self.BindKey(latin1.XK_space,self.modMask,Key.FLOAT.value);
 
 			#workspace dimensions
 			self.BindKey(ord('r'),chamfer.MOD_MASK_4,Key.CONTRACT_ROOT_RESET.value);
@@ -445,7 +451,7 @@ class Backend(chamfer.Backend):
 				peers = list(self.yank);
 
 				focus1 = focus.GetFocus();
-				peers[0].Move(focus); #warning! need to know wether yank is still alive
+				peers[0].Move(focus);
 				
 				if focus1 is None:
 					focus = focus.GetParent();
@@ -454,6 +460,8 @@ class Backend(chamfer.Backend):
 					
 			except (AttributeError,IndexError):
 				print("no containers to paste.",flush=True);
+			except ValueError:
+				print("expired container.",flush=True);
 
 		elif keyId == Key.LIFT_CONTAINER.value:
 			sibling = focus.GetNext();
@@ -488,6 +496,30 @@ class Backend(chamfer.Backend):
 			if parent is None:
 				return;
 			parent.SetStacked(not parent.stacked);
+
+		elif keyId == Key.STACK_RIGHT.value:
+			container = focus.FindParentLayout(chamfer.layout.VSPLIT).GetNext();
+			if container is focus:
+				return;
+			focus.Move(container);
+
+			parent1 = focus.GetParent();
+			parent1.SetStacked(True);
+			parent1.ShiftLayout(chamfer.layout.HSPLIT);
+
+		elif keyId == Key.STACK_LEFT.value:
+			container = focus.FindParentLayout(chamfer.layout.VSPLIT).GetPrev();
+			if container is focus:
+				return;
+			focus.Move(container);
+
+			parent1 = focus.GetParent();
+			parent1.SetStacked(True);
+			parent1.ShiftLayout(chamfer.layout.HSPLIT);
+
+		elif keyId == Key.FLOAT.value:
+			#
+			focus.SetFloating(True);
 		
 		elif keyId == Key.CONTRACT_ROOT_RESET.value:
 			root = self.GetRoot();

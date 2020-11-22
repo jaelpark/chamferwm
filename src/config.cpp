@@ -81,6 +81,10 @@ void ContainerInterface::OnStack(bool toggle){
 	//
 }
 
+void ContainerInterface::OnFloat(bool toggle){
+	//
+}
+
 bool ContainerInterface::OnFocus(){
 	//
 	return true;
@@ -306,6 +310,20 @@ void ContainerProxy::OnStack(bool toggle){
 			PyErr_Clear();
 		}
 	}else ContainerInterface::OnStack(toggle);
+}
+
+void ContainerProxy::OnFloat(bool toggle){
+	boost::python::override ovr = this->get_override("OnFloat");
+	if(ovr){
+		try{
+			ovr(toggle);
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}else ContainerInterface::OnFloat(toggle);
 }
 
 bool ContainerProxy::OnFocus(){
@@ -742,6 +760,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("OnCreate",&ContainerInterface::OnCreate)
 		.def("OnFullscreen",&ContainerInterface::OnFullscreen)
 		.def("OnStack",&ContainerInterface::OnStack)
+		.def("OnFloat",&ContainerInterface::OnFloat)
 		.def("OnFocus",&ContainerInterface::OnFocus)
 		.def("OnEnter",&ContainerInterface::OnEnter)
 		.def("OnPropertyChange",&ContainerInterface::OnPropertyChange)
@@ -795,10 +814,18 @@ BOOST_PYTHON_MODULE(chamfer){
 			[](ContainerInterface &container, bool toggle){
 				if(!container.pcontainer)
 					return;
-				//for(WManager::Container *pcontainer = container.pcontainer->pch; pcontainer; pcontainer = pcontainer->pnext)
-					//pcontainer
 				container.OnStack(toggle);
 				container.pcontainer->SetStacked(toggle);
+			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, bool>()))
+		.def("SetFloating",boost::python::make_function(
+			[](ContainerInterface &container, bool toggle){
+				if(!container.pcontainer)
+					return;
+				container.OnFloat(toggle);
+				ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(container.pcontainer);
+				if(pcontainer1)
+					pcontainer1->pbackend->FloatContainer(container.pcontainer);
+				//container.pcontainer->SetStacked(toggle);
 			},boost::python::default_call_policies(),boost::mpl::vector<void, ContainerInterface &, bool>()))
 		.def("IsFloating",boost::python::make_function(
 			[](ContainerInterface &container){

@@ -76,6 +76,7 @@ public:
 	void Focus();
 	void SetFullscreen(bool);
 	void SetStacked(bool);
+	//void SetFloating(bool);
 	Container * GetNext();
 	Container * GetPrev();
 	Container * GetParent() const;

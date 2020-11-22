@@ -71,6 +71,7 @@ public:
 	//virtual void SetupEnvironment() = 0;
 	virtual sint HandleEvent(bool) = 0;
 	virtual void MoveContainer(WManager::Container *, WManager::Container *) = 0;
+	virtual void FloatContainer(WManager::Container *) = 0;
 	virtual const std::vector<std::pair<const WManager::Client *, WManager::Client *>> * GetStackAppendix() const = 0;
 	virtual void SortStackAppendix() = 0;
 protected:

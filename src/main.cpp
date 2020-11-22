@@ -392,7 +392,7 @@ public:
 			return pclient11;
 
 		}else{
-			Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0,&containerCreateInfo);
+			Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(0,&containerCreateInfo); //null parent = obtain parent from config script
 
 			if(pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_NO_INPUT)
 				containerInt.pcontainer->flags |= WManager::Container::FLAG_NO_FOCUS;
@@ -431,6 +431,80 @@ public:
 	void MoveContainer(WManager::Container *pcontainer, WManager::Container *pdst){
 		//
 		RunBackend::MoveContainer<Config::X11ContainerConfig,DefaultBackend>(pcontainer,pdst);
+	}
+
+	void FloatContainer(WManager::Container *pcontainer){
+		//remove container and destroy it
+		//take the client and setup a new floating container
+		auto n1 = std::find_if(WManager::Container::tiledFocusQueue.begin(),WManager::Container::tiledFocusQueue.end(),[&](auto &p)->bool{
+			return p.first == pcontainer;
+		});
+		if(n1 != WManager::Container::tiledFocusQueue.end())
+			WManager::Container::tiledFocusQueue.erase(n1);
+		auto n2 = std::find(WManager::Container::floatFocusQueue.begin(),WManager::Container::floatFocusQueue.end(),pcontainer);
+		if(n2 != WManager::Container::floatFocusQueue.end())
+			WManager::Container::floatFocusQueue.erase(n2);
+
+		WManager::Container *proot = pcontainer->GetRoot();
+		PrintTree(proot,0);
+		printf("-----------\n");
+
+		/*WManager::Client *pbase = pcontainer->pclient;
+		auto m = std::find_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
+			return pbase == p.second;
+		});
+		if(m != stackAppendix.end()){
+			stackAppendix.erase(m);
+		//if(pcontainer->flags){
+			//TODO: call OnParent
+			WManager::Container::Setup setup;
+			dynamic_cast<Config::ContainerConfig *>(pcontainer)->pcontainerInt->CopySettingsSetup(setup);
+
+			//pcontainer->Initialize(proot,setup);
+			//TODO: call container constructor
+			//focus
+			return;
+		}*/
+		WManager::Container *premoved = pcontainer->Remove();
+		WManager::Container *pOrigParent = premoved->pParent;
+
+		printf("----------- removed %p\n",premoved);
+		PrintTree(proot,0);
+
+		WManager::Container *pcollapsed = 0;
+		if(pOrigParent != proot)
+			pcollapsed = pOrigParent->Collapse();
+		//check if pch is alive, in this case this wasn't the last container
+		if(!pcollapsed && pOrigParent->pch)
+			pcollapsed = pOrigParent->pch->Collapse();
+
+		if(WManager::Container::ptreeFocus == pcontainer || WManager::Container::ptreeFocus == pcollapsed){
+			WManager::Container *pNewFocus = proot;
+			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
+			Config::X11ContainerConfig *pNewFocus1 = dynamic_cast<Config::X11ContainerConfig *>(pNewFocus);
+			if(pNewFocus1->pcontainerInt->OnFocus())
+				pNewFocus1->Focus();
+		}
+
+		printf("----------- collapsed %p\n",pcollapsed);
+		PrintTree(proot,0);
+
+		/*if(premoved->pch) //in this case nothing gets removed
+			ReleaseContainersRecursive(premoved->pch);
+		delete premoved;*/
+		if(pcollapsed){
+			if(pcollapsed->pch) //this should not exist
+				ReleaseContainersRecursive(pcollapsed->pch);
+			delete pcollapsed;
+		}
+		
+		static WManager::Client dummyClient(0); //base client being unavailable means that the client is stacked on top of everything else
+	
+		pcontainer->flags |= WManager::Container::FLAG_FLOATING;
+		stackAppendix.push_back(StackAppendixElement(&dummyClient,pcontainer->pclient));
+
+		pcontainer->pParent = proot;
+		pcontainer->Focus();
 	}
 
 	WManager::Container * CreateWorkspace(const char *pname){
@@ -639,6 +713,10 @@ public:
 	void MoveContainer(WManager::Container *pcontainer, WManager::Container *pdst){
 		//
 		RunBackend::MoveContainer<Config::DebugContainerConfig,DebugBackend>(pcontainer,pdst);
+	}
+
+	void FloatContainer(WManager::Container *pcontainer){
+		//
 	}
 
 	void DestroyClient(Backend::DebugClient *pclient){
