@@ -171,11 +171,11 @@ void X11Client::UpdateTranslation(){
 
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)){
 		stackIndex = 0;
-		for(WManager::Container *pcontainer1 = pcontainer->pParent->pch; pcontainer1; ++stackIndex, pcontainer1 = pcontainer1->pnext)
-			if(pcontainer1 == pcontainer)
-				break;
-		
 		if(pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
+			for(WManager::Container *pcontainer1 = pcontainer->pParent->pch; pcontainer1; ++stackIndex, pcontainer1 = pcontainer1->pnext)
+				if(pcontainer1 == pcontainer)
+					break;
+		
 			float stackOffset = 1.0f/(float)std::max((unsigned long)pcontainer->pParent->stackQueue.size(),1lu);
 			pcontainer->titleSpan = glm::vec2((float)stackIndex*stackOffset,((float)stackIndex+1.0f)*stackOffset);
 

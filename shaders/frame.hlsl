@@ -21,8 +21,9 @@ const float2 vertexPositions[4] = {
 	float2(1.0f,1.0f)
 };
 
-static float2 xy0_1 = xy0+min(2.0f*titlePad*float2(1.0f,screen.x/screen.y),0.0f);
-static float2 xy1_1 = xy1+max(2.0f*titlePad*float2(1.0f,screen.x/screen.y),0.0f);
+static float2 titlePadAspect = 2.0f*titlePad*float2(1.0f,screen.x/screen.y);
+static float2 xy0_1 = xy0+min(titlePadAspect,0.0f);
+static float2 xy1_1 = xy1+max(titlePadAspect,0.0f);
 const float2 vertices[4] = {
 	xy0_1,
 	float2(xy1_1.x,xy0_1.y),
@@ -55,12 +56,18 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 
 #include "chamfer.hlsl"
 
+#ifndef STOCK_FRAME_STYLE
 #define STOCK_FRAME_STYLE 1 //select between two stock styles (1: chamfered edges, other: basic rectangle borders)
+#endif
+
+#ifndef DRAW_SHADOW
+#define DRAW_SHADOW 1 //set 1 to draw shadow
+#endif
 
 const float borderScaling = 1.0f;
 const float4 borderColor = float4(0.0f,0.0f,0.0f,1.0f);
 const float4 focusColor = float4(1.0f,0.6f,0.33f,1.0f);
-const float4 titleBackground[2] = {float4(0.4f,0.4f,0.4f,1.0f),float4(0.5,0.5,0.5,1.0f)};
+const float4 titleBackground[2] = {float4(0.4f,0.4f,0.4f,1.0f),float4(0.5,0.5,0.5,1.0f)}; //second value for alternating stack tabs
 const float4 taskSelectColor = float4(0.957f,0.910f,0.824f,1.0f);
 
 [[vk::binding(0)]] Texture2D<float4> content;
@@ -83,8 +90,9 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 
 	float2 borderScalingScr = borderScaling*screen*aspect;
 
-	float2 xy0_1 = xy0+min(2.0f*titlePad*aspect,0.0f);
-	float2 xy1_1 = xy1+max(2.0f*titlePad*aspect,0.0f);
+	float2 titlePadAspect = 2.0f*titlePad*aspect;
+	float2 xy0_1 = xy0+min(titlePadAspect,0.0f);
+	float2 xy1_1 = xy1+max(titlePadAspect,0.0f);
 
 	float2 a = screen*(0.5f*xy0_1+0.5f); //top-left corner in pixels
 	float2 b = screen*(0.5f*xy1_1+0.5f); //bottom-right corner in pixels
@@ -94,12 +102,21 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 	float2 q = posh.xy-center;
 
 #if STOCK_FRAME_STYLE == 1
-	// ----- frame 1: chamfered -------------------------
+	// ----- frame 1: chamfered (demo frame) ------------
 
 	float sr = ChamferMap(q,0.5f*d1-0.0130f*borderScalingScr.x,0.0195f*borderScalingScr.x);
 	if(sr > 0.0f){
-		//shadow region - to disable shadow, replace line below with: discard; return 0.0f;
-		return float4(0.0f,0.0f,0.0f,0.7f*saturate(1.0f-sr/(0.0078f*borderScalingScr.x)));
+		//shadow region
+#if DRAW_SHADOW
+		if(stackIndex == 0) //only first in stack casts a shadow
+			return float4(0.0f,0.0f,0.0f,0.7f*saturate(1.0f-sr/(0.0078f*borderScalingScr.x)));
+		else{
+#else
+		{
+#endif
+			discard;
+			return 0.0f;
+		}
 	}
 	float br = ChamferMap(q,0.5f*d1-0.0104f*borderScalingScr.x,0.0104f*borderScalingScr.x);
 	if(br > -0.5f){
@@ -122,8 +139,17 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 
 	float sr = RectangleMap(q,0.5f*d1-(0.0130f-0.0195f)*borderScalingScr.x);
 	if(sr > 0.0f){
-		//shadow region - to disable shadow, replace line below with: discard; return 0.0f;
-		return float4(0.0f,0.0f,0.0f,0.9f*saturate(1.0f-sr/(0.0078f*borderScalingScr.x)));
+		//shadow region
+#if DRAW_SHADOW
+		if(stackIndex == 0) //only first in stack casts a shadow
+			return float4(0.0f,0.0f,0.0f,0.9f*saturate(1.0f-sr/(0.0078f*borderScalingScr.x)));
+		else{
+#else
+		{
+#endif
+			discard;
+			return 0.0f;
+		}
 	}
 	float br = RectangleMap(q,0.5f*d1);
 	if(br > -0.5f){

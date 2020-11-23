@@ -5,7 +5,7 @@
 
 namespace WManager{
 
-Client::Client(Container *_pcontainer) : pcontainer(_pcontainer){
+Client::Client(Container *_pcontainer) : stackIndex(0), pcontainer(_pcontainer){
 	//
 }
 
