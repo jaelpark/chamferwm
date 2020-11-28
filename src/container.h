@@ -139,6 +139,7 @@ public:
 	static std::deque<WManager::Container *> rootQueue; //Root container queue in the order of creation. Mainly used for EWMH
 };
 
+//for diamond inheritance:
 /*class RootContainer : Container{
 public:
 	RootContainer(const char *);
@@ -146,6 +147,7 @@ public:
 	void Link(RootContainer *);
 	RootContainer *pRootNext; //Parallel workspace. To avoid bugs, pnext (null for root containers) will not be used for this.
 	char *pname;
+	//noComp
 };*/
 
 }

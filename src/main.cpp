@@ -233,7 +233,7 @@ public:
 		if(WManager::Container::ptreeFocus == pcollapsed){
 			WManager::Container *pNewFocus = proot;
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
-			Config::X11ContainerConfig *pNewFocus1 = dynamic_cast<Config::X11ContainerConfig *>(pNewFocus);
+			Config::X11ContainerConfig *pNewFocus1 = static_cast<Config::X11ContainerConfig *>(pNewFocus);
 			if(pNewFocus1->pcontainerInt->OnFocus())
 				pNewFocus1->Focus();
 		}
@@ -259,7 +259,7 @@ public:
 		if(premoved != pcontainer)
 			pcontainer->pParent->pch = 0;
 
-		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pcontainer);
+		Config::X11ContainerConfig *pcontainer1 = static_cast<Config::X11ContainerConfig *>(pcontainer);
 		if(pcontainer1->pcontainerInt->OnFocus())
 			pcontainer1->Focus();
 
@@ -385,7 +385,7 @@ public:
 				containerInt.vertexShader.c_str(),containerInt.geometryShader.c_str(),containerInt.fragmentShader.c_str()
 			};
 			//WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot(); //TODO: stack's root?
-			Backend::X11Container *proot = dynamic_cast<Backend::X11Container *>(WManager::Container::ptreeFocus->GetRoot());
+			Backend::X11Container *proot = static_cast<Backend::X11Container *>(WManager::Container::ptreeFocus->GetRoot());
 			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo,pshaderName);
 
 			if(pclient11) //in some cases the window is found to be unmanageable
@@ -403,7 +403,7 @@ public:
 			const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
 				containerInt.vertexShader.c_str(),containerInt.geometryShader.c_str(),containerInt.fragmentShader.c_str()
 			};
-			Backend::X11Container *pcontainer11 = dynamic_cast<Backend::X11Container *>(containerInt.pcontainer);
+			Backend::X11Container *pcontainer11 = static_cast<Backend::X11Container *>(containerInt.pcontainer);
 			Backend::X11Client *pclient11 = SetupClient(pcontainer11,pcreateInfo,pshaderName);
 			pcontainer11->SetClient(pclient11);
 			if(containerInt.pcontainer->flags & WManager::Container::FLAG_FLOATING)
@@ -478,7 +478,7 @@ public:
 		if(WManager::Container::ptreeFocus == pcontainer || WManager::Container::ptreeFocus == pcollapsed){
 			WManager::Container *pNewFocus = proot;
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
-			Config::X11ContainerConfig *pNewFocus1 = dynamic_cast<Config::X11ContainerConfig *>(pNewFocus);
+			Config::X11ContainerConfig *pNewFocus1 = static_cast<Config::X11ContainerConfig *>(pNewFocus);
 			if(pNewFocus1->pcontainerInt->OnFocus())
 				pNewFocus1->Focus();
 		}
@@ -516,7 +516,7 @@ public:
 	void SetFullscreen(Backend::X11Client *pclient, bool toggle){
 		if(!pclient || pclient->pcontainer == pclient->pcontainer->GetRoot())
 			return;
-		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
+		Config::X11ContainerConfig *pcontainer1 = static_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
 		if(pcontainer1->pcontainerInt->OnFullscreen(toggle))
 			pcontainer1->SetFullscreen(toggle);
 	}
@@ -525,7 +525,7 @@ public:
 	void SetFocus(Backend::X11Client *pclient){
 		if(!pclient || pclient->pcontainer == pclient->pcontainer->GetRoot())
 			return;
-		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
+		Config::X11ContainerConfig *pcontainer1 = static_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
 		if(pcontainer1->pcontainerInt->OnFocus())
 			pcontainer1->Focus();
 	}
@@ -533,14 +533,14 @@ public:
 	void Enter(Backend::X11Client *pclient){
 		if(!pclient || pclient->pcontainer == pclient->pcontainer->GetRoot())
 			return;
-		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
+		Config::X11ContainerConfig *pcontainer1 = static_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
 		pcontainer1->pcontainerInt->OnEnter();
 	}
 
 	void PropertyChange(Backend::X11Client *pclient, PROPERTY_ID id, const Backend::BackendProperty *pProperty){
 		if(!pclient){
 			//root window
-			const Backend::BackendPixmapProperty *pPixmapProperty = dynamic_cast<const Backend::BackendPixmapProperty *>(pProperty);
+			const Backend::BackendPixmapProperty *pPixmapProperty = static_cast<const Backend::BackendPixmapProperty *>(pProperty);
 			Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 			if(pcomp11)
 				pcomp11->SetBackgroundPixmap(pPixmapProperty);
@@ -548,19 +548,19 @@ public:
 		}
 		if(pclient->pcontainer == pclient->pcontainer->GetRoot())
 			return;
-		Config::X11ContainerConfig *pcontainer1 = dynamic_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
+		Config::X11ContainerConfig *pcontainer1 = static_cast<Config::X11ContainerConfig *>(pclient->pcontainer);
 		if(id == PROPERTY_ID_WM_NAME){
-			pcontainer1->pcontainerInt->wm_name = dynamic_cast<const Backend::BackendStringProperty *>(pProperty)->pstr;
+			pcontainer1->pcontainerInt->wm_name = static_cast<const Backend::BackendStringProperty *>(pProperty)->pstr;
 			pcontainer1->pcontainerInt->OnPropertyChange(Config::ContainerInterface::PROPERTY_ID_NAME);
 		}else
 		if(id == PROPERTY_ID_WM_CLASS){
-			pcontainer1->pcontainerInt->wm_name = dynamic_cast<const Backend::BackendStringProperty *>(pProperty)->pstr;
+			pcontainer1->pcontainerInt->wm_name = static_cast<const Backend::BackendStringProperty *>(pProperty)->pstr;
 			pcontainer1->pcontainerInt->OnPropertyChange(Config::ContainerInterface::PROPERTY_ID_CLASS);
 		}else
 		if(id == PROPERTY_ID_TRANSIENT_FOR){
 			//
 			//TODO!!
-			/*WManager::Container *pstackContainer = dynamic_cast<const Backend::BackendContainerProperty *>(pProperty)->pcontainer;
+			/*WManager::Container *pstackContainer = static_cast<const Backend::BackendContainerProperty *>(pProperty)->pcontainer;
 			auto m = std::find_if(stackAppendix.begin(),stackAppendix.end(),[&](auto &p)->bool{
 				return pclient == p.second;
 			});
@@ -610,7 +610,7 @@ public:
 			WManager::Container *pNewFocus = proot;
 			//for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():pcontainer->pch);
 			for(WManager::Container *pcontainer = pNewFocus; pcontainer; pNewFocus = pcontainer, pcontainer = pcontainer->GetFocus());
-			Config::X11ContainerConfig *pNewFocus1 = dynamic_cast<Config::X11ContainerConfig *>(pNewFocus);
+			Config::X11ContainerConfig *pNewFocus1 = static_cast<Config::X11ContainerConfig *>(pNewFocus);
 			if(pNewFocus1->pcontainerInt->OnFocus())
 				pNewFocus1->Focus();
 		}
@@ -634,7 +634,7 @@ public:
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 		if(!pcomp11)
 			return false;
-		const Backend::X11Event *pevent11 = dynamic_cast<const Backend::X11Event *>(pevent);
+		const Backend::X11Event *pevent11 = static_cast<const Backend::X11Event *>(pevent);
 		return pcomp11->FilterEvent(pevent11);
 	}
 
@@ -697,7 +697,7 @@ public:
 
 		Backend::DebugClient *pclient;
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
-		Backend::DebugContainer *pdebugContainer = dynamic_cast<Backend::DebugContainer *>(containerInt.pcontainer);
+		Backend::DebugContainer *pdebugContainer = static_cast<Backend::DebugContainer *>(containerInt.pcontainer);
 		if(!pcomp11)
 			pclient = new Backend::DebugClient(pdebugContainer,pcreateInfo);
 		else pclient = new Compositor::X11DebugClientFrame(pdebugContainer,pcreateInfo,pshaderName,pcomp11);
@@ -821,10 +821,11 @@ public:
 
 	void Present(){
 		Config::ContainerInterface::UpdateShaders();
-		if(!PollFrameFence())
+		Backend::X11Container *proot = static_cast<Backend::X11Container *>(WManager::Container::ptreeFocus->GetRoot());
+
+		if(!PollFrameFence(proot->noComp))
 			return;
 
-		WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
 		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
 		Compositor::X11Compositor::Present();
 	}
@@ -875,7 +876,7 @@ public:
 
 	void Present(){
 		Config::ContainerInterface::UpdateShaders();
-		if(!PollFrameFence())
+		if(!PollFrameFence(false))
 			return;
 		
 		WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();

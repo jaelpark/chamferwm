@@ -165,8 +165,8 @@ public:
 	void StackRecursiveAppendix(const WManager::Client *);
 	void StackRecursive(const WManager::Container *);
 	void StackClients(const WManager::Container *);
-	void ForEachRecursive(WManager::Container *, WManager::Container *, void (*)(WManager::Container *, WManager::Client *));
-	void ForEach(WManager::Container *, void (*)(WManager::Container *, WManager::Client *));
+	void ForEachRecursive(X11Container *, WManager::Container *, void (*)(X11Container *, WManager::Client *));
+	void ForEach(X11Container *, void (*)(X11Container *, WManager::Client *));
 	void BindKey(uint, uint, uint);
 	void MapKey(uint, uint, uint);
 	void GrabKeyboard(bool);

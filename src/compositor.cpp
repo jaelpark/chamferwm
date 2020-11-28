@@ -228,7 +228,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), pfsApp(0), pfsAppPrev(0), frameApproval(false), unredirected(false), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), hostMemoryImport(pconfig->hostMemoryImport), unredirOnFullscreen(pconfig->unredirOnFullscreen), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration), pfontName(pconfig->pfontName), fontSize(pconfig->fontSize){
+CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), pfsApp(0), pfsAppPrev(0), frameApproval(false), suspended(false), unredirected(false), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), hostMemoryImport(pconfig->hostMemoryImport), unredirOnFullscreen(pconfig->unredirOnFullscreen), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration), pfontName(pconfig->pfontName), fontSize(pconfig->fontSize){
 	//
 }
 
@@ -865,12 +865,18 @@ void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontaine
 	CreateRenderQueueAppendix(pcontainer->pclient,pfocus);
 }
 
-bool CompositorInterface::PollFrameFence(){
+bool CompositorInterface::PollFrameFence(bool suspend){
+	if(suspend != suspended && !unredirected){
+		if(suspend)
+			Suspend();
+		else Resume();
+	}
 	if(unredirOnFullscreen){
 		if(pfsApp && !unredirected){
 			DebugPrintf(stdout,"unredirect %p\n",pfsApp);
 			pfsApp->Exclude(true);
 			pfsAppPrev = pfsApp;
+			unredirected = true;
 			Suspend();
 		}else
 		if(!pfsApp && unredirected){
@@ -879,9 +885,13 @@ bool CompositorInterface::PollFrameFence(){
 				pfsAppPrev->Exclude(false);
 				pfsAppPrev = 0;
 			}
+			unredirected = false;
 			Resume();
 		}
 	}
+
+	if(suspended && !unredirected)
+		return false;
 
 	frameApproval = false;
 	if(unredirected)
@@ -1426,7 +1436,8 @@ X11ClientFrame::X11ClientFrame(Backend::X11Container *pcontainer, const Backend:
 	//xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
 	windowPixmap = xcb_generate_id(pbackend->pcon);
 
-	if(!pcontainer->noComp){
+	Backend::X11Container *proot11 = static_cast<Backend::X11Container *>(pcontainer->GetRoot());
+	if(!proot11->noComp){
 		Redirect1();
 		StartComposition1();
 	}
@@ -1831,19 +1842,19 @@ void X11Compositor::Stop(){
 }
 
 void X11Compositor::Resume(){
-	if(!unredirected)
+	if(!suspended)
 		return;
 	xcb_map_window(pbackend->pcon,overlay);
 	xcb_flush(pbackend->pcon);
-	unredirected = false;
+	suspended = false;
 }
 
 void X11Compositor::Suspend(){
-	if(unredirected)
+	if(suspended)
 		return;
 	xcb_unmap_window(pbackend->pcon,overlay);
 	xcb_flush(pbackend->pcon);
-	unredirected = true;
+	suspended = true;
 }
 
 bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){

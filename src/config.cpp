@@ -426,7 +426,7 @@ X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WMana
 	//
 }
 
-X11ContainerConfig::X11ContainerConfig(Backend::X11Backend *_pbackend, bool noComp) : Backend::X11Container(_pbackend,noComp), ContainerConfig(_pbackend){
+X11ContainerConfig::X11ContainerConfig(Backend::X11Backend *_pbackend, bool _noComp) : Backend::X11Container(_pbackend,_noComp), ContainerConfig(_pbackend){
 	//
 	pcontainerInt->pcontainer = this;
 }
@@ -672,7 +672,7 @@ void BackendProxy::OnExit(){
 }
 
 BackendConfig::BackendConfig(BackendInterface *_pbackendInt) : pbackendInt(_pbackendInt){
-	pbackendInt->pbackend = this;//dynamic_cast<Backend::X11Backend *>(this);
+	pbackendInt->pbackend = this;
 }
 
 BackendConfig::~BackendConfig(){

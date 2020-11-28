@@ -133,7 +133,7 @@ protected:
 	void WaitIdle();
 	void CreateRenderQueueAppendix(const WManager::Client *, const WManager::Container *);
 	void CreateRenderQueue(const WManager::Container *, const WManager::Container *);
-	bool PollFrameFence();
+	bool PollFrameFence(bool);
 	void GenerateCommandBuffers(const WManager::Container *, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *, const WManager::Container *);
 	void Present();
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
@@ -250,7 +250,8 @@ protected:
 	ClientFrame *pfsApp; //fullscreen state app for the current frame (for unredirection)
 	ClientFrame *pfsAppPrev; //fullscreen state app during previous frame (for unredirection)
 	bool frameApproval;
-	bool unredirected;
+	bool suspended; //entire compositor is suspended - all windows are unredirected
+	bool unredirected; //one of the applications is underirected due to it being fullscreen
 	bool playingAnimation;
 
 	//config
