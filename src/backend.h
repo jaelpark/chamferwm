@@ -111,7 +111,7 @@ public:
 		const BackendStringProperty *pwmName;
 		const BackendStringProperty *pwmClass;
 	};
-	X11Client(WManager::Container *, const CreateInfo *);
+	X11Client(class X11Container *, const CreateInfo *);
 	~X11Client();
 	virtual void AdjustSurface1(){};
 	virtual void Redirect1(){};
@@ -134,14 +134,17 @@ public:
 
 class X11Container : public WManager::Container{
 public:
-	X11Container(class X11Backend *);
+	X11Container(class X11Backend *, bool);
 	X11Container(WManager::Container *, const WManager::Container::Setup &, class X11Backend *);
 	virtual ~X11Container();
 	void Focus1();
 	void Place1(WManager::Container *);
 	void Stack1();
 	void Fullscreen1();
+	void SetClient(X11Client *);
 	const X11Backend *pbackend;
+	X11Client *pclient11;
+	bool noComp;
 };
 
 class X11Backend : public BackendInterface{
@@ -258,7 +261,7 @@ public:
 	struct CreateInfo{
 		const class X11Backend *pbackend;
 	};
-	DebugClient(WManager::Container *, const CreateInfo *);
+	DebugClient(class DebugContainer *, const CreateInfo *);
 	~DebugClient();
 	virtual void AdjustSurface1(){};
 	virtual void SetTitle1(const char *){};
@@ -275,7 +278,9 @@ public:
 	void Focus1();
 	void Stack1();
 	//void Fullscreen1();
+	void SetClient(DebugClient *);
 	const X11Backend *pbackend;
+	DebugClient *pdebugClient;
 };
 
 class Debug : public X11Backend{

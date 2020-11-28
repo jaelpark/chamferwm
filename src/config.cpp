@@ -426,7 +426,7 @@ X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WMana
 	//
 }
 
-X11ContainerConfig::X11ContainerConfig(Backend::X11Backend *_pbackend) : Backend::X11Container(_pbackend), ContainerConfig(_pbackend){
+X11ContainerConfig::X11ContainerConfig(Backend::X11Backend *_pbackend, bool noComp) : Backend::X11Container(_pbackend,noComp), ContainerConfig(_pbackend){
 	//
 	pcontainerInt->pcontainer = this;
 }
@@ -541,7 +541,7 @@ boost::python::object BackendInterface::GetRoot(boost::python::object nameObj){
 		return boost::python::object();
 	}
 	Backend::X11Backend *pbackend11 = dynamic_cast<Backend::X11Backend *>(pbackend);
-	Config::X11ContainerConfig *pnewRoot = new Config::X11ContainerConfig(pbackend11);
+	Config::X11ContainerConfig *pnewRoot = new Config::X11ContainerConfig(pbackend11,name == "nocomp");
 	pnewRoot->SetName(name.c_str());
 	pParent->AppendRoot(pnewRoot);
 

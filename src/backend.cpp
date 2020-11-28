@@ -122,7 +122,7 @@ X11Event::~X11Event(){
 	//
 }
 
-X11Client::X11Client(WManager::Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend), flags(0){
+X11Client::X11Client(X11Container *pcontainer, const CreateInfo *pcreateInfo) : Client(pcontainer), window(pcreateInfo->window), pbackend(pcreateInfo->pbackend), flags(0){
 	uint values[1] = {XCB_EVENT_MASK_ENTER_WINDOW|XCB_EVENT_MASK_PROPERTY_CHANGE|XCB_EVENT_MASK_FOCUS_CHANGE};
 	xcb_change_window_attributes(pbackend->pcon,window,XCB_CW_EVENT_MASK,values);
 
@@ -280,7 +280,7 @@ void X11Client::Kill(){
 	xcb_flush(pbackend->pcon);
 }
 
-X11Container::X11Container(X11Backend *_pbackend) : WManager::Container(), pbackend(_pbackend){
+X11Container::X11Container(X11Backend *_pbackend, bool _noComp) : WManager::Container(), pbackend(_pbackend), noComp(_noComp){
 	//
 	uint values[1] = {WManager::Container::rootQueue.size()};
 	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
@@ -334,7 +334,7 @@ void X11Container::Focus1(){
 	}
 	const xcb_window_t *pfocusWindow;
 	if(pclient){
-		X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
+		//X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
 		pfocusWindow = &pclient11->window;
 
 		//TODO: how to handle Container::FLAG_NO_FOCUS?
@@ -353,7 +353,7 @@ void X11Container::Place1(WManager::Container *pOrigParent){
 	WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
 	if(pOrigParent->GetRoot() != proot){
 		if(GetRoot() == proot){
-			X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
+			//X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
 			xcb_map_window(pclient11->pbackend->pcon,pclient11->window);
 
 			pclient11->StartComposition1();
@@ -361,7 +361,7 @@ void X11Container::Place1(WManager::Container *pOrigParent){
 		}
 	}else{
 		if(GetRoot() != proot){
-			X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
+			//X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
 			xcb_unmap_window(pclient11->pbackend->pcon,pclient11->window);
 
 			pclient11->StopComposition1();
@@ -376,7 +376,7 @@ void X11Container::Stack1(){
 void X11Container::Fullscreen1(){
 	if(!pclient)
 		return;
-	X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
+	//X11Client *pclient11 = dynamic_cast<X11Client *>(pclient);
 	if(flags & FLAG_FULLSCREEN){
 		xcb_change_property(pbackend->pcon,XCB_PROP_MODE_APPEND,pclient11->window,pbackend->ewmh._NET_WM_STATE,XCB_ATOM_ATOM,32,1,&pbackend->ewmh._NET_WM_STATE_FULLSCREEN);
 	}else{
@@ -408,6 +408,11 @@ void X11Container::Fullscreen1(){
 	}
 
 	xcb_flush(pbackend->pcon);
+}
+
+void X11Container::SetClient(X11Client *_pclient11){
+	pclient11 = _pclient11; //avoid a bunch of dynamic_casts
+	pclient = pclient11;
 }
 
 X11Backend::X11Backend() : lastTime(XCB_CURRENT_TIME){
@@ -1635,7 +1640,7 @@ X11Client * Default::FindClient(xcb_window_t window, MODE mode) const{
 	return (*m).first;
 }
 
-DebugClient::DebugClient(WManager::Container *pcontainer, const DebugClient::CreateInfo *pcreateInfo) : Client(pcontainer), pbackend(pcreateInfo->pbackend){
+DebugClient::DebugClient(DebugContainer *pcontainer, const DebugClient::CreateInfo *pcreateInfo) : Client(pcontainer), pbackend(pcreateInfo->pbackend){
 	UpdateTranslation();
 	oldRect = rect;
 }
@@ -1727,6 +1732,11 @@ void DebugContainer::Focus1(){
 void DebugContainer::Stack1(){
 	//
 	printf("stacking ...\n");
+}
+
+void DebugContainer::SetClient(DebugClient *_pdebugClient){
+	pdebugClient = _pdebugClient;
+	pclient = _pdebugClient;
 }
 
 Debug::Debug() : X11Backend(){

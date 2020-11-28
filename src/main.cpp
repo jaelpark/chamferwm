@@ -384,7 +384,8 @@ public:
 			const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
 				containerInt.vertexShader.c_str(),containerInt.geometryShader.c_str(),containerInt.fragmentShader.c_str()
 			};
-			WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot(); //TODO: stack's root?
+			//WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot(); //TODO: stack's root?
+			Backend::X11Container *proot = dynamic_cast<Backend::X11Container *>(WManager::Container::ptreeFocus->GetRoot());
 			Backend::X11Client *pclient11 = SetupClient(proot,pcreateInfo,pshaderName);
 
 			if(pclient11) //in some cases the window is found to be unmanageable
@@ -402,8 +403,9 @@ public:
 			const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT] = {
 				containerInt.vertexShader.c_str(),containerInt.geometryShader.c_str(),containerInt.fragmentShader.c_str()
 			};
-			Backend::X11Client *pclient11 = SetupClient(containerInt.pcontainer,pcreateInfo,pshaderName);
-			containerInt.pcontainer->pclient = pclient11;
+			Backend::X11Container *pcontainer11 = dynamic_cast<Backend::X11Container *>(containerInt.pcontainer);
+			Backend::X11Client *pclient11 = SetupClient(pcontainer11,pcreateInfo,pshaderName);
+			pcontainer11->SetClient(pclient11);
 			if(containerInt.pcontainer->flags & WManager::Container::FLAG_FLOATING)
 				stackAppendix.push_back(StackAppendixElement(pcreateInfo->pstackClient,pclient11));
 
@@ -414,7 +416,7 @@ public:
 		}
 	}
 
-	Backend::X11Client * SetupClient(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *pcreateInfo, const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT]){
+	Backend::X11Client * SetupClient(Backend::X11Container *pcontainer, const Backend::X11Client::CreateInfo *pcreateInfo, const char *pshaderName[Compositor::Pipeline::SHADER_MODULE_COUNT]){
 		Backend::X11Client *pclient11;
 		Compositor::X11Compositor *pcomp11 = dynamic_cast<Compositor::X11Compositor *>(pcomp);
 		if(!pcomp11)
@@ -695,10 +697,13 @@ public:
 
 		Backend::DebugClient *pclient;
 		Compositor::X11DebugCompositor *pcomp11 = dynamic_cast<Compositor::X11DebugCompositor *>(pcomp);
+		Backend::DebugContainer *pdebugContainer = dynamic_cast<Backend::DebugContainer *>(containerInt.pcontainer);
 		if(!pcomp11)
-			pclient = new Backend::DebugClient(containerInt.pcontainer,pcreateInfo);
-		else pclient = new Compositor::X11DebugClientFrame(containerInt.pcontainer,pcreateInfo,pshaderName,pcomp11);
-		containerInt.pcontainer->pclient = pclient;
+			pclient = new Backend::DebugClient(pdebugContainer,pcreateInfo);
+		else pclient = new Compositor::X11DebugClientFrame(pdebugContainer,pcreateInfo,pshaderName,pcomp11);
+		pdebugContainer->SetClient(pclient);
+		//containerInt.pcontainer->pclient = pclient;
+		//
 
 		containerInt.OnCreate();
 

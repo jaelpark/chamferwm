@@ -105,7 +105,7 @@ public:
 class X11ContainerConfig : public Backend::X11Container, public ContainerConfig{
 public:
 	X11ContainerConfig(ContainerInterface *, WManager::Container *, const WManager::Container::Setup &, class Backend::X11Backend *);
-	X11ContainerConfig(class Backend::X11Backend *);
+	X11ContainerConfig(class Backend::X11Backend *, bool = false);
 	~X11ContainerConfig();
 };
 

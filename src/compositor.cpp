@@ -1421,13 +1421,15 @@ VKAPI_ATTR VkBool32 VKAPI_CALL CompositorInterface::ValidationLayerDebugCallback
 	return VK_FALSE;
 }
 
-X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(_pshaderName,_pcomp){
+//X11ClientFrame::X11ClientFrame(WManager::Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(_pshaderName,_pcomp){
+X11ClientFrame::X11ClientFrame(Backend::X11Container *pcontainer, const Backend::X11Client::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : X11Client(pcontainer,_pcreateInfo), ClientFrame(_pshaderName,_pcomp){
 	//xcb_composite_redirect_window(pbackend->pcon,window,XCB_COMPOSITE_REDIRECT_MANUAL);
-	Redirect1();
-
 	windowPixmap = xcb_generate_id(pbackend->pcon);
 
-	StartComposition1();
+	if(!pcontainer->noComp){
+		Redirect1();
+		StartComposition1();
+	}
 }
 
 X11ClientFrame::~X11ClientFrame(){
@@ -1958,7 +1960,7 @@ glm::vec2 X11Compositor::GetDPI() const{
 	return glm::vec2(25.4f*(float)pbackend->pscr->width_in_pixels/(float)pbackend->pscr->width_in_millimeters,25.4f*(float)pbackend->pscr->height_in_pixels/(float)pbackend->pscr->height_in_millimeters);
 }
 
-X11DebugClientFrame::X11DebugClientFrame(WManager::Container *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : DebugClient(pcontainer,_pcreateInfo), ClientFrame(_pshaderName,_pcomp){
+X11DebugClientFrame::X11DebugClientFrame(Backend::DebugContainer *pcontainer, const Backend::DebugClient::CreateInfo *_pcreateInfo, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *_pcomp) : DebugClient(pcontainer,_pcreateInfo), ClientFrame(_pshaderName,_pcomp){
 	//
 	StartComposition1();
 }

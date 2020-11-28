@@ -270,7 +270,7 @@ protected:
 
 class X11ClientFrame : public Backend::X11Client, public ClientFrame{
 public:
-	X11ClientFrame(WManager::Container *, const Backend::X11Client::CreateInfo *, const char *[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *);
+	X11ClientFrame(Backend::X11Container *, const Backend::X11Client::CreateInfo *, const char *[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *);
 	~X11ClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	void Exclude(bool);
@@ -334,7 +334,7 @@ protected:
 
 class X11DebugClientFrame : public Backend::DebugClient, public ClientFrame{
 public:
-	X11DebugClientFrame(WManager::Container *, const Backend::DebugClient::CreateInfo *, const char *[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *);
+	X11DebugClientFrame(Backend::DebugContainer *, const Backend::DebugClient::CreateInfo *, const char *[Pipeline::SHADER_MODULE_COUNT], CompositorInterface *);
 	~X11DebugClientFrame();
 	void UpdateContents(const VkCommandBuffer *);
 	void AdjustSurface1();
