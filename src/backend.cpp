@@ -691,7 +691,9 @@ void Default::Start(){
 		ewmh._NET_WM_STATE_FULLSCREEN,
 		ewmh._NET_WM_STATE_DEMANDS_ATTENTION,
 		ewmh._NET_ACTIVE_WINDOW,
-		ewmh._NET_CLOSE_WINDOW
+		ewmh._NET_CLOSE_WINDOW,
+		//ewmh._NET_WM_DESKTOP,
+		ewmh._NET_MOVERESIZE_WINDOW
 	};
 
 	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
@@ -1466,11 +1468,27 @@ sint Default::HandleEvent(bool forcePoll){
 			if(pev->type == ewmh._NET_WM_MOVERESIZE){
 				//---
 			}else
+			/*if(pev->type == ewmh._NET_WM_DESKTOP){
+				uint desktopIndex = pev->data.data32[0];
+				WManager::Container *pcontainer;
+				if(desktopIndex >= WManager::Container::rootQueue.size()){
+					char name[32];
+					snprintf(name,sizeof(name),"%u",desktopIndex+1);
+					pcontainer = CreateWorkspace(name);
+					break;
+				}else pcontainer = WManager::Container::rootQueue[desktopIndex];
+				MoveContainer(pclient1->pcontainer,pcontainer);
+			}else*/
 			if(pev->type == ewmh._NET_MOVERESIZE_WINDOW){
-				//TODO: create configure request
+				if(!(pclient1->pcontainer->flags & WManager::Container::FLAG_FLOATING))
+					break; //for now only allow moving floating windows
+				sint values[4] = {pev->data.data32[1],pev->data.data32[2],
+					pev->data.data32[3],pev->data.data32[4]};
+				xcb_configure_window(pcon,pclient1->window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,values);
+
+				WManager::Rectangle rect = {values[0],values[1],values[2],values[3]};
+				pclient1->UpdateTranslation(&rect);
 			}
-			//_NET_WM_STATE
-			//_NET_WM_STATE_FULLSCREEN, _NET_WM_STATE_DEMANDS_ATTENTION
 			result = 1;
 			}
 			break;
