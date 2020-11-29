@@ -201,7 +201,7 @@ void ContainerInterface::UpdateShaders(){
 			continue;
 		}
 		Compositor::ClientFrame *pclientFrame = dynamic_cast<Compositor::ClientFrame *>((*m)->pcontainer->pclient);
-		if(!pclientFrame){
+		if(!pclientFrame || !pclientFrame->enabled){
 			++m;
 			continue;
 		}

@@ -80,7 +80,9 @@ protected:
 	class Text *ptitle;
 	std::string title;
 	uint surfaceDepth;
+public:
 	bool enabled; //in use and ready to draw
+protected:
 	bool fullRegionUpdate;
 	bool animationCompleted;
 };
