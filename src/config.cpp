@@ -99,8 +99,10 @@ void ContainerInterface::OnPropertyChange(PROPERTY_ID id){
 }
 
 boost::python::object ContainerInterface::GetNext() const{
-	if(!pcontainer)
+	if(!pcontainer){
+		PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
 		return boost::python::object();
+	}
 	WManager::Container *pnext = pcontainer->GetNext();
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pnext);
 	if(pcontainer1)
@@ -109,8 +111,10 @@ boost::python::object ContainerInterface::GetNext() const{
 }
 
 boost::python::object ContainerInterface::GetPrev() const{
-	if(!pcontainer)
+	if(!pcontainer){
+		PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
 		return boost::python::object();
+	}
 	WManager::Container *pPrev = pcontainer->GetPrev();
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pPrev);
 	if(pcontainer1)
@@ -119,8 +123,10 @@ boost::python::object ContainerInterface::GetPrev() const{
 }
 
 boost::python::object ContainerInterface::GetParent() const{
-	if(!pcontainer)
+	if(!pcontainer){
+		PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
 		return boost::python::object();
+	}
 	WManager::Container *pParent = pcontainer->GetParent();
 	if(!pParent)
 		return boost::python::object();
@@ -131,8 +137,10 @@ boost::python::object ContainerInterface::GetParent() const{
 }
 
 boost::python::object ContainerInterface::GetFocus() const{
-	if(!pcontainer)
+	if(!pcontainer){
+		PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
 		return boost::python::object();
+	}
 	WManager::Container *pfocus = pcontainer->GetFocus();
 	ContainerConfig *pcontainer1 = dynamic_cast<ContainerConfig *>(pfocus);
 	if(pcontainer1)
@@ -141,6 +149,10 @@ boost::python::object ContainerInterface::GetFocus() const{
 }
 
 boost::python::object ContainerInterface::GetTiledFocus() const{
+	if(!pcontainer){
+		PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
+		return boost::python::object();
+	}
 	if(WManager::Container::tiledFocusQueue.size() == 0)
 		return boost::python::object();
 	
@@ -161,6 +173,10 @@ boost::python::object ContainerInterface::GetTiledFocus() const{
 }
 
 boost::python::object ContainerInterface::GetFloatFocus() const{
+	if(!pcontainer){
+		PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
+		return boost::python::object();
+	}
 	if(WManager::Container::floatFocusQueue.size() == 0)
 		return boost::python::object();
 	
@@ -179,7 +195,10 @@ boost::python::object ContainerInterface::GetFloatFocus() const{
 }
 
 void ContainerInterface::Move(boost::python::object containerObject){
-	//
+	if(!pcontainer){
+		PyErr_SetString(PyExc_ValueError,"Invalid or expired container.");
+		return;
+	}
 	boost::python::extract<Config::ContainerInterface &> containerExtract(containerObject);
 	if(!containerExtract.check()){
 		DebugPrintf(stderr,"Move(): Invalid container parameter.\n");
