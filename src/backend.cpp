@@ -486,6 +486,8 @@ void X11Backend::StackClients(const WManager::Container *proot){
 
 	appendixQueue.clear();
 	for(auto &p : *pstackAppendix){
+		if(!p.second)
+			continue;
 		if(p.first){
 			appendixQueue.push_back(p);
 			continue;
@@ -500,6 +502,8 @@ void X11Backend::StackClients(const WManager::Container *proot){
 	StackRecursive(proot);
 
 	for(auto m = appendixQueue.begin(); m != appendixQueue.end();){
+		if(!(*m).second)
+			continue;
 		auto k = std::find_if(appendixQueue.begin(),appendixQueue.end(),[&](auto &p)->bool{
 			return (*m).first == p.second;
 		});
@@ -519,6 +523,8 @@ void X11Backend::StackClients(const WManager::Container *proot){
 	}
 
 	for(auto &p : appendixQueue){ //stack the remaining (untransient) windows
+		if(!p.second)
+			continue;
 		X11Client *pclient11 = static_cast<X11Client *>(p.second);
 
 		static uint values[1] = {XCB_STACK_MODE_ABOVE};

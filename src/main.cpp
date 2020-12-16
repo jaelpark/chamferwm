@@ -406,7 +406,7 @@ public:
 			Backend::X11Container *pcontainer11 = static_cast<Backend::X11Container *>(containerInt.pcontainer);
 			Backend::X11Client *pclient11 = SetupClient(pcontainer11,pcreateInfo,pshaderName);
 			pcontainer11->SetClient(pclient11);
-			if(containerInt.pcontainer->flags & WManager::Container::FLAG_FLOATING)
+			if(pclient11 && containerInt.pcontainer->flags & WManager::Container::FLAG_FLOATING)
 				stackAppendix.push_back(StackAppendixElement(pcreateInfo->pstackClient,pclient11));
 
 			containerInt.DeferredPropertyTransfer();
@@ -498,7 +498,8 @@ public:
 		static WManager::Client dummyClient(0); //base client being unavailable means that the client is stacked on top of everything else
 	
 		pcontainer->flags |= WManager::Container::FLAG_FLOATING;
-		stackAppendix.push_back(StackAppendixElement(&dummyClient,pcontainer->pclient));
+		if(pcontainer->pclient)
+			stackAppendix.push_back(StackAppendixElement(&dummyClient,pcontainer->pclient));
 
 		pcontainer->pParent = proot;
 		pcontainer->Focus();
