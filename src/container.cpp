@@ -269,6 +269,8 @@ void Container::SetFullscreen(bool toggle){
 	else flags &= ~FLAG_FULLSCREEN;
 
 	Fullscreen1();
+	if(flags & FLAG_FLOATING)
+		return;
 	Translate();
 }
 
@@ -615,6 +617,8 @@ void Container::Stack(){
 
 void Container::SetLayout(LAYOUT layout){
 	this->layout = layout;
+	if(flags & FLAG_FLOATING)
+		return;
 	Translate();
 }
 
