@@ -646,7 +646,7 @@ void Default::Start(){
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_EXPOSURE
-		|XCB_EVENT_MASK_PROPERTY_CHANGE,0,0,0}; //[2] for later use
+		|XCB_EVENT_MASK_PROPERTY_CHANGE,0,0,0}; //[4] for later use
 	xcb_void_cookie_t cookie = xcb_change_window_attributes_checked(pcon,pscr->root,XCB_CW_EVENT_MASK,values);
 	xcb_generic_error_t *perr = xcb_request_check(pcon,cookie);
 
@@ -882,7 +882,7 @@ sint Default::HandleEvent(bool forcePoll){
 			}
 
 			//center the window to screen, otherwise it might end up to the left upper corner
-			if(!allowPositionConfig){
+			/*if(!allowPositionConfig){
 				if((rect.x == 0 && pev->value_mask & XCB_CONFIG_WINDOW_X) || (mrect != configCache.end() && (*mrect).second.x == 0 && !(pev->value_mask & XCB_CONFIG_WINDOW_X))){ //TODO: need this same check in MAP_REQUEST
 					rect.x = (pscr->width_in_pixels-rect.w)/2;
 					pev->value_mask |= XCB_CONFIG_WINDOW_X;
@@ -891,7 +891,7 @@ sint Default::HandleEvent(bool forcePoll){
 					rect.y = (pscr->height_in_pixels-rect.h)/2;
 					pev->value_mask |= XCB_CONFIG_WINDOW_Y;
 				}
-			}
+			}*/
 			
 			if(mrect == configCache.end()){
 				//an entry should always be present, since CREATE_NOTIFY creates one
@@ -1159,7 +1159,7 @@ sint Default::HandleEvent(bool forcePoll){
 				netClientList.push_back(p.first->window);
 			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
 
-			xcb_grab_button(pcon,0,pev->window,XCB_EVENT_MASK_BUTTON_PRESS,//|XCB_EVENT_MASK_BUTTON_RELEASE,
+			xcb_grab_button(pcon,0,pev->window,XCB_EVENT_MASK_BUTTON_PRESS,
 				XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,1,XCB_MOD_MASK_1);
 	
 			//check fullscreen
@@ -1546,8 +1546,10 @@ sint Default::HandleEvent(bool forcePoll){
 			dragRootX = pev->root_x;
 			dragRootY = pev->root_y;
 
-			xcb_grab_pointer(pcon,0,pscr->root,XCB_EVENT_MASK_BUTTON_RELEASE|XCB_EVENT_MASK_POINTER_MOTION,
+			xcb_grab_pointer(pcon,0,pscr->root,
+				XCB_EVENT_MASK_BUTTON_RELEASE|XCB_EVENT_MASK_POINTER_MOTION,
 				XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,XCB_CURRENT_TIME);
+			//xcb_allow_events(pcon,XCB_ALLOW_REPLAY_POINTER,pev->time);
 			}
 			break;
 		case XCB_BUTTON_RELEASE:{
