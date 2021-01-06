@@ -9,6 +9,7 @@
 #include <vector>
 #include <deque>
 #include <set>
+#include <tuple>
 
 typedef unsigned int uint;
 typedef int sint;
