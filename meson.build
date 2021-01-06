@@ -26,11 +26,14 @@ xcb = [
 	dependency('xcb-dri3'),
 	dependency('xcb-composite'),
 	dependency('xcb-icccm'),
-	dependency('xcb-ewmh')
+	dependency('xcb-ewmh'),
+	dependency('xcb-randr'),
+	dependency('xcb-util')
 ]
 
 vk = [
 	dependency('vulkan'),
+	dependency('glm')
 	#dependency('gbm')
 ]
 
