@@ -5,7 +5,6 @@
 #include "compositor.h"
 
 #include <algorithm>
-//#include <gbm.h>
 #include <unistd.h>
 
 #include "spirv_reflect.h"
@@ -209,38 +208,44 @@ TexturePixmap::~TexturePixmap(){
 
 //only pixmaps that correspond to the created texture in size should be attached
 void TexturePixmap::Attach(xcb_pixmap_t pixmap){
-	xcb_dri3_buffer_from_pixmap_cookie_t bufferFromPixmapCookie = xcb_dri3_buffer_from_pixmap(pcomp11->pbackend->pcon,pixmap);
-	xcb_dri3_buffer_from_pixmap_reply_t *pbufferFromPixmapReply = xcb_dri3_buffer_from_pixmap_reply(pcomp11->pbackend->pcon,bufferFromPixmapCookie,0);
+	//xcb_dri3_buffer_from_pixmap_cookie_t bufferFromPixmapCookie = xcb_dri3_buffer_from_pixmap(pcomp11->pbackend->pcon,pixmap);
+	xcb_dri3_buffers_from_pixmap_cookie_t buffersFromPixmapCookie = xcb_dri3_buffers_from_pixmap(pcomp11->pbackend->pcon,pixmap);
 
-	dmafd = xcb_dri3_buffer_from_pixmap_reply_fds(pcomp11->pbackend->pcon,pbufferFromPixmapReply)[0]; //TODO: get all planes?
+	//xcb_dri3_buffer_from_pixmap_reply_t *pbufferFromPixmapReply = xcb_dri3_buffer_from_pixmap_reply(pcomp11->pbackend->pcon,bufferFromPixmapCookie,0);
+	xcb_dri3_buffers_from_pixmap_reply_t *pbuffersFromPixmapReply = xcb_dri3_buffers_from_pixmap_reply(pcomp11->pbackend->pcon,buffersFromPixmapCookie,0);
 
-	/*struct gbm_import_fd_data gbmImportFdData = {
-		.fd = dmafd,
-		.width = w,
-		.height = h,
-		.stride = pbufferFromPixmapReply->stride,
-		.format = GBM_FORMAT_ARGB8888
-	};
-	pgbmBufferObject = gbm_bo_import(pcomp11->pgbmdev,GBM_BO_IMPORT_FD,&gbmImportFdData,0);//GBM_BO_USE_LINEAR);
-	if(!pgbmBufferObject) //TODO: import once for the first buffer, assume same modifiers and format for all?
-		throw Exception("Failed to import GBM buffer object.");*/
+	//dmafd = xcb_dri3_buffer_from_pixmap_reply_fds(pcomp11->pbackend->pcon,pbufferFromPixmapReply)[0]; //TODO: get all planes?
 
-	VkSubresourceLayout subresourceLayout = {};
+	dmafd = xcb_dri3_buffers_from_pixmap_buffers(pbuffersFromPixmapReply)[0];
+
+	//sint strides = xcb_dri3_buffers_from_pixmap_strides_length(pbuffersFromPixmapReply);
+	uint *pstrides = xcb_dri3_buffers_from_pixmap_strides(pbuffersFromPixmapReply);
+
+	//sint offsets = xcb_dri3_buffers_from_pixmap_offsets_length(pbuffersFromPixmapReply);
+	uint *poffsets = xcb_dri3_buffers_from_pixmap_offsets(pbuffersFromPixmapReply); //---
+
+	/*VkSubresourceLayout subresourceLayout = {};
 	subresourceLayout.offset = 0;
 	subresourceLayout.size = (uint)pbufferFromPixmapReply->size;//(uint)pbufferFromPixmapReply->stride*h;
 	subresourceLayout.rowPitch = (uint)pbufferFromPixmapReply->stride;
 	subresourceLayout.arrayPitch = subresourceLayout.size;
-	subresourceLayout.depthPitch = subresourceLayout.size;
+	subresourceLayout.depthPitch = subresourceLayout.size;*/
+	VkSubresourceLayout subresourceLayout[256];
+	for(uint i = 0; i < pbuffersFromPixmapReply->nfd; ++i){
+		subresourceLayout[i].offset = poffsets[i];
+		subresourceLayout[i].size = pstrides[i]*pbuffersFromPixmapReply->height;
+		subresourceLayout[i].rowPitch = pstrides[i];
+		subresourceLayout[i].arrayPitch = subresourceLayout[i].size;
+		subresourceLayout[i].depthPitch = subresourceLayout[i].size;
+	}
 
-	uint64_t modifier = 0;//gbm_bo_get_modifier(pgbmBufferObject);
-	/*sint planeCount = gbm_bo_get_plane_count(pgbmBufferObject);
-	DebugPrintf(stdout,"Image modifier: %llu, plane count: %d\n",modifier,planeCount);*/
+	//DebugPrintf(stdout,"Image modifier: %llu, plane count: %d\n",modifier,planeCount);
 
 	VkImageDrmFormatModifierExplicitCreateInfoEXT imageDrmFormatModifierExpCreateInfo = {};
 	imageDrmFormatModifierExpCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_EXPLICIT_CREATE_INFO_EXT;
-	imageDrmFormatModifierExpCreateInfo.drmFormatModifier = modifier;//gbm_bo_get_modifier(pgbmBufferObject);
-	imageDrmFormatModifierExpCreateInfo.drmFormatModifierPlaneCount = 1;
-	imageDrmFormatModifierExpCreateInfo.pPlaneLayouts = &subresourceLayout;
+	imageDrmFormatModifierExpCreateInfo.drmFormatModifier = pbuffersFromPixmapReply->modifier;
+	imageDrmFormatModifierExpCreateInfo.drmFormatModifierPlaneCount = pbuffersFromPixmapReply->nfd;
+	imageDrmFormatModifierExpCreateInfo.pPlaneLayouts = subresourceLayout;
 
 	VkExternalMemoryImageCreateInfo externalMemoryCreateInfo = {};
 	externalMemoryCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
@@ -300,14 +305,14 @@ void TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	if(vkBindImageMemory(pcomp->logicalDev,transferImage,transferMemory,0) != VK_SUCCESS)
 		throw Exception("Failed to bind transfer image memory.");
 
-	free(pbufferFromPixmapReply);
+	//free(pbufferFromPixmapReply);
+	free(pbuffersFromPixmapReply);
 }
 
 void TexturePixmap::Detach(){
 	vkFreeMemory(pcomp->logicalDev,transferMemory,0);
 	vkDestroyImage(pcomp->logicalDev,transferImage,0);
 
-	//gbm_bo_destroy(pgbmBufferObject);
 	close(dmafd);
 }
 

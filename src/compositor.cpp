@@ -11,7 +11,6 @@
 #include <sys/shm.h>
 #include <boost/container_hash/hash.hpp>
 
-//#include <gbm.h>
 #include <fcntl.h>
 #include <unistd.h>
 
