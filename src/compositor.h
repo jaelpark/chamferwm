@@ -136,7 +136,7 @@ protected:
 	void CreateRenderQueueAppendix(const WManager::Client *, const WManager::Container *);
 	void CreateRenderQueue(const WManager::Container *, const WManager::Container *);
 	bool PollFrameFence(bool);
-	void GenerateCommandBuffers(const WManager::Container *, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *, const WManager::Container *);
+	void GenerateCommandBuffers(const std::deque<std::tuple<WManager::Client *, bool>> *);
 	void Present();
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;
@@ -223,9 +223,6 @@ protected:
 		//uint flags;
 	};
 	std::vector<RenderObject> renderQueue;
-
-	typedef std::tuple<const WManager::Client *, WManager::Client *, ClientFrame *> AppendixQueueElement;
-	std::deque<AppendixQueueElement> appendixQueue;
 
 	//Used textures get stored for potential reuse before they get destroyed and while waiting for the pipeline to get flushed.
 	//Many of the allocated window textures will initially have some common reoccuring size.

@@ -145,6 +145,8 @@ public:
 	void MapKey(uint, uint, uint);
 	void GrabKeyboard(bool);
 
+	bool standaloneComp;
+
 	class BackendConfig *pbackend;
 
 	static void Bind(boost::python::object);
@@ -217,6 +219,10 @@ public:
 	~Loader();
 	void Run(const char *, const char *);
 
+	//backend
+	static bool standaloneComp;
+
+	//compositor
 	static sint deviceIndex;
 	static bool debugLayers;
 	static bool scissoring;

@@ -337,7 +337,7 @@ public:
 
 class DefaultBackend : public Backend::Default, public RunBackend{
 public:
-	DefaultBackend(Config::BackendInterface *_pbackendInt) : Default(), RunBackend(_pbackendInt){
+	DefaultBackend(Config::BackendInterface *_pbackendInt) : Default(_pbackendInt->standaloneComp), RunBackend(_pbackendInt){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -827,7 +827,7 @@ public:
 		if(!PollFrameFence(proot->noComp))
 			return;
 
-		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
+		GenerateCommandBuffers(&pbackend->clientStack);
 		Compositor::X11Compositor::Present();
 	}
 
@@ -880,8 +880,7 @@ public:
 		if(!PollFrameFence(false))
 			return;
 		
-		WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
-		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
+		GenerateCommandBuffers(&pbackend->clientStack);
 		Compositor::X11DebugCompositor::Present();
 	}
 
@@ -927,6 +926,7 @@ int main(sint argc, const char **pargv){
 
 	args::Group group_backend(parser,"Backend",args::Group::Validators::DontCare);
 	args::Flag debugBackend(group_backend,"debugBackend","Create a test environment for the compositor engine without redirection. The application will not act as a window manager.",{'d',"debug-backend"});
+	args::Flag staComp(group_backend,"standaloneCompositor","Standalone compositor for external window managers.",{'C',"standalone-compositor"});
 
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
 	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
@@ -958,6 +958,9 @@ int main(sint argc, const char **pargv){
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
 	pconfigLoader->Run(configPath?configPath.Get().c_str():0,"config.py");
+
+	if(staComp.Get())
+		Config::BackendInterface::pbackendInt->standaloneComp = true;
 
 	if(deviceIndexOpt)
 		Config::CompositorInterface::pcompositorInt->deviceIndex = deviceIndexOpt.Get();

@@ -813,57 +813,6 @@ void CompositorInterface::WaitIdle(){
 	vkDeviceWaitIdle(logicalDev);
 }
 
-void CompositorInterface::CreateRenderQueueAppendix(const WManager::Client *pclient, const WManager::Container *pfocus){
-	auto s = [&](auto &p)->bool{
-		return pclient == std::get<0>(p);
-	};
-	for(auto m = std::find_if(appendixQueue.begin(),appendixQueue.end(),s);
-		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
-		RenderObject renderObject;
-		renderObject.pclient = std::get<1>(*m);
-		renderObject.pclientFrame = std::get<2>(*m);
-		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
-		renderObject.pclientFrame->shaderFlags =
-			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
-			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
-			//|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
-			|renderObject.pclientFrame->shaderUserFlags;
-		renderQueue.push_back(renderObject);
-
-		CreateRenderQueueAppendix(std::get<1>(*m),pfocus);
-
-		m = appendixQueue.erase(m);
-	}
-}
-
-void CompositorInterface::CreateRenderQueue(const WManager::Container *pcontainer, const WManager::Container *pfocus){
-	if(!pcontainer->pch)
-		return; //workaround a bug with stackQueue, need to fix this properly
-	for(const WManager::Container *pcont : pcontainer->stackQueue){
-		if(pcont->pclient){
-			ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(pcont->pclient);
-			if(!pclientFrame || (!pclientFrame->enabled && pclientFrame != pfsApp))
-				continue;
-			
-			RenderObject renderObject;
-			renderObject.pclient = pcont->pclient;
-			renderObject.pclientFrame = pclientFrame;
-			renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
-			renderObject.pclientFrame->shaderFlags =
-				(pcont == pfocus || pcontainer == pfocus?ClientFrame::ClientFrame::SHADER_FLAG_FOCUS:0)
-				//|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0) //probably not required here
-				|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
-				|renderObject.pclientFrame->shaderUserFlags;
-			renderQueue.push_back(renderObject);
-		}
-		CreateRenderQueue(pcont,pcontainer == pfocus?pcont:pfocus);
-	}
-
-	if(!pcontainer->pclient)
-		return;
-	CreateRenderQueueAppendix(pcontainer->pclient,pfocus);
-}
-
 bool CompositorInterface::PollFrameFence(bool suspend){
 	if(suspend != suspended && !unredirected){
 		if(suspend)
@@ -941,68 +890,20 @@ bool CompositorInterface::PollFrameFence(bool suspend){
 	return true;
 }
 
-void CompositorInterface::GenerateCommandBuffers(const WManager::Container *proot, const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix, const WManager::Container *pfocus){
-	if(!proot)
-		return;
-	
+void CompositorInterface::GenerateCommandBuffers(const std::deque<std::tuple<WManager::Client *, bool>> *pclientStack){
 	//Create a render list elements arranged from back to front
 	renderQueue.clear();
-	appendixQueue.clear();
-	for(auto &p : *pstackAppendix){
-		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(p.second);
-		if(!pclientFrame || !pclientFrame->enabled)
+	for(auto m : *pclientStack){
+		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(std::get<0>(m));
+		if(!pclientFrame || (!pclientFrame->enabled && pclientFrame != pfsApp))
 			continue;
-		if(p.first){
-			appendixQueue.push_back(AppendixQueueElement(p.first,p.second,pclientFrame));
-			continue;
-		}
-		//desktop features are placed first
+
 		RenderObject renderObject;
-		renderObject.pclient = p.second;
+		renderObject.pclient = std::get<0>(m);
 		renderObject.pclientFrame = pclientFrame;
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
 		renderObject.pclientFrame->shaderFlags =
-			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
-			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
-			|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
-			|renderObject.pclientFrame->shaderUserFlags;
-		renderQueue.push_back(renderObject);
-	}
-
-	CreateRenderQueue(proot,pfocus);
-
-	for(auto m = appendixQueue.begin(); m != appendixQueue.end();){
-		auto k = std::find_if(appendixQueue.begin(),appendixQueue.end(),[&](auto &p)->bool{
-			return std::get<0>(*m) == std::get<1>(p);
-		});
-		if(k != appendixQueue.end()){
-			++m;
-			continue;
-		}
-			
-		RenderObject renderObject;
-		renderObject.pclient = std::get<1>(*m);
-		renderObject.pclientFrame = std::get<2>(*m);
-		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
-		renderObject.pclientFrame->shaderFlags =
-			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
-			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
-			|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
-			|renderObject.pclientFrame->shaderUserFlags;
-		renderQueue.push_back(renderObject);
-
-		CreateRenderQueueAppendix(std::get<1>(*m),pfocus);
-
-		m = appendixQueue.erase(m);
-	}
-
-	for(auto &p : appendixQueue){ //push the remaining (untransient) windows to the end of the queue
-		RenderObject renderObject;
-		renderObject.pclient = std::get<1>(p);
-		renderObject.pclientFrame = std::get<2>(p);
-		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
-		renderObject.pclientFrame->shaderFlags =
-			(renderObject.pclient->pcontainer == pfocus?ClientFrame::SHADER_FLAG_FOCUS:0)
+			(std::get<1>(m)?ClientFrame::SHADER_FLAG_FOCUS:0)
 			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
 			|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
 			|renderObject.pclientFrame->shaderUserFlags;
