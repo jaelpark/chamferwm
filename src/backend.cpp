@@ -1374,22 +1374,12 @@ sint Default::HandleEvent(bool forcePoll){
 			
 			unmappingQueue.push_back((*m).first);
 
-			std::iter_swap(m,clients.end()-1);
-			clients.pop_back();
-
-			printf("Before erase:\n");
-			for(auto &p : clientStack)
-				printf("\t:%p\n",std::get<0>(p));
-
-			printf("rect: %d, %d, %ux%u\nold: %d, %d, %ux%u\n",(*m).first->rect.x,(*m).first->rect.y,(*m).first->rect.w,(*m).first->rect.h,(*m).first->oldRect.x,(*m).first->oldRect.y,(*m).first->oldRect.w,(*m).first->oldRect.h);
+			//printf("rect: %d, %d, %ux%u\nold: %d, %d, %ux%u\n",(*m).first->rect.x,(*m).first->rect.y,(*m).first->rect.w,(*m).first->rect.h,
+				//(*m).first->oldRect.x,(*m).first->oldRect.y,(*m).first->oldRect.w,(*m).first->oldRect.h);
 
 			clientStack.erase(std::remove_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
 				return std::get<0>(p) == (*m).first;
 			}),clientStack.end());
-
-			printf("After erase:\n");
-			for(auto &p : clientStack)
-				printf("\t:%p\n",std::get<0>(p));
 
 			netClientList.clear();
 			for(auto &p : clients)
@@ -1397,6 +1387,9 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
 
 			DebugPrintf(stdout,"unmap notify window: %x, client: %p\n",pev->window,(*m).first);
+
+			std::iter_swap(m,clients.end()-1);
+			clients.pop_back();
 			}
 			break;
 		case XCB_PROPERTY_NOTIFY:{
@@ -1651,6 +1644,7 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_focus_in_event_t *pev = (xcb_focus_in_event_t*)pevent;
 			printf("XCB_FOCUS_IN: *** focus %x\n",pev->event);
 			//TODO: standaloneComp: set focus. All clients share the same container
+			//-traverse through parents and mark the focus in clientStack
 			}
 			break;
 		case XCB_ENTER_NOTIFY:{
