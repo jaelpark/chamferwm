@@ -827,7 +827,7 @@ public:
 		if(!PollFrameFence(proot->noComp))
 			return;
 
-		GenerateCommandBuffers(&pbackend->clientStack,WManager::Container::ptreeFocus);
+		GenerateCommandBuffers(&pbackend->clientStack,WManager::Container::ptreeFocus,pbackend->pfocusInClient);
 		Compositor::X11Compositor::Present();
 	}
 
@@ -880,7 +880,7 @@ public:
 		if(!PollFrameFence(false))
 			return;
 		
-		GenerateCommandBuffers(&pbackend->clientStack,WManager::Container::ptreeFocus);
+		GenerateCommandBuffers(&pbackend->clientStack,WManager::Container::ptreeFocus,pbackend->pfocusInClient);
 		Compositor::X11DebugCompositor::Present();
 	}
 

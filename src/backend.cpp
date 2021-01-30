@@ -690,7 +690,15 @@ void Default::Start(){
 	for(uint i = 0; i < ATOM_COUNT; ++i)
 		atoms[i] = GetAtom(patomStrs[i]);
 	
+	//setup EWMH hints
+	ewmh_window = xcb_generate_id(pcon);
+
+	values[0] = 1;
+	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,ewmh_window,pscr->root,
+		-1,-1,1,1,0,XCB_WINDOW_CLASS_INPUT_ONLY,XCB_COPY_FROM_PARENT,XCB_CW_OVERRIDE_REDIRECT,values);
+
 	if(standaloneComp){
+		DebugPrintf(stdout,"Launching in standalone compositor mode.\n");
 		//send an internal map notification to let the compositor know about the existing windows
 		xcb_query_tree_cookie_t queryTreeCookie = xcb_query_tree(pcon,pscr->root);
 		xcb_query_tree_reply_t *pqueryTreeReply = xcb_query_tree_reply(pcon,queryTreeCookie,0);
@@ -711,15 +719,8 @@ void Default::Start(){
 		xcb_flush(pcon);
 
 	}else{
-
 		const char wmName[] = "chamfer";
 
-		//setup EWMH hints
-		ewmh_window = xcb_generate_id(pcon);
-
-		values[0] = 1;
-		xcb_create_window(pcon,XCB_COPY_FROM_PARENT,ewmh_window,pscr->root,
-			-1,-1,1,1,0,XCB_WINDOW_CLASS_INPUT_ONLY,XCB_COPY_FROM_PARENT,XCB_CW_OVERRIDE_REDIRECT,values);
 		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,ewmh_window,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
 		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,ewmh_window,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
 
@@ -780,7 +781,6 @@ void Default::Start(){
 	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 
 	xcb_map_window(pcon,ewmh_window);
-
 }
 
 void Default::Stop(){
@@ -869,12 +869,12 @@ sint Default::HandleEvent(bool forcePoll){
 			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
+				return pev->window == std::get<0>(p);//p.first;
 			});
 			if(mrect == configCache.end()){
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				configCache.push_back(ConfigCacheElement(pev->window,rect,0));
 				mrect = configCache.end()-1;
-			}else (*mrect).second = rect;
+			}else std::get<1>(*mrect) = rect;
 
 			DebugPrintf(stdout,"create %x | %d,%d %ux%u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
 			}
@@ -889,7 +889,7 @@ sint Default::HandleEvent(bool forcePoll){
 				break;
 
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
+				return pev->window == std::get<0>(p);
 			});
 
 			//TODO: allow x,y configuration if dock or desktop feature
@@ -941,27 +941,27 @@ sint Default::HandleEvent(bool forcePoll){
 			
 			if(mrect == configCache.end()){
 				//an entry should always be present, since CREATE_NOTIFY creates one
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				configCache.push_back(ConfigCacheElement(pev->window,rect,0));
 				mrect = configCache.end()-1;
 			}else{
 				if(pev->value_mask & XCB_CONFIG_WINDOW_X)
-					(*mrect).second.x = rect.x;
+					std::get<1>(*mrect).x = rect.x;
 				if(pev->value_mask & XCB_CONFIG_WINDOW_Y)
-					(*mrect).second.y = rect.y;
+					std::get<1>(*mrect).y = rect.y;
 				if(pev->value_mask & XCB_CONFIG_WINDOW_WIDTH)
-					(*mrect).second.w = rect.w;
+					std::get<1>(*mrect).w = rect.w;
 				if(pev->value_mask & XCB_CONFIG_WINDOW_HEIGHT)
-					(*mrect).second.h = rect.h;
+					std::get<1>(*mrect).h = rect.h;
 			}
 
 			struct{
 				uint16_t m;
 				uint32_t v;
 			} maskm[] = {
-				{XCB_CONFIG_WINDOW_X,(*mrect).second.x},
-				{XCB_CONFIG_WINDOW_Y,(*mrect).second.y},
-				{XCB_CONFIG_WINDOW_WIDTH,(*mrect).second.w},
-				{XCB_CONFIG_WINDOW_HEIGHT,(*mrect).second.h},
+				{XCB_CONFIG_WINDOW_X,std::get<1>(*mrect).x},
+				{XCB_CONFIG_WINDOW_Y,std::get<1>(*mrect).y},
+				{XCB_CONFIG_WINDOW_WIDTH,std::get<1>(*mrect).w},
+				{XCB_CONFIG_WINDOW_HEIGHT,std::get<1>(*mrect).h},
 				{XCB_CONFIG_WINDOW_BORDER_WIDTH,pev->border_width},
 				{XCB_CONFIG_WINDOW_SIBLING,pev->sibling},
 				//{XCB_CONFIG_WINDOW_STACK_MODE,pev->stack_mode} //floating clients may request configuration, including stack mode, which ruins the stacking order we've already set
@@ -978,9 +978,9 @@ sint Default::HandleEvent(bool forcePoll){
 
 			//TODO: do this and the cache in CONFIGURE_NOTIFY?
 			if(pclient1)
-				pclient1->UpdateTranslation(&(*mrect).second);
+				pclient1->UpdateTranslation(&std::get<1>(*mrect));
 
-			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u (mask: %x) -> %d, %d, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height,pev->value_mask,(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
+			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u (mask: %x) -> %d, %d, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height,pev->value_mask,std::get<1>(*mrect).x,std::get<1>(*mrect).y,std::get<1>(*mrect).w,std::get<1>(*mrect).h);
 			}
 			break;
 		case XCB_MAP_REQUEST:{
@@ -1048,12 +1048,12 @@ sint Default::HandleEvent(bool forcePoll){
 			}
 
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
+				return pev->window == std::get<0>(p);
 			});
 			if(mrect == configCache.end()){
 				//an entry should always be present, since CREATE_NOTIFY creates one
 				WManager::Rectangle rect;
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				configCache.push_back(ConfigCacheElement(pev->window,rect,0));
 				mrect = configCache.end()-1;
 			}
 			//printf("Found cached location: %d, %d, %u, %u.\n",(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
@@ -1068,25 +1068,25 @@ sint Default::HandleEvent(bool forcePoll){
 				(sizeHints.min_width == sizeHints.max_width ||
 				sizeHints.min_height == sizeHints.max_height)){
 					//
-					(*mrect).second.w = sizeHints.min_width;
-					(*mrect).second.h = sizeHints.min_height;
+					std::get<1>(*mrect).w = sizeHints.min_width;
+					std::get<1>(*mrect).h = sizeHints.min_height;
 					hintFlags |= X11Client::CreateInfo::HINT_FLOATING;
 				}else
 				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_US_SIZE || sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_SIZE){
-					(*mrect).second.w = sizeHints.width;
-					(*mrect).second.h = sizeHints.height;
+					std::get<1>(*mrect).w = sizeHints.width;
+					std::get<1>(*mrect).h = sizeHints.height;
 				}
 
-				(*mrect).second.x = (pscr->width_in_pixels-(*mrect).second.w)/2;
-				(*mrect).second.y = (pscr->height_in_pixels-(*mrect).second.h)/2;
+				std::get<1>(*mrect).x = (pscr->width_in_pixels-std::get<1>(*mrect).w)/2;
+				std::get<1>(*mrect).y = (pscr->height_in_pixels-std::get<1>(*mrect).h)/2;
 				if((sizeHints.flags & XCB_ICCCM_SIZE_HINT_US_POSITION || sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_POSITION) && allowPositionConfig && (sizeHints.x != 0 && sizeHints.y != 0)){
-					(*mrect).second.x = sizeHints.x;
-					(*mrect).second.y = sizeHints.y;
+					std::get<1>(*mrect).x = sizeHints.x;
+					std::get<1>(*mrect).y = sizeHints.y;
 				}
-				uint values[4] = {(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h};
+				uint values[4] = {std::get<1>(*mrect).x,std::get<1>(*mrect).y,std::get<1>(*mrect).w,std::get<1>(*mrect).h};
 				xcb_configure_window(pcon,pev->window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,values);
 			}
-			printf("Size hints: %d, %d, %u, %u.\n",(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
+			printf("Size hints: %d, %d, %u, %u.\n",std::get<1>(*mrect).x,std::get<1>(*mrect).y,std::get<1>(*mrect).w,std::get<1>(*mrect).h);
 
 			if(propertyReplyWindowType){
 				//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
@@ -1167,7 +1167,7 @@ sint Default::HandleEvent(bool forcePoll){
 
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
-			createInfo.prect = &(*mrect).second;
+			createInfo.prect = &std::get<1>(*mrect);
 			createInfo.pstackClient =
 				!(hintFlags & X11Client::CreateInfo::HINT_DESKTOP)?
 					((pbaseClient && !(hintFlags & X11Client::CreateInfo::HINT_ABOVE))?
@@ -1221,19 +1221,38 @@ sint Default::HandleEvent(bool forcePoll){
 			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
+				return pev->window == std::get<0>(p);
 			});
 			if(mrect == configCache.end()){
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				configCache.push_back(ConfigCacheElement(pev->window,rect,pev->above_sibling));
 				mrect = configCache.end()-1;
-			}else (*mrect).second = rect;
+			}else{
+				std::get<1>(*mrect) = rect;
+				std::get<2>(*mrect) = pev->above_sibling;
+			}
 
 			X11Client *pclient1 = FindClient(pev->window,MODE_AUTOMATIC);
 
-			if(pclient1)
-				pclient1->UpdateTranslation(&(*mrect).second);
+			if(pclient1){
+				pclient1->UpdateTranslation(&std::get<1>(*mrect));
 
-			//TODO: handle stacking for standalone compositing
+				if(standaloneComp){
+					auto m1 = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
+						return static_cast<X11Client *>(p)->window == pev->window;
+					});
+					if(pev->above_sibling != XCB_NONE){
+						auto ma = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
+							return static_cast<X11Client *>(p)->window == pev->above_sibling;
+						});
+						if(ma != clientStack.end())
+							if(std::distance(m1,ma) > 0)
+								std::rotate(m1,m1+1,ma+1);
+							else std::rotate(ma+1,m1,m1+1);
+					}else std::rotate(clientStack.begin(),m1,m1+1);
+
+					result = 1;
+				}
+			}
 
 			DebugPrintf(stdout,"configure to %d,%d %ux%u, %x\n",pev->x,pev->y,pev->width,pev->height,pev->window);
 			}
@@ -1272,7 +1291,7 @@ sint Default::HandleEvent(bool forcePoll){
 			}
 
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
+				return pev->window == std::get<0>(p);
 			});
 			if(mrect == configCache.end()){
 				//it might be the case that no configure notification was received
@@ -1283,11 +1302,11 @@ sint Default::HandleEvent(bool forcePoll){
 				WManager::Rectangle rect = {pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
 				free(pgeometryReply);
 
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				configCache.push_back(ConfigCacheElement(pev->window,rect,0));
 				mrect = configCache.end()-1;
 
 			}
-			WManager::Rectangle *prect = &(*mrect).second;
+			WManager::Rectangle *prect = &std::get<1>(*mrect);
 
 			static WManager::Client dummyClient(0);
 
@@ -1337,9 +1356,18 @@ sint Default::HandleEvent(bool forcePoll){
 				break;
 			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
 
-			const WManager::Container *proot = pclient->pcontainer->GetRoot();
-			if(!standaloneComp)
+			if(!standaloneComp){
+				const WManager::Container *proot = pclient->pcontainer->GetRoot();
 				StackClients(proot);
+			}else{
+				//clientStack won't get cleared in standalone compositor mode
+				if(std::get<2>(*mrect) != 0){ //!= XCB_NONE
+					auto m = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
+						return static_cast<X11Client *>(p)->window == std::get<2>(*mrect);
+					});
+					clientStack.insert(m+1,pclient);
+				}else clientStack.push_front(pclient);
+			}
 
 			for(uint i = 0; i < 2; ++i){
 				if(propertyReply1[i])
@@ -1642,18 +1670,11 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_focus_in_event_t *pev = (xcb_focus_in_event_t*)pevent;
 			printf("XCB_FOCUS_IN: *** focus %x\n",pev->event);
 
-			/*X11Client *pclient11 = FindClient(pev->event,MODE_UNDEFINED);
+			X11Client *pclient11 = FindClient(pev->event,MODE_UNDEFINED);
 			if(!pclient11 || pclient11->flags & X11Client::FLAG_UNMAPPING)
 				break;
 
-			for(auto &m : clientStack){
-				//std::get<1>(m) = false;
-				for(WManager::Container *pcontainer = pclient11->pcontainer; pcontainer; pcontainer = pcontainer->GetParent()){
-					//
-				}
-			}*/
-			//TODO: standaloneComp: set focus. All clients share the same container
-			//-traverse through parents and mark the focus in clientStack
+			pfocusInClient = pclient11;
 			}
 			break;
 		case XCB_ENTER_NOTIFY:{

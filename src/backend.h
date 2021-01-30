@@ -200,6 +200,7 @@ protected:
 	
 public:
 	std::deque<WManager::Client *> clientStack;
+	WManager::Client *pfocusInClient; //from XCB_FOCUS_IN events (uncontained clients)
 protected:
 	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue; //no need to store, rather keep it here to avoid repeated construction
 
@@ -250,8 +251,9 @@ protected:
 private:
 	xcb_keycode_t exitKeycode;
 	//xcb_keycode_t testKeycode;
+	typedef std::tuple<xcb_window_t, WManager::Rectangle, xcb_window_t> ConfigCacheElement;
 	std::vector<std::pair<X11Client *, MODE>> clients;
-	std::vector<std::pair<xcb_window_t, WManager::Rectangle>> configCache;
+	std::vector<ConfigCacheElement> configCache;
 	std::vector<X11Client *> unmappingQueue;
 	std::vector<xcb_window_t> netClientList; //used only to update the property - not maintained
 	X11Client *pdragClient;
