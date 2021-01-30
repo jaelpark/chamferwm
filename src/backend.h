@@ -199,8 +199,7 @@ protected:
 	xcb_window_t ewmh_window;
 	
 public:
-	typedef std::tuple<WManager::Client *, bool> ClientStackElement;
-	std::deque<ClientStackElement> clientStack;
+	std::deque<WManager::Client *> clientStack;
 protected:
 	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue; //no need to store, rather keep it here to avoid repeated construction
 

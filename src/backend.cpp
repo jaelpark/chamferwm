@@ -459,7 +459,7 @@ void X11Backend::StackRecursiveAppendix(const WManager::Client *pclient, const W
 			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 		}
 
-		clientStack.push_back(ClientStackElement((*m).second,(*m).second->pcontainer == pfocus));
+		clientStack.push_back((*m).second);
 
 		StackRecursiveAppendix((*m).second,pfocus);
 
@@ -477,7 +477,7 @@ void X11Backend::StackRecursive(const WManager::Container *pcontainer, const WMa
 				xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 			}
 
-			clientStack.push_back(ClientStackElement(pcont->pclient,pcont == pfocus || pcontainer == pfocus));
+			clientStack.push_back(pcont->pclient);
 		}
 		StackRecursive(pcont,pcontainer == pfocus?pcont:pfocus);
 	}
@@ -511,7 +511,7 @@ void X11Backend::StackClients(const WManager::Container *proot){
 		}
 		
 		//desktop features are placed first
-		clientStack.push_back(ClientStackElement(p.second,p.second->pcontainer == WManager::Container::ptreeFocus));
+		clientStack.push_back(p.second);
 	}
 
 	StackRecursive(proot,WManager::Container::ptreeFocus);
@@ -534,7 +534,7 @@ void X11Backend::StackClients(const WManager::Container *proot){
 			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 		}
 
-		clientStack.push_back(ClientStackElement((*m).second,(*m).second->pcontainer == WManager::Container::ptreeFocus));
+		clientStack.push_back((*m).second);
 
 		StackRecursiveAppendix((*m).second,WManager::Container::ptreeFocus);
 
@@ -551,7 +551,7 @@ void X11Backend::StackClients(const WManager::Container *proot){
 			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 		}
 
-		clientStack.push_back(ClientStackElement(p.second,p.second->pcontainer == WManager::Container::ptreeFocus));
+		clientStack.push_back(p.second);
 	}
 }
 
@@ -1377,9 +1377,7 @@ sint Default::HandleEvent(bool forcePoll){
 			//printf("rect: %d, %d, %ux%u\nold: %d, %d, %ux%u\n",(*m).first->rect.x,(*m).first->rect.y,(*m).first->rect.w,(*m).first->rect.h,
 				//(*m).first->oldRect.x,(*m).first->oldRect.y,(*m).first->oldRect.w,(*m).first->oldRect.h);
 
-			clientStack.erase(std::remove_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
-				return std::get<0>(p) == (*m).first;
-			}),clientStack.end());
+			clientStack.erase(std::remove(clientStack.begin(),clientStack.end(),(*m).first),clientStack.end());
 
 			netClientList.clear();
 			for(auto &p : clients)
@@ -1643,6 +1641,17 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_FOCUS_IN:{
 			xcb_focus_in_event_t *pev = (xcb_focus_in_event_t*)pevent;
 			printf("XCB_FOCUS_IN: *** focus %x\n",pev->event);
+
+			/*X11Client *pclient11 = FindClient(pev->event,MODE_UNDEFINED);
+			if(!pclient11 || pclient11->flags & X11Client::FLAG_UNMAPPING)
+				break;
+
+			for(auto &m : clientStack){
+				//std::get<1>(m) = false;
+				for(WManager::Container *pcontainer = pclient11->pcontainer; pcontainer; pcontainer = pcontainer->GetParent()){
+					//
+				}
+			}*/
 			//TODO: standaloneComp: set focus. All clients share the same container
 			//-traverse through parents and mark the focus in clientStack
 			}

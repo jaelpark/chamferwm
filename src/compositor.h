@@ -136,7 +136,7 @@ protected:
 	void CreateRenderQueueAppendix(const WManager::Client *, const WManager::Container *);
 	void CreateRenderQueue(const WManager::Container *, const WManager::Container *);
 	bool PollFrameFence(bool);
-	void GenerateCommandBuffers(const std::deque<std::tuple<WManager::Client *, bool>> *);
+	void GenerateCommandBuffers(const std::deque<WManager::Client *> *, const WManager::Container *);
 	void Present();
 	virtual bool CheckPresentQueueCompatibility(VkPhysicalDevice, uint) const = 0;
 	virtual void CreateSurfaceKHR(VkSurfaceKHR *) const = 0;

@@ -890,20 +890,27 @@ bool CompositorInterface::PollFrameFence(bool suspend){
 	return true;
 }
 
-void CompositorInterface::GenerateCommandBuffers(const std::deque<std::tuple<WManager::Client *, bool>> *pclientStack){
+void CompositorInterface::GenerateCommandBuffers(const std::deque<WManager::Client *> *pclientStack, const WManager::Container *pfocus){
 	//Create a render list elements arranged from back to front
+	auto checkFocus = [&](const WManager::Client *pclient)->bool{
+		for(WManager::Container *pcontainer = pclient->pcontainer; pcontainer; pcontainer = pcontainer->GetParent())
+			if(pfocus == pcontainer)
+				return true;
+		return false;
+	};
 	renderQueue.clear();
 	for(auto m : *pclientStack){
-		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(std::get<0>(m));
+		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(m);
 		if(!pclientFrame || (!pclientFrame->enabled && pclientFrame != pfsApp))
 			continue;
 
 		RenderObject renderObject;
-		renderObject.pclient = std::get<0>(m);
+		renderObject.pclient = m;
 		renderObject.pclientFrame = pclientFrame;
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
 		renderObject.pclientFrame->shaderFlags =
-			(std::get<1>(m)?ClientFrame::SHADER_FLAG_FOCUS:0)
+			//(std::get<1>(m)?ClientFrame::SHADER_FLAG_FOCUS:0)
+			(checkFocus(renderObject.pclient)?ClientFrame::SHADER_FLAG_FOCUS:0)
 			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
 			|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
 			|renderObject.pclientFrame->shaderUserFlags;
