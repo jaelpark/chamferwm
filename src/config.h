@@ -179,7 +179,8 @@ public:
 class CompositorInterface{
 public:
 	CompositorInterface();
-	~CompositorInterface();
+	virtual ~CompositorInterface();
+	virtual bool OnRedirectExternal(std::string, std::string);
 
 	sint deviceIndex;
 	bool debugLayers;
@@ -204,6 +205,7 @@ class CompositorProxy : public CompositorInterface, public boost::python::wrappe
 public:
 	CompositorProxy();
 	~CompositorProxy();
+	bool OnRedirectExternal(std::string, std::string);
 };
 
 class CompositorConfig{

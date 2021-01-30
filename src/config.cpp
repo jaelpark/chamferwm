@@ -707,6 +707,10 @@ CompositorInterface::~CompositorInterface(){
 	//
 }
 
+bool CompositorInterface::OnRedirectExternal(std::string title, std::string className){
+	return true;
+}
+
 void CompositorInterface::Bind(boost::python::object obj){
 	CompositorInterface &compositorInt = boost::python::extract<CompositorInterface&>(obj)();
 	pcompositorInt = &compositorInt;
@@ -722,6 +726,21 @@ CompositorProxy::CompositorProxy(){
 
 CompositorProxy::~CompositorProxy(){
 	//
+}
+
+bool CompositorProxy::OnRedirectExternal(std::string title, std::string className){
+	boost::python::override ovr = this->get_override("OnRedirectExternal");
+	if(ovr){
+		try{
+			return ovr(title,className);
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}
+	return CompositorInterface::OnRedirectExternal(title,className);
 }
 
 CompositorConfig::CompositorConfig(CompositorInterface *_pcompositorInt) : pcompositorInt(_pcompositorInt){
@@ -1126,6 +1145,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.value("USER_BIT",Compositor::ClientFrame::SHADER_FLAG_USER_BIT);
 	
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")
+		.def("OnRedirectExternal",&CompositorInterface::OnRedirectExternal)
 		.def_readwrite("deviceIndex",&CompositorInterface::deviceIndex)
 		.def_readwrite("debugLayers",&CompositorInterface::debugLayers)
 		.def_readwrite("scissoring",&CompositorInterface::scissoring)

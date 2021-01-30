@@ -178,6 +178,7 @@ public:
 	};
 	virtual X11Client * FindClient(xcb_window_t, MODE) const = 0;
 	virtual void TimerEvent() = 0;
+	virtual bool ApproveExternal(const BackendStringProperty *, const BackendStringProperty *) = 0;
 	//void * GetProperty(xcb_atom_t, xcb_atom_t) const;
 	//void FreeProperty(...) const;
 protected:

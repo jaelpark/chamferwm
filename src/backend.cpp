@@ -1359,7 +1359,13 @@ sint Default::HandleEvent(bool forcePoll){
 				if(!standaloneComp){
 					const WManager::Container *proot = pclient->pcontainer->GetRoot();
 					StackClients(proot);
-				}else{
+
+					netClientList.clear();
+					for(auto &p : clients)
+						netClientList.push_back(p.first->window);
+					xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
+				}else
+				if(ApproveExternal(&wmName,&wmClass)){
 					//clientStack won't get cleared in standalone compositor mode
 					if(std::get<2>(*mrect) != 0){ //!= XCB_NONE
 						auto m = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
@@ -1367,11 +1373,6 @@ sint Default::HandleEvent(bool forcePoll){
 						});
 						clientStack.insert(m+1,pclient);
 					}else clientStack.push_front(pclient);
-
-					netClientList.clear();
-					for(auto &p : clients)
-						netClientList.push_back(p.first->window);
-					xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
 				}
 			}
 

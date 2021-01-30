@@ -665,6 +665,10 @@ public:
 		//
 		Config::BackendInterface::pbackendInt->OnTimer();
 	}
+
+	bool ApproveExternal(const Backend::BackendStringProperty *pwmName, const Backend::BackendStringProperty *pwmClass){
+		return Config::CompositorInterface::pcompositorInt->OnRedirectExternal(pwmName->pstr,pwmClass->pstr);
+	}
 };
 
 //TODO: some of these functions can be templated and shared with the DefaultBackend
@@ -784,6 +788,10 @@ public:
 
 	void TimerEvent(){
 		//
+	}
+
+	bool ApproveExternal(const Backend::BackendStringProperty *pwmName, const Backend::BackendStringProperty *pwmClass){
+		return true;
 	}
 };
 

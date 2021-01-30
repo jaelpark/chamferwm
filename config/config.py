@@ -654,6 +654,7 @@ class Backend(chamfer.Backend):
 			self.shiftFocus = None;
 
 	def OnTimer(self):
+		#NOTE: OnTimer() calls currently disabled.
 		battery = psutil.sensors_battery();
 		try:
 			if not battery.power_plugged:
@@ -677,7 +678,9 @@ class Backend(chamfer.Backend):
 			self.batteryAlarmLevel = 0;
 
 class Compositor(chamfer.Compositor):
-	pass
+	def OnRedirectExternal(self, title, className):
+		#Used only in standalone compositor mode. Return False to filter out incompatible WM/UI components.
+		return True;
 
 backend = Backend();
 chamfer.BindBackend(backend);
