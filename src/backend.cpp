@@ -1282,12 +1282,17 @@ sint Default::HandleEvent(bool forcePoll){
 			createInfo.pwmName = &wmName;
 			createInfo.pwmClass = &wmClass;
 			X11Client *pclient = SetupClient(&createInfo);
-			if(!pclient)
-				break;
-			clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
+			if(pclient){
+				clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
 
-			const WManager::Container *proot = pclient->pcontainer->GetRoot();
-			StackClients(proot);
+				const WManager::Container *proot = pclient->pcontainer->GetRoot();
+				StackClients(proot);
+
+				netClientList.clear();
+				for(auto &p : clients)
+					netClientList.push_back(p.first->window);
+				xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
+			}
 
 			for(uint i = 0; i < 2; ++i){
 				if(propertyReply1[i])
@@ -1295,11 +1300,6 @@ sint Default::HandleEvent(bool forcePoll){
 				if(pwmProperty[i])
 					mstrfree(pwmProperty[i]);
 			}
-
-			netClientList.clear();
-			for(auto &p : clients)
-				netClientList.push_back(p.first->window);
-			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
 
 			DebugPrintf(stdout,"map notify, %x\n",pev->window);
 			}
