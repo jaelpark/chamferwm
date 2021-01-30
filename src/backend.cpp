@@ -1236,11 +1236,12 @@ sint Default::HandleEvent(bool forcePoll){
 			if(pclient1){
 				pclient1->UpdateTranslation(&std::get<1>(*mrect));
 
+				//handle stacking order
 				if(standaloneComp){
 					auto m1 = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
 						return static_cast<X11Client *>(p)->window == pev->window;
 					});
-					if(pev->above_sibling != XCB_NONE){
+					if(pev->above_sibling != 0){
 						auto ma = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
 							return static_cast<X11Client *>(p)->window == pev->above_sibling;
 						});
@@ -1674,7 +1675,8 @@ sint Default::HandleEvent(bool forcePoll){
 			if(!pclient11 || pclient11->flags & X11Client::FLAG_UNMAPPING)
 				break;
 
-			pfocusInClient = pclient11;
+			if(standaloneComp)
+				pfocusInClient = pclient11;
 			}
 			break;
 		case XCB_ENTER_NOTIFY:{
