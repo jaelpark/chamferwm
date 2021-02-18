@@ -1878,7 +1878,7 @@ bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 
 		xcb_xfixes_fetch_region_reply_t *pfetchRegionReply = xcb_xfixes_fetch_region_reply(pbackend->pcon,fetchRegionCookie,0);
 
-		if(!pclientFrame->enabled){
+		if(!pfetchRegionReply || !pclientFrame->enabled){
 			free(pfetchRegionReply);
 			return true;
 		}
