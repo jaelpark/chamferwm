@@ -1537,9 +1537,11 @@ sint Default::HandleEvent(bool forcePoll){
 				if(pev->data.data32[1] == ewmh._NET_WM_STATE_FULLSCREEN){
 					switch(pev->data.data32[0]){
 					case 2://ewmh._NET_WM_STATE_TOGGLE)
+						pclient1->pcontainer->Focus();
 						SetFullscreen(pclient1,(pclient1->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) == 0);
 						break;
 					case 1://ewmh._NET_WM_STATE_ADD)
+						pclient1->pcontainer->Focus();
 						SetFullscreen(pclient1,true);
 						break;
 					case 0://ewmh._NET_WM_STATE_REMOVE)
