@@ -1390,7 +1390,9 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 			//wait for the buffers to get updated before copying them
 			xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
 			xcb_flush(pbackend->pcon);
-			free(pimageReply);
+			if(pimageReply)
+				free(pimageReply);
+			else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null");
 
 			for(uint y = 0; y < rect1.extent.height; ++y){
 				uint offsetDst = 4*(rect.w*(y+rect1.offset.y)+rect1.offset.x);
@@ -1411,7 +1413,9 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		//wait for the buffers to get updated before copying them
 		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
 		xcb_flush(pbackend->pcon);
-		free(pimageReply);
+		if(pimageReply)
+			free(pimageReply);
+		else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null");
 
 		for(VkRect2D &rect1 : damageRegions){
 			VkRect2D screenRect;
@@ -1609,12 +1613,9 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
 	xcb_flush(pcomp11->pbackend->pcon);
 
-	if(!pimageReply){
-		DebugPrintf(stderr,"No shared memory.\n");
-		return;
-	}
-
-	free(pimageReply);
+	if(pimageReply)
+		free(pimageReply);
+	else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null (background)");
 
 	VkRect2D screenRect;
 	screenRect.offset = {0,0};
