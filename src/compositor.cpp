@@ -1461,16 +1461,14 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	if(!fullRegionUpdate && damageRegions.size() == 0)
 		return;
 
-	if(fullRegionUpdate){
-		damageRegions.clear();
+	damageRegions.clear();
 
-		VkRect2D rect1;
-		rect1.offset = {0,0};
-		rect1.extent = {rect.w,rect.h};
-		damageRegions.push_back(rect1);
+	VkRect2D rect1;
+	rect1.offset = {0,0};
+	rect1.extent = {rect.w,rect.h};
+	damageRegions.push_back(rect1);
 
-		fullRegionUpdate = false;
-	}
+	fullRegionUpdate = false;
 
 	if(!pcomp->hostMemoryImport){
 		unsigned char *pdata = (unsigned char *)ptexture->Map();
