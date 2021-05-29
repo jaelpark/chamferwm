@@ -1399,6 +1399,8 @@ sint Default::HandleEvent(bool forcePoll){
 
 			(*m).first->flags |= X11Client::FLAG_UNMAPPING;
 
+			clientStack.erase(std::remove(clientStack.begin(),clientStack.end(),(*m).first),clientStack.end());
+
 			if((*m).first->pcontainer->GetRoot() != WManager::Container::ptreeFocus->GetRoot())
 				break;
 			
@@ -1406,8 +1408,6 @@ sint Default::HandleEvent(bool forcePoll){
 
 			//printf("rect: %d, %d, %ux%u\nold: %d, %d, %ux%u\n",(*m).first->rect.x,(*m).first->rect.y,(*m).first->rect.w,(*m).first->rect.h,
 				//(*m).first->oldRect.x,(*m).first->oldRect.y,(*m).first->oldRect.w,(*m).first->oldRect.h);
-
-			clientStack.erase(std::remove(clientStack.begin(),clientStack.end(),(*m).first),clientStack.end());
 
 			netClientList.clear();
 			for(auto &p : clients)
@@ -1722,9 +1722,17 @@ sint Default::HandleEvent(bool forcePoll){
 	}
 
 	//Destroy the clients here, after the event queue has been cleared. This is to ensure that no already destroyed client is attempted to be readjusted.
-	for(X11Client *pclient : unmappingQueue)
-		DestroyClient(pclient);
-	unmappingQueue.clear();
+	if(unmappingQueue.size() > 0){
+		std::set<WManager::Container *> roots;
+		for(X11Client *pclient : unmappingQueue){
+			roots.insert(pclient->pcontainer->GetRoot());
+			DestroyClient(pclient);
+		}
+		unmappingQueue.clear();
+
+		for(auto m : roots)
+			StackClients(m); //just to recreate the clientStack
+	}
 
 	if(xcb_connection_has_error(pcon)){
 		DebugPrintf(stderr,"X server connection lost\n");
