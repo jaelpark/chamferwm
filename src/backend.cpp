@@ -627,6 +627,8 @@ Default::Default(bool _standaloneComp) : X11Backend(), pdragClient(0), standalon
 	pollTimer.tv_sec = 0;
 	pollTimer.tv_nsec = 0;
 	//polling = false;
+	
+	inputTimer = eventTimer;
 }
 
 Default::~Default(){
@@ -1595,6 +1597,13 @@ sint Default::HandleEvent(bool forcePoll){
 				printf("test\n");
 				xcb_grab_keyboard(pcon,0,pscr->root,lastTime,XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 			}else*/
+			//Check if more than 10 minutes since previous input has elapsed since previous input (TODO: configurable).
+			//This might indicate that the screen was turned off and everything has to be redrawn when scissoring.
+			if(timespec_diff_sec(currentTime,inputTimer) > 600){
+				WakeNotify();
+				inputTimer = currentTime;
+			}
+			clock_gettime(CLOCK_MONOTONIC,&inputTimer);
 			if(pev->state == (XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT) && pev->detail == exitKeycode){
 				free(pevent);
 				return -1;

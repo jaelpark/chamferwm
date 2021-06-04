@@ -104,13 +104,14 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 typedef std::pair<const WManager::Client *, WManager::Client *> StackAppendixElement;
 class RunCompositor : public Config::CompositorConfig{
 public:
-	RunCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
+	//RunCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
+	RunCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : Config::CompositorConfig(_pcompositorInt){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
 	virtual bool IsAnimating() const = 0;
 	virtual void WaitIdle() = 0;
-protected:
-	std::vector<StackAppendixElement> *pstackAppendix;
+//protected:
+//	std::vector<StackAppendixElement> *pstackAppendix;
 };
 
 class RunBackend : public Config::BackendConfig{
@@ -123,6 +124,7 @@ public:
 
 	void SetCompositor(class RunCompositor *pcomp){
 		this->pcomp = pcomp;
+		pcompInt = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
 	}
 
 	struct ContainerCreateInfo{
@@ -157,8 +159,6 @@ public:
 	Config::ContainerInterface & SetupContainer(WManager::Container *pParent, const ContainerCreateInfo *pcreateInfo){
 		Config::ContainerInterface &containerInt = SetupContainer<T,U>(pcreateInfo);
 		containerInt.OnSetupContainer();
-
-		Compositor::CompositorInterface *pcompInt = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
 
 		WManager::Container::Setup setup;
 		if(containerInt.floatingMode == Config::ContainerInterface::FLOAT_ALWAYS ||
@@ -333,6 +333,7 @@ public:
 //protected:
 	std::vector<StackAppendixElement> stackAppendix;
 	class RunCompositor *pcomp;
+	Compositor::CompositorInterface *pcompInt; //dynamic casted from pcomp on initialization
 };
 
 class DefaultBackend : public Backend::Default, public RunBackend{
@@ -639,6 +640,10 @@ public:
 		return pcomp11->FilterEvent(pevent11);
 	}
 
+	void WakeNotify(){
+		pcompInt->FullDamageRegion();
+	}
+
 	void KeyPress(uint keyId, bool down){
 		if(down)
 			Config::BackendInterface::pbackendInt->OnKeyPress(keyId);
@@ -770,6 +775,10 @@ public:
 	bool EventNotify(const Backend::BackendEvent *pevent){
 		//nothing to process
 		return false;
+	}
+
+	void WakeNotify(){
+		pcompInt->FullDamageRegion();
 	}
 
 	void KeyPress(uint keyId, bool down){

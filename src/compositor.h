@@ -132,6 +132,9 @@ protected:
 	void AddShader(const char *, const Blob *);
 	void AddDamageRegion(const VkRect2D *);
 	void AddDamageRegion(const WManager::Client *);
+public: //probably need a proxy
+	void FullDamageRegion(); //quickly mark the whole screen for redrawing
+protected:
 	void WaitIdle();
 	void CreateRenderQueueAppendix(const WManager::Client *, const WManager::Container *);
 	void CreateRenderQueue(const WManager::Container *, const WManager::Container *);

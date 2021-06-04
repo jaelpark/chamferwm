@@ -78,6 +78,7 @@ protected:
 	//Functions defined by the implementing backends.
 	virtual void DefineBindings() = 0;
 	virtual bool EventNotify(const BackendEvent *) = 0;
+	virtual void WakeNotify() = 0;
 	virtual void KeyPress(uint, bool) = 0;
 };
 
@@ -189,6 +190,7 @@ protected:
 	xcb_timestamp_t lastTime;
 	struct timespec eventTimer;
 	struct timespec pollTimer;
+	struct timespec inputTimer; //track time since last keypress
 	//bool polling;
 	struct KeyBinding{
 		xcb_keycode_t keycode;

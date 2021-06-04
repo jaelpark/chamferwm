@@ -809,6 +809,17 @@ void CompositorInterface::AddDamageRegion(const WManager::Client *pclient){
 	AddDamageRegion(&rect1);
 }
 
+void CompositorInterface::FullDamageRegion(){
+	if(!scissoring)
+		return;
+	VkRect2D screenRect;
+	screenRect.offset = {0,0};
+	screenRect.extent = imageExtent;
+
+	scissorRegions.clear();
+	scissorRegions.push_back(std::pair<VkRect2D, uint>(screenRect,0));
+}
+
 void CompositorInterface::WaitIdle(){
 	vkDeviceWaitIdle(logicalDev);
 }
@@ -1227,10 +1238,7 @@ void CompositorInterface::ClearBackground(){
 
 	pbackground = pcolorBackground;
 	
-	VkRect2D screenRect;
-	screenRect.offset = {0,0};
-	screenRect.extent = imageExtent;
-	AddDamageRegion(&screenRect);
+	FullDamageRegion();
 }
 
 Texture * CompositorInterface::CreateTexture(uint w, uint h, uint surfaceDepth){
@@ -1583,10 +1591,7 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 		pcomp->hostMemoryImport = false;
 	}
 
-	VkRect2D screenRect;
-	screenRect.offset = {0,0};
-	screenRect.extent = {w,h};
-	pcomp->AddDamageRegion(&screenRect);
+	pcomp->FullDamageRegion();
 }
 
 X11Background::~X11Background(){
@@ -1598,10 +1603,7 @@ X11Background::~X11Background(){
 
 	shmctl(shmid,IPC_RMID,0);
 
-	VkRect2D screenRect;
-	screenRect.offset = {0,0};
-	screenRect.extent = {w,h};
-	pcomp->AddDamageRegion(&screenRect);
+	pcomp->FullDamageRegion();
 }
 
 void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
@@ -1633,7 +1635,7 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 
 	fullRegionUpdate = false;
 
-	pcomp->AddDamageRegion(&screenRect);
+	pcomp->FullDamageRegion();
 }
 
 X11Compositor::X11Compositor(const Configuration *_pconfig, const Backend::X11Backend *_pbackend) : CompositorInterface(_pconfig), pbackend(_pbackend){
