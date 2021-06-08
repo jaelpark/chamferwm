@@ -159,7 +159,7 @@ friend class Compositor::X11Compositor;
 friend class Compositor::X11DebugCompositor;
 friend class Compositor::TexturePixmap;
 public:
-	X11Backend();
+	X11Backend(bool);
 	virtual ~X11Backend();
 	bool QueryExtension(const char *, sint *, sint *) const;
 	xcb_atom_t GetAtom(const char *) const;
@@ -206,6 +206,7 @@ public:
 	WManager::Client *pfocusInClient; //from XCB_FOCUS_IN events (uncontained clients)
 protected:
 	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue; //no need to store, rather keep it here to avoid repeated construction
+	bool standaloneComp;
 
 	enum ATOM{
 		//ATOM_CHAMFER_ALARM,
@@ -261,7 +262,6 @@ private:
 	std::vector<xcb_window_t> netClientList; //used only to update the property - not maintained
 	X11Client *pdragClient;
 	sint dragRootX, dragRootY;
-	bool standaloneComp;
 };
 
 class DebugClient : public WManager::Client{

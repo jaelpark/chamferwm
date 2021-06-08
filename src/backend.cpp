@@ -283,7 +283,8 @@ void X11Client::Kill(){
 X11Container::X11Container(X11Backend *_pbackend, bool _noComp) : WManager::Container(), pbackend(_pbackend), noComp(_noComp){
 	//
 	uint values[1] = {WManager::Container::rootQueue.size()};
-	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
+	if(!pbackend->standaloneComp)
+		xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
 }
 
 X11Container::X11Container(WManager::Container *_pParent, const WManager::Container::Setup &_setup, X11Backend *_pbackend) : WManager::Container(_pParent,_setup), pbackend(_pbackend), noComp(false){
@@ -414,7 +415,7 @@ void X11Container::SetClient(X11Client *_pclient11){
 	pclient = pclient11;
 }
 
-X11Backend::X11Backend() : lastTime(XCB_CURRENT_TIME){
+X11Backend::X11Backend(bool _standaloneComp) : lastTime(XCB_CURRENT_TIME), standaloneComp(_standaloneComp){
 	//
 }
 
@@ -621,7 +622,7 @@ const char *X11Backend::pcursorStrs[CURSOR_COUNT] = {
 	"left_ptr"
 };
 
-Default::Default(bool _standaloneComp) : X11Backend(), pdragClient(0), standaloneComp(_standaloneComp){
+Default::Default(bool _standaloneComp) : X11Backend(_standaloneComp), pdragClient(0){
 	//
 	clock_gettime(CLOCK_MONOTONIC,&eventTimer);
 	pollTimer.tv_sec = 0;
@@ -1860,7 +1861,7 @@ void DebugContainer::SetClient(DebugClient *_pdebugClient){
 	pclient = _pdebugClient;
 }
 
-Debug::Debug() : X11Backend(){
+Debug::Debug() : X11Backend(false){
 	//
 }
 
