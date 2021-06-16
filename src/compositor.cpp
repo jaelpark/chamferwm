@@ -1713,10 +1713,13 @@ void X11Compositor::Start(){
 
 	xcb_dri3_query_version_cookie_t dri3Cookie = xcb_dri3_query_version(pbackend->pcon,XCB_DRI3_MAJOR_VERSION,XCB_DRI3_MINOR_VERSION);
 	xcb_dri3_query_version_reply_t *pdri3Reply = xcb_dri3_query_version_reply(pbackend->pcon,dri3Cookie,0);
+	//DRI3 extension is optional
 	if(!pdri3Reply)
-		throw Exception("DRI3 extension unavailable.");
-	DebugPrintf(stdout,"DRI3 %u.%u\n",pdri3Reply->major_version,pdri3Reply->minor_version);
-	free(pdri3Reply);
+		DebugPrintf(stderr,"DRI3 extension unavailable.");
+	else{
+		DebugPrintf(stdout,"DRI3 %u.%u\n",pdri3Reply->major_version,pdri3Reply->minor_version);
+		free(pdri3Reply);
+	}
 
 	xcb_flush(pbackend->pcon);
 
