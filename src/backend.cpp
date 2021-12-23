@@ -805,7 +805,7 @@ sint Default::HandleEvent(bool forcePoll){
 	struct timespec currentTime;
 	clock_gettime(CLOCK_MONOTONIC,&currentTime);
 	
-	/*if(timespec_diff(currentTime,pollTimer) >= 0.04f){
+	/*if(timespec_diff(currentTime,pollTimer) >= 0.04){
 	//if(!polling){
 		sint fd = xcb_get_file_descriptor(pcon);
 
@@ -844,7 +844,7 @@ sint Default::HandleEvent(bool forcePoll){
 		//application that sends the highest rate of damage events, thus preventing stutter.
 		//Using select() alone seemingly stutters some of applications, while this keeps everything
 		//smooth, and still makes callbacks possible without continued polling by the CPU.
-		if(timespec_diff(currentTime,eventTimer) >= 5.0f){
+		if(timespec_diff(currentTime,eventTimer) >= 5.0){
 			TimerEvent();
 			clock_gettime(CLOCK_MONOTONIC,&eventTimer);
 		}

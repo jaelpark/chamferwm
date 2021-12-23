@@ -94,7 +94,7 @@ ColorFrame::~ColorFrame(){
 }
 
 void ColorFrame::Draw(const VkRect2D &frame, const glm::vec2 &margin, const glm::vec2 &titlePad, const glm::vec2 &titleSpan, uint stackIndex, uint flags, const VkCommandBuffer *pcommandBuffer){
-	time = timespec_diff(pcomp->frameTime,creationTime);
+	time = (float)timespec_diff(pcomp->frameTime,creationTime);
 
 	glm::vec2 imageExtent = glm::vec2(pcomp->imageExtent.width,pcomp->imageExtent.height);
 
@@ -873,7 +873,7 @@ bool CompositorInterface::PollFrameFence(bool suspend){
 
 	//release the textures no longer in use
 	textureCache.erase(std::remove_if(textureCache.begin(),textureCache.end(),[&](auto &textureCacheEntry)->bool{
-		if(frameTag < textureCacheEntry.releaseTag+swapChainImageCount+1 || timespec_diff(frameTime,textureCacheEntry.releaseTime) < 5.0f)
+		if(frameTag < textureCacheEntry.releaseTag+swapChainImageCount+1 || timespec_diff(frameTime,textureCacheEntry.releaseTime) < 5.0)
 			return false;
 		delete textureCacheEntry.ptexture;
 		return true;
@@ -940,7 +940,7 @@ void CompositorInterface::GenerateCommandBuffers(const std::deque<WManager::Clie
 
 		float s;
 		if(enableAnimation){
-			float t = timespec_diff(frameTime,renderObject.pclient->translationTime);
+			float t = (float)timespec_diff(frameTime,renderObject.pclient->translationTime);
 			s = std::clamp(t/animationDuration,0.0f,1.0f);
 			s = 1.0f/(1.0f+expf(-10.0f*s+5.0f));
 		}else s = 1.0f;
