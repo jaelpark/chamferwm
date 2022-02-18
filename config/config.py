@@ -105,11 +105,11 @@ class Container(chamfer.Container):
 		self.splitArmed = False;
 
 		self.titleBar = chamfer.titleBar.TOP; #options for the title bar location are NONE, LEFT, TOP, RIGHT or BOTTOM
+		self.titleStackOnly = False; #enable to use title bars only on stacked containers
 
-		#if self.wm_class == "skype":
-		#	self.floatingMode = chamfer.floatingMode.NEVER;
+		#WM_CLASS/TITLE rules to force floating mode / never float
 		if self.wm_class == "matplotlib":
-			self.floatingMode = chamfer.floatingMode.ALWAYS;
+			self.floatingMode = chamfer.floatingMode.ALWAYS; #.NEVER
 
 	#setup the client before it's created (shaders)
 	def OnSetupClient(self):
@@ -167,7 +167,7 @@ class Container(chamfer.Container):
 	def OnFocus(self):
 		return True;
 
-	#called when window is stacked or unstacked
+	#called when window is stacked or unstacked - only called for the parent container
 	def OnStack(self, toggle):
 		pass;
 
@@ -180,7 +180,7 @@ class Container(chamfer.Container):
 
 	#called whenever cursor enters the window
 	def OnEnter(self):
-		#self.focus();
+		#self.Focus();
 		pass;
 	
 	#Place container under another so that its structure remains intact.
@@ -287,14 +287,15 @@ class Backend(chamfer.Backend):
 			self.BindKey(latin1.XK_plus,self.modMask|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.EXPAND_VERTICAL_LOCAL.value);
 			self.BindKey(ord('k'),chamfer.MOD_MASK_4|chamfer.MOD_MASK_SHIFT|chamfer.MOD_MASK_CONTROL,Key.EXPAND_VERTICAL_LOCAL.value);
 
-			#workspaces
+			#workspaces (regular and composed)
 			self.BindKey(ord('1'),self.modMask,Key.WORKSPACE_1.value);
 			self.BindKey(ord('2'),self.modMask,Key.WORKSPACE_2.value);
 			self.BindKey(ord('3'),self.modMask,Key.WORKSPACE_3.value);
 			self.BindKey(ord('4'),self.modMask,Key.WORKSPACE_4.value);
+			#one special workspace without compositor (maximize performance for fullscreen games, video and such)
 			self.BindKey(ord('0'),self.modMask,Key.WORKSPACE_NOCOMP.value);
 			
-			#kill + launching applications
+			#kill + launching applications (setup your default programs in the respective OnKeyPress if-branch)
 			self.BindKey(ord('q'),self.modMask|chamfer.MOD_MASK_SHIFT,Key.KILL.value);
 			self.BindKey(miscellany.XK_Return,self.modMask,Key.LAUNCH_TERMINAL.value);
 			self.BindKey(ord('1'),chamfer.MOD_MASK_4,Key.LAUNCH_BROWSER.value);
@@ -314,7 +315,7 @@ class Backend(chamfer.Backend):
 			self.MapKey(XK.XK_Super_L,chamfer.MOD_MASK_4,Key.MODIFIER_4.value);
 
 			#hacks
-			self.BindKey(ord('q'),chamfer.MOD_MASK_CONTROL,Key.NOOP.value); #prevent madness while browsing the web 
+			self.BindKey(ord('q'),chamfer.MOD_MASK_CONTROL,Key.NOOP.value); #prevent madness while web browsing (disable Ctrl+Q by overriding it)
 
 		else:
 			#debug only (compositor testing mode)
@@ -576,6 +577,7 @@ class Backend(chamfer.Backend):
 			container.ShiftLayout(container.layout);
 
 		elif keyId in [Key.WORKSPACE_1.value,Key.WORKSPACE_2.value,Key.WORKSPACE_3.value,Key.WORKSPACE_4.value]:
+			#add more workspaces by defining more WORKSPACE_*
 			wsName = str(keyId-Key.WORKSPACE_1.value+1);
 			root = self.GetRoot(wsName);
 			root.GetFocusDescend = Container.GetFocusDescend.__get__(root); #RootContainer does not have GetFocusDescend, so we will add it now
@@ -610,7 +612,7 @@ class Backend(chamfer.Backend):
 			focus.Kill();
 
 		elif keyId == Key.LAUNCH_TERMINAL.value:
-			psutil.Popen(["termite"],stdout=None,stderr=None);
+			psutil.Popen(["alacritty"],stdout=None,stderr=None);
 
 		elif keyId == Key.LAUNCH_BROWSER.value:
 			psutil.Popen(["firefox"],stdout=None,stderr=None);

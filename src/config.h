@@ -51,6 +51,7 @@ public:
 		FLOAT_NEVER
 	} floatingMode;
 	WManager::Container::TITLEBAR titleBar;
+	bool titleStackOnly;
 	//float titlePadding;
 	//client variables
 	uint shaderUserFlags;

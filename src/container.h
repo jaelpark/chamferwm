@@ -64,6 +64,7 @@ public:
 		glm::vec2 maxSize = glm::vec2(1.0f);
 		uint flags = 0;
 		TITLEBAR titleBar = TITLEBAR_NONE;
+		bool titleStackOnly = false;
 		float titlePad = 0.0f;
 	};
 	Container(); //root container
@@ -132,6 +133,7 @@ public:
 	uint flags;
 	LAYOUT layout;
 	TITLEBAR titleBar;
+	bool titleStackOnly; //title is rendered only when stacking
 
 	static WManager::Container *ptreeFocus; //client focus, managed by Python
 	static std::deque<std::pair<WManager::Container *, struct timespec>> tiledFocusQueue;

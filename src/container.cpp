@@ -19,8 +19,7 @@ Container::Container() : pParent(0), pch(0), pnext(0), pRootNext(this),
 	//scale(1.0f), p(0.0f), e(1.0f), margin(0.0f), minSize(0.0f), maxSize(1.0f), mode(MODE_TILED),
 	p(0.0f), posFullCanvas(0.0f), e(1.0f), extFullCanvas(1.0f), canvasOffset(0.0f), canvasExtent(0.0f),
 	margin(0.015f), titlePad(0.0f), titleSpan(0.0f,1.0f), titleTransform(glm::mat2x2(1.0f)), absTitlePad(0.0f), size(1.0f), minSize(0.015f), maxSize(1.0f),
-	flags(0), layout(LAYOUT_VSPLIT), titleBar(TITLEBAR_NONE){//, flags(0){
-	//
+	flags(0), layout(LAYOUT_VSPLIT), titleBar(TITLEBAR_NONE), titleStackOnly(false){
 	//This constructor creates a root container, since no parent is given.
 	rootQueue.push_back(this);
 }
@@ -31,7 +30,7 @@ Container::Container(Container *_pParent, const Setup &setup) :
 	pname(0),
 	canvasOffset(setup.canvasOffset), canvasExtent(setup.canvasExtent),
 	margin(setup.margin), titlePad(0.0f), titleSpan(0.0f,1.0f), titleTransform(glm::mat2x2(1.0f)), absTitlePad(setup.titlePad), size(setup.size), minSize(setup.minSize), maxSize(setup.maxSize),// mode(setup.mode),
-	flags(setup.flags), layout(LAYOUT_VSPLIT), titleBar(setup.titleBar){//, flags(setup.flags){
+	flags(setup.flags), layout(LAYOUT_VSPLIT), titleBar(setup.titleBar), titleStackOnly(setup.titleStackOnly){
 
 	if(setup.pname)
 		SetName(setup.pname);
@@ -204,6 +203,8 @@ Container * Container::Collapse(){
 		focusQueue.clear();
 
 		GetRoot()->Stack();
+		if(titleStackOnly && flags & FLAG_STACKED) //this is only needed to handle the stacking exclusive titlebars
+			pParent->Translate();
 
 		return this;
 
@@ -226,6 +227,8 @@ Container * Container::Collapse(){
 		focusQueue.clear();
 
 		GetRoot()->Stack();
+		if(titleStackOnly && flags & FLAG_STACKED) //this is only needed to handle the stacking exclusive titlebars
+			pParent->Translate();
 
 		return this;
 	}
@@ -355,6 +358,7 @@ void Container::SetTitlebar(TITLEBAR titleBar, bool translate){
 	case TITLEBAR_BOTTOM:
 		titlePad = glm::vec2(0.0f,absTitlePad);
 	default:
+		titlePad = glm::vec2(0.0f);
 		titleTransform = glm::mat2x2(1.0f);
 		break;
 	}

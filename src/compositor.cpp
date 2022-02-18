@@ -1086,9 +1086,14 @@ void CompositorInterface::GenerateCommandBuffers(const std::deque<WManager::Clie
 
 		vkCmdBindPipeline(pcommandBuffers[currentFrame],VK_PIPELINE_BIND_POINT_GRAPHICS,renderObject.pclientFrame->passignedSet->p->pipeline);
 
-		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,renderObject.pclient->pcontainer->titlePad,renderObject.pclient->pcontainer->titleSpan,renderObject.pclient->stackIndex,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
+		glm::vec2 titlePad = (!renderObject.pclient->pcontainer->titleStackOnly || (renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED))?
+		renderObject.pclient->pcontainer->titlePad:glm::vec2(0.0f);
+		renderObject.pclientFrame->Draw(frame,renderObject.pclient->pcontainer->margin,titlePad,renderObject.pclient->pcontainer->titleSpan,renderObject.pclient->stackIndex,renderObject.pclientFrame->shaderFlags,&pcommandBuffers[currentFrame]);
 
-		if(renderObject.pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE && !(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) && renderObject.pclientFrame->ptitle){
+		if(renderObject.pclient->pcontainer->titleBar != WManager::Container::TITLEBAR_NONE
+			&& !(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)
+			&& (!renderObject.pclient->pcontainer->titleStackOnly || (renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED))
+			&& renderObject.pclientFrame->ptitle){
 			glm::uvec2 titlePosition = glm::uvec2(frame.offset.x,frame.offset.y);
 			if(renderObject.pclient->titlePad1.x > 1e-5)
 				titlePosition.x += frame.extent.width;

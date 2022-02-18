@@ -18,6 +18,7 @@ minSize(boost::python::make_tuple(0.0f,0.0f)),
 maxSize(boost::python::make_tuple(1.0f,1.0f)),
 floatingMode(FLOAT_AUTOMATIC),
 titleBar(WManager::Container::TITLEBAR_NONE),
+titleStackOnly(false),
 shaderUserFlags(0),
 pcontainer(0){
 	//
@@ -46,6 +47,7 @@ void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 	setup.maxSize.x = boost::python::extract<float>(maxSize[0])();
 	setup.maxSize.y = boost::python::extract<float>(maxSize[1])();
 	setup.titleBar = titleBar;
+	setup.titleStackOnly = titleStackOnly;
 }
 
 void ContainerInterface::DeferredPropertyTransfer(){
@@ -1044,6 +1046,20 @@ BOOST_PYTHON_MODULE(chamfer){
 				}
 				container.pcontainer->SetTitlebar(titleBar);
 			},boost::python::default_call_policies(),boost::mpl::vector3<void, ContainerInterface &, WManager::Container::TITLEBAR>()))
+		.add_property("titleStackOnly",boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return false;
+				return container.pcontainer->titleStackOnly;
+			},boost::python::default_call_policies(),boost::mpl::vector2<bool, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, bool titleStackOnly){
+				if(!container.pcontainer){
+					container.titleStackOnly = titleStackOnly;
+					return;
+				}
+				container.pcontainer->titleStackOnly = titleStackOnly;
+			},boost::python::default_call_policies(),boost::mpl::vector3<void, ContainerInterface &, bool>()))
 		.add_property("shaderFlags",
 			boost::python::make_function(
 			[](ContainerInterface &container){
