@@ -1593,10 +1593,9 @@ void X11ClientFrame::SetTitle1(const char *ptitle){
 	pcomp->AddDamageRegion(&rect);
 }
 
-#if 0
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
 	//
-	uint textureSize = w*h*4;
+	/*uint textureSize = w*h*4;
 	shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
 	if(shmid == -1){
 		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
@@ -1605,27 +1604,28 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 	segment = xcb_generate_id(pcomp11->pbackend->pcon);
 	xcb_shm_attach(pcomp11->pbackend->pcon,segment,shmid,0);
 
-	pchpixels = (unsigned char*)shmat(shmid,0,0);
+	pchpixels = (unsigned char*)shmat(shmid,0,0);*/
 
 	CreateSurface(w,h,24);
 
-	if(pcomp->hostMemoryImport && !ptexture->Attach(pchpixels)){
+	/*if(pcomp->hostMemoryImport && !ptexture->Attach(pchpixels)){
 		DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
 		pcomp->hostMemoryImport = false;
-	}
+	}*/
+	ptexture->Attach(pixmap);
 
 	pcomp->FullDamageRegion();
 }
 
 X11Background::~X11Background(){
-	if(pcomp->hostMemoryImport)
-		ptexture->Detach(pcomp->frameTag);
+	/*if(pcomp->hostMemoryImport)
+		ptexture->Detach(pcomp->frameTag);*/
 	ptexture->Detach();
 
-	xcb_shm_detach(pcomp11->pbackend->pcon,segment);
+	/*xcb_shm_detach(pcomp11->pbackend->pcon,segment);
 	shmdt(pchpixels);
 
-	shmctl(shmid,IPC_RMID,0);
+	shmctl(shmid,IPC_RMID,0);*/
 
 	pcomp->FullDamageRegion();
 }
@@ -1634,20 +1634,20 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	if(!fullRegionUpdate)
 		return;
 
-	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pcomp11->pbackend->pcon,pixmap,0,0,w,h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+	/*xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pcomp11->pbackend->pcon,pixmap,0,0,w,h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
 
 	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
 	xcb_flush(pcomp11->pbackend->pcon);
 
 	if(pimageReply)
 		free(pimageReply);
-	else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null (background)");
+	else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null (background)");*/
 
 	VkRect2D screenRect;
 	screenRect.offset = {0,0};
 	screenRect.extent = {w,h};
 
-	if(!pcomp->hostMemoryImport){
+	/*if(!pcomp->hostMemoryImport){
 		unsigned char *pdata = (unsigned char*)ptexture->Map();
 		memcpy(pdata,pchpixels,w*h*4);
 		
@@ -1655,13 +1655,13 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	
 	}else{
 		ptexture->Update(pcommandBuffer,&screenRect,1);
-	}
+	}*/
+	ptexture->Update(pcommandBuffer,&screenRect,1);
 
 	fullRegionUpdate = false;
 
 	pcomp->FullDamageRegion();
 }
-#endif
 
 X11Compositor::X11Compositor(const Configuration *_pconfig, const Backend::X11Backend *_pbackend) : CompositorInterface(_pconfig), pbackend(_pbackend){
 	//
@@ -1883,7 +1883,7 @@ void X11Compositor::SetBackgroundPixmap(const Backend::BackendPixmapProperty *pP
 		delete pbackground;
 		pbackground = pcolorBackground;
 	}
-	/*if(pPixmapProperty->pixmap != 0){
+	if(pPixmapProperty->pixmap != 0){
 		xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pbackend->pcon,pPixmapProperty->pixmap);
 		xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pbackend->pcon,geometryCookie,0);
 		if(!pgeometryReply)
@@ -1894,7 +1894,7 @@ void X11Compositor::SetBackgroundPixmap(const Backend::BackendPixmapProperty *pP
 		};
 		pbackground = new X11Background(pPixmapProperty->pixmap,pgeometryReply->width,pgeometryReply->height,pshaderName,this);
 		printf("background set!\n");
-	}*/
+	}
 }
 
 VkExtent2D X11Compositor::GetExtent() const{

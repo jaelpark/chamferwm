@@ -107,6 +107,11 @@ friend class X11ClientFrame;
 friend class X11Background;
 friend class X11DebugClientFrame;
 public:
+	enum IMPORT_MODE{
+		IMPORT_MODE_CPU_COPY,
+		IMPORT_MODE_HOST_MEMORY,
+		IMPORT_MODE_DMABUF
+	};
 	struct Configuration{
 		uint deviceIndex;
 		bool debugLayers;
