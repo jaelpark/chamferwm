@@ -227,7 +227,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), pfsApp(0), pfsAppPrev(0), frameApproval(false), suspended(false), unredirected(false), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), hostMemoryImport(pconfig->hostMemoryImport), unredirOnFullscreen(pconfig->unredirOnFullscreen), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration), pfontName(pconfig->pfontName), fontSize(pconfig->fontSize){
+CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), pfsApp(0), pfsAppPrev(0), frameApproval(false), suspended(false), unredirected(false), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), memoryImportMode(pconfig->memoryImportMode), unredirOnFullscreen(pconfig->unredirOnFullscreen), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration), pfontName(pconfig->pfontName), fontSize(pconfig->fontSize){
 	//
 }
 

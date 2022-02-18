@@ -186,7 +186,8 @@ public:
 	sint deviceIndex;
 	bool debugLayers;
 	bool scissoring;
-	bool hostMemoryImport;
+	//bool hostMemoryImport;
+	Compositor::CompositorInterface::IMPORT_MODE memoryImportMode;
 	bool unredirOnFullscreen;
 	bool enableAnimation;
 	float animationDuration;
@@ -229,7 +230,8 @@ public:
 	static sint deviceIndex;
 	static bool debugLayers;
 	static bool scissoring;
-	static bool hostMemoryImport;
+	//static bool hostMemoryImport;
+	static Compositor::CompositorInterface::IMPORT_MODE memoryImportMode;
 	static bool unredirOnFullscreen;
 };
 

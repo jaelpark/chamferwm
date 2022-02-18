@@ -116,7 +116,8 @@ public:
 		uint deviceIndex;
 		bool debugLayers;
 		bool scissoring;
-		bool hostMemoryImport;
+		//bool hostMemoryImport;
+		IMPORT_MODE memoryImportMode;
 		bool unredirOnFullscreen;
 		bool enableAnimation;
 		float animationDuration;
@@ -264,8 +265,9 @@ protected:
 	//config
 	bool debugLayers;
 	bool scissoring;
-	bool hostMemoryImport;
+	//bool hostMemoryImport;
 	bool unredirOnFullscreen;
+	IMPORT_MODE memoryImportMode;
 
 public:
 	bool enableAnimation;
@@ -379,7 +381,8 @@ public:
 		.deviceIndex = 0,
 		.debugLayers = false,
 		.scissoring = true,
-		.hostMemoryImport = true,
+		//.hostMemoryImport = true,
+		.memoryImportMode = IMPORT_MODE_DMABUF,
 		.enableAnimation = false,
 		.animationDuration = 0.3f,
 		.pfontName = "Monospace",

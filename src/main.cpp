@@ -810,7 +810,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
+	DefaultCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->memoryImportMode,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
 		Start();
 
 		wordexp_t expResult;
@@ -865,7 +865,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
+	DebugCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->memoryImportMode,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
 		Compositor::X11DebugCompositor::Start();
 
 		wordexp_t expResult;
@@ -955,7 +955,7 @@ int main(sint argc, const char **pargv){
 	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
-	args::Flag noHostMemoryImportOpt(group_comp,"noHostMemoryImport","Disable host shared memory import.",{"no-host-memory-import"},false);
+	//args::Flag noHostMemoryImportOpt(group_comp,"noHostMemoryImport","Disable host shared memory import.",{"no-host-memory-import"},false);
 	args::Flag unredirOnFullscreenOpt(group_comp,"unredirOnFullscreen","Unredirect a fullscreen window bypassing the compositor to improve performance.",{"unredir-on-fullscreen"},false);
 	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified.",{"shader-path"},{"/usr/share/chamfer/shaders"});
 
@@ -974,7 +974,7 @@ int main(sint argc, const char **pargv){
 	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
 	Config::Loader::debugLayers = debugLayersOpt.Get();
 	Config::Loader::scissoring = !noScissoringOpt.Get();
-	Config::Loader::hostMemoryImport = !noHostMemoryImportOpt.Get();
+	Config::Loader::memoryImportMode = Compositor::CompositorInterface::IMPORT_MODE_DMABUF;//!noHostMemoryImportOpt.Get();
 	Config::Loader::unredirOnFullscreen = unredirOnFullscreenOpt.Get();
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
@@ -989,8 +989,8 @@ int main(sint argc, const char **pargv){
 		Config::CompositorInterface::pcompositorInt->debugLayers = true;
 	if(noScissoringOpt.Get())
 		Config::CompositorInterface::pcompositorInt->scissoring = false;
-	if(noHostMemoryImportOpt.Get())
-		Config::CompositorInterface::pcompositorInt->hostMemoryImport = false;
+	//if(noHostMemoryImportOpt.Get())
+	//	Config::CompositorInterface::pcompositorInt->hostMemoryImport = false;
 	if(unredirOnFullscreenOpt.Get())
 		Config::CompositorInterface::pcompositorInt->unredirOnFullscreen = true;
 	
