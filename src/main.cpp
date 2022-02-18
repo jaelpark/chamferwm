@@ -325,7 +325,11 @@ public:
 			printf("(focus), ");
 		Config::ContainerConfig *pcontainerConfig = dynamic_cast<Config::ContainerConfig *>(pcontainer);
 		printf("[ContainerConfig: %p, (->container: %p)], ",pcontainerConfig,pcontainerConfig->pcontainerInt->pcontainer);
-		printf("focusQueue: %lu (%p), stackQueue: %lu (%p)\n",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0,pcontainer->stackQueue.size(),pcontainer->stackQueue.size() > 0?pcontainer->stackQueue.back():0);
+		//printf("focusQueue: %lu (%p), stackQueue: %lu (%p)\n",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0,pcontainer->stackQueue.size(),pcontainer->stackQueue.size() > 0?pcontainer->stackQueue.back():0);
+		printf("focusQueue: %lu (%p), stackQueue: %lu (%p) {",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0,pcontainer->stackQueue.size(),pcontainer->stackQueue.size() > 0?pcontainer->stackQueue.back():0);
+		for(WManager::Container *pcont : pcontainer->stackQueue)
+			printf("%p,",pcont);
+		printf("}\n");
 		for(WManager::Container *pcontainer1 = pcontainer->pch; pcontainer1; pcontainer1 = pcontainer1->pnext)
 			PrintTree(pcontainer1,level+1);
 	}
