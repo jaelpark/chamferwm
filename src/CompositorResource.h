@@ -85,10 +85,11 @@ public:
 	std::vector<VkBufferImageCopy> bufferImageCopyBuffer;
 };
 
-//class Texture : public TextureStaged, public TexturePixmap{
-class Texture : public TextureStaged, public TextureHostPointer{
+class Texture : public TextureStaged, public TexturePixmap{
+//class Texture : public TextureStaged, public TextureHostPointer{
 public:
 	Texture(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
+	//Texture(uint, uint, const class CompositorInterface *);
 	~Texture();
 };
 
