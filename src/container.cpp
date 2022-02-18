@@ -203,6 +203,8 @@ Container * Container::Collapse(){
 		pch = 0;
 		focusQueue.clear();
 
+		GetRoot()->Stack();
+
 		return this;
 
 	}else
@@ -223,10 +225,10 @@ Container * Container::Collapse(){
 		pch = 0; //dereference the leftover container
 		focusQueue.clear();
 
+		GetRoot()->Stack();
+
 		return this;
 	}
-
-	GetRoot()->Stack();
 
 	return 0;
 }
