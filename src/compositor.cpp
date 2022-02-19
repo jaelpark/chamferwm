@@ -236,6 +236,8 @@ CompositorInterface::~CompositorInterface(){
 }
 
 void CompositorInterface::InitializeRenderEngine(){
+	DebugPrintf(stdout,"Using memory import mode %u.\n",memoryImportMode);
+
 	uint layerCount;
 	vkEnumerateInstanceLayerProperties(&layerCount,0);
 	VkLayerProperties *playerProps = new VkLayerProperties[layerCount];
@@ -1246,8 +1248,8 @@ void CompositorInterface::ClearBackground(){
 	FullDamageRegion();
 }
 
-Texture * CompositorInterface::CreateTexture(uint w, uint h, uint surfaceDepth){
-	Texture *ptexture;
+TextureBase * CompositorInterface::CreateTexture(uint w, uint h, uint surfaceDepth){
+	TextureBase *ptexture;
 
 	//should be larger than 0:
 	w = std::max(std::min(w,physicalDevProps.limits.maxImageDimension2D),1u);
@@ -1267,12 +1269,22 @@ Texture * CompositorInterface::CreateTexture(uint w, uint h, uint surfaceDepth){
 		textureCache.pop_back();
 		printf("----------- found cached texture\n");
 
-	}else ptexture = new Texture(w,h,pcomponentMapping,0,this);
+	}else{
+		switch(memoryImportMode){
+		case IMPORT_MODE_CPU_COPY:
+		case IMPORT_MODE_HOST_MEMORY:
+			ptexture = new TextureSharedMemory(w,h,pcomponentMapping,0,this);
+			break;
+		case IMPORT_MODE_DMABUF:
+			ptexture = new TextureDMABuffer(w,h,pcomponentMapping,0,this);
+			break;
+		}
+	}
 
 	return ptexture;
 }
 
-void CompositorInterface::ReleaseTexture(Texture *ptexture){
+void CompositorInterface::ReleaseTexture(TextureBase *ptexture){
 	TextureCacheEntry textureCacheEntry;
 	textureCacheEntry.ptexture = ptexture;
 	textureCacheEntry.releaseTag = frameTag;
@@ -1394,8 +1406,40 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		fullRegionUpdate = false;
 	}
 
-	/*if(!pcomp->hostMemoryImport){
-		unsigned char *pdata = (unsigned char *)ptexture->Map();
+	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
+		for(VkRect2D &rect1 : damageRegions){
+			VkRect2D screenRect;
+			screenRect.offset = {(sint)position.x+rect1.offset.x,(sint)position.y+rect1.offset.y};
+			screenRect.extent = rect1.extent;
+			pcomp->AddDamageRegion(&screenRect);
+		}
+		dynamic_cast<TextureDMABuffer *>(ptexture)->Update(pcommandBuffer,damageRegions.data(),damageRegions.size());
+
+	}else
+	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY){
+
+		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,rect.w,rect.h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0); //need to get whole image
+
+		//wait for the buffers to get updated before copying them
+		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
+		xcb_flush(pbackend->pcon);
+		if(pimageReply)
+			free(pimageReply);
+		else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null");
+
+		for(VkRect2D &rect1 : damageRegions){
+			VkRect2D screenRect;
+			screenRect.offset = {(sint)position.x+rect1.offset.x,(sint)position.y+rect1.offset.y};
+			screenRect.extent = rect1.extent;
+			pcomp->AddDamageRegion(&screenRect);
+		}
+		
+		dynamic_cast<TextureSharedMemory *>(ptexture)->Update(pcommandBuffer,damageRegions.data(),damageRegions.size());
+
+	}else{
+		//
+		TextureStaged *ptexture1 = dynamic_cast<TextureStaged *>(ptexture);
+		unsigned char *pdata = (unsigned char *)ptexture1->Map();
 
 		for(VkRect2D &rect1 : damageRegions){
 			xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,rect1.offset.x,rect1.offset.y,rect1.extent.width,rect1.extent.height,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
@@ -1418,37 +1462,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 			screenRect.extent = rect1.extent;
 			pcomp->AddDamageRegion(&screenRect);
 		}
-		ptexture->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
-
-	}else{
-		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,rect.w,rect.h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0); //need to get whole image
-
-		//wait for the buffers to get updated before copying them
-		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
-		xcb_flush(pbackend->pcon);
-		if(pimageReply)
-			free(pimageReply);
-		else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null");
-
-		for(VkRect2D &rect1 : damageRegions){
-			VkRect2D screenRect;
-			screenRect.offset = {(sint)position.x+rect1.offset.x,(sint)position.y+rect1.offset.y};
-			screenRect.extent = rect1.extent;
-			pcomp->AddDamageRegion(&screenRect);
-		}
-		
-		ptexture->Update(pcommandBuffer,damageRegions.data(),damageRegions.size());
-	}*/
-	{
-		//unsigned char *pdata = (unsigned char *)ptexture->Map();
-
-		for(VkRect2D &rect1 : damageRegions){
-			VkRect2D screenRect;
-			screenRect.offset = {(sint)position.x+rect1.offset.x,(sint)position.y+rect1.offset.y};
-			screenRect.extent = rect1.extent;
-			pcomp->AddDamageRegion(&screenRect);
-		}
-		ptexture->Update(pcommandBuffer,damageRegions.data(),damageRegions.size());
+		ptexture1->Unmap(pcommandBuffer,damageRegions.data(),damageRegions.size());
 	}
 
 	damageRegions.clear();
@@ -1468,36 +1482,47 @@ void X11ClientFrame::AdjustSurface1(){
 	if(!enabled)
 		return;
 	if(oldRect.w != rect.w || oldRect.h != rect.h){
-		//detach
-		ptexture->Detach();
-		/*if(pcomp->hostMemoryImport)
-			ptexture->Detach(pcomp->frameTag);
-		xcb_shm_detach(pbackend->pcon,segment);
-		shmdt(pchpixels);
+		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
+			dynamic_cast<TextureDMABuffer *>(ptexture)->Detach();
 
-		shmctl(shmid,IPC_RMID,0);
+			xcb_free_pixmap(pbackend->pcon,windowPixmap);
+			xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 
-		//attach
-		uint textureSize = rect.w*rect.h*4;
-		shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
-		if(shmid == -1){
-			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
-			return;
+			AdjustSurface(rect.w,rect.h);
+
+			//texture renewed, cast again
+			dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(windowPixmap);
+
+		}else{
+			TextureSharedMemory *ptexture1;
+			if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY)
+				dynamic_cast<TextureSharedMemory *>(ptexture)->Detach(pcomp->frameTag);
+
+			xcb_shm_detach(pbackend->pcon,segment);
+			shmdt(pchpixels);
+
+			shmctl(shmid,IPC_RMID,0);
+
+			//attach
+			uint textureSize = rect.w*rect.h*4;
+			shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
+			if(shmid == -1){
+				DebugPrintf(stderr,"Failed to allocate shared memory.\n");
+				return;
+			}
+			xcb_shm_attach(pbackend->pcon,segment,shmid,0);
+			pchpixels = (unsigned char*)shmat(shmid,0,0);
+
+			xcb_free_pixmap(pbackend->pcon,windowPixmap);
+			xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
+
+			AdjustSurface(rect.w,rect.h);
+
+			if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY && !dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
+				DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
+				pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
+			}
 		}
-		xcb_shm_attach(pbackend->pcon,segment,shmid,0);
-		pchpixels = (unsigned char*)shmat(shmid,0,0);*/
-
-		xcb_free_pixmap(pbackend->pcon,windowPixmap);
-		xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
-
-		AdjustSurface(rect.w,rect.h);
-
-		/*if(pcomp->hostMemoryImport && !ptexture->Attach(pchpixels)){
-			DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-			pcomp->hostMemoryImport = false;
-		}*/
-
-		ptexture->Attach(windowPixmap);
 
 		pcomp->AddDamageRegion(this);
 	}else
@@ -1518,40 +1543,46 @@ void X11ClientFrame::StartComposition1(){
 	damage = xcb_generate_id(pbackend->pcon);
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_NON_EMPTY);
 
-	//attach to shared memory
-	/*uint textureSize = rect.w*rect.h*4;
-	shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
-	if(shmid == -1){
-		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
-		return;
-	}
-	segment = xcb_generate_id(pbackend->pcon);
-	xcb_shm_attach(pbackend->pcon,segment,shmid,0);
-	pchpixels = (unsigned char*)shmat(shmid,0,0);
+	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
+		//
+		CreateSurface(rect.w,rect.h,24);
+		dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(windowPixmap);
 
-	xcb_flush(pbackend->pcon);
-	
-	//get image depth
-	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,1,1,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
-	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
-
-	uint depth;
-	if(pimageReply){
-		depth = pimageReply->depth;
-		free(pimageReply);
 	}else{
-		DebugPrintf(stderr,"Failed to get SHM image. Assuming 24 bit depth.\n");
-		depth = 24;
+		//
+		//attach to shared memory
+		uint textureSize = rect.w*rect.h*4;
+		shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
+		if(shmid == -1){
+			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
+			return;
+		}
+		segment = xcb_generate_id(pbackend->pcon);
+		xcb_shm_attach(pbackend->pcon,segment,shmid,0);
+		pchpixels = (unsigned char*)shmat(shmid,0,0);
+
+		xcb_flush(pbackend->pcon);
+		
+		//get image depth
+		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,1,1,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
+
+		uint depth;
+		if(pimageReply){
+			depth = pimageReply->depth;
+			free(pimageReply);
+		}else{
+			DebugPrintf(stderr,"Failed to get SHM image. Assuming 24 bit depth.\n");
+			depth = 24;
+		}
+
+		CreateSurface(rect.w,rect.h,depth);
+
+		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY && !dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
+			DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
+			pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
+		}
 	}
-
-	CreateSurface(rect.w,rect.h,depth);*/
-	CreateSurface(rect.w,rect.h,24);
-
-	/*if(pcomp->hostMemoryImport && !ptexture->Attach(pchpixels)){
-		DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-		pcomp->hostMemoryImport = false;
-	}*/
-	ptexture->Attach(windowPixmap);
 
 	pcomp->AddDamageRegion(this);
 	enabled = true;
@@ -1565,14 +1596,17 @@ void X11ClientFrame::Unredirect1(){
 void X11ClientFrame::StopComposition1(){
 	if(!enabled)
 		return;
-	/*if(pcomp->hostMemoryImport)
-		ptexture->Detach(pcomp->frameTag);*/
-	ptexture->Detach();
+	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF)
+		dynamic_cast<TextureDMABuffer *>(ptexture)->Detach();
+	else{
+		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY)
+			dynamic_cast<TextureSharedMemory *>(ptexture)->Detach(pcomp->frameTag);
 
-	/*xcb_shm_detach(pbackend->pcon,segment);
-	shmdt(pchpixels);
+		xcb_shm_detach(pbackend->pcon,segment);
+		shmdt(pchpixels);
 
-	shmctl(shmid,IPC_RMID,0);*/
+		shmctl(shmid,IPC_RMID,0);
+	}
 
 	xcb_damage_destroy(pbackend->pcon,damage);
 
@@ -1595,37 +1629,45 @@ void X11ClientFrame::SetTitle1(const char *ptitle){
 
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
 	//
-	/*uint textureSize = w*h*4;
-	shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
-	if(shmid == -1){
-		DebugPrintf(stderr,"Failed to allocate shared memory.\n");
-		return;
+	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
+		CreateSurface(w,h,24);
+		dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(pixmap);
+
+	}else{
+		uint textureSize = w*h*4;
+		shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
+		if(shmid == -1){
+			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
+			return;
+		}
+		segment = xcb_generate_id(pcomp11->pbackend->pcon);
+		xcb_shm_attach(pcomp11->pbackend->pcon,segment,shmid,0);
+
+		pchpixels = (unsigned char*)shmat(shmid,0,0);
+
+		CreateSurface(w,h,24);
+
+		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY && !dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
+			DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
+			pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_HOST_MEMORY;
+		}
 	}
-	segment = xcb_generate_id(pcomp11->pbackend->pcon);
-	xcb_shm_attach(pcomp11->pbackend->pcon,segment,shmid,0);
-
-	pchpixels = (unsigned char*)shmat(shmid,0,0);*/
-
-	CreateSurface(w,h,24);
-
-	/*if(pcomp->hostMemoryImport && !ptexture->Attach(pchpixels)){
-		DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-		pcomp->hostMemoryImport = false;
-	}*/
-	ptexture->Attach(pixmap);
 
 	pcomp->FullDamageRegion();
 }
 
 X11Background::~X11Background(){
-	/*if(pcomp->hostMemoryImport)
-		ptexture->Detach(pcomp->frameTag);*/
-	ptexture->Detach();
+	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF)
+		dynamic_cast<TextureDMABuffer *>(ptexture)->Detach();
+	else{
+		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY)
+			dynamic_cast<TextureSharedMemory *>(ptexture)->Detach(pcomp->frameTag);
 
-	/*xcb_shm_detach(pcomp11->pbackend->pcon,segment);
-	shmdt(pchpixels);
+		xcb_shm_detach(pcomp11->pbackend->pcon,segment);
+		shmdt(pchpixels);
 
-	shmctl(shmid,IPC_RMID,0);*/
+		shmctl(shmid,IPC_RMID,0);
+	}
 
 	pcomp->FullDamageRegion();
 }
@@ -1634,29 +1676,31 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	if(!fullRegionUpdate)
 		return;
 
-	/*xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pcomp11->pbackend->pcon,pixmap,0,0,w,h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
-
-	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
-	xcb_flush(pcomp11->pbackend->pcon);
-
-	if(pimageReply)
-		free(pimageReply);
-	else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null (background)");*/
-
 	VkRect2D screenRect;
 	screenRect.offset = {0,0};
 	screenRect.extent = {w,h};
 
-	/*if(!pcomp->hostMemoryImport){
-		unsigned char *pdata = (unsigned char*)ptexture->Map();
-		memcpy(pdata,pchpixels,w*h*4);
-		
-		ptexture->Unmap(pcommandBuffer,&screenRect,1);
-	
-	}else{
-		ptexture->Update(pcommandBuffer,&screenRect,1);
-	}*/
-	ptexture->Update(pcommandBuffer,&screenRect,1);
+	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF)
+		dynamic_cast<TextureDMABuffer *>(ptexture)->Update(pcommandBuffer,&screenRect,1);
+	else{
+		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pcomp11->pbackend->pcon,pixmap,0,0,w,h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+
+		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
+		xcb_flush(pcomp11->pbackend->pcon);
+
+		if(pimageReply)
+			free(pimageReply);
+		else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null (background)");
+
+		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_CPU_COPY){
+			TextureStaged *ptexture1 = dynamic_cast<TextureStaged *>(ptexture);
+			unsigned char *pdata = (unsigned char*)ptexture1->Map();
+			memcpy(pdata,pchpixels,w*h*4);
+			ptexture1->Unmap(pcommandBuffer,&screenRect,1);
+		}else{
+			dynamic_cast<TextureSharedMemory *>(ptexture)->Update(pcommandBuffer,&screenRect,1);
+		}
+	}
 
 	fullRegionUpdate = false;
 
@@ -1925,7 +1969,8 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	uint color[3];
 	for(uint &t : color)
 		t = rand()%190;
-	unsigned char *pdata = (unsigned char*)ptexture->Map();
+	TextureStaged *ptexture1 = dynamic_cast<TextureStaged *>(ptexture);
+	unsigned char *pdata = (unsigned char*)ptexture1->Map();
 	for(uint i = 0, n = rect.w*rect.h; i < n; ++i){
 		//unsigned char t = (float)(i/rect.w)/(float)rect.h*255;
 		pdata[4*i+0] = color[0];
@@ -1936,7 +1981,7 @@ void X11DebugClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	VkRect2D rect1;
 	rect1.offset = {0,0};
 	rect1.extent = {rect.w,rect.h};
-	ptexture->Unmap(pcommandBuffer,&rect1,1);
+	ptexture1->Unmap(pcommandBuffer,&rect1,1);
 
 	pcomp->AddDamageRegion(&rect1);
 }

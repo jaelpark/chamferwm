@@ -76,7 +76,8 @@ public:
 	};
 protected:
 	void UpdateDescSets();
-	Texture *ptexture;
+	//Texture *ptexture;
+	TextureBase *ptexture;
 	class Text *ptitle;
 	std::string title;
 	uint surfaceDepth;
@@ -92,7 +93,7 @@ friend class TextureBase;
 friend class TextureStaged;
 friend class TexturePixmap;
 friend class TextureHostPointer;
-friend class Texture;
+//friend class Texture;
 friend class Buffer;
 friend class ShaderModule;
 friend class Pipeline;
@@ -108,9 +109,9 @@ friend class X11Background;
 friend class X11DebugClientFrame;
 public:
 	enum IMPORT_MODE{
-		IMPORT_MODE_CPU_COPY,
+		IMPORT_MODE_DMABUF,
 		IMPORT_MODE_HOST_MEMORY,
-		IMPORT_MODE_DMABUF
+		IMPORT_MODE_CPU_COPY
 	};
 	struct Configuration{
 		uint deviceIndex;
@@ -235,11 +236,11 @@ protected:
 
 	//Used textures get stored for potential reuse before they get destroyed and while waiting for the pipeline to get flushed.
 	//Many of the allocated window textures will initially have some common reoccuring size.
-	Texture * CreateTexture(uint, uint, uint);
-	void ReleaseTexture(Texture *);
+	TextureBase * CreateTexture(uint, uint, uint);
+	void ReleaseTexture(TextureBase *);
 
 	struct TextureCacheEntry{
-		Texture *ptexture;
+		TextureBase *ptexture;
 		uint64 releaseTag;
 		struct timespec releaseTime;
 	};

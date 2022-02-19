@@ -956,6 +956,7 @@ int main(sint argc, const char **pargv){
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
 	//args::Flag noHostMemoryImportOpt(group_comp,"noHostMemoryImport","Disable host shared memory import.",{"no-host-memory-import"},false);
+	args::ValueFlag<uint> memoryImportMode(group_comp,"memoryImportMode","Memory import mode:\n0: DMA-buf import (fastest, default)\n1: Host memory import\n2: CPU copy (slow, compatibility)",{"memory-import-mode",'m'});
 	args::Flag unredirOnFullscreenOpt(group_comp,"unredirOnFullscreen","Unredirect a fullscreen window bypassing the compositor to improve performance.",{"unredir-on-fullscreen"},false);
 	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified.",{"shader-path"},{"/usr/share/chamfer/shaders"});
 
@@ -974,7 +975,7 @@ int main(sint argc, const char **pargv){
 	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
 	Config::Loader::debugLayers = debugLayersOpt.Get();
 	Config::Loader::scissoring = !noScissoringOpt.Get();
-	Config::Loader::memoryImportMode = Compositor::CompositorInterface::IMPORT_MODE_DMABUF;//!noHostMemoryImportOpt.Get();
+	Config::Loader::memoryImportMode = memoryImportMode?(Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get():Compositor::CompositorInterface::IMPORT_MODE_DMABUF;
 	Config::Loader::unredirOnFullscreen = unredirOnFullscreenOpt.Get();
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
@@ -989,8 +990,8 @@ int main(sint argc, const char **pargv){
 		Config::CompositorInterface::pcompositorInt->debugLayers = true;
 	if(noScissoringOpt.Get())
 		Config::CompositorInterface::pcompositorInt->scissoring = false;
-	//if(noHostMemoryImportOpt.Get())
-	//	Config::CompositorInterface::pcompositorInt->hostMemoryImport = false;
+	if(memoryImportMode)
+		Config::CompositorInterface::pcompositorInt->memoryImportMode = (Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get();
 	if(unredirOnFullscreenOpt.Get())
 		Config::CompositorInterface::pcompositorInt->unredirOnFullscreen = true;
 	
