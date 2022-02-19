@@ -53,7 +53,7 @@ class TexturePixmap : virtual public TextureBase{
 public:
 	TexturePixmap(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
 	virtual ~TexturePixmap();
-	void Attach(xcb_pixmap_t);
+	bool Attach(xcb_pixmap_t);
 	void Detach();
 	void Update(const VkCommandBuffer *, const VkRect2D *, uint);
 

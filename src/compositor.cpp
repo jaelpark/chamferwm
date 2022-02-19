@@ -465,31 +465,54 @@ void CompositorInterface::InitializeRenderEngine(){
 	vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,pdevExtProps);
 
 	//device extensions
-	const char *pdevExtensions[] = {
+	const char *pdevExtensionsDMABuf[] = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
-		//VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
 		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
 		VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
 		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
 		VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME,
-		//VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
-		//VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,
-		//VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
-		//VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,
-		VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME
-		//VK_GOOGLE_HLSL_FUNCTIONALITY1_EXTENSION_NAME,VK_GOOGLE_DECORATE_STRING_EXTENSION_NAME};
+		VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME,
+		VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME
 	};
+	const char *pdevExtensionsHostPointer[] = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
+		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
+		VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
+		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME
+	};
+	const char *pdevExtensionsCPUCopy[] = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
+		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
+	};
+	const char **pdevExtensions;
+	uint requiredDevExtCount;
+	switch(memoryImportMode){
+	case IMPORT_MODE_DMABUF:
+		pdevExtensions = pdevExtensionsDMABuf;
+		requiredDevExtCount = sizeof(pdevExtensionsDMABuf)/sizeof(pdevExtensionsDMABuf[0]);
+		break;
+	case IMPORT_MODE_HOST_MEMORY:
+		pdevExtensions = pdevExtensionsHostPointer;
+		requiredDevExtCount = sizeof(pdevExtensionsHostPointer)/sizeof(pdevExtensionsHostPointer[0]);
+		break;
+	case IMPORT_MODE_CPU_COPY:
+		pdevExtensions = pdevExtensionsCPUCopy;
+		requiredDevExtCount = sizeof(pdevExtensionsCPUCopy)/sizeof(pdevExtensionsCPUCopy[0]);
+		break;
+	}
 
 	DebugPrintf(stdout,"Enumerating required device extensions\n");
 	uint devExtFound = 0;
 	for(uint i = 0; i < devExtCount; ++i)
-		for(uint j = 0; j < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]); ++j)
+		for(uint j = 0; j < requiredDevExtCount; ++j)
 			if(strcmp(pdevExtProps[i].extensionName,pdevExtensions[j]) == 0){
 				printf("  %s\n",pdevExtensions[j]);
 				++devExtFound;
 			}
-	if(devExtFound < sizeof(pdevExtensions)/sizeof(pdevExtensions[0]))
+	if(devExtFound < requiredDevExtCount)
 		throw Exception("Could not find all required device extensions.");
 
 	VkDeviceCreateInfo devCreateInfo = {};
@@ -498,7 +521,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	devCreateInfo.queueCreateInfoCount = queueCount;
 	devCreateInfo.pEnabledFeatures = &physicalDevFeatures;
 	devCreateInfo.ppEnabledExtensionNames = pdevExtensions;
-	devCreateInfo.enabledExtensionCount = sizeof(pdevExtensions)/sizeof(pdevExtensions[0]);
+	devCreateInfo.enabledExtensionCount = requiredDevExtCount;
 	if(debugLayers){
 		devCreateInfo.ppEnabledLayerNames = players;
 		devCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]);
@@ -783,8 +806,10 @@ void CompositorInterface::AddDamageRegion(const VkRect2D *prect){
 	VkRectLayerKHR &rectLayer = presentRectLayers.emplace_back();
 	rectLayer.offset = {std::max(prect->offset.x,0),std::max(prect->offset.y,0)};
 	rectLayer.extent = {
-		prect->extent.width+std::min((int)imageExtent.width-(rectLayer.offset.x+(int)prect->extent.width),0),
-		prect->extent.height+std::min((int)imageExtent.height-(rectLayer.offset.y+(int)prect->extent.height),0)
+		rectLayer.offset.x+prect->extent.width > imageExtent.width?imageExtent.width-rectLayer.offset.x:prect->extent.width,
+		rectLayer.offset.y+prect->extent.height > imageExtent.height?imageExtent.height-rectLayer.offset.y:prect->extent.height
+		//prect->extent.width+std::min((int)imageExtent.width-(rectLayer.offset.x+(int)prect->extent.width),0),
+		//prect->extent.height+std::min((int)imageExtent.height-(rectLayer.offset.y+(int)prect->extent.height),0)
 	};
 	rectLayer.layer = 0;
 }
@@ -1180,7 +1205,7 @@ void CompositorInterface::Present(){
 	presentInfo.pSwapchains = &swapChain;
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = 0;
-	presentInfo.pNext = presentRegion.rectangleCount > 0?&presentRegions:0;
+	presentInfo.pNext = 0;//presentRegion.rectangleCount > 0?&presentRegions:0;
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
 
 	presentRectLayers.clear();
@@ -1794,6 +1819,7 @@ void X11Compositor::Start(){
 
 	InitializeRenderEngine();
 
+	//TODO: needs VK_EXT_physical_device_drm to get the correct id
 	/*char cardStr[256];
 	snprintf(cardStr,sizeof(cardStr),"/dev/dri/card%u",physicalDevIndex);
 
