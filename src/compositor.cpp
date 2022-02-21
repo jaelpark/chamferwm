@@ -473,6 +473,7 @@ void CompositorInterface::InitializeRenderEngine(){
 		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
 		VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME,
 		VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME,
+		VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME,
 		VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME
 	};
 	const char *pdevExtensionsHostPointer[] = {
@@ -1205,7 +1206,7 @@ void CompositorInterface::Present(){
 	presentInfo.pSwapchains = &swapChain;
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = 0;
-	presentInfo.pNext = 0;//presentRegion.rectangleCount > 0?&presentRegions:0;
+	presentInfo.pNext = presentRegion.rectangleCount > 0?&presentRegions:0;
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
 
 	presentRectLayers.clear();

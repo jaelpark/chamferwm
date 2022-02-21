@@ -164,7 +164,7 @@ void TextureStaged::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D 
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	imageMemoryBarrier.image = image;
 	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
-	imageMemoryBarrier.srcAccessMask = 0;
+	imageMemoryBarrier.srcAccessMask = 0u;
 	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
 	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -382,9 +382,11 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D
 
 	VkImageMemoryBarrier transferImageMemoryBarrier = {};
 	transferImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	transferImageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT;
+	transferImageMemoryBarrier.dstQueueFamilyIndex = pcomp->queueFamilyIndex[CompositorInterface::QUEUE_INDEX_GRAPHICS];
 	transferImageMemoryBarrier.image = transferImage;
 	transferImageMemoryBarrier.subresourceRange = imageSubresourceRange;
-	transferImageMemoryBarrier.srcAccessMask = 0;
+	transferImageMemoryBarrier.srcAccessMask = 0u;
 	transferImageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 	//transferImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	transferImageMemoryBarrier.oldLayout = transferImageLayout;
@@ -392,19 +394,31 @@ void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D
 	//vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
 		//0,0,0,0,1,&transferImageMemoryBarrier);
 
+	VkImageMemoryBarrier transferImageMemoryReleaseBarrier = {};
+	transferImageMemoryReleaseBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	transferImageMemoryReleaseBarrier.srcQueueFamilyIndex = pcomp->queueFamilyIndex[CompositorInterface::QUEUE_INDEX_GRAPHICS];
+	transferImageMemoryReleaseBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT;
+	transferImageMemoryReleaseBarrier.image = transferImage;
+	transferImageMemoryReleaseBarrier.subresourceRange = imageSubresourceRange;
+	transferImageMemoryReleaseBarrier.srcAccessMask = 0u;
+	transferImageMemoryReleaseBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+	transferImageMemoryReleaseBarrier.oldLayout = transferImageLayout;
+	transferImageMemoryReleaseBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+
 	VkImageMemoryBarrier imageMemoryBarrier = {};
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	imageMemoryBarrier.image = image;
 	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
-	imageMemoryBarrier.srcAccessMask = 0;
+	imageMemoryBarrier.srcAccessMask = 0u;
 	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
 	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	//vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
 		//0,0,0,0,1,&imageMemoryBarrier);
 	const VkImageMemoryBarrier barriers[] = {imageMemoryBarrier,transferImageMemoryBarrier};
-	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
-		0,0,0,0,2,barriers);
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,0,0,0,0,2,barriers);
+
+	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,0,0,0,0,0,1,&transferImageMemoryReleaseBarrier);
 	
 	VkImageSubresourceLayers imageSubresourceLayers = {};
 	imageSubresourceLayers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -553,7 +567,7 @@ void TextureHostPointer::Update(const VkCommandBuffer *pcommandBuffer, const VkR
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	imageMemoryBarrier.image = image;
 	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
-	imageMemoryBarrier.srcAccessMask = 0;
+	imageMemoryBarrier.srcAccessMask = 0u;
 	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
 	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
