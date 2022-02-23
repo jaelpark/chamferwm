@@ -211,9 +211,18 @@ TexturePixmap::~TexturePixmap(){
 bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	xcb_dri3_buffers_from_pixmap_cookie_t buffersFromPixmapCookie = xcb_dri3_buffers_from_pixmap(pcomp11->pbackend->pcon,pixmap);
 	xcb_dri3_buffers_from_pixmap_reply_t *pbuffersFromPixmapReply = xcb_dri3_buffers_from_pixmap_reply(pcomp11->pbackend->pcon,buffersFromPixmapCookie,0);
+	if(!pbuffersFromPixmapReply){
+		DebugPrintf(stderr,"Failed to get buffers from pixmap (DRI3 ext).");
+		return false;
+	}
 	//DebugPrintf(stdout,"----------- depth: %u, bpp: %u\n",pbuffersFromPixmapReply->depth,pbuffersFromPixmapReply->bpp);
 
-	dmafd = xcb_dri3_buffers_from_pixmap_buffers(pbuffersFromPixmapReply)[0];
+	int *pdmafds = xcb_dri3_buffers_from_pixmap_buffers(pbuffersFromPixmapReply);
+	if(!pdmafds){
+		DebugPrintf(stderr,"NULL DMA-buf fd.");
+		return false;
+	}
+	dmafd = pdmafds[0];
 
 	//sint strides = xcb_dri3_buffers_from_pixmap_strides_length(pbuffersFromPixmapReply);
 	uint *pstrides = xcb_dri3_buffers_from_pixmap_strides(pbuffersFromPixmapReply);
