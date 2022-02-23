@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "CHAMFERWM" "1" "Nov 28, 2020" "" "chamferwm"
+.TH "CHAMFERWM" "1" "Feb 23, 2022" "" "chamferwm"
 .SH NAME
 chamferwm \- chamferwm git
 .
@@ -36,14 +36,7 @@ Chamferwm is a dynamic tiling window manager with a built\-in Vulkan based compo
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
-In case of open source graphics, the most recent version of Mesa is highly recommended. With older versions of Mesa, user may experience glitches or other graphical corruption.
-.UNINDENT
-.UNINDENT
-.sp
-\fBWARNING:\fP
-.INDENT 0.0
-.INDENT 3.5
-\fBVK_EXT_image_drm_format_modifier\fP, a vital Vulkan extension required to import DRM format modifiers from DMA buffers, is currently unavailable. As a result, Chamferwm must rely on shared memory access to read client window contents. Using shared memory access may be detrimental to performance at high client resolutions. This limination will persist for as long as the required extension remains unimplemented.
+In case of open source graphics, the most recent version of Mesa is highly recommended. With older versions of Mesa, one may experience glitches or other graphical corruption.
 .UNINDENT
 .UNINDENT
 .SH FEATURES
@@ -216,6 +209,9 @@ Configuration Python script
 .TP
 .B \-d\fP,\fB  \-\-debug\-backend
 Create a test environment for the compositor engine without redirection. The application will not act as a window manager.
+.TP
+.B \-C\fP,\fB  \-\-standalone\-compositor
+Use compositor for external window managers. (Work in progress)
 .UNINDENT
 .sp
 \fBCompositor\fP
@@ -236,14 +232,14 @@ Enable Vulkan debug layers.
 .B \-\-no\-scissoring
 Disable scissoring optimization.
 .TP
-.B \-\-no\-host\-memory\-import
-Disable host shared memory import.
+.BI \-m\fP,\fB  \-\-memory\-import\-mode\fB= m
+Memory import mode: 0: DMA\-buf import, 1: Host memory import, 2: CPU import (slow, compatibility)
 .TP
 .B \-\-unredir\-on\-fullscreen
 Unredirect a fullscreen window bypassing the compositor to improve performance.
 .TP
 .BI \-\-shader\-path\fB= path
-Shader lookup path. SPIR\-V shader objects are identified by an \(aq.spv\(aq extension. Multiple paths may be specified.
+Shader lookup path. SPIR\-V shader objects are identified by an ‘.spv’ extension. Multiple paths may be specified.
 .UNINDENT
 .SH KEY BINDINGS
 .sp
@@ -525,7 +521,7 @@ class Key(Enum):
 .UNINDENT
 .UNINDENT
 .sp
-\fB2. Launch procedure.\fP We launch the application using \fBpsutil\fP module’s \fBpsutil.Popen()\fP function. Under \fI\%chamfer.Backend.OnKeyPress()\fP callback we add a branch for our newly defined key identifier, in which we start our browser process:
+\fB2. Launch procedure.\fP We launch the application using \fBpsutil\fP module\(aqs \fBpsutil.Popen()\fP function. Under \fI\%chamfer.Backend.OnKeyPress()\fP callback we add a branch for our newly defined key identifier, in which we start our browser process:
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -551,7 +547,7 @@ Chamferwm is work in progress, and the configuration API is subject to breaking 
 .UNINDENT
 .INDENT 0.0
 .TP
-.B class chamfer.Container
+.B class  chamfer.Container
 The workspace in Chamferwm is arranged in containers. Containers are a construct to hold either a client window or a set of child containers. The concept of a \fIchild\fP container comes from a hierarchial approach: at the base of the tree, there exists a root container which is split into one or more child containers. The child containers may in turn be further split into child containers, or alternatively hold a single instance of a client window.
 .INDENT 7.0
 .INDENT 2.5
@@ -788,7 +784,7 @@ Determine in which mode (tiled or floating) the client shall be created. See \fI
 .UNINDENT
 .INDENT 0.0
 .TP
-.B class chamfer.layout(enum.Enum)
+.B class  chamfer.layout(enum.Enum)
 Possible values of \fI\%layout\fP and the \fIlayout\fP parameter of \fI\%ShiftLayout()\fP, dictating the splitting mode of the container.
 .INDENT 7.0
 .TP
@@ -803,7 +799,7 @@ Implies a horizontally split container. Containers will be placed in a vertical 
 .UNINDENT
 .INDENT 0.0
 .TP
-.B class chamfer.floatingMode(enum.Enum)
+.B class  chamfer.floatingMode(enum.Enum)
 Possible values of \fI\%floatingMode\fP, dictating the mode in which the client shall be created.
 .INDENT 7.0
 .TP
@@ -823,7 +819,7 @@ The client is always created in a tiled container, regardless of its client attr
 .UNINDENT
 .INDENT 0.0
 .TP
-.B class chamfer.property
+.B class  chamfer.property
 Various client property identifiers.
 .INDENT 7.0
 .TP
@@ -838,7 +834,7 @@ Client window class name.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B class chamfer.titleBar
+.B class  chamfer.titleBar
 Title bar placement. By default the title bars are placed on top of the client.
 .INDENT 7.0
 .TP
@@ -868,8 +864,8 @@ Title bar placed at the left border of client
 .UNINDENT
 .INDENT 0.0
 .TP
-.B class chamfer.Backend
-A user implemented interface to define routines for various window management related events. Moreover, \fI\%Backend\fP provides methods for …
+.B class  chamfer.Backend
+A user implemented interface to define routines for various window management related events. Moreover, \fI\%Backend\fP provides methods for ...
 .INDENT 7.0
 .TP
 .B OnSetupKeys(debug)
@@ -913,7 +909,7 @@ Get the root container \fI\%chamfer.Container\fP\&. If \fIname\fP is specified, 
 .INDENT 7.0
 .TP
 .B BindKey(symbol, mask, keyId)
-Bind key \fIsymbol\fP with modifier \fImask\fP\&. The key combination will be exclusive to Chamferwm, and won’t be reported to any of the clients. Whenever the bound key is pressed, \fI\%chamfer.Backend.OnKeyPress()\fP with \fIkeyId\fP is called. Likewise, \fI\%chamfer.Backend.OnKeyRelease()\fP is called when the pressed key is released.
+Bind key \fIsymbol\fP with modifier \fImask\fP\&. The key combination will be exclusive to Chamferwm, and won\(aqt be reported to any of the clients. Whenever the bound key is pressed, \fI\%chamfer.Backend.OnKeyPress()\fP with \fIkeyId\fP is called. Likewise, \fI\%chamfer.Backend.OnKeyRelease()\fP is called when the pressed key is released.
 .UNINDENT
 .INDENT 7.0
 .TP
@@ -938,7 +934,7 @@ Bound backend class object used by Chamferwm. Read only attribute.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B class chamfer.shaderFlag(enum.Enum)
+.B class  chamfer.shaderFlag(enum.Enum)
 Bit flags for the shader push constant, accessible with \fI\%shaderFlags\fP\&.
 .INDENT 7.0
 .TP
@@ -963,7 +959,7 @@ First bit reserved for user defined flags.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B class chamfer.Compositor
+.B class  chamfer.Compositor
 A user implemented interface to define routines for various compositing related events.
 .INDENT 7.0
 .TP
