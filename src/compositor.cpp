@@ -930,15 +930,6 @@ bool CompositorInterface::PollFrameFence(bool suspend){
 }
 
 void CompositorInterface::GenerateCommandBuffers(const std::deque<WManager::Client *> *pclientStack, const WManager::Container *pfocus, const WManager::Client *pfocusClient){
-	//Create a render list elements arranged from back to front
-	auto checkFocus = [&](const WManager::Client *pclient)->bool{
-		if(pclient->pcontainer == pclient->pcontainer->GetRoot())
-			return false;
-		for(WManager::Container *pcontainer = pclient->pcontainer; pcontainer; pcontainer = pcontainer->GetParent())
-			if(pfocus == pcontainer)
-				return true;
-		return false;
-	};
 	renderQueue.clear();
 	for(auto m : *pclientStack){
 		ClientFrame *pclientFrame = dynamic_cast<ClientFrame *>(m);
@@ -950,11 +941,27 @@ void CompositorInterface::GenerateCommandBuffers(const std::deque<WManager::Clie
 		renderObject.pclientFrame = pclientFrame;
 		renderObject.pclientFrame->oldShaderFlags = renderObject.pclientFrame->shaderFlags;
 		renderObject.pclientFrame->shaderFlags =
-			//(std::get<1>(m)?ClientFrame::SHADER_FLAG_FOCUS:0)
-			((checkFocus(renderObject.pclient) || m == pfocusClient)?ClientFrame::SHADER_FLAG_FOCUS:0)
-			|(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING?ClientFrame::SHADER_FLAG_FLOATING:0)
-			|(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED?ClientFrame::SHADER_FLAG_STACKED:0)
-			|renderObject.pclientFrame->shaderUserFlags;
+			ClientFrame::SHADER_FLAG_CONTAINER_FOCUS|renderObject.pclientFrame->shaderUserFlags;
+		if(renderObject.pclient == pfocusClient)
+			renderObject.pclientFrame->shaderFlags |= ClientFrame::SHADER_FLAG_FOCUS;
+		else
+		if(renderObject.pclient->pcontainer != renderObject.pclient->pcontainer->GetRoot()){
+			for(WManager::Container *pcontainer = renderObject.pclient->pcontainer; pcontainer; pcontainer = pcontainer->GetParent())
+				if(pfocus == pcontainer){
+					renderObject.pclientFrame->shaderFlags |= ClientFrame::SHADER_FLAG_FOCUS;
+					break;
+				}
+		}
+		if(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING)
+			renderObject.pclient->pcontainer->flags |= ClientFrame::SHADER_FLAG_FLOATING;
+		if(renderObject.pclient->pcontainer->pParent){
+			if(renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
+				renderObject.pclientFrame->shaderFlags |= ClientFrame::SHADER_FLAG_STACKED;
+				if(!renderObject.pclient->pcontainer->pParent->focusQueue.empty()
+					&& renderObject.pclient->pcontainer->pParent->focusQueue.back() != renderObject.pclient->pcontainer)
+						renderObject.pclientFrame->shaderFlags &= ~ClientFrame::SHADER_FLAG_CONTAINER_FOCUS;
+			}
+		}
 		renderQueue.push_back(renderObject);
 	}
 

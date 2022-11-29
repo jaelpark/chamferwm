@@ -550,7 +550,7 @@ void X11Backend::StackClients(const WManager::Container *proot){
 
 		if(pclient11){
 			static uint values[1] = {XCB_STACK_MODE_ABOVE};
-			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values); //crashes often
 		}
 
 		clientStack.push_back(p.second);

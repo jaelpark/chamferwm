@@ -175,8 +175,12 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 		return titleBackground[stackIndex%2];
 	}
 	//content region
-	float4 c = content.Load(float3(posh.xy-a_content,0));
-	return c;
+	if(flags & FLAGS_CONTAINER_FOCUS){
+		float4 c = content.Load(float3(posh.xy-a_content,0));
+		return c;
+	}
+	discard;
+	return 0.0f;
 }
 
 #endif

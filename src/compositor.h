@@ -70,9 +70,10 @@ public:
 	void SetTitle(const char *);
 	enum SHADER_FLAG{ //+config
 		SHADER_FLAG_FOCUS = 0x1,
-		SHADER_FLAG_FLOATING = 0x2,
-		SHADER_FLAG_STACKED = 0x4,
-		SHADER_FLAG_USER_BIT = 0x8
+		SHADER_FLAG_CONTAINER_FOCUS = 0x2,
+		SHADER_FLAG_FLOATING = 0x4,
+		SHADER_FLAG_STACKED = 0x8,
+		SHADER_FLAG_USER_BIT = 0x10
 	};
 protected:
 	void UpdateDescSets();
