@@ -105,7 +105,7 @@ class Container(chamfer.Container):
 		self.splitArmed = False;
 
 		self.titleBar = chamfer.titleBar.TOP; #options for the title bar location are NONE, LEFT, TOP, RIGHT or BOTTOM
-		self.titleStackOnly = False; #enable to use title bars only on stacked containers
+		self.titleStackOnly = True; #disable to always show title bars
 
 		#WM_CLASS/TITLE rules to force floating mode / never float
 		if self.wm_class == "matplotlib":
