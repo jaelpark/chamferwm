@@ -169,7 +169,6 @@ void X11Client::UpdateTranslation(){
 	glm::vec2 titlePadOffset = glm::min(titlePad,glm::vec2(0.0f));
 	glm::vec2 titlePadExtent = glm::max(titlePad,glm::vec2(0.0f));
 
-	//if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)){
 	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) && (!pcontainer->titleStackOnly || (pcontainer->pParent && pcontainer->pParent->flags & WManager::Container::FLAG_STACKED))){
 		stackIndex = 0;
 		if(pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
@@ -207,7 +206,7 @@ void X11Client::UpdateTranslation(){
 		
 		titleRect = (WManager::Rectangle){titleFrameOffset.x,titleFrameOffset.y,titleFrameExtent.x,titleFrameExtent.y};
 		titlePad1 = titlePad;
-	}
+	}else stackIndex = 0;
 
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);

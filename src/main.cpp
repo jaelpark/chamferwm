@@ -323,6 +323,10 @@ public:
 			printf("(parent: %p), ",pcontainer->pParent);
 		if(WManager::Container::ptreeFocus == pcontainer)
 			printf("(focus), ");
+		if(pcontainer->flags & WManager::Container::FLAG_STACKED)
+			printf("(+stacked), ");
+		if(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)
+			printf("(+fullscr.), ");
 		Config::ContainerConfig *pcontainerConfig = dynamic_cast<Config::ContainerConfig *>(pcontainer);
 		printf("[ContainerConfig: %p, (->container: %p)], ",pcontainerConfig,pcontainerConfig->pcontainerInt->pcontainer);
 		//printf("focusQueue: %lu (%p), stackQueue: %lu (%p)\n",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0,pcontainer->stackQueue.size(),pcontainer->stackQueue.size() > 0?pcontainer->stackQueue.back():0);
@@ -332,6 +336,9 @@ public:
 		printf("}\n");
 		for(WManager::Container *pcontainer1 = pcontainer->pch; pcontainer1; pcontainer1 = pcontainer1->pnext)
 			PrintTree(pcontainer1,level+1);
+		if(level == 0)
+			for(auto &p : stackAppendix)
+				printf("FLOAT %p, flags: %x\n",p.second->pcontainer,p.second->pcontainer->flags);
 	}
 
 //protected:
@@ -461,9 +468,11 @@ public:
 		if(m != stackAppendix.end()){
 			stackAppendix.erase(m);
 			//TODO: call OnParent
-
 			pcontainer->flags &= ~WManager::Container::FLAG_FLOATING;
 			pcontainer->Place(proot);
+
+			printf("----------- placed %p\n",pcontainer);
+			PrintTree(proot,0);
 
 			return;
 		}

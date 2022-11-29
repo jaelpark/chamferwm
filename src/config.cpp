@@ -858,7 +858,7 @@ BOOST_PYTHON_MODULE(chamfer){
 				container.pcontainer->SetStacked(toggle);
 			},boost::python::default_call_policies(),boost::mpl::vector3<void, ContainerInterface &, bool>()))
 		.def("SetFloating",boost::python::make_function(
-			[](ContainerInterface &container, bool toggle){
+			[](ContainerInterface &container, bool toggle){ //XXX toggle does nothing here!
 				if(!container.pcontainer)
 					return;
 				container.OnFloat(toggle);

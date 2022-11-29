@@ -953,7 +953,7 @@ void CompositorInterface::GenerateCommandBuffers(const std::deque<WManager::Clie
 				}
 		}
 		if(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING)
-			renderObject.pclient->pcontainer->flags |= ClientFrame::SHADER_FLAG_FLOATING;
+			renderObject.pclientFrame->shaderFlags |= ClientFrame::SHADER_FLAG_FLOATING;
 		if(renderObject.pclient->pcontainer->pParent){
 			if(renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
 				renderObject.pclientFrame->shaderFlags |= ClientFrame::SHADER_FLAG_STACKED;
