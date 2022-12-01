@@ -51,6 +51,7 @@ public:
 		FLOAT_NEVER
 	} floatingMode;
 	WManager::Container::TITLEBAR titleBar;
+	bool titleStackOnly;
 	//float titlePadding;
 	//client variables
 	uint shaderUserFlags;
@@ -145,6 +146,8 @@ public:
 	void MapKey(uint, uint, uint);
 	void GrabKeyboard(bool);
 
+	bool standaloneComp;
+
 	class BackendConfig *pbackend;
 
 	static void Bind(boost::python::object);
@@ -177,12 +180,14 @@ public:
 class CompositorInterface{
 public:
 	CompositorInterface();
-	~CompositorInterface();
+	virtual ~CompositorInterface();
+	virtual bool OnRedirectExternal(std::string, std::string);
 
 	sint deviceIndex;
 	bool debugLayers;
 	bool scissoring;
-	bool hostMemoryImport;
+	//bool hostMemoryImport;
+	Compositor::CompositorInterface::IMPORT_MODE memoryImportMode;
 	bool unredirOnFullscreen;
 	bool enableAnimation;
 	float animationDuration;
@@ -202,6 +207,7 @@ class CompositorProxy : public CompositorInterface, public boost::python::wrappe
 public:
 	CompositorProxy();
 	~CompositorProxy();
+	bool OnRedirectExternal(std::string, std::string);
 };
 
 class CompositorConfig{
@@ -217,10 +223,15 @@ public:
 	~Loader();
 	void Run(const char *, const char *);
 
+	//backend
+	static bool standaloneComp;
+
+	//compositor
 	static sint deviceIndex;
 	static bool debugLayers;
 	static bool scissoring;
-	static bool hostMemoryImport;
+	//static bool hostMemoryImport;
+	static Compositor::CompositorInterface::IMPORT_MODE memoryImportMode;
 	static bool unredirOnFullscreen;
 };
 

@@ -104,13 +104,14 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 typedef std::pair<const WManager::Client *, WManager::Client *> StackAppendixElement;
 class RunCompositor : public Config::CompositorConfig{
 public:
-	RunCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
+	//RunCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : pstackAppendix(_pstackAppendix), Config::CompositorConfig(_pcompositorInt){}
+	RunCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Config::CompositorInterface *_pcompositorInt) : Config::CompositorConfig(_pcompositorInt){}
 	virtual ~RunCompositor(){}
 	virtual void Present() = 0;
 	virtual bool IsAnimating() const = 0;
 	virtual void WaitIdle() = 0;
-protected:
-	std::vector<StackAppendixElement> *pstackAppendix;
+//protected:
+//	std::vector<StackAppendixElement> *pstackAppendix;
 };
 
 class RunBackend : public Config::BackendConfig{
@@ -123,6 +124,7 @@ public:
 
 	void SetCompositor(class RunCompositor *pcomp){
 		this->pcomp = pcomp;
+		pcompInt = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
 	}
 
 	struct ContainerCreateInfo{
@@ -157,8 +159,6 @@ public:
 	Config::ContainerInterface & SetupContainer(WManager::Container *pParent, const ContainerCreateInfo *pcreateInfo){
 		Config::ContainerInterface &containerInt = SetupContainer<T,U>(pcreateInfo);
 		containerInt.OnSetupContainer();
-
-		Compositor::CompositorInterface *pcompInt = dynamic_cast<Compositor::CompositorInterface *>(pcomp);
 
 		WManager::Container::Setup setup;
 		if(containerInt.floatingMode == Config::ContainerInterface::FLOAT_ALWAYS ||
@@ -323,21 +323,33 @@ public:
 			printf("(parent: %p), ",pcontainer->pParent);
 		if(WManager::Container::ptreeFocus == pcontainer)
 			printf("(focus), ");
+		if(pcontainer->flags & WManager::Container::FLAG_STACKED)
+			printf("(+stacked), ");
+		if(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)
+			printf("(+fullscr.), ");
 		Config::ContainerConfig *pcontainerConfig = dynamic_cast<Config::ContainerConfig *>(pcontainer);
 		printf("[ContainerConfig: %p, (->container: %p)], ",pcontainerConfig,pcontainerConfig->pcontainerInt->pcontainer);
-		printf("focusQueue: %lu (%p), stackQueue: %lu (%p)\n",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0,pcontainer->stackQueue.size(),pcontainer->stackQueue.size() > 0?pcontainer->stackQueue.back():0);
+		//printf("focusQueue: %lu (%p), stackQueue: %lu (%p)\n",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0,pcontainer->stackQueue.size(),pcontainer->stackQueue.size() > 0?pcontainer->stackQueue.back():0);
+		printf("focusQueue: %lu (%p), stackQueue: %lu (%p) {",pcontainer->focusQueue.size(),pcontainer->focusQueue.size() > 0?pcontainer->focusQueue.back():0,pcontainer->stackQueue.size(),pcontainer->stackQueue.size() > 0?pcontainer->stackQueue.back():0);
+		for(WManager::Container *pcont : pcontainer->stackQueue)
+			printf("%p,",pcont);
+		printf("}\n");
 		for(WManager::Container *pcontainer1 = pcontainer->pch; pcontainer1; pcontainer1 = pcontainer1->pnext)
 			PrintTree(pcontainer1,level+1);
+		if(level == 0)
+			for(auto &p : stackAppendix)
+				printf("FLOAT %p, flags: %x\n",p.second->pcontainer,p.second->pcontainer->flags);
 	}
 
 //protected:
 	std::vector<StackAppendixElement> stackAppendix;
 	class RunCompositor *pcomp;
+	Compositor::CompositorInterface *pcompInt; //dynamic casted from pcomp on initialization
 };
 
 class DefaultBackend : public Backend::Default, public RunBackend{
 public:
-	DefaultBackend(Config::BackendInterface *_pbackendInt) : Default(), RunBackend(_pbackendInt){
+	DefaultBackend(Config::BackendInterface *_pbackendInt) : Default(_pbackendInt->standaloneComp), RunBackend(_pbackendInt){
 		Start();
 		DebugPrintf(stdout,"Backend initialized.\n");
 	}
@@ -456,9 +468,11 @@ public:
 		if(m != stackAppendix.end()){
 			stackAppendix.erase(m);
 			//TODO: call OnParent
-
 			pcontainer->flags &= ~WManager::Container::FLAG_FLOATING;
 			pcontainer->Place(proot);
+
+			printf("----------- placed %p\n",pcontainer);
+			PrintTree(proot,0);
 
 			return;
 		}
@@ -639,6 +653,10 @@ public:
 		return pcomp11->FilterEvent(pevent11);
 	}
 
+	void WakeNotify(){
+		pcompInt->FullDamageRegion();
+	}
+
 	void KeyPress(uint keyId, bool down){
 		if(down)
 			Config::BackendInterface::pbackendInt->OnKeyPress(keyId);
@@ -664,6 +682,10 @@ public:
 	void TimerEvent(){
 		//
 		Config::BackendInterface::pbackendInt->OnTimer();
+	}
+
+	bool ApproveExternal(const Backend::BackendStringProperty *pwmName, const Backend::BackendStringProperty *pwmClass){
+		return Config::CompositorInterface::pcompositorInt->OnRedirectExternal(pwmName->pstr,pwmClass->pstr);
 	}
 };
 
@@ -768,6 +790,10 @@ public:
 		return false;
 	}
 
+	void WakeNotify(){
+		pcompInt->FullDamageRegion();
+	}
+
 	void KeyPress(uint keyId, bool down){
 		if(down)
 			Config::BackendInterface::pbackendInt->OnKeyPress(keyId);
@@ -785,11 +811,15 @@ public:
 	void TimerEvent(){
 		//
 	}
+
+	bool ApproveExternal(const Backend::BackendStringProperty *pwmName, const Backend::BackendStringProperty *pwmClass){
+		return true;
+	}
 };
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
+	DefaultCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->memoryImportMode,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
 		Start();
 
 		wordexp_t expResult;
@@ -827,7 +857,7 @@ public:
 		if(!PollFrameFence(proot->noComp))
 			return;
 
-		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
+		GenerateCommandBuffers(&pbackend->clientStack,WManager::Container::ptreeFocus,pbackend->pfocusInClient);
 		Compositor::X11Compositor::Present();
 	}
 
@@ -844,7 +874,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->hostMemoryImport,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
+	DebugCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->memoryImportMode,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
 		Compositor::X11DebugCompositor::Start();
 
 		wordexp_t expResult;
@@ -880,8 +910,7 @@ public:
 		if(!PollFrameFence(false))
 			return;
 		
-		WManager::Container *proot = WManager::Container::ptreeFocus->GetRoot();
-		GenerateCommandBuffers(proot,pstackAppendix,WManager::Container::ptreeFocus);
+		GenerateCommandBuffers(&pbackend->clientStack,WManager::Container::ptreeFocus,pbackend->pfocusInClient);
 		Compositor::X11DebugCompositor::Present();
 	}
 
@@ -927,14 +956,15 @@ int main(sint argc, const char **pargv){
 
 	args::Group group_backend(parser,"Backend",args::Group::Validators::DontCare);
 	args::Flag debugBackend(group_backend,"debugBackend","Create a test environment for the compositor engine without redirection. The application will not act as a window manager.",{'d',"debug-backend"});
+	args::Flag staComp(group_backend,"standaloneCompositor","Standalone compositor for external window managers.",{'C',"standalone-compositor"});
 
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
 	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
-	args::Flag expFeatures(group_comp,"expFeatures","Enable experimental features",{"experimental",'e'},false);
 	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
-	args::Flag noHostMemoryImportOpt(group_comp,"noHostMemoryImport","Disable host shared memory import.",{"no-host-memory-import"},false);
+	//args::Flag noHostMemoryImportOpt(group_comp,"noHostMemoryImport","Disable host shared memory import.",{"no-host-memory-import"},false);
+	args::ValueFlag<uint> memoryImportMode(group_comp,"memoryImportMode","Memory import mode:\n0: DMA-buf import (fastest)\n1: Host memory import (default)\n2: CPU copy (slow, compatibility)",{"memory-import-mode",'m'});
 	args::Flag unredirOnFullscreenOpt(group_comp,"unredirOnFullscreen","Unredirect a fullscreen window bypassing the compositor to improve performance.",{"unredir-on-fullscreen"},false);
 	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified.",{"shader-path"},{"/usr/share/chamfer/shaders"});
 
@@ -953,11 +983,15 @@ int main(sint argc, const char **pargv){
 	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
 	Config::Loader::debugLayers = debugLayersOpt.Get();
 	Config::Loader::scissoring = !noScissoringOpt.Get();
-	Config::Loader::hostMemoryImport = !noHostMemoryImportOpt.Get();
+	//Config::Loader::memoryImportMode = memoryImportMode?(Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get():Compositor::CompositorInterface::IMPORT_MODE_DMABUF;
+	Config::Loader::memoryImportMode = memoryImportMode?(Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get():Compositor::CompositorInterface::IMPORT_MODE_HOST_MEMORY;
 	Config::Loader::unredirOnFullscreen = unredirOnFullscreenOpt.Get();
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
 	pconfigLoader->Run(configPath?configPath.Get().c_str():0,"config.py");
+
+	if(staComp.Get())
+		Config::BackendInterface::pbackendInt->standaloneComp = true;
 
 	if(deviceIndexOpt)
 		Config::CompositorInterface::pcompositorInt->deviceIndex = deviceIndexOpt.Get();
@@ -965,14 +999,11 @@ int main(sint argc, const char **pargv){
 		Config::CompositorInterface::pcompositorInt->debugLayers = true;
 	if(noScissoringOpt.Get())
 		Config::CompositorInterface::pcompositorInt->scissoring = false;
-	if(noHostMemoryImportOpt.Get())
-		Config::CompositorInterface::pcompositorInt->hostMemoryImport = false;
+	if(memoryImportMode)
+		Config::CompositorInterface::pcompositorInt->memoryImportMode = (Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get();
 	if(unredirOnFullscreenOpt.Get())
 		Config::CompositorInterface::pcompositorInt->unredirOnFullscreen = true;
 	
-	if(expFeatures.Get())
-		DebugPrintf(stdout,"Experimental compositor features enabled.\n");
-
 	Backend::X11Backend *pbackend11;
 	try{
 		if(debugBackend.Get()){

@@ -162,6 +162,7 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 		return borderColor;
 	}
 #endif //STOCK_FRAME_STYLE
+
 	float2 a_content = screen*(0.5f*xy0+0.5f); //top-left corner in pixels, content area
 	float2 b_content = screen*(0.5f*xy1+0.5f); //bottom-right corner in pixels, content area
 	if(any(posh.xy < a_content) || any(posh.xy > b_content)){ //title region
@@ -174,8 +175,12 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 		return titleBackground[stackIndex%2];
 	}
 	//content region
-	float4 c = content.Load(float3(posh.xy-a_content,0));
-	return c;
+	if(flags & FLAGS_CONTAINER_FOCUS){
+		float4 c = content.Load(float3(posh.xy-a_content,0));
+		return c;
+	}
+	discard;
+	return 0.0f;
 }
 
 #endif

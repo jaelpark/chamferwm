@@ -23,7 +23,8 @@ void DebugPrintf(FILE *, const char *, ...);
 #define mstrndup(s,n) strncpy(new char[n+1],s,n)
 #define mstrfree(s) delete []s
 
-#define timespec_diff(b,a) (float)(b.tv_sec-a.tv_sec)+(float)((b.tv_nsec-a.tv_nsec)/1e9)
+#define timespec_diff(b,a) (double)(b.tv_sec-a.tv_sec)+(double)((b.tv_nsec-a.tv_nsec)/1e9)
+#define timespec_diff_sec(b,a) (b.tv_sec-a.tv_sec)
 
 static inline void timespec_diff_ptr(struct timespec &b, struct timespec &a, struct timespec &r){
 	if(b.tv_nsec < a.tv_nsec){

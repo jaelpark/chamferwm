@@ -57,7 +57,7 @@ spirv_opt = find_program('spirv-opt') #optimization has to be done separately as
 #glslc_invoke_fragment = [glslc,'--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=fragment','-O','-g','-x','hlsl','-DSHADER_STAGE_PS','-o','@OUTPUT@','@INPUT@']
 glslc_args_vertex = ['--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=vertex','-x','hlsl','-DSHADER_STAGE_VS','-o','@OUTPUT@','@INPUT@']
 glslc_args_geometry = ['--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=geometry','-x','hlsl','-DSHADER_STAGE_GS','-o','@OUTPUT@','@INPUT@']
-glslc_args_fragment = ['--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=fragment','-x','hlsl','-DSHADER_STAGE_PS','-o','@OUTPUT@','@INPUT@']
+glslc_args_fragment = ['--target-env=vulkan','-fhlsl_functionality1','-fshader-stage=fragment','-x','hlsl','-DSHADER_STAGE_PS','@EXTRA_ARGS@','-o','@OUTPUT@','@INPUT@']
 invoke_spirv_opt = [spirv_opt,'-O','-o','@OUTPUT@','@INPUT@']
 
 #custom_target('default_vertex',output:'default_vertex.spv',input:'shaders/default.hlsl',command:glslc_invoke_vertex,install:true,install_dir:'.')
@@ -90,8 +90,16 @@ custom_target('frame_geometry',output:'frame_geometry.spv',input:obj,command:inv
 obj = gen_fragment.process(['shaders/default.hlsl'])
 custom_target('default_fragment',output:'default_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
 
-obj = gen_fragment.process(['shaders/frame.hlsl'])
-custom_target('frame_fragment',output:'frame_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
+foreach name,args : {
+		'fragment':['-DSTOCK_FRAME_STYLE=1'],
+		'fragment_basic':['-DSTOCK_FRAME_STYLE=0']
+	}
+	obj = generator(glslc,output:'@BASENAME@_'+name+'_unopt.spv',arguments:glslc_args_fragment).process(['shaders/frame.hlsl'],extra_args:args)
+	custom_target('frame_'+name,output:'frame_'+name+'.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
+endforeach
+
+#obj = gen_fragment.process(['shaders/frame.hlsl'],extra_args:['-DSTOCK_FRAME_STYLE=1'])
+#custom_target('frame_fragment',output:'frame_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
 
 obj = gen_fragment.process(['shaders/text.hlsl'])
 custom_target('text_fragment',output:'text_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')

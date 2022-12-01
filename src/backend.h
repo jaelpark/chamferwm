@@ -78,6 +78,7 @@ protected:
 	//Functions defined by the implementing backends.
 	virtual void DefineBindings() = 0;
 	virtual bool EventNotify(const BackendEvent *) = 0;
+	virtual void WakeNotify() = 0;
 	virtual void KeyPress(uint, bool) = 0;
 };
 
@@ -158,12 +159,12 @@ friend class Compositor::X11Compositor;
 friend class Compositor::X11DebugCompositor;
 friend class Compositor::TexturePixmap;
 public:
-	X11Backend();
+	X11Backend(bool);
 	virtual ~X11Backend();
 	bool QueryExtension(const char *, sint *, sint *) const;
 	xcb_atom_t GetAtom(const char *) const;
-	void StackRecursiveAppendix(const WManager::Client *);
-	void StackRecursive(const WManager::Container *);
+	void StackRecursiveAppendix(const WManager::Client *, const WManager::Container *);
+	void StackRecursive(const WManager::Container *, const WManager::Container *);
 	void StackClients(const WManager::Container *);
 	void ForEachRecursive(X11Container *, WManager::Container *, void (*)(X11Container *, WManager::Client *));
 	void ForEach(X11Container *, void (*)(X11Container *, WManager::Client *));
@@ -178,6 +179,7 @@ public:
 	};
 	virtual X11Client * FindClient(xcb_window_t, MODE) const = 0;
 	virtual void TimerEvent() = 0;
+	virtual bool ApproveExternal(const BackendStringProperty *, const BackendStringProperty *) = 0;
 	//void * GetProperty(xcb_atom_t, xcb_atom_t) const;
 	//void FreeProperty(...) const;
 protected:
@@ -188,6 +190,7 @@ protected:
 	xcb_timestamp_t lastTime;
 	struct timespec eventTimer;
 	struct timespec pollTimer;
+	struct timespec inputTimer; //track time since last keypress
 	//bool polling;
 	struct KeyBinding{
 		xcb_keycode_t keycode;
@@ -198,7 +201,12 @@ protected:
 	xcb_ewmh_connection_t ewmh;
 	xcb_window_t ewmh_window;
 	
-	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue;
+public:
+	std::deque<WManager::Client *> clientStack;
+	WManager::Client *pfocusInClient; //from XCB_FOCUS_IN events (uncontained clients)
+protected:
+	std::deque<std::pair<const WManager::Client *, WManager::Client *>> appendixQueue; //no need to store, rather keep it here to avoid repeated construction
+	bool standaloneComp;
 
 	enum ATOM{
 		//ATOM_CHAMFER_ALARM,
@@ -224,11 +232,10 @@ protected:
 
 class Default : public X11Backend{
 public:
-	Default();
+	Default(bool);
 	virtual ~Default();
 	void Start();
 	void Stop();
-	//void SetupEnvironment();
 	sint HandleEvent(bool);
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:
@@ -248,8 +255,9 @@ protected:
 private:
 	xcb_keycode_t exitKeycode;
 	//xcb_keycode_t testKeycode;
+	typedef std::tuple<xcb_window_t, WManager::Rectangle, xcb_window_t> ConfigCacheElement;
 	std::vector<std::pair<X11Client *, MODE>> clients;
-	std::vector<std::pair<xcb_window_t, WManager::Rectangle>> configCache;
+	std::vector<ConfigCacheElement> configCache;
 	std::vector<X11Client *> unmappingQueue;
 	std::vector<xcb_window_t> netClientList; //used only to update the property - not maintained
 	X11Client *pdragClient;
@@ -289,7 +297,6 @@ public:
 	virtual ~Debug();
 	void Start();
 	void Stop();
-	//void SetupEnvironment();
 	sint HandleEvent(bool);
 	X11Client * FindClient(xcb_window_t, MODE) const;
 protected:

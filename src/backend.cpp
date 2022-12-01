@@ -169,7 +169,7 @@ void X11Client::UpdateTranslation(){
 	glm::vec2 titlePadOffset = glm::min(titlePad,glm::vec2(0.0f));
 	glm::vec2 titlePadExtent = glm::max(titlePad,glm::vec2(0.0f));
 
-	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN)){
+	if(!(pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) && (!pcontainer->titleStackOnly || (pcontainer->pParent && pcontainer->pParent->flags & WManager::Container::FLAG_STACKED))){
 		stackIndex = 0;
 		if(pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
 			for(WManager::Container *pcontainer1 = pcontainer->pParent->pch; pcontainer1; ++stackIndex, pcontainer1 = pcontainer1->pnext)
@@ -206,7 +206,7 @@ void X11Client::UpdateTranslation(){
 		
 		titleRect = (WManager::Rectangle){titleFrameOffset.x,titleFrameOffset.y,titleFrameExtent.x,titleFrameExtent.y};
 		titlePad1 = titlePad;
-	}
+	}else stackIndex = 0;
 
 	oldRect = rect;
 	clock_gettime(CLOCK_MONOTONIC,&translationTime);
@@ -283,7 +283,8 @@ void X11Client::Kill(){
 X11Container::X11Container(X11Backend *_pbackend, bool _noComp) : WManager::Container(), pbackend(_pbackend), noComp(_noComp){
 	//
 	uint values[1] = {WManager::Container::rootQueue.size()};
-	xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
+	if(!pbackend->standaloneComp)
+		xcb_change_property(pbackend->pcon,XCB_PROP_MODE_REPLACE,pbackend->pscr->root,pbackend->ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
 }
 
 X11Container::X11Container(WManager::Container *_pParent, const WManager::Container::Setup &_setup, X11Backend *_pbackend) : WManager::Container(_pParent,_setup), pbackend(_pbackend), noComp(false){
@@ -414,7 +415,7 @@ void X11Container::SetClient(X11Client *_pclient11){
 	pclient = pclient11;
 }
 
-X11Backend::X11Backend() : lastTime(XCB_CURRENT_TIME){
+X11Backend::X11Backend(bool _standaloneComp) : lastTime(XCB_CURRENT_TIME), standaloneComp(_standaloneComp){
 	//
 }
 
@@ -445,7 +446,7 @@ xcb_atom_t X11Backend::GetAtom(const char *pstr) const{
 	return atom;
 }
 
-void X11Backend::StackRecursiveAppendix(const WManager::Client *pclient){
+void X11Backend::StackRecursiveAppendix(const WManager::Client *pclient, const WManager::Container *pfocus){
 	auto s = [&](auto &p)->bool{
 		return pclient == p.first;
 	};
@@ -454,29 +455,37 @@ void X11Backend::StackRecursiveAppendix(const WManager::Client *pclient){
 		m != appendixQueue.end(); m = std::find_if(m,appendixQueue.end(),s)){
 		X11Client *pclient11 = static_cast<X11Client *>((*m).second);
 
-		static uint values[1] = {XCB_STACK_MODE_ABOVE};
-		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		if(pclient11){
+			static uint values[1] = {XCB_STACK_MODE_ABOVE};
+			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		}
 
-		StackRecursiveAppendix((*m).second);
+		clientStack.push_back((*m).second);
+
+		StackRecursiveAppendix((*m).second,pfocus);
 
 		m = appendixQueue.erase(m);
 	}
 }
 
-void X11Backend::StackRecursive(const WManager::Container *pcontainer){
+void X11Backend::StackRecursive(const WManager::Container *pcontainer, const WManager::Container *pfocus){
 	for(WManager::Container *pcont : pcontainer->stackQueue){
 		if(pcont->pclient){
 			X11Client *pclient11 = static_cast<X11Client *>(pcont->pclient);
 
-			static uint values[1] = {XCB_STACK_MODE_ABOVE};
-			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+			if(pclient11){
+				static uint values[1] = {XCB_STACK_MODE_ABOVE};
+				xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+			}
+
+			clientStack.push_back(pcont->pclient);
 		}
-		StackRecursive(pcont);
+		StackRecursive(pcont,pcontainer == pfocus?pcont:pfocus);
 	}
 
 	if(!pcontainer->pclient)
 		return;
-	StackRecursiveAppendix(pcontainer->pclient);
+	StackRecursiveAppendix(pcontainer->pclient,pfocus);
 }
 
 void X11Backend::StackClients(const WManager::Container *proot){
@@ -485,6 +494,8 @@ void X11Backend::StackClients(const WManager::Container *proot){
 	const std::vector<std::pair<const WManager::Client *, WManager::Client *>> *pstackAppendix = GetStackAppendix();
 
 	appendixQueue.clear();
+	clientStack.clear();
+
 	for(auto &p : *pstackAppendix){
 		if(!p.second)
 			continue;
@@ -495,11 +506,16 @@ void X11Backend::StackClients(const WManager::Container *proot){
 
 		X11Client *pclient11 = static_cast<X11Client *>(p.second);
 
-		static uint values[1] = {XCB_STACK_MODE_ABOVE};
-		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		if(pclient11){
+			static uint values[1] = {XCB_STACK_MODE_ABOVE};
+			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		}
+		
+		//desktop features are placed first
+		clientStack.push_back(p.second);
 	}
 
-	StackRecursive(proot);
+	StackRecursive(proot,WManager::Container::ptreeFocus);
 
 	for(auto m = appendixQueue.begin(); m != appendixQueue.end();){
 		if(!(*m).second)
@@ -514,10 +530,14 @@ void X11Backend::StackClients(const WManager::Container *proot){
 			
 		X11Client *pclient11 = static_cast<X11Client *>((*m).second);
 
-		static uint values[1] = {XCB_STACK_MODE_ABOVE};
-		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		if(pclient11){
+			static uint values[1] = {XCB_STACK_MODE_ABOVE};
+			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		}
 
-		StackRecursiveAppendix((*m).second);
+		clientStack.push_back((*m).second);
+
+		StackRecursiveAppendix((*m).second,WManager::Container::ptreeFocus);
 
 		m = appendixQueue.erase(m);
 	}
@@ -527,8 +547,12 @@ void X11Backend::StackClients(const WManager::Container *proot){
 			continue;
 		X11Client *pclient11 = static_cast<X11Client *>(p.second);
 
-		static uint values[1] = {XCB_STACK_MODE_ABOVE};
-		xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+		if(pclient11){
+			static uint values[1] = {XCB_STACK_MODE_ABOVE};
+			xcb_configure_window(pcon,pclient11->window,XCB_CONFIG_WINDOW_STACK_MODE,values); //crashes often
+		}
+
+		clientStack.push_back(p.second);
 	}
 }
 
@@ -598,12 +622,14 @@ const char *X11Backend::pcursorStrs[CURSOR_COUNT] = {
 	"left_ptr"
 };
 
-Default::Default() : X11Backend(), pdragClient(0){
+Default::Default(bool _standaloneComp) : X11Backend(_standaloneComp), pdragClient(0){
 	//
 	clock_gettime(CLOCK_MONOTONIC,&eventTimer);
 	pollTimer.tv_sec = 0;
 	pollTimer.tv_nsec = 0;
 	//polling = false;
+	
+	inputTimer = eventTimer;
 }
 
 Default::~Default(){
@@ -628,21 +654,18 @@ void Default::Start(){
 	DebugPrintf(stdout,"Screen size: %ux%u (DPI: %fx%f)\n",pscr->width_in_pixels,pscr->height_in_pixels,25.4f*(float)pscr->width_in_pixels/(float)pscr->width_in_millimeters,0.0f);
 	//https://standards.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
 
-	//xcb_key_symbols_t *psymbols = xcb_key_symbols_alloc(pcon);
 	psymbols = xcb_key_symbols_alloc(pcon);
 
-	//testKeycode = SymbolToKeycode(XK_X,psymbols);
-	//xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1,testKeycode,
-	//	XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	exitKeycode = SymbolToKeycode(XK_E,psymbols);
 	xcb_grab_key(pcon,1,pscr->root,XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT,exitKeycode,
 		XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 	
-	DefineBindings();
+	if(!standaloneComp)
+		DefineBindings();
 
 	xcb_flush(pcon);
 
-	uint values[4] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
+	uint values[4] = {(!standaloneComp?XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT:0)
 		|XCB_EVENT_MASK_STRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY
 		|XCB_EVENT_MASK_EXPOSURE
@@ -670,73 +693,97 @@ void Default::Start(){
 	for(uint i = 0; i < ATOM_COUNT; ++i)
 		atoms[i] = GetAtom(patomStrs[i]);
 	
-	const char wmName[] = "chamfer";
-
 	//setup EWMH hints
 	ewmh_window = xcb_generate_id(pcon);
 
 	values[0] = 1;
 	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,ewmh_window,pscr->root,
 		-1,-1,1,1,0,XCB_WINDOW_CLASS_INPUT_ONLY,XCB_COPY_FROM_PARENT,XCB_CW_OVERRIDE_REDIRECT,values);
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,ewmh_window,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,ewmh_window,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
 
-	//https://specifications.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
-	const xcb_atom_t supportedAtoms[] = {
-		ewmh._NET_WM_NAME,
-		ewmh._NET_CLIENT_LIST,
-		//TODO: _NET_CLIENT_LIST_STACKING
-		ewmh._NET_CURRENT_DESKTOP,
-		ewmh._NET_NUMBER_OF_DESKTOPS,
-		//ewmh._NET_NUMBER_OF_DESKTOPS
-		ewmh._NET_DESKTOP_VIEWPORT,
-		ewmh._NET_DESKTOP_GEOMETRY,
-		ewmh._NET_ACTIVE_WINDOW,
-		ewmh._NET_WORKAREA,
-		ewmh._NET_WM_STATE,
-		ewmh._NET_WM_STATE_FULLSCREEN,
-		ewmh._NET_WM_STATE_DEMANDS_ATTENTION,
-		ewmh._NET_ACTIVE_WINDOW,
-		ewmh._NET_CLOSE_WINDOW,
-		//ewmh._NET_WM_DESKTOP,
-		ewmh._NET_MOVERESIZE_WINDOW
-	};
+	if(standaloneComp){
+		DebugPrintf(stdout,"Launching in standalone compositor mode.\n");
+		//send an internal map notification to let the compositor know about the existing windows
+		xcb_query_tree_cookie_t queryTreeCookie = xcb_query_tree(pcon,pscr->root);
+		xcb_query_tree_reply_t *pqueryTreeReply = xcb_query_tree_reply(pcon,queryTreeCookie,0);
+		xcb_window_t *pchs = xcb_query_tree_children(pqueryTreeReply);
+		for(uint i = 0, n = xcb_query_tree_children_length(pqueryTreeReply); i < n; ++i){
+			char buffer[32];
 
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTED,XCB_ATOM_ATOM,32,sizeof(supportedAtoms)/sizeof(supportedAtoms[0]),supportedAtoms);
+			xcb_map_notify_event_t *pev = (xcb_map_notify_event_t*)buffer;
+			pev->event = pchs[i];
+			pev->window = pchs[i];
+			pev->response_type = XCB_MAP_NOTIFY;
+			pev->override_redirect = true;
 
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,0,0);
-	values[0] = 0;
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
-	values[0] = 1;
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
-	//xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_NAMES,XCB_ATOM_STRING,8,0,0);
-	values[0] = 0; //viewport x
-	values[1] = 0; //viewport y
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
-	values[0] = pscr->width_in_pixels; //geometry x
-	values[1] = pscr->height_in_pixels; //geometry y
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_GEOMETRY,XCB_ATOM_CARDINAL,32,2,values);
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_ACTIVE_WINDOW,XCB_ATOM_WINDOW,32,1,&ewmh_window);
-	values[0] = 0;
-	values[1] = 0;
-	values[2] = pscr->width_in_pixels;
-	values[3] = pscr->height_in_pixels;
-	xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_WORKAREA,XCB_ATOM_CARDINAL,32,4,values);
+			xcb_send_event(pcon,false,ewmh_window,XCB_EVENT_MASK_NO_EVENT,buffer);
+		}
+		free(pqueryTreeReply);
 
-	xcb_map_window(pcon,ewmh_window);
+		xcb_flush(pcon);
 
+	}else{
+		const char wmName[] = "chamfer";
+
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,ewmh_window,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,ewmh_window,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
+
+		//https://specifications.freedesktop.org/wm-spec/wm-spec-1.3.html#idm140130317705584
+		const xcb_atom_t supportedAtoms[] = {
+			ewmh._NET_WM_NAME,
+			ewmh._NET_CLIENT_LIST,
+			//TODO: _NET_CLIENT_LIST_STACKING
+			ewmh._NET_CURRENT_DESKTOP,
+			ewmh._NET_NUMBER_OF_DESKTOPS,
+			//ewmh._NET_NUMBER_OF_DESKTOPS
+			ewmh._NET_DESKTOP_VIEWPORT,
+			ewmh._NET_DESKTOP_GEOMETRY,
+			ewmh._NET_ACTIVE_WINDOW,
+			ewmh._NET_WORKAREA,
+			ewmh._NET_WM_STATE,
+			ewmh._NET_WM_STATE_FULLSCREEN,
+			ewmh._NET_WM_STATE_DEMANDS_ATTENTION,
+			ewmh._NET_ACTIVE_WINDOW,
+			ewmh._NET_CLOSE_WINDOW,
+			//ewmh._NET_WM_DESKTOP,
+			ewmh._NET_MOVERESIZE_WINDOW
+		};
+
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTING_WM_CHECK,XCB_ATOM_WINDOW,32,1,&ewmh_window);
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_SUPPORTED,XCB_ATOM_ATOM,32,sizeof(supportedAtoms)/sizeof(supportedAtoms[0]),supportedAtoms);
+
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_WM_NAME,XCB_ATOM_STRING,8,strlen(wmName),wmName);
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,0,0);
+		values[0] = 0;
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CURRENT_DESKTOP,XCB_ATOM_CARDINAL,32,1,values);
+		values[0] = 1;
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_NUMBER_OF_DESKTOPS,XCB_ATOM_CARDINAL,32,1,values);
+		//xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_NAMES,XCB_ATOM_STRING,8,0,0);
+		values[0] = 0; //viewport x
+		values[1] = 0; //viewport y
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_VIEWPORT,XCB_ATOM_CARDINAL,32,2,values);
+		values[0] = pscr->width_in_pixels; //geometry x
+		values[1] = pscr->height_in_pixels; //geometry y
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_DESKTOP_GEOMETRY,XCB_ATOM_CARDINAL,32,2,values);
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_ACTIVE_WINDOW,XCB_ATOM_WINDOW,32,1,&ewmh_window);
+		values[0] = 0;
+		values[1] = 0;
+		values[2] = pscr->width_in_pixels;
+		values[3] = pscr->height_in_pixels;
+		xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_WORKAREA,XCB_ATOM_CARDINAL,32,4,values);
+	
+		pcursorctx = 0;
+		if(xcb_cursor_context_new(pcon,pscr,&pcursorctx) >= 0){
+			for(uint i = 0; i < CURSOR_COUNT; ++i)
+				cursors[i] = xcb_cursor_load_cursor(pcursorctx,pcursorStrs[i]);
+		
+			xcb_change_window_attributes(pcon,pscr->root,XCB_CW_CURSOR,&cursors[CURSOR_POINTER]);
+		}
+	}
+	
 	values[0] = XCB_STACK_MODE_BELOW;
 	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
 
-	pcursorctx = 0;
-	if(xcb_cursor_context_new(pcon,pscr,&pcursorctx) >= 0){
-		for(uint i = 0; i < CURSOR_COUNT; ++i)
-			cursors[i] = xcb_cursor_load_cursor(pcursorctx,pcursorStrs[i]);
-	
-		xcb_change_window_attributes(pcon,pscr->root,XCB_CW_CURSOR,&cursors[CURSOR_POINTER]);
-	}
+	xcb_map_window(pcon,ewmh_window);
 }
 
 void Default::Stop(){
@@ -758,7 +805,7 @@ sint Default::HandleEvent(bool forcePoll){
 	struct timespec currentTime;
 	clock_gettime(CLOCK_MONOTONIC,&currentTime);
 	
-	/*if(timespec_diff(currentTime,pollTimer) >= 0.04f){
+	/*if(timespec_diff(currentTime,pollTimer) >= 0.04){
 	//if(!polling){
 		sint fd = xcb_get_file_descriptor(pcon);
 
@@ -797,7 +844,7 @@ sint Default::HandleEvent(bool forcePoll){
 		//application that sends the highest rate of damage events, thus preventing stutter.
 		//Using select() alone seemingly stutters some of applications, while this keeps everything
 		//smooth, and still makes callbacks possible without continued polling by the CPU.
-		if(timespec_diff(currentTime,eventTimer) >= 5.0f){
+		if(timespec_diff(currentTime,eventTimer) >= 5.0){
 			TimerEvent();
 			clock_gettime(CLOCK_MONOTONIC,&eventTimer);
 		}
@@ -819,16 +866,18 @@ sint Default::HandleEvent(bool forcePoll){
 		switch(pevent->response_type & 0x7f){
 		case XCB_CREATE_NOTIFY:{
 			xcb_create_notify_event_t *pev = (xcb_create_notify_event_t*)pevent;
+			//if(pev->override_redirect)
+			//	break;
 
 			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
+				return pev->window == std::get<0>(p);//p.first;
 			});
 			if(mrect == configCache.end()){
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				configCache.push_back(ConfigCacheElement(pev->window,rect,0));
 				mrect = configCache.end()-1;
-			}else (*mrect).second = rect;
+			}else std::get<1>(*mrect) = rect;
 
 			DebugPrintf(stdout,"create %x | %d,%d %ux%u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
 			}
@@ -843,7 +892,7 @@ sint Default::HandleEvent(bool forcePoll){
 				break;
 
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
+				return pev->window == std::get<0>(p);
 			});
 
 			//TODO: allow x,y configuration if dock or desktop feature
@@ -895,27 +944,27 @@ sint Default::HandleEvent(bool forcePoll){
 			
 			if(mrect == configCache.end()){
 				//an entry should always be present, since CREATE_NOTIFY creates one
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				configCache.push_back(ConfigCacheElement(pev->window,rect,0));
 				mrect = configCache.end()-1;
 			}else{
 				if(pev->value_mask & XCB_CONFIG_WINDOW_X)
-					(*mrect).second.x = rect.x;
+					std::get<1>(*mrect).x = rect.x;
 				if(pev->value_mask & XCB_CONFIG_WINDOW_Y)
-					(*mrect).second.y = rect.y;
+					std::get<1>(*mrect).y = rect.y;
 				if(pev->value_mask & XCB_CONFIG_WINDOW_WIDTH)
-					(*mrect).second.w = rect.w;
+					std::get<1>(*mrect).w = rect.w;
 				if(pev->value_mask & XCB_CONFIG_WINDOW_HEIGHT)
-					(*mrect).second.h = rect.h;
+					std::get<1>(*mrect).h = rect.h;
 			}
 
 			struct{
 				uint16_t m;
 				uint32_t v;
 			} maskm[] = {
-				{XCB_CONFIG_WINDOW_X,(*mrect).second.x},
-				{XCB_CONFIG_WINDOW_Y,(*mrect).second.y},
-				{XCB_CONFIG_WINDOW_WIDTH,(*mrect).second.w},
-				{XCB_CONFIG_WINDOW_HEIGHT,(*mrect).second.h},
+				{XCB_CONFIG_WINDOW_X,std::get<1>(*mrect).x},
+				{XCB_CONFIG_WINDOW_Y,std::get<1>(*mrect).y},
+				{XCB_CONFIG_WINDOW_WIDTH,std::get<1>(*mrect).w},
+				{XCB_CONFIG_WINDOW_HEIGHT,std::get<1>(*mrect).h},
 				{XCB_CONFIG_WINDOW_BORDER_WIDTH,pev->border_width},
 				{XCB_CONFIG_WINDOW_SIBLING,pev->sibling},
 				//{XCB_CONFIG_WINDOW_STACK_MODE,pev->stack_mode} //floating clients may request configuration, including stack mode, which ruins the stacking order we've already set
@@ -932,9 +981,9 @@ sint Default::HandleEvent(bool forcePoll){
 
 			//TODO: do this and the cache in CONFIGURE_NOTIFY?
 			if(pclient1)
-				pclient1->UpdateTranslation(&(*mrect).second);
+				pclient1->UpdateTranslation(&std::get<1>(*mrect));
 
-			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u (mask: %x) -> %d, %d, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height,pev->value_mask,(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
+			DebugPrintf(stdout,"configure request: %x | %d, %d, %u, %u (mask: %x) -> %d, %d, %u, %u\n",pev->window,pev->x,pev->y,pev->width,pev->height,pev->value_mask,std::get<1>(*mrect).x,std::get<1>(*mrect).y,std::get<1>(*mrect).w,std::get<1>(*mrect).h);
 			}
 			break;
 		case XCB_MAP_REQUEST:{
@@ -1002,12 +1051,12 @@ sint Default::HandleEvent(bool forcePoll){
 			}
 
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
+				return pev->window == std::get<0>(p);
 			});
 			if(mrect == configCache.end()){
 				//an entry should always be present, since CREATE_NOTIFY creates one
 				WManager::Rectangle rect;
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				configCache.push_back(ConfigCacheElement(pev->window,rect,0));
 				mrect = configCache.end()-1;
 			}
 			//printf("Found cached location: %d, %d, %u, %u.\n",(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
@@ -1022,25 +1071,25 @@ sint Default::HandleEvent(bool forcePoll){
 				(sizeHints.min_width == sizeHints.max_width ||
 				sizeHints.min_height == sizeHints.max_height)){
 					//
-					(*mrect).second.w = sizeHints.min_width;
-					(*mrect).second.h = sizeHints.min_height;
+					std::get<1>(*mrect).w = sizeHints.min_width;
+					std::get<1>(*mrect).h = sizeHints.min_height;
 					hintFlags |= X11Client::CreateInfo::HINT_FLOATING;
 				}else
 				if(sizeHints.flags & XCB_ICCCM_SIZE_HINT_US_SIZE || sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_SIZE){
-					(*mrect).second.w = sizeHints.width;
-					(*mrect).second.h = sizeHints.height;
+					std::get<1>(*mrect).w = sizeHints.width;
+					std::get<1>(*mrect).h = sizeHints.height;
 				}
 
-				(*mrect).second.x = (pscr->width_in_pixels-(*mrect).second.w)/2;
-				(*mrect).second.y = (pscr->height_in_pixels-(*mrect).second.h)/2;
+				std::get<1>(*mrect).x = (pscr->width_in_pixels-std::get<1>(*mrect).w)/2;
+				std::get<1>(*mrect).y = (pscr->height_in_pixels-std::get<1>(*mrect).h)/2;
 				if((sizeHints.flags & XCB_ICCCM_SIZE_HINT_US_POSITION || sizeHints.flags & XCB_ICCCM_SIZE_HINT_P_POSITION) && allowPositionConfig && (sizeHints.x != 0 && sizeHints.y != 0)){
-					(*mrect).second.x = sizeHints.x;
-					(*mrect).second.y = sizeHints.y;
+					std::get<1>(*mrect).x = sizeHints.x;
+					std::get<1>(*mrect).y = sizeHints.y;
 				}
-				uint values[4] = {(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h};
+				uint values[4] = {std::get<1>(*mrect).x,std::get<1>(*mrect).y,std::get<1>(*mrect).w,std::get<1>(*mrect).h};
 				xcb_configure_window(pcon,pev->window,XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,values);
 			}
-			printf("Size hints: %d, %d, %u, %u.\n",(*mrect).second.x,(*mrect).second.y,(*mrect).second.w,(*mrect).second.h);
+			printf("Size hints: %d, %d, %u, %u.\n",std::get<1>(*mrect).x,std::get<1>(*mrect).y,std::get<1>(*mrect).w,std::get<1>(*mrect).h);
 
 			if(propertyReplyWindowType){
 				//https://specifications.freedesktop.org/wm-spec/1.3/ar01s05.html
@@ -1121,7 +1170,7 @@ sint Default::HandleEvent(bool forcePoll){
 
 			X11Client::CreateInfo createInfo;
 			createInfo.window = pev->window;
-			createInfo.prect = &(*mrect).second;
+			createInfo.prect = &std::get<1>(*mrect);
 			createInfo.pstackClient =
 				!(hintFlags & X11Client::CreateInfo::HINT_DESKTOP)?
 					((pbaseClient && !(hintFlags & X11Client::CreateInfo::HINT_ABOVE))?
@@ -1159,9 +1208,9 @@ sint Default::HandleEvent(bool forcePoll){
 				netClientList.push_back(p.first->window);
 			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
 
-			xcb_grab_button(pcon,0,pev->window,XCB_EVENT_MASK_BUTTON_PRESS,
-				XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,1,XCB_MOD_MASK_1);
-	
+			if(!standaloneComp)
+				xcb_grab_button(pcon,0,pev->window,XCB_EVENT_MASK_BUTTON_PRESS,
+					XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,1,XCB_MOD_MASK_1);
 			//check fullscreen
 		
 			DebugPrintf(stdout,"map request, %x\n",pev->window);
@@ -1169,27 +1218,52 @@ sint Default::HandleEvent(bool forcePoll){
 			break;
 		case XCB_CONFIGURE_NOTIFY:{
 			xcb_configure_notify_event_t *pev = (xcb_configure_notify_event_t*)pevent;
+			//if(pev->override_redirect)
+			//	break;
 
 			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
+				return pev->window == std::get<0>(p);
 			});
 			if(mrect == configCache.end()){
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				configCache.push_back(ConfigCacheElement(pev->window,rect,pev->above_sibling));
 				mrect = configCache.end()-1;
-			}else (*mrect).second = rect;
+			}else{
+				std::get<1>(*mrect) = rect;
+				std::get<2>(*mrect) = pev->above_sibling;
+			}
 
 			X11Client *pclient1 = FindClient(pev->window,MODE_AUTOMATIC);
 
-			if(pclient1)
-				pclient1->UpdateTranslation(&(*mrect).second);
+			if(pclient1){
+				pclient1->UpdateTranslation(&std::get<1>(*mrect));
+
+				//handle stacking order
+				if(standaloneComp){
+					auto m1 = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
+						return static_cast<X11Client *>(p)->window == pev->window;
+					});
+					if(pev->above_sibling != 0){
+						auto ma = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
+							return static_cast<X11Client *>(p)->window == pev->above_sibling;
+						});
+						if(ma != clientStack.end())
+							if(std::distance(m1,ma) > 0)
+								std::rotate(m1,m1+1,ma+1);
+							else std::rotate(ma+1,m1,m1+1);
+					}else std::rotate(clientStack.begin(),m1,m1+1);
+
+					result = 1;
+				}
+			}
 
 			DebugPrintf(stdout,"configure to %d,%d %ux%u, %x\n",pev->x,pev->y,pev->width,pev->height,pev->window);
 			}
 			break;
 		case XCB_MAP_NOTIFY:{
 			xcb_map_notify_event_t *pev = (xcb_map_notify_event_t*)pevent;
+			//pev->override_redirect
 			if(pev->window == ewmh_window)
 				break;
 
@@ -1221,7 +1295,7 @@ sint Default::HandleEvent(bool forcePoll){
 			}
 
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == p.first;
+				return pev->window == std::get<0>(p);
 			});
 			if(mrect == configCache.end()){
 				//it might be the case that no configure notification was received
@@ -1232,16 +1306,16 @@ sint Default::HandleEvent(bool forcePoll){
 				WManager::Rectangle rect = {pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
 				free(pgeometryReply);
 
-				configCache.push_back(std::pair<xcb_window_t, WManager::Rectangle>(pev->window,rect));
+				configCache.push_back(ConfigCacheElement(pev->window,rect,0));
 				mrect = configCache.end()-1;
 
 			}
-			WManager::Rectangle *prect = &(*mrect).second;
+			WManager::Rectangle *prect = &std::get<1>(*mrect);
 
 			static WManager::Client dummyClient(0);
 
 			const WManager::Client *pstackClient = &dummyClient;
-			if(pbaseClient){
+			if(pbaseClient && !standaloneComp){
 				auto k = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
 					return p.first->window == pbaseClient->window;
 				});
@@ -1285,13 +1359,24 @@ sint Default::HandleEvent(bool forcePoll){
 			if(pclient){
 				clients.push_back(std::pair<X11Client *, MODE>(pclient,MODE_AUTOMATIC));
 
-				const WManager::Container *proot = pclient->pcontainer->GetRoot();
-				StackClients(proot);
+				if(!standaloneComp){
+					const WManager::Container *proot = pclient->pcontainer->GetRoot();
+					StackClients(proot);
 
-				netClientList.clear();
-				for(auto &p : clients)
-					netClientList.push_back(p.first->window);
-				xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
+					netClientList.clear();
+					for(auto &p : clients)
+						netClientList.push_back(p.first->window);
+					xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
+				}else
+				if(ApproveExternal(&wmName,&wmClass)){
+					//clientStack won't get cleared in standalone compositor mode
+					if(std::get<2>(*mrect) != 0){ //!= XCB_NONE
+						auto m = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
+							return static_cast<X11Client *>(p)->window == std::get<2>(*mrect);
+						});
+						clientStack.insert(m+1,pclient);
+					}else clientStack.push_front(pclient);
+				}
 			}
 
 			for(uint i = 0; i < 2; ++i){
@@ -1317,20 +1402,25 @@ sint Default::HandleEvent(bool forcePoll){
 
 			(*m).first->flags |= X11Client::FLAG_UNMAPPING;
 
+			clientStack.erase(std::remove(clientStack.begin(),clientStack.end(),(*m).first),clientStack.end());
+
 			if((*m).first->pcontainer->GetRoot() != WManager::Container::ptreeFocus->GetRoot())
 				break;
 			
 			unmappingQueue.push_back((*m).first);
 
-			std::iter_swap(m,clients.end()-1);
-			clients.pop_back();
+			//printf("rect: %d, %d, %ux%u\nold: %d, %d, %ux%u\n",(*m).first->rect.x,(*m).first->rect.y,(*m).first->rect.w,(*m).first->rect.h,
+				//(*m).first->oldRect.x,(*m).first->oldRect.y,(*m).first->oldRect.w,(*m).first->oldRect.h);
 
 			netClientList.clear();
 			for(auto &p : clients)
 				netClientList.push_back(p.first->window);
 			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
 
-			DebugPrintf(stdout,"unmap notify %x\n",pev->window);
+			DebugPrintf(stdout,"unmap notify window: %x, client: %p\n",pev->window,(*m).first);
+
+			std::iter_swap(m,clients.end()-1);
+			clients.pop_back();
 			}
 			break;
 		case XCB_PROPERTY_NOTIFY:{
@@ -1450,9 +1540,11 @@ sint Default::HandleEvent(bool forcePoll){
 				if(pev->data.data32[1] == ewmh._NET_WM_STATE_FULLSCREEN){
 					switch(pev->data.data32[0]){
 					case 2://ewmh._NET_WM_STATE_TOGGLE)
+						pclient1->pcontainer->Focus();
 						SetFullscreen(pclient1,(pclient1->pcontainer->flags & WManager::Container::FLAG_FULLSCREEN) == 0);
 						break;
 					case 1://ewmh._NET_WM_STATE_ADD)
+						pclient1->pcontainer->Focus();
 						SetFullscreen(pclient1,true);
 						break;
 					case 0://ewmh._NET_WM_STATE_REMOVE)
@@ -1506,6 +1598,13 @@ sint Default::HandleEvent(bool forcePoll){
 				printf("test\n");
 				xcb_grab_keyboard(pcon,0,pscr->root,lastTime,XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC);
 			}else*/
+			//Check if more than 10 minutes since previous input has elapsed since previous input (TODO: configurable).
+			//This might indicate that the screen was turned off and everything has to be redrawn when scissoring.
+			if(timespec_diff_sec(currentTime,inputTimer) > 600){
+				WakeNotify();
+				inputTimer = currentTime;
+			}
+			clock_gettime(CLOCK_MONOTONIC,&inputTimer);
 			if(pev->state == (XCB_MOD_MASK_1|XCB_MOD_MASK_SHIFT) && pev->detail == exitKeycode){
 				free(pevent);
 				return -1;
@@ -1584,6 +1683,13 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_FOCUS_IN:{
 			xcb_focus_in_event_t *pev = (xcb_focus_in_event_t*)pevent;
 			printf("XCB_FOCUS_IN: *** focus %x\n",pev->event);
+
+			X11Client *pclient11 = FindClient(pev->event,MODE_UNDEFINED);
+			if(!pclient11 || pclient11->flags & X11Client::FLAG_UNMAPPING)
+				break;
+
+			if(standaloneComp)
+				pfocusInClient = pclient11;
 			}
 			break;
 		case XCB_ENTER_NOTIFY:{
@@ -1606,24 +1712,6 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_DESTROY_NOTIFY:{
 			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
 			DebugPrintf(stdout,"destroy notify, %x\n",pev->window);
-
-			/*auto m = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
-				return p.first->window == pev->window;
-			});
-			if(m == clients.end())
-				break;
-
-			unmappingQueue.push_back((*m).first);
-
-			std::iter_swap(m,clients.end()-1);
-			clients.pop_back();
-
-			result = 1;*/
-
-			/*configCache.erase(std::remove_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return p.first == pev->window;
-			}));*/
-			//
 			}
 			break;
 		case 0:
@@ -1644,9 +1732,17 @@ sint Default::HandleEvent(bool forcePoll){
 	}
 
 	//Destroy the clients here, after the event queue has been cleared. This is to ensure that no already destroyed client is attempted to be readjusted.
-	for(X11Client *pclient : unmappingQueue)
-		DestroyClient(pclient);
-	unmappingQueue.clear();
+	if(unmappingQueue.size() > 0){
+		std::set<WManager::Container *> roots;
+		for(X11Client *pclient : unmappingQueue){
+			roots.insert(pclient->pcontainer->GetRoot());
+			DestroyClient(pclient);
+		}
+		unmappingQueue.clear();
+
+		for(auto m : roots)
+			StackClients(m); //just to recreate the clientStack
+	}
 
 	if(xcb_connection_has_error(pcon)){
 		DebugPrintf(stderr,"X server connection lost\n");
@@ -1757,6 +1853,7 @@ void DebugContainer::Focus1(){
 void DebugContainer::Stack1(){
 	//
 	printf("stacking ...\n");
+	const_cast<X11Backend *>(pbackend)->StackClients(GetRoot());
 }
 
 void DebugContainer::SetClient(DebugClient *_pdebugClient){
@@ -1764,7 +1861,7 @@ void DebugContainer::SetClient(DebugClient *_pdebugClient){
 	pclient = _pdebugClient;
 }
 
-Debug::Debug() : X11Backend(){
+Debug::Debug() : X11Backend(false){
 	//
 }
 

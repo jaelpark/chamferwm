@@ -39,6 +39,7 @@ public:
 	virtual ~TextureStaged();
 	const void * Map() const;
 	void Unmap(const VkCommandBuffer *, const VkRect2D *, uint);
+	//virtual void Update(const VkCommandBuffer *, const VkRect2D *, uint) = 0;
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingMemory;
@@ -52,7 +53,7 @@ class TexturePixmap : virtual public TextureBase{
 public:
 	TexturePixmap(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
 	virtual ~TexturePixmap();
-	void Attach(xcb_pixmap_t);
+	bool Attach(xcb_pixmap_t);
 	void Detach();
 	void Update(const VkCommandBuffer *, const VkRect2D *, uint);
 
@@ -85,11 +86,16 @@ public:
 	std::vector<VkBufferImageCopy> bufferImageCopyBuffer;
 };
 
-//class Texture : public TextureStaged, public TexturePixmap{
-class Texture : public TextureStaged, public TextureHostPointer{
+class TextureDMABuffer : public TextureStaged, public TexturePixmap{
 public:
-	Texture(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
-	~Texture();
+	TextureDMABuffer(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
+	~TextureDMABuffer();
+};
+
+class TextureSharedMemory : public TextureStaged, public TextureHostPointer{
+public:
+	TextureSharedMemory(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
+	~TextureSharedMemory();
 };
 
 class Buffer{

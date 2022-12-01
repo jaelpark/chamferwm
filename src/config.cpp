@@ -18,6 +18,7 @@ minSize(boost::python::make_tuple(0.0f,0.0f)),
 maxSize(boost::python::make_tuple(1.0f,1.0f)),
 floatingMode(FLOAT_AUTOMATIC),
 titleBar(WManager::Container::TITLEBAR_NONE),
+titleStackOnly(false),
 shaderUserFlags(0),
 pcontainer(0){
 	//
@@ -46,6 +47,7 @@ void ContainerInterface::CopySettingsSetup(WManager::Container::Setup &setup){
 	setup.maxSize.x = boost::python::extract<float>(maxSize[0])();
 	setup.maxSize.y = boost::python::extract<float>(maxSize[1])();
 	setup.titleBar = titleBar;
+	setup.titleStackOnly = titleStackOnly;
 }
 
 void ContainerInterface::DeferredPropertyTransfer(){
@@ -483,7 +485,7 @@ WorkspaceProxy::~WorkspaceProxy(){
 	//
 }*/
 
-BackendInterface::BackendInterface() : pbackend(0){
+BackendInterface::BackendInterface() : standaloneComp(Loader::standaloneComp), pbackend(0){
 	//
 }
 
@@ -699,12 +701,16 @@ BackendConfig::~BackendConfig(){
 	pbackendInt->pbackend = 0;
 }
 
-CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), hostMemoryImport(Loader::hostMemoryImport), unredirOnFullscreen(Loader::unredirOnFullscreen), enableAnimation(true), animationDuration(0.3f), fontName("Monospace"), fontSize(18), pcompositor(0){
+CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), memoryImportMode(Loader::memoryImportMode), unredirOnFullscreen(Loader::unredirOnFullscreen), enableAnimation(true), animationDuration(0.3f), fontName("Monospace"), fontSize(18), pcompositor(0){
 	//
 }
 
 CompositorInterface::~CompositorInterface(){
 	//
+}
+
+bool CompositorInterface::OnRedirectExternal(std::string title, std::string className){
+	return true;
 }
 
 void CompositorInterface::Bind(boost::python::object obj){
@@ -722,6 +728,21 @@ CompositorProxy::CompositorProxy(){
 
 CompositorProxy::~CompositorProxy(){
 	//
+}
+
+bool CompositorProxy::OnRedirectExternal(std::string title, std::string className){
+	boost::python::override ovr = this->get_override("OnRedirectExternal");
+	if(ovr){
+		try{
+			return ovr(title,className);
+		}catch(boost::python::error_already_set &){
+			PyErr_Print();
+			//
+			boost::python::handle_exception();
+			PyErr_Clear();
+		}
+	}
+	return CompositorInterface::OnRedirectExternal(title,className);
 }
 
 CompositorConfig::CompositorConfig(CompositorInterface *_pcompositorInt) : pcompositorInt(_pcompositorInt){
@@ -837,7 +858,7 @@ BOOST_PYTHON_MODULE(chamfer){
 				container.pcontainer->SetStacked(toggle);
 			},boost::python::default_call_policies(),boost::mpl::vector3<void, ContainerInterface &, bool>()))
 		.def("SetFloating",boost::python::make_function(
-			[](ContainerInterface &container, bool toggle){
+			[](ContainerInterface &container, bool toggle){ //XXX toggle does nothing here!
 				if(!container.pcontainer)
 					return;
 				container.OnFloat(toggle);
@@ -1025,6 +1046,20 @@ BOOST_PYTHON_MODULE(chamfer){
 				}
 				container.pcontainer->SetTitlebar(titleBar);
 			},boost::python::default_call_policies(),boost::mpl::vector3<void, ContainerInterface &, WManager::Container::TITLEBAR>()))
+		.add_property("titleStackOnly",boost::python::make_function(
+			[](ContainerInterface &container){
+				if(!container.pcontainer)
+					return false;
+				return container.pcontainer->titleStackOnly;
+			},boost::python::default_call_policies(),boost::mpl::vector2<bool, ContainerInterface &>()),
+			boost::python::make_function(
+			[](ContainerInterface &container, bool titleStackOnly){
+				if(!container.pcontainer){
+					container.titleStackOnly = titleStackOnly;
+					return;
+				}
+				container.pcontainer->titleStackOnly = titleStackOnly;
+			},boost::python::default_call_policies(),boost::mpl::vector3<void, ContainerInterface &, bool>()))
 		.add_property("shaderFlags",
 			boost::python::make_function(
 			[](ContainerInterface &container){
@@ -1115,6 +1150,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def("BindKey",&BackendInterface::BindKey)
 		.def("MapKey",&BackendInterface::MapKey)
 		.def("GrabKeyboard",&BackendInterface::GrabKeyboard)
+		.def_readwrite("standaloneCompositor",&BackendInterface::standaloneComp)
 		;
 	boost::python::def("BindBackend",BackendInterface::Bind);
 
@@ -1123,12 +1159,19 @@ BOOST_PYTHON_MODULE(chamfer){
 		.value("FLOATING",Compositor::ClientFrame::SHADER_FLAG_FLOATING)
 		.value("STACKED",Compositor::ClientFrame::SHADER_FLAG_STACKED)
 		.value("USER_BIT",Compositor::ClientFrame::SHADER_FLAG_USER_BIT);
+
+	boost::python::enum_<Compositor::CompositorInterface::IMPORT_MODE>("importMode")
+		.value("CPU_COPY",Compositor::CompositorInterface::IMPORT_MODE_CPU_COPY)
+		.value("HOST_MEMORY",Compositor::CompositorInterface::IMPORT_MODE_HOST_MEMORY)
+		.value("DMABUF",Compositor::CompositorInterface::IMPORT_MODE_DMABUF);
 	
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")
+		.def("OnRedirectExternal",&CompositorInterface::OnRedirectExternal)
 		.def_readwrite("deviceIndex",&CompositorInterface::deviceIndex)
 		.def_readwrite("debugLayers",&CompositorInterface::debugLayers)
 		.def_readwrite("scissoring",&CompositorInterface::scissoring)
-		.def_readwrite("hostMemoryImport",&CompositorInterface::hostMemoryImport)
+		//.def_readwrite("hostMemoryImport",&CompositorInterface::hostMemoryImport)
+		.def_readwrite("memoryImportMode",&CompositorInterface::memoryImportMode)
 		.def_readwrite("unredirOnFullscreen",&CompositorInterface::unredirOnFullscreen)
 		.add_property("enableAnimation",
 			boost::python::make_function(
@@ -1217,10 +1260,13 @@ void Loader::Run(const char *pfilePath, const char *pfileLabel){
 	fclose(pf);
 }
 
+bool Loader::standaloneComp;
+
 sint Loader::deviceIndex;
 bool Loader::debugLayers;
 bool Loader::scissoring;
-bool Loader::hostMemoryImport;
+//bool Loader::hostMemoryImport;
+Compositor::CompositorInterface::IMPORT_MODE Loader::memoryImportMode;
 bool Loader::unredirOnFullscreen;
 
 }
