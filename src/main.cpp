@@ -960,12 +960,11 @@ int main(sint argc, const char **pargv){
 
 	args::Group group_comp(parser,"Compositor",args::Group::Validators::DontCare);
 	args::Flag noComp(group_comp,"noComp","Disable compositor.",{"no-compositor",'n'});
-	args::Flag expFeatures(group_comp,"expFeatures","Enable experimental features",{"experimental",'e'},false);
 	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
 	//args::Flag noHostMemoryImportOpt(group_comp,"noHostMemoryImport","Disable host shared memory import.",{"no-host-memory-import"},false);
-	args::ValueFlag<uint> memoryImportMode(group_comp,"memoryImportMode","Memory import mode:\n0: DMA-buf import (fastest, default)\n1: Host memory import\n2: CPU copy (slow, compatibility)",{"memory-import-mode",'m'});
+	args::ValueFlag<uint> memoryImportMode(group_comp,"memoryImportMode","Memory import mode:\n0: DMA-buf import (fastest)\n1: Host memory import (default)\n2: CPU copy (slow, compatibility)",{"memory-import-mode",'m'});
 	args::Flag unredirOnFullscreenOpt(group_comp,"unredirOnFullscreen","Unredirect a fullscreen window bypassing the compositor to improve performance.",{"unredir-on-fullscreen"},false);
 	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified.",{"shader-path"},{"/usr/share/chamfer/shaders"});
 
@@ -984,7 +983,8 @@ int main(sint argc, const char **pargv){
 	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
 	Config::Loader::debugLayers = debugLayersOpt.Get();
 	Config::Loader::scissoring = !noScissoringOpt.Get();
-	Config::Loader::memoryImportMode = memoryImportMode?(Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get():Compositor::CompositorInterface::IMPORT_MODE_DMABUF;
+	//Config::Loader::memoryImportMode = memoryImportMode?(Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get():Compositor::CompositorInterface::IMPORT_MODE_DMABUF;
+	Config::Loader::memoryImportMode = memoryImportMode?(Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get():Compositor::CompositorInterface::IMPORT_MODE_HOST_MEMORY;
 	Config::Loader::unredirOnFullscreen = unredirOnFullscreenOpt.Get();
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
@@ -1004,9 +1004,6 @@ int main(sint argc, const char **pargv){
 	if(unredirOnFullscreenOpt.Get())
 		Config::CompositorInterface::pcompositorInt->unredirOnFullscreen = true;
 	
-	if(expFeatures.Get())
-		DebugPrintf(stdout,"Experimental compositor features enabled.\n");
-
 	Backend::X11Backend *pbackend11;
 	try{
 		if(debugBackend.Get()){
