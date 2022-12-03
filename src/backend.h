@@ -258,8 +258,8 @@ private:
 	typedef std::tuple<xcb_window_t, WManager::Rectangle, xcb_window_t> ConfigCacheElement;
 	std::vector<std::pair<X11Client *, MODE>> clients;
 	std::vector<ConfigCacheElement> configCache;
-	std::vector<X11Client *> unmappingQueue;
 	std::vector<xcb_window_t> netClientList; //used only to update the property - not maintained
+	std::set<X11Client *> unmappingQueue;
 	X11Client *pdragClient;
 	sint dragRootX, dragRootY;
 };

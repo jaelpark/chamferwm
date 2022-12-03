@@ -48,7 +48,7 @@ exec chamfer --config=/usr/share/chamfer/config/config.py --shader-path=/usr/sha
 
 When multiple rendering devices are available, make the choice with `--device-index=n`, where `n` is the zero-based index of the device (default = 0). The ordering follows the list reported by `vulkaninfo` utility. Launch Xorg with `startx`.
 
- - To automatically let fullscreen applications bypass the compositor, use `--unredir-on-fullscreen`. A dedicated virtual desktop with the compositor always disabled is provided, and by default bound to Alt+0.
+ - To automatically let fullscreen applications bypass the compositor, use `--unredir-on-fullscreen`. A dedicated workspace with the compositor always disabled is provided, and by default bound to Alt+0.
  - NVIDIA users may have to add ``Option "AllowSHMPixmaps" "1"`` to their Xorg configuration, if shared memory import is used (`--memory-import-mode=1`, default).
  - For compositor compatibility mode if encountering any issues, use `--no-host-memory-import` and `--no-scissoring`.
 

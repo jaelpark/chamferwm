@@ -1407,7 +1407,7 @@ sint Default::HandleEvent(bool forcePoll){
 			if((*m).first->pcontainer->GetRoot() != WManager::Container::ptreeFocus->GetRoot())
 				break;
 			
-			unmappingQueue.push_back((*m).first);
+			unmappingQueue.insert((*m).first);
 
 			//printf("rect: %d, %d, %ux%u\nold: %d, %d, %ux%u\n",(*m).first->rect.x,(*m).first->rect.y,(*m).first->rect.w,(*m).first->rect.h,
 				//(*m).first->oldRect.x,(*m).first->oldRect.y,(*m).first->oldRect.w,(*m).first->oldRect.h);
@@ -1712,6 +1712,19 @@ sint Default::HandleEvent(bool forcePoll){
 		case XCB_DESTROY_NOTIFY:{
 			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
 			DebugPrintf(stdout,"destroy notify, %x\n",pev->window);
+
+			//the removal below may not have been done yet if
+			//the client got unmapped in another workspace.
+			auto m = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
+				return p.first->window == pev->window;
+			});
+			if(m == clients.end())
+				break;
+
+			unmappingQueue.insert((*m).first);
+
+			std::iter_swap(m,clients.end()-1);
+			clients.pop_back();
 			}
 			break;
 		case 0:
