@@ -1425,7 +1425,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		return rect.w < rect1.offset.x+rect1.extent.width || rect.h < rect1.offset.y+rect1.extent.height;
 	}),damageRegions.end());
 
-	if(!fullRegionUpdate && damageRegions.size() == 0)
+	if(!enabled || (!fullRegionUpdate && damageRegions.size() == 0))
 		return;
 
 	if(fullRegionUpdate){
@@ -1884,6 +1884,8 @@ bool X11Compositor::FilterEvent(const Backend::X11Event *pevent){
 			DebugPrintf(stderr,"Unknown damage event.\n");
 			return true;
 		}
+		if(pclient->flags & Backend::X11Client::FLAG_UNMAPPING)
+			return true;
 
 		X11ClientFrame *pclientFrame = dynamic_cast<X11ClientFrame *>(pclient);
 
