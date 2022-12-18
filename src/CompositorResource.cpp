@@ -199,7 +199,7 @@ void TextureStaged::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D 
 	imageLayout = imageMemoryBarrier.newLayout;
 }
 
-TexturePixmap::TexturePixmap(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), transferImageLayout(VK_IMAGE_LAYOUT_UNDEFINED){
+TexturePixmap::TexturePixmap(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), transferImage(0), transferMemory(0), transferImageLayout(VK_IMAGE_LAYOUT_UNDEFINED){
 	pcomp11 = dynamic_cast<const X11Compositor *>(pcomp);
 }
 
@@ -372,8 +372,12 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 
 void TexturePixmap::Detach(){
 	vkDeviceWaitIdle(pcomp->logicalDev); //TODO: remove, and fix the buffer freeing
-	vkFreeMemory(pcomp->logicalDev,transferMemory,0);
-	vkDestroyImage(pcomp->logicalDev,transferImage,0);
+	if(transferImage){ //check if attached
+		vkFreeMemory(pcomp->logicalDev,transferMemory,0);
+		vkDestroyImage(pcomp->logicalDev,transferImage,0);
+		transferMemory = 0;
+		transferImage = 0;
+	}
 
 	close(dmafd);
 
@@ -381,6 +385,8 @@ void TexturePixmap::Detach(){
 }
 
 void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prects, uint rectCount){
+	if(!transferImage)
+		return; //not attached FIXME
 	//
 	VkImageSubresourceRange imageSubresourceRange = {};
 	imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -471,7 +477,7 @@ const VkComponentMapping TexturePixmap::pixmapComponentMapping24 = {
 	VK_COMPONENT_SWIZZLE_ONE
 };
 
-TextureHostPointer::TextureHostPointer(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp){
+TextureHostPointer::TextureHostPointer(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), transferBuffer(0), transferMemory(0){
 	//
 	discards.reserve(2);
 }
@@ -559,8 +565,12 @@ void TextureHostPointer::Detach(uint64 releaseTag){
 	}));
 	//discards.push_back(std::tuple<uint64, VkDeviceMemory, VkBuffer>(releaseTag,transferMemory,transferBuffer));
 	vkDeviceWaitIdle(pcomp->logicalDev); //TODO: remove, and fix the buffer freeing
-	vkFreeMemory(pcomp->logicalDev,transferMemory,0);
-	vkDestroyBuffer(pcomp->logicalDev,transferBuffer,0);
+	if(transferBuffer){
+		vkFreeMemory(pcomp->logicalDev,transferMemory,0);
+		vkDestroyBuffer(pcomp->logicalDev,transferBuffer,0);
+		transferMemory = 0;
+		transferBuffer = 0;
+	}
 }
 
 void TextureHostPointer::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prects, uint rectCount){
@@ -611,7 +621,7 @@ void TextureHostPointer::Update(const VkCommandBuffer *pcommandBuffer, const VkR
 	imageLayout = imageMemoryBarrier.newLayout;
 }
 
-TextureDMABuffer::TextureDMABuffer(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TexturePixmap(_w,_h,_pcomponentMapping,_flags,_pcomp){
+TextureDMABuffer::TextureDMABuffer(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TexturePixmap(_w,_h,_pcomponentMapping,_flags,_pcomp){
 	//
 }
 

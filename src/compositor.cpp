@@ -140,6 +140,7 @@ void ClientFrame::CreateSurface(uint w, uint h, uint depth){
 
 	surfaceDepth = depth;
 	ptexture = pcomp->CreateTexture(w,h,surfaceDepth);
+	DebugPrintf(stdout,"Texture created (new surface): %ux%u\n",w,h);
 
 	UpdateDescSets();
 }
@@ -154,7 +155,7 @@ void ClientFrame::AdjustSurface(uint w, uint h){
 	//In this case updating the descriptor sets would be enough, but we can't do that because of them being used currently by the pipeline.
 	if(!AssignPipeline(passignedSet->p))
 		throw Exception("Failed to assign a pipeline.");
-	DebugPrintf(stdout,"Texture created: %ux%u\n",w,h);
+	DebugPrintf(stdout,"Texture created (adjust): %ux%u\n",w,h);
 
 	UpdateDescSets();
 }

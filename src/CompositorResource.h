@@ -86,7 +86,7 @@ public:
 	std::vector<VkBufferImageCopy> bufferImageCopyBuffer;
 };
 
-class TextureDMABuffer : public TextureStaged, public TexturePixmap{
+class TextureDMABuffer : public TexturePixmap{
 public:
 	TextureDMABuffer(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
 	~TextureDMABuffer();
