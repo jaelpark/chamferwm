@@ -955,13 +955,11 @@ void CompositorInterface::GenerateCommandBuffers(const std::deque<WManager::Clie
 		}
 		if(renderObject.pclient->pcontainer->flags & WManager::Container::FLAG_FLOATING)
 			renderObject.pclientFrame->shaderFlags |= ClientFrame::SHADER_FLAG_FLOATING;
-		if(renderObject.pclient->pcontainer->pParent){
-			if(renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
-				renderObject.pclientFrame->shaderFlags |= ClientFrame::SHADER_FLAG_STACKED;
-				if(!renderObject.pclient->pcontainer->pParent->focusQueue.empty()
-					&& renderObject.pclient->pcontainer->pParent->focusQueue.back() != renderObject.pclient->pcontainer)
-						renderObject.pclientFrame->shaderFlags &= ~ClientFrame::SHADER_FLAG_CONTAINER_FOCUS;
-			}
+		if(renderObject.pclient->pcontainer->pParent && renderObject.pclient->pcontainer->pParent->flags & WManager::Container::FLAG_STACKED){
+			renderObject.pclientFrame->shaderFlags |= ClientFrame::SHADER_FLAG_STACKED;
+			if(!renderObject.pclient->pcontainer->pParent->focusQueue.empty()
+				&& renderObject.pclient->pcontainer->pParent->focusQueue.back() != renderObject.pclient->pcontainer)
+					renderObject.pclientFrame->shaderFlags &= ~ClientFrame::SHADER_FLAG_CONTAINER_FOCUS;
 		}
 		renderQueue.push_back(renderObject);
 	}
@@ -1024,6 +1022,7 @@ void CompositorInterface::GenerateCommandBuffers(const std::deque<WManager::Clie
 
 	//TODO: update only visible clients
 	for(ClientFrame *pclientFrame : updateQueue)
+		//if(pclientFrame->shaderFlags & ClientFrame::SHADER_FLAG_CONTAINER_FOCUS)
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 	updateQueue.clear();
 
@@ -1426,7 +1425,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		return rect.w < rect1.offset.x+rect1.extent.width || rect.h < rect1.offset.y+rect1.extent.height;
 	}),damageRegions.end());
 
-	if(!enabled || (!fullRegionUpdate && damageRegions.size() == 0))
+	if(!enabled || (!fullRegionUpdate && damageRegions.empty()))
 		return;
 
 	if(fullRegionUpdate){
@@ -1440,6 +1439,10 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		fullRegionUpdate = false;
 	}
 
+	if(!(shaderFlags & ClientFrame::SHADER_FLAG_CONTAINER_FOCUS)){
+		damageRegions.clear();
+		return;
+	}
 	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
 		for(VkRect2D &rect1 : damageRegions){
 			VkRect2D screenRect;
