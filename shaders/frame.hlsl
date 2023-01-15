@@ -66,6 +66,8 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 
 const float borderScaling = 1.0f;
 const float4 borderColor = float4(0.0f,0.0f,0.0f,1.0f);
+//const float borderScaling = 0.75f;
+//const float4 borderColor = float4(0.07f,0.07f,0.07f,1.0f);
 const float4 focusColor = float4(1.0f,0.6f,0.33f,1.0f);
 const float4 titleBackground[2] = {float4(0.4f,0.4f,0.4f,1.0f),float4(0.5,0.5,0.5,1.0f)}; //second value for alternating stack tabs
 const float4 taskSelectColor = float4(0.957f,0.910f,0.824f,1.0f);
@@ -104,12 +106,12 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 #if STOCK_FRAME_STYLE == 1
 	// ----- frame 1: chamfered (demo frame) ------------
 
-	float sr = ChamferMap(q,0.5f*d1-0.0130f*borderScalingScr.x,0.0195f*borderScalingScr.x);
-	if(sr > 0.0f){
+	float sr1 = ChamferMap(q,0.5f*d1-0.0130f*borderScalingScr.x,0.0195f*borderScalingScr.x);
+	if(sr1 > 0.0f){
 		//shadow region
 #if DRAW_SHADOW
 		if(stackIndex == 0) //only first in stack casts a shadow
-			return float4(0.0f,0.0f,0.0f,0.7f*saturate(1.0f-sr/(0.0078f*borderScalingScr.x)));
+			return float4(0.0f,0.0f,0.0f,0.7f*saturate(1.0f-sr1/(0.0078f*borderScalingScr.x)));
 		else{
 #else
 		{
@@ -137,12 +139,12 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 #else //STOCK_FRAME_STYLE
 	// ----- frame 0: basic -----------------------------
 
-	float sr = RectangleMap(q,0.5f*d1-(0.0130f-0.0195f)*borderScalingScr.x);
-	if(sr > 0.0f){
+	float sr2 = RectangleMap(q,0.5f*d1-(0.0130f-0.0195f)*borderScalingScr.x);
+	if(sr2 > 0.0f){
 		//shadow region
 #if DRAW_SHADOW
 		if(stackIndex == 0) //only first in stack casts a shadow
-			return float4(0.0f,0.0f,0.0f,0.9f*saturate(1.0f-sr/(0.0078f*borderScalingScr.x)));
+			return float4(0.0f,0.0f,0.0f,0.9f*saturate(1.0f-sr2/(0.0078f*borderScalingScr.x)));
 		else{
 #else
 		{

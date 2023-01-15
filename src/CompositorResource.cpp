@@ -231,17 +231,9 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	uint *poffsets = xcb_dri3_buffers_from_pixmap_offsets(pbuffersFromPixmapReply); //---
 
 	uint64 modifier = pbuffersFromPixmapReply->modifier;
-	if(modifier == DRM_FORMAT_MOD_INVALID){
-		//Failed to acquire valid modifier. TODO: make a better guess based on vendor and model
-		/*switch(pcomp->physicalDevProps.vendorID){
-		case 0x8086: //intel
-			modifier = I915_FORMAT_MOD_TILED_X;
-		case 0x1022:
-		case 0x1002:
-			//
-			break;*/
-		modifier = I915_FORMAT_MOD_X_TILED;
-	}
+	/*if(modifier == DRM_FORMAT_MOD_INVALID){
+		//modifier = I915_FORMAT_MOD_X_TILED;
+	}*/
 	//-------------------------------------
 
 	/*VkDrmFormatModifierPropertiesListEXT fml = {};
@@ -314,7 +306,6 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	imageCreateInfo.mipLevels = 1;
 	imageCreateInfo.arrayLayers = 1;
 	imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM; //todo: format from image reply?
-	//imageCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;//VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
 	imageCreateInfo.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT; //need the extension
 	imageCreateInfo.initialLayout = transferImageLayout;
 	imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
