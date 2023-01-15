@@ -473,8 +473,12 @@ void CompositorInterface::InitializeRenderEngine(){
 		VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
 		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
 		VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME,
+		VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
+		VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,
+		VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,
 		VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME,
 		VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME,
+		VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
 		VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME
 	};
 	const char *pdevExtensionsHostPointer[] = {
@@ -654,101 +658,101 @@ void CompositorInterface::InitializeRenderEngine(){
 	ptextEngine = new TextEngine(pfontName,fontSize,this);
 
 	//-------------------------------
-	printf("Texture format query:\n");
-	//for(VkFormat formats[] = {VK_FORMAT_R8G8B8A8_SRGB}, format = formats[0]; 
-	//VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
-	VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-	//drm format DRM_FORMAT_ARGB8888;
+	if(memoryImportMode == IMPORT_MODE_DMABUF){
+		printf("DMA-buf import: texture format query:\n");
+		//for(VkFormat formats[] = {VK_FORMAT_R8G8B8A8_SRGB}, format = formats[0]; 
+		//VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
+		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+		//drm format DRM_FORMAT_ARGB8888;
 
-	VkDrmFormatModifierPropertiesListEXT drmFormatModPropsList = {};
-	drmFormatModPropsList.sType = VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT;
+		VkDrmFormatModifierPropertiesListEXT drmFormatModPropsList = {};
+		drmFormatModPropsList.sType = VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT;
 
-	VkFormatProperties2 formatProps2 = {};
-	formatProps2.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
-	formatProps2.pNext = &drmFormatModPropsList;
+		VkFormatProperties2 formatProps2 = {};
+		formatProps2.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+		formatProps2.pNext = &drmFormatModPropsList;
 
-	vkGetPhysicalDeviceFormatProperties2(physicalDev,format,&formatProps2);
+		vkGetPhysicalDeviceFormatProperties2(physicalDev,format,&formatProps2);
 
-	//--------------
-	VkDrmFormatModifierPropertiesListEXT drmFormatModPropsListB = {};
-	drmFormatModPropsListB.sType = VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT;
-	drmFormatModPropsListB.drmFormatModifierCount = drmFormatModPropsList.drmFormatModifierCount;
-	drmFormatModPropsListB.pDrmFormatModifierProperties = new VkDrmFormatModifierPropertiesEXT[drmFormatModPropsList.drmFormatModifierCount];
+		//--------------
+		VkDrmFormatModifierPropertiesListEXT drmFormatModPropsListB = {};
+		drmFormatModPropsListB.sType = VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT;
+		drmFormatModPropsListB.drmFormatModifierCount = drmFormatModPropsList.drmFormatModifierCount;
+		drmFormatModPropsListB.pDrmFormatModifierProperties = new VkDrmFormatModifierPropertiesEXT[drmFormatModPropsList.drmFormatModifierCount];
 
-	VkFormatProperties2 formatProps2B = {};
-	formatProps2B.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
-	formatProps2B.pNext = &drmFormatModPropsListB;
+		VkFormatProperties2 formatProps2B = {};
+		formatProps2B.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+		formatProps2B.pNext = &drmFormatModPropsListB;
 
-	//--------------
-	VkPhysicalDeviceImageDrmFormatModifierInfoEXT drmInfo = {};
-	drmInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT;
-	drmInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		//--------------
+		VkPhysicalDeviceImageDrmFormatModifierInfoEXT drmInfo = {};
+		drmInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT;
+		drmInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	VkPhysicalDeviceExternalImageFormatInfo externalImageFormatInfo = {};
-	externalImageFormatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO;
-	externalImageFormatInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
-	externalImageFormatInfo.pNext = &drmInfo;
+		VkPhysicalDeviceExternalImageFormatInfo externalImageFormatInfo = {};
+		externalImageFormatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO;
+		externalImageFormatInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
+		externalImageFormatInfo.pNext = &drmInfo;
 
-	VkPhysicalDeviceImageFormatInfo2 imageFormatInfo2 = {};
-	imageFormatInfo2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
-	imageFormatInfo2.type = VK_IMAGE_TYPE_2D;
-	imageFormatInfo2.format = format;
-	imageFormatInfo2.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
-	imageFormatInfo2.pNext = &externalImageFormatInfo;
+		VkPhysicalDeviceImageFormatInfo2 imageFormatInfo2 = {};
+		imageFormatInfo2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
+		imageFormatInfo2.type = VK_IMAGE_TYPE_2D;
+		imageFormatInfo2.format = format;
+		imageFormatInfo2.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
+		imageFormatInfo2.pNext = &externalImageFormatInfo;
 
-	VkExternalImageFormatProperties externalImageFormatProps = {};
-	externalImageFormatProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES;
+		VkExternalImageFormatProperties externalImageFormatProps = {};
+		externalImageFormatProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES;
 
-	VkImageFormatProperties2 imageFormatProps2 = {};
-	imageFormatProps2.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
-	imageFormatProps2.pNext = &externalImageFormatProps;
+		VkImageFormatProperties2 imageFormatProps2 = {};
+		imageFormatProps2.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
+		imageFormatProps2.pNext = &externalImageFormatProps;
 
-	printf("  drmFormatModifierCount: %u\n",drmFormatModPropsList.drmFormatModifierCount);
-	for(uint i = 0; i < drmFormatModPropsList.drmFormatModifierCount; ++i){
-		vkGetPhysicalDeviceFormatProperties2(physicalDev,format,&formatProps2B);
+		printf("  drmFormatModifierCount: %u\n",drmFormatModPropsList.drmFormatModifierCount);
+		for(uint i = 0; i < drmFormatModPropsList.drmFormatModifierCount; ++i){
+			vkGetPhysicalDeviceFormatProperties2(physicalDev,format,&formatProps2B);
 
-		for(uint j = 0; j < drmFormatModPropsListB.drmFormatModifierCount; ++j){
-			printf("  modifier: %llu, features: %d, planes: %d\n",
-				drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier,
-				drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures,
-				drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierPlaneCount);
-			if((drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures &
-				VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) == VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT){
-				printf("  * render usage:");
-				imageFormatInfo2.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-				drmInfo.drmFormatModifier = drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier;
-				VkResult r = vkGetPhysicalDeviceImageFormatProperties2(physicalDev,&imageFormatInfo2,&imageFormatProps2);
-				if(r != VK_SUCCESS){
-					printf(" format not supported\n");
-					continue;
+			for(uint j = 0; j < drmFormatModPropsListB.drmFormatModifierCount; ++j){
+				printf("  modifier: %lu, features: %d, planes: %d\n",
+					drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier,
+					drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures,
+					drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierPlaneCount);
+				if((drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures &
+					VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) == VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT){
+					printf("  * render usage:");
+					imageFormatInfo2.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+					drmInfo.drmFormatModifier = drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier;
+					VkResult r = vkGetPhysicalDeviceImageFormatProperties2(physicalDev,&imageFormatInfo2,&imageFormatProps2);
+					if(r != VK_SUCCESS){
+						printf(" format not supported\n");
+						continue;
+					}
+					if(!(externalImageFormatProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)){
+						printf(" importing not supported\n");
+						continue;
+					}
+					printf(" OK\n");
 				}
-				if(!(externalImageFormatProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)){
-					printf(" importing not supported\n");
-					continue;
+				if((drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures &
+					VK_FORMAT_FEATURE_TRANSFER_DST_BIT) == VK_FORMAT_FEATURE_TRANSFER_DST_BIT){
+					printf("  * transfer src usage:");
+					imageFormatInfo2.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+					drmInfo.drmFormatModifier = drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier;
+					VkResult r = vkGetPhysicalDeviceImageFormatProperties2(physicalDev,&imageFormatInfo2,&imageFormatProps2);
+					if(r != VK_SUCCESS){
+						printf(" format not supported\n");
+						continue;
+					}
+					if(!(externalImageFormatProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)){
+						printf(" importing not supported\n");
+						continue;
+					}
+					printf(" OK\n");
 				}
-				printf(" OK\n");
-			}
-			if((drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures &
-				VK_FORMAT_FEATURE_TRANSFER_DST_BIT) == VK_FORMAT_FEATURE_TRANSFER_DST_BIT){
-				printf("  * transfer src usage:");
-				imageFormatInfo2.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-				drmInfo.drmFormatModifier = drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier;
-				VkResult r = vkGetPhysicalDeviceImageFormatProperties2(physicalDev,&imageFormatInfo2,&imageFormatProps2);
-				if(r != VK_SUCCESS){
-					printf(" format not supported\n");
-					continue;
-				}
-				if(!(externalImageFormatProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)){
-					printf(" importing not supported\n");
-					continue;
-				}
-				printf(" OK\n");
 			}
 		}
+		delete []drmFormatModPropsListB.pDrmFormatModifierProperties;
 	}
-
-	delete []drmFormatModPropsListB.pDrmFormatModifierProperties;
-	
 }
 
 void CompositorInterface::InitializeSwapchain(){
@@ -1522,7 +1526,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		return rect.w < rect1.offset.x+rect1.extent.width || rect.h < rect1.offset.y+rect1.extent.height;
 	}),damageRegions.end());
 
-	if(!enabled || (!fullRegionUpdate && damageRegions.empty()))
+	if(!enabled || (!fullRegionUpdate && damageRegions.empty()) || !(shaderFlags & ClientFrame::SHADER_FLAG_CONTAINER_FOCUS))
 		return;
 
 	if(fullRegionUpdate){
@@ -1536,10 +1540,6 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		fullRegionUpdate = false;
 	}
 
-	if(!(shaderFlags & ClientFrame::SHADER_FLAG_CONTAINER_FOCUS)){
-		damageRegions.clear();
-		return;
-	}
 	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
 		for(VkRect2D &rect1 : damageRegions){
 			VkRect2D screenRect;
@@ -1547,7 +1547,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 			screenRect.extent = rect1.extent;
 			pcomp->AddDamageRegion(&screenRect);
 		}
-		dynamic_cast<TextureDMABuffer *>(ptexture)->Update(pcommandBuffer,damageRegions.data(),damageRegions.size());
+		//dynamic_cast<TextureDMABuffer *>(ptexture)->Update(pcommandBuffer,damageRegions.data(),damageRegions.size());
 
 	}else
 	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY){
@@ -1627,6 +1627,8 @@ void X11ClientFrame::AdjustSurface1(){
 			//texture renewed, cast again
 			dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(windowPixmap);
 
+			UpdateDescSets(); //view is recreated every time for the imported buffer
+
 		}else{
 			TextureSharedMemory *ptexture1;
 			if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY)
@@ -1681,6 +1683,8 @@ void X11ClientFrame::StartComposition1(){
 		//
 		CreateSurface(rect.w,rect.h,24);
 		dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(windowPixmap);
+
+		UpdateDescSets(); //view is recreated every time for the imported buffer
 
 	}else{
 		//
@@ -1763,11 +1767,11 @@ void X11ClientFrame::SetTitle1(const char *ptitle){
 
 X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char *_pshaderName[Pipeline::SHADER_MODULE_COUNT], X11Compositor *_pcomp) : w(_w), h(_h), ClientFrame(_pshaderName,_pcomp), pcomp11(_pcomp), pixmap(_pixmap){
 	//
-	/*if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
+	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
 		CreateSurface(w,h,24);
 		dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(pixmap);
 
-	}else{*/
+	}else{
 		uint textureSize = w*h*4;
 		shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
 		if(shmid == -1){
@@ -1781,11 +1785,11 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 
 		CreateSurface(w,h,24);
 
-		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY && !dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
+		if(pcomp->memoryImportMode != CompositorInterface::IMPORT_MODE_CPU_COPY && !dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
 			DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-			pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_HOST_MEMORY;
+			pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
 		}
-	//}
+	}
 
 	pcomp->FullDamageRegion();
 }
@@ -1794,7 +1798,7 @@ X11Background::~X11Background(){
 	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF)
 		dynamic_cast<TextureDMABuffer *>(ptexture)->Detach();
 	else{
-		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY)
+		if(pcomp->memoryImportMode != CompositorInterface::IMPORT_MODE_CPU_COPY)
 			dynamic_cast<TextureSharedMemory *>(ptexture)->Detach(pcomp->frameTag);
 
 		xcb_shm_detach(pcomp11->pbackend->pcon,segment);
@@ -1809,31 +1813,32 @@ X11Background::~X11Background(){
 void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 	if(!fullRegionUpdate)
 		return;
+	
+	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
+		pcomp->FullDamageRegion();
+		return;
+	}
 
 	VkRect2D screenRect;
 	screenRect.offset = {0,0};
 	screenRect.extent = {w,h};
 
-	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF)
-		dynamic_cast<TextureDMABuffer *>(ptexture)->Update(pcommandBuffer,&screenRect,1);
-	else{
-		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pcomp11->pbackend->pcon,pixmap,0,0,w,h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
+	xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pcomp11->pbackend->pcon,pixmap,0,0,w,h,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
 
-		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
-		xcb_flush(pcomp11->pbackend->pcon);
+	xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pcomp11->pbackend->pcon,imageCookie,0);
+	xcb_flush(pcomp11->pbackend->pcon);
 
-		if(pimageReply)
-			free(pimageReply);
-		else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null (background)");
+	if(pimageReply)
+		free(pimageReply);
+	else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null (background)");
 
-		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_CPU_COPY){
-			TextureStaged *ptexture1 = dynamic_cast<TextureStaged *>(ptexture);
-			unsigned char *pdata = (unsigned char*)ptexture1->Map();
-			memcpy(pdata,pchpixels,w*h*4);
-			ptexture1->Unmap(pcommandBuffer,&screenRect,1);
-		}else{
-			dynamic_cast<TextureSharedMemory *>(ptexture)->Update(pcommandBuffer,&screenRect,1);
-		}
+	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_CPU_COPY){
+		TextureStaged *ptexture1 = dynamic_cast<TextureStaged *>(ptexture);
+		unsigned char *pdata = (unsigned char*)ptexture1->Map();
+		memcpy(pdata,pchpixels,w*h*4);
+		ptexture1->Unmap(pcommandBuffer,&screenRect,1);
+	}else{
+		dynamic_cast<TextureSharedMemory *>(ptexture)->Update(pcommandBuffer,&screenRect,1);
 	}
 
 	fullRegionUpdate = false;
@@ -1866,8 +1871,7 @@ void X11Compositor::Start(){
 	if(!poverlayReply)
 		throw Exception("Unable to get overlay window.");
 	overlay = poverlayReply->overlay_win;
-	free(poverlayReply);
-	DebugPrintf(stdout,"overlay xid: %u\n",overlay);
+	free(poverlayReply); DebugPrintf(stdout,"overlay xid: %u\n",overlay);
 
 	uint mask = XCB_CW_EVENT_MASK;
 	uint values[1] = {XCB_EVENT_MASK_EXPOSURE};

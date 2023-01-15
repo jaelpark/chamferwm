@@ -8,6 +8,8 @@
 
 namespace Compositor{
 
+#define TEXTURE_BASE_FLAG_SKIP 0x1
+
 class TextureBase{
 public:
 	TextureBase(uint, uint, VkFormat, const VkComponentMapping *, uint, const class CompositorInterface *);
@@ -55,13 +57,14 @@ public:
 	virtual ~TexturePixmap();
 	bool Attach(xcb_pixmap_t);
 	void Detach();
-	void Update(const VkCommandBuffer *, const VkRect2D *, uint);
+	//void Update(const VkCommandBuffer *, const VkRect2D *, uint);
 
-	VkImage transferImage;
+	/*VkImage transferImage;
 	VkDeviceMemory transferMemory;
 	VkImageLayout transferImageLayout;
 
-	std::vector<VkImageCopy> imageCopyBuffer;
+	std::vector<VkImageCopy> imageCopyBuffer;*/
+	const VkComponentMapping *pcomponentMapping;
 	
 	sint dmafd;
 	//struct gbm_bo *pgbmBufferObject;
