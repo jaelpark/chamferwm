@@ -95,7 +95,7 @@ public:
 	~TextureDMABuffer();
 };
 
-class TextureSharedMemory : public TextureStaged, public TextureHostPointer{
+class TextureSharedMemory : public TextureHostPointer{
 public:
 	TextureSharedMemory(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
 	~TextureSharedMemory();

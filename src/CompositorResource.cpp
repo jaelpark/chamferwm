@@ -555,7 +555,7 @@ TextureDMABuffer::~TextureDMABuffer(){
 	//
 }
 
-TextureSharedMemory::TextureSharedMemory(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TextureHostPointer(_w,_h,_pcomponentMapping,_flags,_pcomp){
+TextureSharedMemory::TextureSharedMemory(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TextureHostPointer(_w,_h,_pcomponentMapping,_flags,_pcomp){
 	//
 }
 
