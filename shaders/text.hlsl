@@ -22,8 +22,7 @@ void main(float2 pos : POSITION, uint2 texc : TEXCOORD, out PS_INPUT output){
 [[vk::binding(0)]] Texture2D<float> fontAtlas;
 
 float4 main(PS_INPUT input) : SV_Target{
-	//
-	float c = fontAtlas.Load(float3(input.texc,0));
+	float c = fontAtlas.Load(float3(input.texc+0.5f,0));
 	return float4(0,0,0,c);
 }
 
