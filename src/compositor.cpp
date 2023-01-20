@@ -1326,7 +1326,6 @@ void CompositorInterface::Present(){
 	frameTag++;
 }
 
-//-vertex buffer layout is always fixed, since there is no predefined information on what shaders (and thus inputs) will be used on what vertex data
 //TODO: take out 'new Pipeline' from below, move it outside - no need to template this
 template<class T>
 Pipeline * CompositorInterface::LoadPipeline(const char *pshaderName[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT,uint>> *pvertexBufferLayout){
@@ -1940,19 +1939,6 @@ void X11Compositor::Start(){
 	xcb_flush(pbackend->pcon);
 
 	InitializeRenderEngine();
-
-	//TODO: needs VK_EXT_physical_device_drm to get the correct id
-	/*char cardStr[256];
-	snprintf(cardStr,sizeof(cardStr),"/dev/dri/card%u",physicalDevIndex);
-
-	cardfd = open(cardStr,O_RDWR|FD_CLOEXEC);
-	if(cardfd < 0){
-		snprintf(Exception::buffer,sizeof(Exception::buffer),"Failed to open %s",cardStr);
-		throw Exception();
-	}
-	pgbmdev = gbm_create_device(cardfd);
-	if(!pgbmdev)
-		throw Exception("Failed to create GBM device.");*/
 }
 
 void X11Compositor::Stop(){
@@ -1961,9 +1947,6 @@ void X11Compositor::Stop(){
 	if(pcolorBackground)
 		delete pcolorBackground;
 	DestroyRenderEngine();
-
-	/*gbm_device_destroy(pgbmdev);
-	close(cardfd);*/
 
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_BOUNDING,0,0,XCB_XFIXES_REGION_NONE);
 	xcb_xfixes_set_window_shape_region(pbackend->pcon,overlay,XCB_SHAPE_SK_INPUT,0,0,XCB_XFIXES_REGION_NONE);
@@ -2088,6 +2071,7 @@ void X11Compositor::SetBackgroundPixmap(const Backend::BackendPixmapProperty *pP
 		};
 		pbackground = new X11Background(pPixmapProperty->pixmap,pgeometryReply->width,pgeometryReply->height,pshaderName,this);
 		printf("background set!\n");
+		free(pgeometryReply);
 	}
 }
 
