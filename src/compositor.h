@@ -112,7 +112,8 @@ public:
 	enum IMPORT_MODE{
 		IMPORT_MODE_DMABUF,
 		IMPORT_MODE_HOST_MEMORY,
-		IMPORT_MODE_CPU_COPY
+		IMPORT_MODE_CPU_COPY,
+		IMPORT_MODE_COUNT
 	};
 	struct Configuration{
 		uint deviceIndex;
@@ -257,6 +258,8 @@ protected:
 	};
 	std::vector<DescSetCacheEntry> descSetCache;
 
+	std::set<std::pair<uint64, uint>> drmFormatModifiers; //mod, planes
+
 	ClientFrame *pfsApp; //fullscreen state app for the current frame (for unredirection)
 	ClientFrame *pfsAppPrev; //fullscreen state app during previous frame (for unredirection)
 	bool frameApproval;
@@ -267,7 +270,6 @@ protected:
 	//config
 	bool debugLayers;
 	bool scissoring;
-	//bool hostMemoryImport;
 	bool unredirOnFullscreen;
 	IMPORT_MODE memoryImportMode;
 

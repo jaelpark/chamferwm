@@ -660,10 +660,7 @@ void CompositorInterface::InitializeRenderEngine(){
 	//-------------------------------
 	if(memoryImportMode == IMPORT_MODE_DMABUF){
 		printf("DMA-buf import: texture format query:\n");
-		//for(VkFormat formats[] = {VK_FORMAT_R8G8B8A8_SRGB}, format = formats[0]; 
-		//VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
 		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-		//drm format DRM_FORMAT_ARGB8888;
 
 		VkDrmFormatModifierPropertiesListEXT drmFormatModPropsList = {};
 		drmFormatModPropsList.sType = VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT;
@@ -732,8 +729,11 @@ void CompositorInterface::InitializeRenderEngine(){
 						continue;
 					}
 					printf(" OK\n");
+					drmFormatModifiers.insert(std::pair<uint64, uint>(
+						drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier,
+						drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierPlaneCount));
 				}
-				if((drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures &
+				/*if((drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures &
 					VK_FORMAT_FEATURE_TRANSFER_DST_BIT) == VK_FORMAT_FEATURE_TRANSFER_DST_BIT){
 					printf("  * transfer src usage:");
 					imageFormatInfo2.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -748,7 +748,7 @@ void CompositorInterface::InitializeRenderEngine(){
 						continue;
 					}
 					printf(" OK\n");
-				}
+				}*/
 			}
 		}
 		delete []drmFormatModPropsListB.pDrmFormatModifierProperties;

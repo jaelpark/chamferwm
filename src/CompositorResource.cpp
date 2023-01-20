@@ -220,58 +220,44 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	}
 	dmafd = pdmafds[0];
 
-	//sint strides = xcb_dri3_buffers_from_pixmap_strides_length(pbuffersFromPixmapReply);
 	uint *pstrides = xcb_dri3_buffers_from_pixmap_strides(pbuffersFromPixmapReply);
-
-	//sint offsets = xcb_dri3_buffers_from_pixmap_offsets_length(pbuffersFromPixmapReply);
 	uint *poffsets = xcb_dri3_buffers_from_pixmap_offsets(pbuffersFromPixmapReply); //---
 
 	uint64 modifier = pbuffersFromPixmapReply->modifier;
-	if(modifier == DRM_FORMAT_MOD_INVALID){
-		//modifier = I915_FORMAT_MOD_X_TILED;
+	//-------------------------------------
+
+	VkPhysicalDeviceImageDrmFormatModifierInfoEXT drmInfo = {};
+	drmInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT;
+	drmInfo.drmFormatModifier = modifier;
+	drmInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	VkPhysicalDeviceImageFormatInfo2 imageFormatInfo2 = {};
+	imageFormatInfo2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
+	imageFormatInfo2.pNext = &drmInfo;
+	imageFormatInfo2.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageFormatInfo2.type = VK_IMAGE_TYPE_2D;
+	imageFormatInfo2.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
+	imageFormatInfo2.usage = VK_IMAGE_USAGE_SAMPLED_BIT; //TODO: not strictly needed?
+	imageFormatInfo2.flags = 0;
+
+	VkImageFormatProperties2 imageFormatProps2 = {};
+	imageFormatProps2.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
+	if(vkGetPhysicalDeviceImageFormatProperties2(pcomp->physicalDev,&imageFormatInfo2,&imageFormatProps2) == VK_ERROR_FORMAT_NOT_SUPPORTED){
+		//printf("*** vkGetPhysicalDeviceImageFormatProperties2 FAILED\n");
+		//try specify the format modifier explicitly
+		for(auto &p : pcomp->drmFormatModifiers){
+			//printf("TRY: %llu, %u (assume %llu, accept %u planes)\n",p.first,p.second,I915_FORMAT_MOD_X_TILED,pbuffersFromPixmapReply->nfd);
+			if(p.first == 0 || p.second != pbuffersFromPixmapReply->nfd)
+				continue;
+			drmInfo.drmFormatModifier = p.first;//I915_FORMAT_MOD_X_TILED;
+			if(vkGetPhysicalDeviceImageFormatProperties2(pcomp->physicalDev,&imageFormatInfo2,&imageFormatProps2) == VK_SUCCESS){
+				modifier = p.first;
+				break;
+			}
+		}
+		if(modifier == pbuffersFromPixmapReply->modifier)
+			DebugPrintf(stderr,"Unable to find compatible DRM modifier: pixmap: %llu. Check format query list output.");
 	}
-	//-------------------------------------
-
-	/*VkDrmFormatModifierPropertiesListEXT fml = {};
-	fml.sType = VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT;
-	VkFormatProperties2 formatProps = {};
-	formatProps.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
-	formatProps.pNext = &fml;
-	vkGetPhysicalDeviceFormatProperties2(pcomp->physicalDev,VK_FORMAT_R8G8B8A8_UNORM,&formatProps);
-	((PFN_vkGetPhysicalDeviceFormatProperties2)vkGetInstanceProcAddr(pcomp->instance,"vkGetPhysicalDeviceFormatProperties2"))(pcomp->physicalDev,VK_FORMAT_R8G8B8A8_UNORM,&formatProps);
-	printf("****modifier: %lu\n",pbuffersFromPixmapReply->modifier);
-	printf("****drmFormatModifierCount: %u\n",fml.drmFormatModifierCount);
-	if(fml.pDrmFormatModifierProperties)
-		for(uint i = 0; i < fml.drmFormatModifierCount; ++i)
-			printf("\t%lu\n",fml.pDrmFormatModifierProperties[i].drmFormatModifier);
-	else printf("**** null pDrmFormatModifierProperties\n");*/
-
-	/*printf("****modifier: %lu\n",pbuffersFromPixmapReply->modifier);
-	for(uint f = 1; f <= 97; ++f){
-		VkPhysicalDeviceImageDrmFormatModifierInfoEXT drmInfo = {};
-		drmInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT;
-		drmInfo.drmFormatModifier = 72057594037927937;//pbuffersFromPixmapReply->modifier;
-		drmInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-		VkPhysicalDeviceImageFormatInfo2 info = {};
-		info.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
-		info.pNext = &drmInfo;
-		info.format = (VkFormat)f;//VK_FORMAT_R8G8B8A8_UNORM;
-		info.type = VK_IMAGE_TYPE_2D;
-		info.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT; //need the extension
-		info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-		info.flags = 0;
-
-		//https://www.khronos.org/registry/vulkan/specs/1.3-extensions/man/html/vkGetPhysicalDeviceImageFormatProperties2.html
-		VkImageFormatProperties2 props = {};
-		props.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
-		VkResult r = vkGetPhysicalDeviceImageFormatProperties2(pcomp->physicalDev,&info,&props);
-		if(r == VK_SUCCESS)
-			printf("**** success: %u\n",f);
-		//printf("------ support: %u\n",vkGetPhysicalDeviceImageFormatProperties2(pcomp->physicalDev,&info,&props));
-		//
-	}*/
-	//-------------------------------------
 
 	VkSubresourceLayout subresourceLayout[256];
 	for(uint i = 0; i < pbuffersFromPixmapReply->nfd; ++i){
@@ -311,6 +297,7 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	imageCreateInfo.pNext = &externalMemoryCreateInfo;
 	if(vkCreateImage(pcomp->logicalDev,&imageCreateInfo,0,&image) != VK_SUCCESS){
 		DebugPrintf(stderr,"Failed to create an image.");
+		free(pbuffersFromPixmapReply);
 		return false;
 	}
 	
@@ -318,6 +305,7 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	memoryFdProps.sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR;
 	if(((PFN_vkGetMemoryFdPropertiesKHR)vkGetInstanceProcAddr(pcomp11->instance,"vkGetMemoryFdPropertiesKHR"))(pcomp->logicalDev,VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,dmafd,&memoryFdProps) != VK_SUCCESS){
 		DebugPrintf(stderr,"Failed to get memory fd properties.");
+		free(pbuffersFromPixmapReply);
 		return false;
 	}
 
@@ -345,10 +333,12 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	}
 	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&deviceMemory) != VK_SUCCESS){
 		DebugPrintf(stderr,"Failed to allocate transfer image memory."); //NOTE: may return invalid handle, if the buffer that we're trying to import is only shortly available (for example firefox animating it's url menu by resizing). Need xcb_dri3 fences to keep the handle alive most likely.
+		free(pbuffersFromPixmapReply);
 		return false;
 	}
 	if(vkBindImageMemory(pcomp->logicalDev,image,deviceMemory,0) != VK_SUCCESS){
 		DebugPrintf(stderr,"Failed to bind transfer image memory.");
+		free(pbuffersFromPixmapReply);
 		return false;
 	}
 
