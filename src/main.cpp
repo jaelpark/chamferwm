@@ -963,10 +963,9 @@ int main(sint argc, const char **pargv){
 	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
-	//args::Flag noHostMemoryImportOpt(group_comp,"noHostMemoryImport","Disable host shared memory import.",{"no-host-memory-import"},false);
 	args::ValueFlag<uint> memoryImportMode(group_comp,"memoryImportMode","Memory import mode:\n0: DMA-buf import (fastest)\n1: Host memory import (default)\n2: CPU copy (slow, compatibility)",{"memory-import-mode",'m'});
 	args::Flag unredirOnFullscreenOpt(group_comp,"unredirOnFullscreen","Unredirect a fullscreen window bypassing the compositor to improve performance.",{"unredir-on-fullscreen"},false);
-	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified.",{"shader-path"},{"/usr/share/chamfer/shaders"});
+	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified through multiple --shader-path, and the first specified paths will take priority over the later ones.",{"shader-path"},{"/usr/share/chamfer/shaders"});
 
 	try{
 		parser.ParseCLI(argc,pargv);
@@ -983,8 +982,13 @@ int main(sint argc, const char **pargv){
 	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
 	Config::Loader::debugLayers = debugLayersOpt.Get();
 	Config::Loader::scissoring = !noScissoringOpt.Get();
-	//Config::Loader::memoryImportMode = memoryImportMode?(Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get():Compositor::CompositorInterface::IMPORT_MODE_DMABUF;
-	Config::Loader::memoryImportMode = memoryImportMode?(Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get():Compositor::CompositorInterface::IMPORT_MODE_HOST_MEMORY;
+	if(memoryImportMode){
+		if(memoryImportMode.Get() >= Compositor::CompositorInterface::IMPORT_MODE_COUNT){
+			DebugPrintf(stderr,"Invalid memory import mode specified (%u). Mode specifier must be less than %u. See --help for available options.\n",memoryImportMode.Get(),Compositor::CompositorInterface::IMPORT_MODE_COUNT);
+			return 1;
+		}
+		Config::Loader::memoryImportMode = (Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get();
+	}else Config::Loader::memoryImportMode = Compositor::CompositorInterface::IMPORT_MODE_HOST_MEMORY;
 	Config::Loader::unredirOnFullscreen = unredirOnFullscreenOpt.Get();
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
@@ -1046,7 +1050,7 @@ int main(sint argc, const char **pargv){
 		if(result == -1)
 			break;
 		else
-		if(result == 0 && !pcomp->IsAnimating()) //&& !pcomp->Animated()
+		if(result == 0 && !pcomp->IsAnimating())
 			continue;
 
 		try{
