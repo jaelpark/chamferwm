@@ -4,8 +4,6 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_xcb.h>
 
-//struct gbm_bo;
-
 namespace Compositor{
 
 #define TEXTURE_BASE_FLAG_SKIP 0x1
@@ -62,7 +60,6 @@ public:
 	const VkComponentMapping *pcomponentMapping;
 	
 	sint dmafd;
-	//struct gbm_bo *pgbmBufferObject;
 	const class X11Compositor *pcomp11;
 
 	static const VkComponentMapping pixmapComponentMapping;

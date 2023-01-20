@@ -1725,7 +1725,6 @@ void X11ClientFrame::StartComposition1(){
 				pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
 			}else UpdateDescSets(); //view is recreated every time for the imported buffer
 		}
-
 	}
 
 	pcomp->AddDamageRegion(this);
