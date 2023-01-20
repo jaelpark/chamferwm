@@ -59,11 +59,6 @@ public:
 	void Detach();
 	//void Update(const VkCommandBuffer *, const VkRect2D *, uint);
 
-	/*VkImage transferImage;
-	VkDeviceMemory transferMemory;
-	VkImageLayout transferImageLayout;
-
-	std::vector<VkImageCopy> imageCopyBuffer;*/
 	const VkComponentMapping *pcomponentMapping;
 	
 	sint dmafd;
@@ -80,13 +75,11 @@ public:
 	virtual ~TextureHostPointer();
 	bool Attach(unsigned char *);
 	void Detach(uint64);
-	void Update(const VkCommandBuffer *, const VkRect2D *, uint);
+
+	const VkComponentMapping *pcomponentMapping;
 
 	VkBuffer transferBuffer;
-	VkDeviceMemory transferMemory;
 	std::vector<std::tuple<uint64, VkDeviceMemory, VkBuffer>> discards;
-
-	std::vector<VkBufferImageCopy> bufferImageCopyBuffer;
 };
 
 class TextureDMABuffer : public TexturePixmap{

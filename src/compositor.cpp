@@ -486,7 +486,9 @@ void CompositorInterface::InitializeRenderEngine(){
 		VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
 		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
 		VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME
+		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
+		VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+		VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME
 	};
 	const char *pdevExtensionsCPUCopy[] = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -1568,7 +1570,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 			pcomp->AddDamageRegion(&screenRect);
 		}
 		
-		dynamic_cast<TextureSharedMemory *>(ptexture)->Update(pcommandBuffer,damageRegions.data(),damageRegions.size());
+		//dynamic_cast<TextureSharedMemory *>(ptexture)->Update(pcommandBuffer,damageRegions.data(),damageRegions.size());
 
 	}else{
 		//
@@ -1654,9 +1656,11 @@ void X11ClientFrame::AdjustSurface1(){
 
 			AdjustSurface(rect.w,rect.h);
 
-			if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY && !dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
-				DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-				pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
+			if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY){
+				if(!dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
+					DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
+					pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
+				}else UpdateDescSets(); //view is recreated every time for the imported buffer
 			}
 		}
 
@@ -1716,10 +1720,13 @@ void X11ClientFrame::StartComposition1(){
 
 		CreateSurface(rect.w,rect.h,depth);
 
-		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY && !dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
-			DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-			pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
+		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY){
+			if(!dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
+				DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
+				pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
+			}else UpdateDescSets(); //view is recreated every time for the imported buffer
 		}
+
 	}
 
 	pcomp->AddDamageRegion(this);
@@ -1771,6 +1778,8 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 		CreateSurface(w,h,24);
 		dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(pixmap);
 
+		UpdateDescSets();
+
 	}else{
 		uint textureSize = w*h*4;
 		shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
@@ -1785,9 +1794,11 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 
 		CreateSurface(w,h,24);
 
-		if(pcomp->memoryImportMode != CompositorInterface::IMPORT_MODE_CPU_COPY && !dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
-			DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-			pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
+		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY){
+			if(!dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
+				DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
+				pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
+			}else UpdateDescSets(); //view is recreated every time for the imported buffer
 		}
 	}
 
@@ -1837,8 +1848,6 @@ void X11Background::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		unsigned char *pdata = (unsigned char*)ptexture1->Map();
 		memcpy(pdata,pchpixels,w*h*4);
 		ptexture1->Unmap(pcommandBuffer,&screenRect,1);
-	}else{
-		dynamic_cast<TextureSharedMemory *>(ptexture)->Update(pcommandBuffer,&screenRect,1);
 	}
 
 	fullRegionUpdate = false;

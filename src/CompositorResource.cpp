@@ -393,7 +393,7 @@ const VkComponentMapping TexturePixmap::pixmapComponentMapping24 = {
 	VK_COMPONENT_SWIZZLE_ONE
 };
 
-TextureHostPointer::TextureHostPointer(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), transferBuffer(0), transferMemory(0){
+TextureHostPointer::TextureHostPointer(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags|TEXTURE_BASE_FLAG_SKIP,_pcomp), transferBuffer(0), pcomponentMapping(_pcomponentMapping){
 	//
 	discards.reserve(2);
 }
@@ -424,7 +424,7 @@ bool TextureHostPointer::Attach(unsigned char *pchpixels){
 		return false;
 	}
 
-	VkMemoryHostPointerPropertiesEXT memoryHostPointerProps;
+	VkMemoryHostPointerPropertiesEXT memoryHostPointerProps = {};
 	memoryHostPointerProps.sType = VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT;
 	if(((PFN_vkGetMemoryHostPointerPropertiesEXT)vkGetInstanceProcAddr(pcomp->instance,"vkGetMemoryHostPointerPropertiesEXT"))(pcomp->logicalDev,VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,pchpixels,&memoryHostPointerProps) != VK_SUCCESS){
 		DebugPrintf(stderr,"Failed to get memory host pointer properties.");
@@ -457,17 +457,58 @@ bool TextureHostPointer::Attach(unsigned char *pchpixels){
 		if((memoryRequirements.memoryTypeBits & memoryHostPointerProps.memoryTypeBits) & (1<<memoryAllocateInfo.memoryTypeIndex) && physicalDeviceMemoryProps.memoryTypes[memoryAllocateInfo.memoryTypeIndex].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
 			break;
 	}
-	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&transferMemory) != VK_SUCCESS){
+	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&deviceMemory) != VK_SUCCESS){
 		DebugPrintf(stderr,"Failed to allocate transfer buffer memory.");
 		vkDestroyBuffer(pcomp->logicalDev,transferBuffer,0);
 		return false;
 	}
-	if(vkBindBufferMemory(pcomp->logicalDev,transferBuffer,transferMemory,0) != VK_SUCCESS){
+	if(vkBindBufferMemory(pcomp->logicalDev,transferBuffer,deviceMemory,0) != VK_SUCCESS){
 		DebugPrintf(stderr,"Failed to bind transfer buffer memory.");
-		vkFreeMemory(pcomp->logicalDev,transferMemory,0);
+		vkFreeMemory(pcomp->logicalDev,deviceMemory,0);
 		vkDestroyBuffer(pcomp->logicalDev,transferBuffer,0);
 		return false;
 	}
+
+	VkExternalMemoryImageCreateInfo externalMemoryCreateInfo = {};
+	externalMemoryCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
+	externalMemoryCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
+
+	VkImageCreateInfo imageCreateInfo = {};
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.extent.width = w;
+	imageCreateInfo.extent.height = h;
+	imageCreateInfo.extent.depth = 1;
+	imageCreateInfo.mipLevels = 1;
+	imageCreateInfo.arrayLayers = 1;
+	imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageCreateInfo.flags = 0;
+	imageCreateInfo.pNext = &externalMemoryCreateInfo;
+	if(vkCreateImage(pcomp->logicalDev,&imageCreateInfo,0,&image) != VK_SUCCESS)
+		throw Exception("Failed to create an image.");
+
+	if(vkBindImageMemory(pcomp->logicalDev,image,deviceMemory,0) != VK_SUCCESS)
+		throw Exception("Failed to bind image memory.");
+
+	VkImageViewCreateInfo imageViewCreateInfo = {};
+	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageViewCreateInfo.image = image;
+	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	imageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageViewCreateInfo.components = *pcomponentMapping;
+	imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+	imageViewCreateInfo.subresourceRange.levelCount = 1;
+	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+	imageViewCreateInfo.subresourceRange.layerCount = 1;
+	if(vkCreateImageView(pcomp->logicalDev,&imageViewCreateInfo,0,&imageView) != VK_SUCCESS)
+		throw Exception("Failed to create texture image view.");
+
 	return true;
 }
 
@@ -482,59 +523,15 @@ void TextureHostPointer::Detach(uint64 releaseTag){
 	//discards.push_back(std::tuple<uint64, VkDeviceMemory, VkBuffer>(releaseTag,transferMemory,transferBuffer));
 	vkDeviceWaitIdle(pcomp->logicalDev); //TODO: remove, and fix the buffer freeing
 	if(transferBuffer){
-		vkFreeMemory(pcomp->logicalDev,transferMemory,0);
+		vkFreeMemory(pcomp->logicalDev,deviceMemory,0);
 		vkDestroyBuffer(pcomp->logicalDev,transferBuffer,0);
-		transferMemory = 0;
+		vkDestroyImage(pcomp->logicalDev,image,0);
+
+		imageView = 0;
+		deviceMemory = 0;
 		transferBuffer = 0;
+		image = 0;
 	}
-}
-
-void TextureHostPointer::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prects, uint rectCount){
-	//
-	VkImageSubresourceRange imageSubresourceRange = {};
-	imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	imageSubresourceRange.baseMipLevel = 0;
-	imageSubresourceRange.levelCount = 1;
-	imageSubresourceRange.baseArrayLayer = 0;
-	imageSubresourceRange.layerCount = 1;
-
-	VkImageMemoryBarrier imageMemoryBarrier = {};
-	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	imageMemoryBarrier.image = image;
-	imageMemoryBarrier.subresourceRange = imageSubresourceRange;
-	imageMemoryBarrier.srcAccessMask = 0u;
-	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-	imageMemoryBarrier.oldLayout = imageLayout;//VK_IMAGE_LAYOUT_UNDEFINED;
-	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
-		0,0,0,0,1,&imageMemoryBarrier);
-
-	//transfer "stage"
-	bufferImageCopyBuffer.reserve(rectCount);
-	for(uint i = 0; i < rectCount; ++i){
-		bufferImageCopyBuffer[i].imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		bufferImageCopyBuffer[i].imageSubresource.mipLevel = 0;
-		bufferImageCopyBuffer[i].imageSubresource.baseArrayLayer = 0;
-		bufferImageCopyBuffer[i].imageSubresource.layerCount = 1;
-		bufferImageCopyBuffer[i].imageExtent.width = prects[i].extent.width;//w/4; //w
-		bufferImageCopyBuffer[i].imageExtent.height = prects[i].extent.height;//h
-		bufferImageCopyBuffer[i].imageExtent.depth = 1;
-		bufferImageCopyBuffer[i].imageOffset = (VkOffset3D){prects[i].offset.x,prects[i].offset.y,0};//(VkOffset3D){w/4,0,0}; //x,y
-		bufferImageCopyBuffer[i].bufferOffset = (w*prects[i].offset.y+prects[i].offset.x)*formatSizeMap[formatIndex].second;//w/4*4; //(w*y+x)*format
-		bufferImageCopyBuffer[i].bufferRowLength = w;
-		bufferImageCopyBuffer[i].bufferImageHeight = h;
-	}
-	vkCmdCopyBufferToImage(*pcommandBuffer,transferBuffer,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,rectCount,bufferImageCopyBuffer.data());
-
-	//create in transfer stage, use in fragment shader stage
-	imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-	imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,0,
-		0,0,0,0,1,&imageMemoryBarrier);
-	
-	imageLayout = imageMemoryBarrier.newLayout;
 }
 
 TextureDMABuffer::TextureDMABuffer(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TexturePixmap(_w,_h,_pcomponentMapping,_flags,_pcomp){
