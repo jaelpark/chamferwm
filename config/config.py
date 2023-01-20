@@ -151,6 +151,8 @@ class Backend(chamfer.Backend):
 	def OnSetupKeys(self, debug):
 		def KeyId(keyId):
 			nonlocal self;
+			if hasattr(self,keyId):
+				return getattr(self,keyId);
 			try:
 				self.keyCounter += 1;
 				setattr(self,keyId,self.keyCounter);
