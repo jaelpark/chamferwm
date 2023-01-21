@@ -103,10 +103,7 @@ class Container(chamfer.Container):
 
 	#called every time a client property has changed (title etc.)
 	def OnPropertyChange(self, propId):
-		try:
-			print(self.wm_name,flush=True);
-		except UnicodeDecodeError:
-			print("UnicodeDecodeError",flush=True);
+		pass; #self.wm_name, etc.
 
 	#called whenever cursor enters the window
 	def OnEnter(self):
@@ -464,7 +461,6 @@ class Backend(chamfer.Backend):
 			parent1.ShiftLayout(chamfer.layout.HSPLIT);
 
 		elif keyId == self.FLOAT:
-			#
 			focus.SetFloating(True);
 		
 		elif keyId == self.CONTRACT_ROOT_RESET:
@@ -612,30 +608,6 @@ class Backend(chamfer.Backend):
 	
 			self.shiftFocus = None;
 
-	def OnTimer(self):
-		#NOTE: OnTimer() calls currently disabled.
-		battery = psutil.sensors_battery();
-		try:
-			if not battery.power_plugged:
-				self.batteryFullNotified = False;
-				if battery.percent <= 5 and self.batteryAlarmLevel < 3:
-					psutil.Popen(["dunstify","--urgency=2","-p","100","Battery below 5%"]);
-					self.batteryAlarmLevel = 3;
-				elif battery.percent <= 10 and self.batteryAlarmLevel < 2:
-					psutil.Popen(["dunstify","--urgency=2","-p","100","Battery below 10%"]);
-					self.batteryAlarmLevel = 2;
-				elif battery.percent <= 15 and self.batteryAlarmLevel < 1:
-					psutil.Popen(["dunstify","--urgency=2","-p","100","Battery below 15%"]);
-					self.batteryAlarmLevel = 1;
-			else:
-				self.batteryAlarmLevel = 0;
-				if battery.percent >= 99 and not self.batteryFullNotified:
-					psutil.Popen(["dunstify","--urgency=0","-p","100","Battery full"]);
-					self.batteryFullNotified = True;
-		except AttributeError:
-			self.batteryFullNotified = True;
-			self.batteryAlarmLevel = 0;
-
 class Compositor(chamfer.Compositor):
 	def OnRedirectExternal(self, title, className):
 		#Used only in standalone compositor mode. Return False to filter out incompatible WM/UI components.
@@ -650,6 +622,7 @@ compositor.fontName = "Monospace";
 compositor.fontSize = 32;
 chamfer.BindCompositor(compositor);
 
+#Acquire list of running processes to not launch something that is already running.
 pids = psutil.pids();
 pnames = [psutil.Process(pid).name() for pid in pids];
 pcmdls = [a for p in [psutil.Process(pid).cmdline() for pid in pids] for a in p];
