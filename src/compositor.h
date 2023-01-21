@@ -63,7 +63,7 @@ public:
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	virtual void Exclude(bool);
-	void CreateSurface(uint, uint, uint);
+	void CreateSurface(uint, uint, uint, bool = false);
 	void AdjustSurface(uint, uint);
 	void DestroySurface();
 	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
@@ -238,7 +238,7 @@ protected:
 
 	//Used textures get stored for potential reuse before they get destroyed and while waiting for the pipeline to get flushed.
 	//Many of the allocated window textures will initially have some common reoccuring size.
-	TextureBase * CreateTexture(uint, uint, uint);
+	TextureBase * CreateTexture(uint, uint, uint, bool = false);
 	void ReleaseTexture(TextureBase *);
 
 	struct TextureCacheEntry{

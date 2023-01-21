@@ -55,7 +55,7 @@ public:
 	virtual ~TexturePixmap();
 	bool Attach(xcb_pixmap_t);
 	void Detach();
-	//void Update(const VkCommandBuffer *, const VkRect2D *, uint);
+	void Update(const VkCommandBuffer *, const VkRect2D *, uint);
 
 	const VkComponentMapping *pcomponentMapping;
 	
@@ -72,6 +72,7 @@ public:
 	virtual ~TextureHostPointer();
 	bool Attach(unsigned char *);
 	void Detach(uint64);
+	void Update(const VkCommandBuffer *, const VkRect2D *, uint);
 
 	const VkComponentMapping *pcomponentMapping;
 
@@ -95,6 +96,12 @@ class TextureSharedMemoryStaged : public TextureStaged{
 public:
 	TextureSharedMemoryStaged(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
 	~TextureSharedMemoryStaged();
+};
+
+class TextureCompatible : public TextureStaged{
+public:
+	TextureCompatible(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
+	~TextureCompatible();
 };
 
 class Buffer{
