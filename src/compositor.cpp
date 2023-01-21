@@ -673,17 +673,12 @@ void CompositorInterface::InitializeRenderEngine(){
 
 		vkGetPhysicalDeviceFormatProperties2(physicalDev,format,&formatProps2);
 
-		//--------------
-		VkDrmFormatModifierPropertiesListEXT drmFormatModPropsListB = {};
-		drmFormatModPropsListB.sType = VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT;
-		drmFormatModPropsListB.drmFormatModifierCount = drmFormatModPropsList.drmFormatModifierCount;
-		drmFormatModPropsListB.pDrmFormatModifierProperties = new VkDrmFormatModifierPropertiesEXT[drmFormatModPropsList.drmFormatModifierCount];
+		drmFormatModPropsList.pDrmFormatModifierProperties = new VkDrmFormatModifierPropertiesEXT[drmFormatModPropsList.drmFormatModifierCount];
 
 		VkFormatProperties2 formatProps2B = {};
 		formatProps2B.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
-		formatProps2B.pNext = &drmFormatModPropsListB;
+		formatProps2B.pNext = &drmFormatModPropsList;
 
-		//--------------
 		VkPhysicalDeviceImageDrmFormatModifierInfoEXT drmInfo = {};
 		drmInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT;
 		drmInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -707,53 +702,51 @@ void CompositorInterface::InitializeRenderEngine(){
 		imageFormatProps2.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
 		imageFormatProps2.pNext = &externalImageFormatProps;
 
+		vkGetPhysicalDeviceFormatProperties2(physicalDev,format,&formatProps2B);
+
 		printf("  drmFormatModifierCount: %u\n",drmFormatModPropsList.drmFormatModifierCount);
 		for(uint i = 0; i < drmFormatModPropsList.drmFormatModifierCount; ++i){
-			vkGetPhysicalDeviceFormatProperties2(physicalDev,format,&formatProps2B);
-
-			for(uint j = 0; j < drmFormatModPropsListB.drmFormatModifierCount; ++j){
-				printf("  modifier: %lu, features: %d, planes: %d\n",
-					drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier,
-					drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures,
-					drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierPlaneCount);
-				if((drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures &
-					VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) == VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT){
-					printf("  * render usage:");
-					imageFormatInfo2.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-					drmInfo.drmFormatModifier = drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier;
-					VkResult r = vkGetPhysicalDeviceImageFormatProperties2(physicalDev,&imageFormatInfo2,&imageFormatProps2);
-					if(r != VK_SUCCESS){
-						printf(" format not supported\n");
-						continue;
-					}
-					if(!(externalImageFormatProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)){
-						printf(" importing not supported\n");
-						continue;
-					}
-					printf(" OK\n");
-					drmFormatModifiers.insert(std::pair<uint64, uint>(
-						drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier,
-						drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierPlaneCount));
+			printf("  modifier: %lu, features: %d, planes: %d\n",
+				drmFormatModPropsList.pDrmFormatModifierProperties[i].drmFormatModifier,
+				drmFormatModPropsList.pDrmFormatModifierProperties[i].drmFormatModifierTilingFeatures,
+				drmFormatModPropsList.pDrmFormatModifierProperties[i].drmFormatModifierPlaneCount);
+			if((drmFormatModPropsList.pDrmFormatModifierProperties[i].drmFormatModifierTilingFeatures &
+				VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) == VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT){
+				printf("  * render usage:");
+				imageFormatInfo2.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+				drmInfo.drmFormatModifier = drmFormatModPropsList.pDrmFormatModifierProperties[i].drmFormatModifier;
+				VkResult r = vkGetPhysicalDeviceImageFormatProperties2(physicalDev,&imageFormatInfo2,&imageFormatProps2);
+				if(r != VK_SUCCESS){
+					printf(" format not supported\n");
+					continue;
 				}
-				/*if((drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifierTilingFeatures &
-					VK_FORMAT_FEATURE_TRANSFER_DST_BIT) == VK_FORMAT_FEATURE_TRANSFER_DST_BIT){
-					printf("  * transfer src usage:");
-					imageFormatInfo2.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-					drmInfo.drmFormatModifier = drmFormatModPropsListB.pDrmFormatModifierProperties[j].drmFormatModifier;
-					VkResult r = vkGetPhysicalDeviceImageFormatProperties2(physicalDev,&imageFormatInfo2,&imageFormatProps2);
-					if(r != VK_SUCCESS){
-						printf(" format not supported\n");
-						continue;
-					}
-					if(!(externalImageFormatProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)){
-						printf(" importing not supported\n");
-						continue;
-					}
-					printf(" OK\n");
-				}*/
+				if(!(externalImageFormatProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)){
+					printf(" importing not supported\n");
+					continue;
+				}
+				printf(" OK\n");
+				drmFormatModifiers.insert(std::pair<uint64, uint>(
+					drmFormatModPropsList.pDrmFormatModifierProperties[i].drmFormatModifier,
+					drmFormatModPropsList.pDrmFormatModifierProperties[i].drmFormatModifierPlaneCount));
 			}
+			/*if((drmFormatModPropsList.pDrmFormatModifierProperties[i].drmFormatModifierTilingFeatures &
+				VK_FORMAT_FEATURE_TRANSFER_DST_BIT) == VK_FORMAT_FEATURE_TRANSFER_DST_BIT){
+				printf("  * transfer src usage:");
+				imageFormatInfo2.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+				drmInfo.drmFormatModifier = drmFormatModPropsList.pDrmFormatModifierProperties[i].drmFormatModifier;
+				VkResult r = vkGetPhysicalDeviceImageFormatProperties2(physicalDev,&imageFormatInfo2,&imageFormatProps2);
+				if(r != VK_SUCCESS){
+					printf(" format not supported\n");
+					continue;
+				}
+				if(!(externalImageFormatProps.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)){
+					printf(" importing not supported\n");
+					continue;
+				}
+				printf(" OK\n");
+			}*/
 		}
-		delete []drmFormatModPropsListB.pDrmFormatModifierProperties;
+		delete []drmFormatModPropsList.pDrmFormatModifierProperties;
 	}
 }
 
@@ -1407,6 +1400,8 @@ TextureBase * CompositorInterface::CreateTexture(uint w, uint h, uint surfaceDep
 	}else{
 		switch(memoryImportMode){
 		case IMPORT_MODE_CPU_COPY:
+			ptexture = new TextureSharedMemoryStaged(w,h,pcomponentMapping,0,this);
+			break;
 		case IMPORT_MODE_HOST_MEMORY:
 			ptexture = new TextureSharedMemory(w,h,pcomponentMapping,0,this);
 			break;

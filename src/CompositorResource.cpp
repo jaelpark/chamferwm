@@ -226,37 +226,56 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	uint64 modifier = pbuffersFromPixmapReply->modifier;
 	//-------------------------------------
 
-	VkPhysicalDeviceImageDrmFormatModifierInfoEXT drmInfo = {};
-	drmInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT;
-	drmInfo.drmFormatModifier = modifier;
-	drmInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	//AMD: 0x1002, nvidia: 0x10de
+	if(pcomp->physicalDevProps.vendorID == 0x8086){ //trust the query only on intel for now
+		if(std::find_if(pcomp->drmFormatModifiers.begin(),pcomp->drmFormatModifiers.end(),[&](auto &p)->bool{
+			return modifier == p.first;
+		}) != pcomp->drmFormatModifiers.end()){
+			printf("DRM format modifier %llu found during query.\n",modifier);
+		}else{
+			VkPhysicalDeviceImageDrmFormatModifierInfoEXT drmInfo = {};
+			drmInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT;
+			drmInfo.drmFormatModifier = modifier;
+			drmInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	VkPhysicalDeviceImageFormatInfo2 imageFormatInfo2 = {};
-	imageFormatInfo2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
-	imageFormatInfo2.pNext = &drmInfo;
-	imageFormatInfo2.format = VK_FORMAT_R8G8B8A8_UNORM;
-	imageFormatInfo2.type = VK_IMAGE_TYPE_2D;
-	imageFormatInfo2.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
-	imageFormatInfo2.usage = VK_IMAGE_USAGE_SAMPLED_BIT; //TODO: not strictly needed?
-	imageFormatInfo2.flags = 0;
+			VkPhysicalDeviceExternalImageFormatInfo externalImageFormatInfo = {};
+			externalImageFormatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO;
+			externalImageFormatInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
+			externalImageFormatInfo.pNext = &drmInfo;
 
-	VkImageFormatProperties2 imageFormatProps2 = {};
-	imageFormatProps2.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
-	if(vkGetPhysicalDeviceImageFormatProperties2(pcomp->physicalDev,&imageFormatInfo2,&imageFormatProps2) == VK_ERROR_FORMAT_NOT_SUPPORTED){
-		//printf("*** vkGetPhysicalDeviceImageFormatProperties2 FAILED\n");
-		//try specify the format modifier explicitly
-		for(auto &p : pcomp->drmFormatModifiers){
-			//printf("TRY: %llu, %u (assume %llu, accept %u planes)\n",p.first,p.second,I915_FORMAT_MOD_X_TILED,pbuffersFromPixmapReply->nfd);
-			if(p.first == 0 || p.second != pbuffersFromPixmapReply->nfd)
-				continue;
-			drmInfo.drmFormatModifier = p.first;//I915_FORMAT_MOD_X_TILED;
-			if(vkGetPhysicalDeviceImageFormatProperties2(pcomp->physicalDev,&imageFormatInfo2,&imageFormatProps2) == VK_SUCCESS){
-				modifier = p.first;
-				break;
-			}
+			VkPhysicalDeviceImageFormatInfo2 imageFormatInfo2 = {};
+			imageFormatInfo2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
+			imageFormatInfo2.pNext = &externalImageFormatInfo;
+			imageFormatInfo2.format = VK_FORMAT_R8G8B8A8_UNORM;
+			imageFormatInfo2.type = VK_IMAGE_TYPE_2D;
+			imageFormatInfo2.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
+			imageFormatInfo2.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+			imageFormatInfo2.flags = 0;
+
+			VkExternalImageFormatProperties externalImageFormatProps = {};
+			externalImageFormatProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES;
+
+			VkImageFormatProperties2 imageFormatProps2 = {};
+			imageFormatProps2.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
+			imageFormatProps2.pNext = &externalImageFormatProps;
+			if(vkGetPhysicalDeviceImageFormatProperties2(pcomp->physicalDev,&imageFormatInfo2,&imageFormatProps2) == VK_ERROR_FORMAT_NOT_SUPPORTED){
+				printf("*** vkGetPhysicalDeviceImageFormatProperties2 FAILED for %llu\n",modifier);
+				//try specify the format modifier explicitly
+				for(auto &p : pcomp->drmFormatModifiers){
+					printf("TRY: %llu, %u (assume %llu, accept %u planes)\n",p.first,p.second,I915_FORMAT_MOD_X_TILED,pbuffersFromPixmapReply->nfd);
+					if(p.first == 0 || p.second != pbuffersFromPixmapReply->nfd)
+						continue;
+					drmInfo.drmFormatModifier = p.first;//I915_FORMAT_MOD_X_TILED;
+					if(vkGetPhysicalDeviceImageFormatProperties2(pcomp->physicalDev,&imageFormatInfo2,&imageFormatProps2) == VK_SUCCESS){
+						modifier = p.first;
+						break;
+					}
+				}
+				if(modifier == pbuffersFromPixmapReply->modifier)
+					DebugPrintf(stderr,"Unable to find compatible DRM modifier: pixmap: %llu. Check format query list output.");
+			}else 
+				printf("*** vkGetPhysicalDeviceImageFormatProperties2 OK for %llu\n",modifier);
 		}
-		if(modifier == pbuffersFromPixmapReply->modifier)
-			DebugPrintf(stderr,"Unable to find compatible DRM modifier: pixmap: %llu. Check format query list output.");
 	}
 
 	VkSubresourceLayout subresourceLayout[256];
@@ -534,7 +553,7 @@ void TextureHostPointer::Detach(uint64 releaseTag){
 	}
 }
 
-TextureDMABuffer::TextureDMABuffer(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TexturePixmap(_w,_h,_pcomponentMapping,_flags,_pcomp){
+TextureDMABuffer::TextureDMABuffer(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags|TEXTURE_BASE_FLAG_SKIP,_pcomp), TexturePixmap(_w,_h,_pcomponentMapping,_flags,_pcomp){
 	//
 }
 
@@ -542,11 +561,19 @@ TextureDMABuffer::~TextureDMABuffer(){
 	//
 }
 
-TextureSharedMemory::TextureSharedMemory(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TextureHostPointer(_w,_h,_pcomponentMapping,_flags,_pcomp){
-	//
+TextureSharedMemory::TextureSharedMemory(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags|TEXTURE_BASE_FLAG_SKIP,_pcomp), TextureHostPointer(_w,_h,_pcomponentMapping,_flags,_pcomp){
+	//does it need SKIP??
 }
 
 TextureSharedMemory::~TextureSharedMemory(){
+	//
+}
+
+TextureSharedMemoryStaged::TextureSharedMemoryStaged(uint _w, uint _h, const VkComponentMapping *_pcomponentMapping, uint _flags, const CompositorInterface *_pcomp) : TextureBase(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp), TextureStaged(_w,_h,VK_FORMAT_R8G8B8A8_UNORM,_pcomponentMapping,_flags,_pcomp){
+	//
+}
+
+TextureSharedMemoryStaged::~TextureSharedMemoryStaged(){
 	//
 }
 

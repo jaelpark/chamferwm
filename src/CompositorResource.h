@@ -91,6 +91,12 @@ public:
 	~TextureSharedMemory();
 };
 
+class TextureSharedMemoryStaged : public TextureStaged{
+public:
+	TextureSharedMemoryStaged(uint, uint, const VkComponentMapping *, uint, const class CompositorInterface *);
+	~TextureSharedMemoryStaged();
+};
+
 class Buffer{
 public:
 	Buffer(uint, VkBufferUsageFlagBits, const class CompositorInterface *);
