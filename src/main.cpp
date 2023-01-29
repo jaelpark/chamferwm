@@ -979,6 +979,7 @@ int main(sint argc, const char **pargv){
 		return 1;
 	}
 
+	Config::Loader::standaloneComp = staComp.Get();
 	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
 	Config::Loader::debugLayers = debugLayersOpt.Get();
 	Config::Loader::scissoring = !noScissoringOpt.Get();

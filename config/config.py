@@ -622,32 +622,33 @@ compositor.fontName = "Monospace";
 compositor.fontSize = 32;
 chamfer.BindCompositor(compositor);
 
-#Acquire list of running processes to not launch something that is already running.
-pids = psutil.pids();
-pnames = [psutil.Process(pid).name() for pid in pids];
-pcmdls = [a for p in [psutil.Process(pid).cmdline() for pid in pids] for a in p];
+if not backend.standaloneCompositor:
+	#Acquire list of running processes to not launch something that is already running.
+	pids = psutil.pids();
+	pnames = [psutil.Process(pid).name() for pid in pids];
+	pcmdls = [a for p in [psutil.Process(pid).cmdline() for pid in pids] for a in p];
 
-#---set wallpaper with feh
-#psutil.Popen(["feh","--no-fehbg","--image-bg","black","--bg-center","background.png"]);
+	#---set wallpaper with feh
+	#psutil.Popen(["feh","--no-fehbg","--image-bg","black","--bg-center","background.png"]);
 
-#---startup programs examples:
-#launch pulseaudio if installed
-#if not "pulseaudio" in pnames:
-#	print("starting pulseaudio...");
-#	psutil.Popen(["sleep 1.0; pulseaudio --start"],shell=True,stdout=None,stderr=None);
+	#---startup programs examples:
+	#launch pulseaudio if installed
+	#if not "pulseaudio" in pnames:
+	#	print("starting pulseaudio...");
+	#	psutil.Popen(["sleep 1.0; pulseaudio --start"],shell=True,stdout=None,stderr=None);
 
-#launch notification system
-#if not "dunst" in pnames:
-#	print("starting dunst...");
-#	psutil.Popen(["dunst"],stdout=None,stderr=None);
+	#launch notification system
+	#if not "dunst" in pnames:
+	#	print("starting dunst...");
+	#	psutil.Popen(["dunst"],stdout=None,stderr=None);
 
-#launch clipboard manager
-#if not any(["clipster" in p for p in pcmdls]):
-#	print("starting clipster..."); #clipboard manager
-#	psutil.Popen(["clipster","-d"],stdout=None,stderr=None);
+	#launch clipboard manager
+	#if not any(["clipster" in p for p in pcmdls]):
+	#	print("starting clipster..."); #clipboard manager
+	#	psutil.Popen(["clipster","-d"],stdout=None,stderr=None);
 
-#launch gestures daemon for touch devices
-#if not any(["libinput-gestures" in p for p in pcmdls]):
-#	print("starting libinput-gestures..."); #touchpad gestures
-#	psutil.Popen(["libinput-gestures-setup","start"],stdout=None,stderr=None);
+	#launch gestures daemon for touch devices
+	#if not any(["libinput-gestures" in p for p in pcmdls]):
+	#	print("starting libinput-gestures..."); #touchpad gestures
+	#	psutil.Popen(["libinput-gestures-setup","start"],stdout=None,stderr=None);
 
