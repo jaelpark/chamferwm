@@ -211,11 +211,11 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 		DebugPrintf(stderr,"Failed to get buffers from pixmap (DRI3 ext).\n");
 		return false;
 	}
-	//DebugPrintf(stdout,"----------- depth: %u, bpp: %u\n",pbuffersFromPixmapReply->depth,pbuffersFromPixmapReply->bpp);
 
 	int *pdmafds = xcb_dri3_buffers_from_pixmap_buffers(pbuffersFromPixmapReply);
 	if(!pdmafds){
 		DebugPrintf(stderr,"NULL DMA-buf fd.\n");
+		free(pbuffersFromPixmapReply);
 		return false;
 	}
 	dmafd = pdmafds[0];
@@ -350,7 +350,7 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 			break;
 	}
 	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&deviceMemory) != VK_SUCCESS){
-		DebugPrintf(stderr,"Failed to allocate transfer image memory.\n"); //NOTE: may return invalid handle, if the buffer that we're trying to import is only shortly available (for example firefox animating it's url menu by resizing). Need xcb_dri3 fences to keep the handle alive most likely.
+		DebugPrintf(stderr,"Failed to allocate transfer image memory.\n");
 		free(pbuffersFromPixmapReply);
 		return false;
 	}
@@ -374,9 +374,9 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	if(vkCreateImageView(pcomp->logicalDev,&imageViewCreateInfo,0,&imageView) != VK_SUCCESS)
 		throw Exception("Failed to create texture image view.");
 	
-	printf("*** Created VkImage %p, %lx\n",image,image);
-
 	free(pbuffersFromPixmapReply);
+
+	imageLayout = imageCreateInfo.initialLayout;
 
 	return true;
 }
@@ -395,8 +395,6 @@ void TexturePixmap::Detach(){
 	}
 
 	close(dmafd);
-
-	//transferImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prects, uint rectCount){

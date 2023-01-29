@@ -135,7 +135,7 @@ void ClientFrame::Exclude(bool exclude){
 	//
 }
 
-void ClientFrame::CreateSurface(uint w, uint h, uint depth, bool compatibility){
+void ClientFrame::CreateSurface(uint w, uint h, SURFACE_DEPTH depth, bool compatibility){
 	pcomp->updateQueue.push_back(this);
 
 	surfaceDepth = depth;
@@ -934,6 +934,9 @@ void CompositorInterface::AddDamageRegion(const WManager::Client *pclient){
 	rect1.offset = {pclient->oldRect.x-margin.x+titlePadOffset.x,pclient->oldRect.y-margin.y+titlePadOffset.y};
 	rect1.extent = {pclient->oldRect.w+2*margin.x-titlePadOffset.x+titlePadExtent.x,pclient->oldRect.h+2*margin.y-titlePadOffset.y+titlePadExtent.y};
 	AddDamageRegion(&rect1);
+	rect1.offset = {pclient->position.x-margin.x+titlePadOffset.x,pclient->position.y-margin.y+titlePadOffset.y};
+	rect1.extent = {pclient->rect.w+2*margin.x-titlePadOffset.x+titlePadExtent.x,pclient->rect.h+2*margin.y-titlePadOffset.y+titlePadExtent.y};
+	AddDamageRegion(&rect1);
 }
 
 void CompositorInterface::FullDamageRegion(){
@@ -1378,14 +1381,16 @@ void CompositorInterface::ClearBackground(){
 	FullDamageRegion();
 }
 
-TextureBase * CompositorInterface::CreateTexture(uint w, uint h, uint surfaceDepth, bool compatibility){
+TextureBase * CompositorInterface::CreateTexture(uint w, uint h, ClientFrame::SURFACE_DEPTH surfaceDepth, bool compatibility){
 	TextureBase *ptexture;
 
 	//should be larger than 0:
 	w = std::max(std::min(w,physicalDevProps.limits.maxImageDimension2D),1u);
 	h = std::max(std::min(h,physicalDevProps.limits.maxImageDimension2D),1u);
 
-	const VkComponentMapping *pcomponentMapping = surfaceDepth > 24?&TexturePixmap::pixmapComponentMapping:&TexturePixmap::pixmapComponentMapping24;
+	const VkComponentMapping *pcomponentMapping = surfaceDepth == ClientFrame::SURFACE_DEPTH_24
+		?&TexturePixmap::pixmapComponentMapping24
+		:&TexturePixmap::pixmapComponentMapping;
 	uint componentMappingHash = TextureBase::GetComponentMappingHash(pcomponentMapping);
 
 	auto m = std::find_if(textureCache.begin(),textureCache.end(),[&](auto &r)->bool{
@@ -1625,9 +1630,11 @@ void X11ClientFrame::AdjustSurface1(){
 			AdjustSurface(rect.w,rect.h);
 
 			//texture renewed, cast again
-			dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(windowPixmap);
-
-			UpdateDescSets(); //view is recreated every time for the imported buffer
+			if(!dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(windowPixmap)){
+				xcb_free_pixmap(pbackend->pcon,windowPixmap);
+				enabled = false;
+				return;
+			}else UpdateDescSets(); //view is recreated every time for the imported buffer
 
 		}else{
 			TextureSharedMemory *ptexture1;
@@ -1656,8 +1663,9 @@ void X11ClientFrame::AdjustSurface1(){
 
 			if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY){
 				if(!dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
-					DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-					pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
+					xcb_free_pixmap(pbackend->pcon,windowPixmap);
+					enabled = false;
+					return;
 				}else UpdateDescSets(); //view is recreated every time for the imported buffer
 			}
 		}
@@ -1678,15 +1686,13 @@ void X11ClientFrame::StartComposition1(){
 		return;
 	xcb_composite_name_window_pixmap(pbackend->pcon,window,windowPixmap);
 
-	damage = xcb_generate_id(pbackend->pcon);
-	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_NON_EMPTY);
-
 	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
 		//
-		CreateSurface(rect.w,rect.h,24);
-		dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(windowPixmap);
-
-		UpdateDescSets(); //view is recreated every time for the imported buffer
+		CreateSurface(rect.w,rect.h,SURFACE_DEPTH_24);
+		if(!dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(windowPixmap)){
+			xcb_free_pixmap(pbackend->pcon,windowPixmap);
+			return; //do not show
+		}else UpdateDescSets(); //view is recreated every time for the imported buffer
 
 	}else{
 		//
@@ -1695,6 +1701,7 @@ void X11ClientFrame::StartComposition1(){
 		shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
 		if(shmid == -1){
 			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
+			xcb_free_pixmap(pbackend->pcon,windowPixmap);
 			return;
 		}
 		segment = xcb_generate_id(pbackend->pcon);
@@ -1707,24 +1714,27 @@ void X11ClientFrame::StartComposition1(){
 		xcb_shm_get_image_cookie_t imageCookie = xcb_shm_get_image(pbackend->pcon,windowPixmap,0,0,1,1,~0u,XCB_IMAGE_FORMAT_Z_PIXMAP,segment,0);
 		xcb_shm_get_image_reply_t *pimageReply = xcb_shm_get_image_reply(pbackend->pcon,imageCookie,0);
 
-		uint depth;
+		SURFACE_DEPTH depth;
 		if(pimageReply){
-			depth = pimageReply->depth;
+			depth = pimageReply->depth == 24?SURFACE_DEPTH_24:SURFACE_DEPTH_32;
 			free(pimageReply);
 		}else{
 			DebugPrintf(stderr,"Failed to get SHM image. Assuming 24 bit depth.\n");
-			depth = 24;
+			depth = SURFACE_DEPTH_24;
 		}
 
 		CreateSurface(rect.w,rect.h,depth);
 
 		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY){
 			if(!dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
-				DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-				pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
+				xcb_free_pixmap(pbackend->pcon,windowPixmap);
+				return;
 			}else UpdateDescSets(); //view is recreated every time for the imported buffer
 		}
 	}
+
+	damage = xcb_generate_id(pbackend->pcon);
+	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_NON_EMPTY);
 
 	pcomp->AddDamageRegion(this);
 	enabled = true;
@@ -1782,7 +1792,7 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 
 	pchpixels = (unsigned char*)shmat(shmid,0,0);
 
-	CreateSurface(w,h,24,true);
+	CreateSurface(w,h,SURFACE_DEPTH_24,true);
 
 	/*if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
 		CreateSurface(w,h,24);
@@ -2152,7 +2162,7 @@ void X11DebugClientFrame::Redirect1(){
 void X11DebugClientFrame::StartComposition1(){
 	if(enabled)
 		return;
-	CreateSurface(rect.w,rect.h,32);
+	CreateSurface(rect.w,rect.h,SURFACE_DEPTH_32);
 	pcomp->AddDamageRegion(this);
 	enabled = true;
 }

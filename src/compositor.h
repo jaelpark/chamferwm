@@ -63,7 +63,11 @@ public:
 	virtual ~ClientFrame();
 	virtual void UpdateContents(const VkCommandBuffer *) = 0;
 	virtual void Exclude(bool);
-	void CreateSurface(uint, uint, uint, bool = false);
+	enum SURFACE_DEPTH{
+		SURFACE_DEPTH_24,
+		SURFACE_DEPTH_32
+	};
+	void CreateSurface(uint, uint, SURFACE_DEPTH, bool = false);
 	void AdjustSurface(uint, uint);
 	void DestroySurface();
 	void SetShaders(const char *[Pipeline::SHADER_MODULE_COUNT]);
@@ -81,7 +85,7 @@ protected:
 	TextureBase *ptexture;
 	class Text *ptitle;
 	std::string title;
-	uint surfaceDepth;
+	SURFACE_DEPTH surfaceDepth;
 public:
 	bool enabled; //in use and ready to draw
 protected:
@@ -238,7 +242,7 @@ protected:
 
 	//Used textures get stored for potential reuse before they get destroyed and while waiting for the pipeline to get flushed.
 	//Many of the allocated window textures will initially have some common reoccuring size.
-	TextureBase * CreateTexture(uint, uint, uint, bool = false);
+	TextureBase * CreateTexture(uint, uint, ClientFrame::SURFACE_DEPTH, bool = false);
 	void ReleaseTexture(TextureBase *);
 
 	struct TextureCacheEntry{
