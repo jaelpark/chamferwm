@@ -1,62 +1,77 @@
 
 import chamfer
 import sys
+import os
 from enum import Enum,auto
-
-try:
-	import psutil
-except ModuleNotFoundError:
-	print("No psutil module.");
-
-try:
-	from Xlib.keysymdef import latin1,miscellany,xf86
-	from Xlib import XK
-except ModuleNotFoundError:
-	print("No Xlib module.");
-
-try:
-	import pulsectl
-except ModuleNotFoundError:
-	print("No pulsectl module.");
 
 class ShaderFlag(Enum):
 	FOCUS_NEXT = chamfer.shaderFlag.USER_BIT<<0x0
 
 #Refer to the documentation
 #https://jaelpark.github.io/chamferwm-docs/bindings.html
-#for all the keybinding and how to setup them.
+#for all the keybindings and how to setup them.
+#TLDR: define the key binding in OnSetupKeys() and the
+#behaviour in OnKeyPress().
 
 class Container(chamfer.Container):
 	#setup the container before it's created (dimensions)
 	def OnSetupContainer(self):
-		self.margin = (0.015,0.015);
-		self.minSize = (0.3,0.2);
-
-		self.splitArmed = False;
+		self.margin = (0.015,0.015); #Relative amount of empty space around containers (i.e. gap). Fragment shader covers this area for over-reaching decorations.
+		self.minSize = (0.3,0.2); #Minimum size of the container, before they start to overlap
 
 		self.titleBar = chamfer.titleBar.TOP; #options for the title bar location are NONE, LEFT, TOP, RIGHT or BOTTOM
 		self.titleStackOnly = True; #disable to always show title bars
 
 		#WM_CLASS/TITLE rules to force floating mode / never float
 		if self.wm_class == "matplotlib":
+			#Example: always float matplotlib graph windows.
 			self.floatingMode = chamfer.floatingMode.ALWAYS; #.NEVER
 
 	#setup the client before it's created (shaders)
 	def OnSetupClient(self):
-		#TODO: Panels, docks etc. should be rendered with no decorations. Later, it should be possible to check this by looking at the window type property, not just the class name.
 		try:
 			print("Setting up \"{}\" ({})".format(self.wm_name,self.wm_class),flush=True);
 		except UnicodeDecodeError:
-			print("UnicodeDecodeError",flush=True);
+			pass;
 
-		if self.wm_class == "Conky":
-			self.vertexShader = "default_vertex.spv";
-			self.geometryShader = "default_geometry.spv";
-			self.fragmentShader = "default_fragment.spv";
+		#Setup shaders for the newly created client container.
+		#The stock build includes the following fragment shaders
+		#build by default:
+
+		#1. frame_fragment.spv: default "demo" decoration with border and rounded corners
+		#2. frame_fragment_basic.spv: rectangular borders with focus highlight, no bling
+		#3. frame_fragment_ext.spv: #default rounded corner style for external wms
+		#4. frame_fragment_ext_basic.spv: #simple compatible style for external wms, only draw shadows
+		#5. default_fragment.spv: #absolutely no decoration (goes together with default_vertex.spv and
+		#   (default_geometry.spv)
+
+		#All shader builds include the shadows by default. Shadows can be
+		#removed by disabling the build feature in meson.build. Other features
+		#such as the border thickness, rounding, and colors can be edited
+		#in the shader source itself (for now).
+
+		if not chamfer.backend.standaloneCompositor:
+			#Shaders for the chamferwm.
+			if self.wm_class == "Conky":
+				#Example: zero decoration for conky system monitor.
+				#Add docks and other desktop widgets similarly,
+				#if needed.
+				self.vertexShader = "default_vertex.spv";
+				self.geometryShader = "default_geometry.spv";
+				self.fragmentShader = "default_fragment.spv";
+			else:
+				self.vertexShader = "frame_vertex.spv";
+				self.geometryShader = "frame_geometry.spv";
+				self.fragmentShader = "frame_fragment.spv";
 		else:
+			#Shader for other window managers (standalone
+			#compositor mode).
 			self.vertexShader = "frame_vertex.spv";
 			self.geometryShader = "frame_geometry.spv";
-			self.fragmentShader = "frame_fragment.spv";
+			self.fragmentShader = "frame_fragment_ext.spv";
+
+		#this is just to restore the defaults when leaving fullscreen (used in OnFullscreen())
+		self.defaultShaders = (self.vertexShader,self.geometryShader,self.fragmentShader);
 
 	#select and assign a parent container
 	def OnParent(self):
@@ -76,20 +91,19 @@ class Container(chamfer.Container):
 		try:
 			print("Created client \"{}\" ({})".format(self.wm_name,self.wm_class),flush=True);
 		except UnicodeDecodeError:
-			print("UnicodeDecodeError",flush=True);
+			pass
 		self.Focus();
 
-	#called to request fullscreen mode - either by calling SetFullscreen or by client message
+	#Called to request fullscreen mode - either by calling SetFullscreen or by client message.
+	#Not used in standalone compositor mode.
 	def OnFullscreen(self, toggle):
-		#In fullscreen mode, no decorations
+		#In fullscreen mode, no decorations.
 		if toggle:
 			self.vertexShader = "default_vertex.spv";
 			self.geometryShader = "default_geometry.spv";
 			self.fragmentShader = "default_fragment.spv";
 		else:
-			self.vertexShader = "frame_vertex.spv";
-			self.geometryShader = "frame_geometry.spv";
-			self.fragmentShader = "frame_fragment.spv";
+			self.vertexShader,self.geometryShader,self.fragmentShader = self.defaultShaders;
 
 		return True;
 	
@@ -146,6 +160,7 @@ class Container(chamfer.Container):
 	
 class Backend(chamfer.Backend):
 	def OnSetupKeys(self, debug):
+		#Helper function to create key binding IDs
 		def KeyId(keyId):
 			nonlocal self;
 			if hasattr(self,keyId):
@@ -428,8 +443,12 @@ class Backend(chamfer.Backend):
 			parent.ShiftLayout(layout);
 
 		elif keyId == self.SPLIT_V:
-			#TODO: add render flags property, bitwise OR them
-			focus.splitArmed = not focus.splitArmed;
+			try:
+				#Indicate that next time a container is created,
+				#the current focus will be split.
+				focus.splitArmed = not focus.splitArmed;
+			except AttributeError:
+				focus.splitArmed = True;
 
 		elif keyId == self.FULLSCREEN:
 			print("setting fullscreen",flush=True);
@@ -553,7 +572,12 @@ class Backend(chamfer.Backend):
 			focus.Kill();
 
 		elif keyId == self.LAUNCH_TERMINAL:
-			psutil.Popen(["alacritty"],stdout=None,stderr=None);
+			for t in [os.getenv("TERMINAL"),"alacritty","kitty","urxvt","rxvt","st","xterm"]:
+				try:
+					psutil.Popen([t],stdout=None,stderr=None);
+					break;
+				except (TypeError,FileNotFoundError):
+					pass;
 
 		elif keyId == self.LAUNCH_BROWSER:
 			psutil.Popen(["firefox"],stdout=None,stderr=None);
@@ -616,10 +640,29 @@ class Compositor(chamfer.Compositor):
 backend = Backend();
 chamfer.BindBackend(backend);
 
+if not backend.standaloneCompositor:
+	#Import some modules for WM use
+	try:
+		import psutil
+	except ModuleNotFoundError:
+		print("No psutil module.");
+
+	try:
+		from Xlib.keysymdef import latin1,miscellany,xf86
+		from Xlib import XK
+	except ModuleNotFoundError:
+		print("No Xlib module.");
+
+	try:
+		import pulsectl
+	except ModuleNotFoundError:
+		print("No pulsectl module.");
+
 compositor = Compositor();
 #compositor.deviceIndex = 0;
 compositor.fontName = "Monospace";
-compositor.fontSize = 32;
+compositor.fontSize = 24;
+compositor.enableAnimation = True;
 chamfer.BindCompositor(compositor);
 
 if not backend.standaloneCompositor:
@@ -632,11 +675,6 @@ if not backend.standaloneCompositor:
 	#psutil.Popen(["feh","--no-fehbg","--image-bg","black","--bg-center","background.png"]);
 
 	#---startup programs examples:
-	#launch pulseaudio if installed
-	#if not "pulseaudio" in pnames:
-	#	print("starting pulseaudio...");
-	#	psutil.Popen(["sleep 1.0; pulseaudio --start"],shell=True,stdout=None,stderr=None);
-
 	#launch notification system
 	#if not "dunst" in pnames:
 	#	print("starting dunst...");

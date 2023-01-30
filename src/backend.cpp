@@ -371,7 +371,8 @@ void X11Container::Place1(WManager::Container *pOrigParent){
 }
 
 void X11Container::Stack1(){
-	const_cast<X11Backend *>(pbackend)->StackClients(GetRoot());
+	if(!pbackend->standaloneComp)
+		const_cast<X11Backend *>(pbackend)->StackClients(GetRoot());
 }
 
 void X11Container::Fullscreen1(){
@@ -699,6 +700,10 @@ void Default::Start(){
 	values[0] = 1;
 	xcb_create_window(pcon,XCB_COPY_FROM_PARENT,ewmh_window,pscr->root,
 		-1,-1,1,1,0,XCB_WINDOW_CLASS_INPUT_ONLY,XCB_COPY_FROM_PARENT,XCB_CW_OVERRIDE_REDIRECT,values);
+	
+	values[0] = XCB_STACK_MODE_BELOW;
+	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
+	xcb_map_window(pcon,ewmh_window);
 
 	if(standaloneComp){
 		DebugPrintf(stdout,"Launching in standalone compositor mode.\n");
@@ -779,11 +784,6 @@ void Default::Start(){
 			xcb_change_window_attributes(pcon,pscr->root,XCB_CW_CURSOR,&cursors[CURSOR_POINTER]);
 		}
 	}
-	
-	values[0] = XCB_STACK_MODE_BELOW;
-	xcb_configure_window(pcon,ewmh_window,XCB_CONFIG_WINDOW_STACK_MODE,values);
-
-	xcb_map_window(pcon,ewmh_window);
 }
 
 void Default::Stop(){
@@ -866,18 +866,41 @@ sint Default::HandleEvent(bool forcePoll){
 		switch(pevent->response_type & 0x7f){
 		case XCB_CREATE_NOTIFY:{
 			xcb_create_notify_event_t *pev = (xcb_create_notify_event_t*)pevent;
-			//if(pev->override_redirect)
-			//	break;
-
+			
 			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			
+			if(!configCache.empty())
+				std::get<2>(configCache.back()) = pev->window;
+
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
 				return pev->window == std::get<0>(p);//p.first;
 			});
 			if(mrect == configCache.end()){
 				configCache.push_back(ConfigCacheElement(pev->window,rect,0));
 				mrect = configCache.end()-1;
-			}else std::get<1>(*mrect) = rect;
+			}else{ //tbh there should not be any
+				std::get<1>(*mrect) = rect;
+				std::get<2>(*mrect) = 0;
+			}
+			//debug: print current and expected stacking order (standalone comp).
+			//-----------------------------------------
+#if 0
+#define debug_query_tree(m) if(standaloneComp){\
+			printf("%s\n",m);\
+			xcb_query_tree_cookie_t queryTreeCookie = xcb_query_tree(pcon,pscr->root);\
+			xcb_query_tree_reply_t *pqueryTreeReply = xcb_query_tree_reply(pcon,queryTreeCookie,0);\
+			xcb_window_t *pchs = xcb_query_tree_children(pqueryTreeReply);\
+			printf("E\tC\n");\
+			for(uint i = 0, n = xcb_query_tree_children_length(pqueryTreeReply); i < n || i < configCache.size(); ++i){\
+				printf("%x\t%x\t->%x\n",i < n?pchs[i]:0xff,i < configCache.size()?std::get<0>(configCache[i]):0xff,\
+					i < configCache.size()?std::get<2>(configCache[i]):0xff);\
+			}\
+			free(pqueryTreeReply);}
+#else
+#define debug_query_tree(m) {}
+#endif
+			//-----------------------------------------
+			debug_query_tree("CREATE");
 
 			DebugPrintf(stdout,"create %x | %d,%d %ux%u\n",pev->window,pev->x,pev->y,pev->width,pev->height);
 			}
@@ -979,7 +1002,6 @@ sint Default::HandleEvent(bool forcePoll){
 
 			xcb_configure_window(pcon,pev->window,mask,values);
 
-			//TODO: do this and the cache in CONFIGURE_NOTIFY?
 			if(pclient1)
 				pclient1->UpdateTranslation(&std::get<1>(*mrect));
 
@@ -992,6 +1014,8 @@ sint Default::HandleEvent(bool forcePoll){
 				xcb_map_window(pcon,pev->window);
 				break;
 			}
+
+			DebugPrintf(stdout,"map request, %x\n",pev->window);
 
 			result = 1;
 			
@@ -1213,26 +1237,46 @@ sint Default::HandleEvent(bool forcePoll){
 					XCB_GRAB_MODE_ASYNC,XCB_GRAB_MODE_ASYNC,pscr->root,XCB_NONE,1,XCB_MOD_MASK_1);
 			//check fullscreen
 		
-			DebugPrintf(stdout,"map request, %x\n",pev->window);
 			}
 			break;
 		case XCB_CONFIGURE_NOTIFY:{
 			xcb_configure_notify_event_t *pev = (xcb_configure_notify_event_t*)pevent;
-			//if(pev->override_redirect)
-			//	break;
 
 			WManager::Rectangle rect = {pev->x,pev->y,pev->width,pev->height};
 			
+			//TODO: this and in the CREATE -> function?
 			auto mrect = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
-				return pev->window == std::get<0>(p);
+				return pev->window == std::get<0>(p); //fix the above_sibling reference at the old list location
 			});
-			if(mrect == configCache.end()){
-				configCache.push_back(ConfigCacheElement(pev->window,rect,pev->above_sibling));
-				mrect = configCache.end()-1;
+			if(standaloneComp){
+				//order matters when running on other window managers
+				//TODO: rotate
+				if(mrect != configCache.end()){
+					auto m = configCache.erase(mrect);
+					if(m != configCache.begin())
+						std::get<2>(*(m-1)) = (m != configCache.end())?std::get<0>(*m):0;
+				}
+				auto mabv = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+					return std::get<0>(p) == pev->above_sibling;
+				});
+				if(mabv != configCache.end()){
+					mrect = configCache.insert(mabv+1,ConfigCacheElement(pev->window,rect,std::get<2>(*mabv))); //insert to new location
+					std::get<2>(*mabv) = pev->window; //fix the above_sibling reference at the new list location
+				}else{
+					//nothing above this client
+					configCache.push_back(ConfigCacheElement(pev->window,rect,pev->above_sibling));
+					mrect = configCache.end()-1;
+				}
 			}else{
-				std::get<1>(*mrect) = rect;
-				std::get<2>(*mrect) = pev->above_sibling;
+				if(mrect == configCache.end()){
+					configCache.push_back(ConfigCacheElement(pev->window,rect,pev->above_sibling));
+					mrect = configCache.end()-1;
+				}else{
+					std::get<1>(*mrect) = rect;
+					std::get<2>(*mrect) = pev->above_sibling;
+				}
 			}
+			debug_query_tree("CONFIG");
 
 			X11Client *pclient1 = FindClient(pev->window,MODE_AUTOMATIC);
 
@@ -1241,18 +1285,25 @@ sint Default::HandleEvent(bool forcePoll){
 
 				//handle stacking order
 				if(standaloneComp){
-					auto m1 = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
-						return static_cast<X11Client *>(p)->window == pev->window;
-					});
-					if(pev->above_sibling != 0){
-						auto ma = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
-							return static_cast<X11Client *>(p)->window == pev->above_sibling;
+					clientStack.erase(std::remove(clientStack.begin(),clientStack.end(),pclient1),clientStack.end());
+					bool found = false;
+
+					//find the first client ("above sibling") that is actually mapped
+					for(auto k = std::make_reverse_iterator(mrect); k != configCache.rend(); ++k){ //start from above sibling, go reverse
+						//TODO: skip mrect
+						auto m = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{ //todo: rbegin/rend()
+							return static_cast<X11Client *>(p)->window == std::get<2>(*k);
+							//return pev->above_sibling == std::get<0>(*k);
 						});
-						if(ma != clientStack.end())
-							if(std::distance(m1,ma) > 0)
-								std::rotate(m1,m1+1,ma+1);
-							else std::rotate(ma+1,m1,m1+1);
-					}else std::rotate(clientStack.begin(),m1,m1+1);
+						if(m != clientStack.end()){
+							clientStack.insert(m+1,pclient1);
+							found = true;
+							break;
+						}
+					}
+
+					if(!found) //nothing was mapped
+						clientStack.push_back(pclient1);
 
 					result = 1;
 				}
@@ -1263,17 +1314,17 @@ sint Default::HandleEvent(bool forcePoll){
 			break;
 		case XCB_MAP_NOTIFY:{
 			xcb_map_notify_event_t *pev = (xcb_map_notify_event_t*)pevent;
-			//pev->override_redirect
-			if(pev->window == ewmh_window)
+			if(pev->window == ewmh_window && !standaloneComp)
 				break;
 
 			result = 1;
 
-			//check if window already exists
+			//check if window already exists (already mapped)
 			X11Client *pclient1 = FindClient(pev->window,MODE_UNDEFINED);
 			if(pclient1){
 				//TODO: check if transient_for is in different root this time
 				pclient1->flags &= ~X11Client::FLAG_UNMAPPING;
+				DebugPrintf(stdout,"Unmapping flag erased.\n");
 				break;
 			}
 
@@ -1302,14 +1353,19 @@ sint Default::HandleEvent(bool forcePoll){
 				xcb_get_geometry_cookie_t geometryCookie = xcb_get_geometry(pcon,pev->window);
 				xcb_get_geometry_reply_t *pgeometryReply = xcb_get_geometry_reply(pcon,geometryCookie,0);
 				if(!pgeometryReply)
-					break; //happens sometimes on high rate of events
+					break; //hack: happens sometimes on high rate of events
 				WManager::Rectangle rect = {pgeometryReply->x,pgeometryReply->y,pgeometryReply->width,pgeometryReply->height};
 				free(pgeometryReply);
+
+				if(!configCache.empty()) //ensure that the above_sibling is correctly set during the initial tree query
+					std::get<2>(configCache.back()) = pev->window;
 
 				configCache.push_back(ConfigCacheElement(pev->window,rect,0));
 				mrect = configCache.end()-1;
 
 			}
+			debug_query_tree("MAP");
+
 			WManager::Rectangle *prect = &std::get<1>(*mrect);
 
 			static WManager::Client dummyClient(0);
@@ -1370,14 +1426,28 @@ sint Default::HandleEvent(bool forcePoll){
 				}else
 				if(ApproveExternal(&wmName,&wmClass)){
 					//clientStack won't get cleared in standalone compositor mode
-					if(std::get<2>(*mrect) != 0){ //!= XCB_NONE
-						auto m = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{
-							return static_cast<X11Client *>(p)->window == std::get<2>(*mrect);
+					bool found = false;
+
+					//find the first client ("above sibling") that is actually mapped
+					for(auto k = std::make_reverse_iterator(mrect); k != configCache.rend(); ++k){ //start from above sibling, go reverse
+						//TODO: skip mrect
+						auto m = std::find_if(clientStack.begin(),clientStack.end(),[&](auto &p)->bool{ //todo: rbegin/rend()
+							return static_cast<X11Client *>(p)->window == std::get<2>(*k);
+							//return std::get<2>(*mrect) == std::get<0>(*k);
 						});
-						clientStack.insert(m+1,pclient);
-					}else clientStack.push_front(pclient);
+						if(m != clientStack.end()){
+							clientStack.insert(m+1,pclient);
+							found = true;
+							break;
+						}
+					}
+
+					if(!found) //nothing was mapped
+						clientStack.push_back(pclient);
 				}
 			}
+
+			DebugPrintf(stdout,"map notify %x, client: %p \"%s\", \"%s\"\n",pev->window,pclient,wmClass.pstr,wmName.pstr);
 
 			for(uint i = 0; i < 2; ++i){
 				if(propertyReply1[i])
@@ -1386,11 +1456,14 @@ sint Default::HandleEvent(bool forcePoll){
 					mstrfree(pwmProperty[i]);
 			}
 
-			DebugPrintf(stdout,"map notify, %x\n",pev->window);
 			}
 			break;
 		case XCB_UNMAP_NOTIFY:{
 			xcb_unmap_notify_event_t *pev = (xcb_unmap_notify_event_t*)pevent;
+
+			DebugPrintf(stdout,"unmap notify %x",pev->window);
+
+			debug_query_tree("UNMAP");
 
 			auto m = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
 				return p.first->window == pev->window;
@@ -1400,8 +1473,9 @@ sint Default::HandleEvent(bool forcePoll){
 
 			result = 1;
 
-			(*m).first->flags |= X11Client::FLAG_UNMAPPING;
+			//DebugPrintf(stdout,"unmap notify %x, client: %p\n",pev->window,(*m).first);
 
+			(*m).first->flags |= X11Client::FLAG_UNMAPPING;
 			clientStack.erase(std::remove(clientStack.begin(),clientStack.end(),(*m).first),clientStack.end());
 
 			if((*m).first->pcontainer->GetRoot() != WManager::Container::ptreeFocus->GetRoot())
@@ -1409,15 +1483,10 @@ sint Default::HandleEvent(bool forcePoll){
 			
 			unmappingQueue.insert((*m).first);
 
-			//printf("rect: %d, %d, %ux%u\nold: %d, %d, %ux%u\n",(*m).first->rect.x,(*m).first->rect.y,(*m).first->rect.w,(*m).first->rect.h,
-				//(*m).first->oldRect.x,(*m).first->oldRect.y,(*m).first->oldRect.w,(*m).first->oldRect.h);
-
 			netClientList.clear();
 			for(auto &p : clients)
 				netClientList.push_back(p.first->window);
 			xcb_change_property(pcon,XCB_PROP_MODE_REPLACE,pscr->root,ewmh._NET_CLIENT_LIST,XCB_ATOM_WINDOW,32,netClientList.size(),netClientList.data());
-
-			DebugPrintf(stdout,"unmap notify window: %x, client: %p\n",pev->window,(*m).first);
 
 			std::iter_swap(m,clients.end()-1);
 			clients.pop_back();
@@ -1713,17 +1782,38 @@ sint Default::HandleEvent(bool forcePoll){
 			xcb_destroy_notify_event_t *pev = (xcb_destroy_notify_event_t*)pevent;
 			DebugPrintf(stdout,"destroy notify, %x\n",pev->window);
 
+			auto m2 = std::find_if(configCache.begin(),configCache.end(),[&](auto &p)->bool{
+				return std::get<0>(p) == pev->window;
+			});
+			if(m2 != configCache.end()){
+				if(standaloneComp){
+					//preserve the order
+					auto m = configCache.erase(m2);
+					if(m != configCache.begin())
+						std::get<2>(*(m-1)) = (m != configCache.end())?std::get<0>(*m):0;
+				}else{
+					std::iter_swap(m2,configCache.end()-1);
+					configCache.pop_back();
+				}
+			}
+
+			debug_query_tree("DESTROY");
+
 			//the removal below may not have been done yet if
 			//the client got unmapped in another workspace.
-			auto m = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
+			auto m1 = std::find_if(clients.begin(),clients.end(),[&](auto &p)->bool{
 				return p.first->window == pev->window;
 			});
-			if(m == clients.end())
+			if(m1 == clients.end())
 				break;
 
-			unmappingQueue.insert((*m).first);
+			//Erase here in case unmap was not notified. StackClients() will also take care of the wm mode erasure.
+			(*m1).first->flags |= X11Client::FLAG_UNMAPPING; //should not be needed here
+			clientStack.erase(std::remove(clientStack.begin(),clientStack.end(),(*m1).first),clientStack.end());
 
-			std::iter_swap(m,clients.end()-1);
+			unmappingQueue.insert((*m1).first);
+
+			std::iter_swap(m1,clients.end()-1);
 			clients.pop_back();
 			}
 			break;
@@ -1745,16 +1835,18 @@ sint Default::HandleEvent(bool forcePoll){
 	}
 
 	//Destroy the clients here, after the event queue has been cleared. This is to ensure that no already destroyed client is attempted to be readjusted.
-	if(unmappingQueue.size() > 0){
+	if(!unmappingQueue.empty()){
 		std::set<WManager::Container *> roots;
 		for(X11Client *pclient : unmappingQueue){
+			DebugPrintf(stdout,"Unmap queue: %x\n",pclient->window);
 			roots.insert(pclient->pcontainer->GetRoot());
 			DestroyClient(pclient);
 		}
 		unmappingQueue.clear();
 
-		for(auto m : roots)
-			StackClients(m); //just to recreate the clientStack
+		if(!standaloneComp)
+			for(auto m : roots)
+				StackClients(m); //just to recreate the clientStack
 	}
 
 	if(xcb_connection_has_error(pcon)){

@@ -993,7 +993,8 @@ int main(sint argc, const char **pargv){
 	Config::Loader::unredirOnFullscreen = unredirOnFullscreenOpt.Get();
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
-	pconfigLoader->Run(configPath?configPath.Get().c_str():0,"config.py");
+	if(!pconfigLoader->Run(configPath?configPath.Get().c_str():0,"config.py"))
+		return 1;
 
 	if(staComp.Get())
 		Config::BackendInterface::pbackendInt->standaloneComp = true;

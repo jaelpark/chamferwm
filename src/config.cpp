@@ -1222,7 +1222,7 @@ Loader::~Loader(){
 	Py_Finalize();
 }
 
-void Loader::Run(const char *pfilePath, const char *pfileLabel){
+bool Loader::Run(const char *pfilePath, const char *pfileLabel){
 	FILE *pf = 0;
 	if(!pfilePath){
 		const char *pconfigPaths[] = {
@@ -1248,7 +1248,7 @@ void Loader::Run(const char *pfilePath, const char *pfileLabel){
 	}
 	if(!pf){
 		DebugPrintf(stderr,"Unable to find configuration file.\n");
-		return;
+		return false;
 	}
 	try{
 		PyRun_SimpleFile(pf,pfileLabel);
@@ -1256,8 +1256,12 @@ void Loader::Run(const char *pfilePath, const char *pfileLabel){
 	}catch(boost::python::error_already_set &){
 		boost::python::handle_exception();
 		PyErr_Clear();
+		fclose(pf);
+		return false;
 	}
 	fclose(pf);
+
+	return true;
 }
 
 bool Loader::standaloneComp;

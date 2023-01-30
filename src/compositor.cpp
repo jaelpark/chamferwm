@@ -1565,7 +1565,11 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		xcb_flush(pbackend->pcon);
 		if(pimageReply)
 			free(pimageReply);
-		else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null.\n");
+		else{
+			DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null.\n");
+			damageRegions.clear();
+			return;
+		}
 
 		for(VkRect2D &rect1 : damageRegions){
 			VkRect2D screenRect;
@@ -1588,7 +1592,11 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 			xcb_flush(pbackend->pcon);
 			if(pimageReply)
 				free(pimageReply);
-			else DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null.\n");
+			else{
+				DebugPrintf(stderr,"xcb_shm_get_image_reply() returned null.\n");
+				damageRegions.clear();
+				return;
+			}
 
 			for(uint y = 0; y < rect1.extent.height; ++y){
 				uint offsetDst = 4*(rect.w*(y+rect1.offset.y)+rect1.offset.x);
@@ -1688,7 +1696,7 @@ void X11ClientFrame::StartComposition1(){
 
 	if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
 		//
-		CreateSurface(rect.w,rect.h,SURFACE_DEPTH_24);
+		CreateSurface(rect.w,rect.h,SURFACE_DEPTH_32);
 		if(!dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(windowPixmap)){
 			xcb_free_pixmap(pbackend->pcon,windowPixmap);
 			return; //do not show
@@ -1733,6 +1741,8 @@ void X11ClientFrame::StartComposition1(){
 		}
 	}
 
+	DebugPrintf(stdout,"StartComposition1() for %x\n",window);
+
 	damage = xcb_generate_id(pbackend->pcon);
 	xcb_damage_create(pbackend->pcon,damage,window,XCB_DAMAGE_REPORT_LEVEL_NON_EMPTY);
 
@@ -1766,6 +1776,8 @@ void X11ClientFrame::StopComposition1(){
 
 	DestroySurface();
 
+	DebugPrintf(stdout,"StopComposition1() for %x\n",window);
+
 	pcomp->AddDamageRegion(this);
 	enabled = false;
 }
@@ -1794,34 +1806,6 @@ X11Background::X11Background(xcb_pixmap_t _pixmap, uint _w, uint _h, const char 
 
 	CreateSurface(w,h,SURFACE_DEPTH_24,true);
 
-	/*if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF){
-		CreateSurface(w,h,24);
-		dynamic_cast<TextureDMABuffer *>(ptexture)->Attach(pixmap);
-
-		UpdateDescSets();
-
-	}else{
-		uint textureSize = w*h*4;
-		shmid = shmget(IPC_PRIVATE,(textureSize-1)+pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment-(textureSize-1)%pcomp->physicalDevExternalMemoryHostProps.minImportedHostPointerAlignment,IPC_CREAT|0777);
-		if(shmid == -1){
-			DebugPrintf(stderr,"Failed to allocate shared memory.\n");
-			return;
-		}
-		segment = xcb_generate_id(pcomp11->pbackend->pcon);
-		xcb_shm_attach(pcomp11->pbackend->pcon,segment,shmid,0);
-
-		pchpixels = (unsigned char*)shmat(shmid,0,0);
-
-		CreateSurface(w,h,24);
-
-		if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_HOST_MEMORY){
-			if(!dynamic_cast<TextureSharedMemory *>(ptexture)->Attach(pchpixels)){
-				DebugPrintf(stderr,"Failed to import host memory. Disabling feature.\n");
-				pcomp->memoryImportMode = CompositorInterface::IMPORT_MODE_CPU_COPY;
-			}else UpdateDescSets(); //view is recreated every time for the imported buffer
-		}
-	}*/
-
 	pcomp->FullDamageRegion();
 }
 
@@ -1830,17 +1814,6 @@ X11Background::~X11Background(){
 	shmdt(pchpixels);
 
 	shmctl(shmid,IPC_RMID,0);
-	/*if(pcomp->memoryImportMode == CompositorInterface::IMPORT_MODE_DMABUF)
-		dynamic_cast<TextureDMABuffer *>(ptexture)->Detach();
-	else{
-		if(pcomp->memoryImportMode != CompositorInterface::IMPORT_MODE_CPU_COPY)
-			dynamic_cast<TextureSharedMemory *>(ptexture)->Detach(pcomp->frameTag);
-
-		xcb_shm_detach(pcomp11->pbackend->pcon,segment);
-		shmdt(pchpixels);
-
-		shmctl(shmid,IPC_RMID,0);
-	}*/
 
 	pcomp->FullDamageRegion();
 }
@@ -1905,7 +1878,8 @@ void X11Compositor::Start(){
 	if(!poverlayReply)
 		throw Exception("Unable to get overlay window.");
 	overlay = poverlayReply->overlay_win;
-	free(poverlayReply); DebugPrintf(stdout,"overlay xid: %u\n",overlay);
+	free(poverlayReply);
+	DebugPrintf(stdout,"overlay xid: %x\n",overlay);
 
 	uint mask = XCB_CW_EVENT_MASK;
 	uint values[1] = {XCB_EVENT_MASK_EXPOSURE};

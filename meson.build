@@ -91,8 +91,10 @@ obj = gen_fragment.process(['shaders/default.hlsl'])
 custom_target('default_fragment',output:'default_fragment.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')
 
 foreach name,args : {
-		'fragment':['-DSTOCK_FRAME_STYLE=1'],
-		'fragment_basic':['-DSTOCK_FRAME_STYLE=0']
+		'fragment':['-DSTOCK_FRAME_STYLE=1'], #default "demo" decoration with border and rounded corners
+		'fragment_basic':['-DSTOCK_FRAME_STYLE=0'], #rectangular borders, no bling
+        'fragment_ext':['-DSTOCK_FRAME_STYLE=1','-DDRAW_BORDER=1','-DENABLE_TITLE=0','-DDRAW_SHADOW=1'], #default rounded corner style for external wms
+        'fragment_ext_basic':['-DSTOCK_FRAME_STYLE=0','-DDRAW_BORDER=0','-DENABLE_TITLE=0','-DDRAW_SHADOW=1'] #simple compatible style for external wms, only draw shadows
 	}
 	obj = generator(glslc,output:'@BASENAME@_'+name+'_unopt.spv',arguments:glslc_args_fragment).process(['shaders/frame.hlsl'],extra_args:args)
 	custom_target('frame_'+name,output:'frame_'+name+'.spv',input:obj,command:invoke_spirv_opt,install:true,install_dir:'.')

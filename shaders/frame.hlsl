@@ -64,10 +64,18 @@ void main(point float2 posh[1], inout TriangleStream<GS_OUTPUT> stream){
 #define DRAW_SHADOW 1 //set 1 to draw shadow
 #endif
 
-const float borderScaling = 1.0f;
-const float4 borderColor = float4(0.0f,0.0f,0.0f,1.0f);
-//const float borderScaling = 0.75f;
-//const float4 borderColor = float4(0.07f,0.07f,0.07f,1.0f);
+#ifndef DRAW_BORDER
+#define DRAW_BORDER 1
+#endif
+
+#ifndef ENABLE_TITLE
+#define ENABLE_TITLE 1
+#endif
+
+#define BORDER_RADIUS 0.02f
+#define BORDER_THICKNESS 0.008f
+
+const float4 borderColor = float4(0.07f,0.07f,0.07f,1.0f);
 const float4 focusColor = float4(1.0f,0.6f,0.33f,1.0f);
 const float4 titleBackground[2] = {float4(0.4f,0.4f,0.4f,1.0f),float4(0.5,0.5,0.5,1.0f)}; //second value for alternating stack tabs
 const float4 taskSelectColor = float4(0.957f,0.910f,0.824f,1.0f);
@@ -90,7 +98,7 @@ float ChamferMap(float2 p, float2 b, float r){
 float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 	float2 aspect = float2(1.0f,screen.x/screen.y);
 
-	float2 borderScalingScr = borderScaling*screen*aspect;
+	float2 borderScalingScr = screen*aspect;
 
 	float2 titlePadAspect = 2.0f*titlePad*aspect;
 	float2 xy0_1 = xy0+min(titlePadAspect,0.0f);
@@ -101,13 +109,13 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 	float2 center = 0.5f*(a+b); //center location in pixels
 	float2 d1 = b-a; //d1: pixel extent of the window
 
-	float2 q = posh.xy-center;
+	float2 q = posh.xy-center; //pixel offset from center of the window
 
 #if STOCK_FRAME_STYLE == 1
-	// ----- frame 1: chamfered (demo frame) ------------
+	// ----- frame 1: rounded corners (demo frame) -------------------
 
-	float sr1 = ChamferMap(q,0.5f*d1-0.0130f*borderScalingScr.x,0.0195f*borderScalingScr.x);
-	if(sr1 > 0.0f){
+	float sr1 = ChamferMap(q,0.5f*d1-BORDER_RADIUS*borderScalingScr.x,(BORDER_RADIUS+DRAW_BORDER*BORDER_THICKNESS)*borderScalingScr.x); //with border (thicknes determined here)
+	if(sr1 > -1.0f){
 		//shadow region
 #if DRAW_SHADOW
 		if(stackIndex == 0) //only first in stack casts a shadow
@@ -120,31 +128,34 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 			return 0.0f;
 		}
 	}
-	float br = ChamferMap(q,0.5f*d1-0.0104f*borderScalingScr.x,0.0104f*borderScalingScr.x);
-	if(br > -0.5f){
+#if DRAW_BORDER
+	//radius extends from the rectangle
+	float br1 = ChamferMap(q,0.5f*d1-BORDER_RADIUS*borderScalingScr.x,BORDER_RADIUS*borderScalingScr.x);
+	if(br1 > -1.0f){
 		//border region
 		if(flags & FLAGS_FOCUS)
 			//dashed line around focus
 			if((any(posh > center-0.5f*d1 && posh < center+0.5f*d1 && fmod(floor(posh/(0.0130f*borderScalingScr.x)),3.0f) < 0.5f) &&
-				any(posh < center-0.5f*d1-0.0037f*borderScalingScr || posh > center+0.5f*d1+0.0037f*borderScalingScr)))
+				any(posh < center-0.5f*d1-0.6f*BORDER_THICKNESS*borderScalingScr || posh > center+0.5f*d1+0.6f*BORDER_THICKNESS*borderScalingScr))) //0.0037f
 				return focusColor;
 
 		if(flags & FLAGS_FOCUS_NEXT)
 			if((any(posh > center-0.5f*d1 && posh < center+0.5f*d1 && fmod(floor(posh/(0.0130f*borderScalingScr.x)),3.0f) < 0.5f) &&
-				any(posh < center-0.5f*d1-0.0037f*borderScalingScr || posh > center+0.5f*d1+0.0037f*borderScalingScr)))
+				any(posh < center-0.5f*d1-0.6f*BORDER_THICKNESS*borderScalingScr || posh > center+0.5f*d1+0.6f*BORDER_THICKNESS*borderScalingScr)))
 				return taskSelectColor;
 
 		return borderColor;
 	}
+#endif //DRAW_BORDER
 #else //STOCK_FRAME_STYLE
-	// ----- frame 0: basic -----------------------------
+	// ----- frame 0: basic rectangular ------------------------------
 
-	float sr2 = RectangleMap(q,0.5f*d1-(0.0130f-0.0195f)*borderScalingScr.x);
-	if(sr2 > 0.0f){
+	float sr1 = RectangleMap(q,0.5f*d1+DRAW_BORDER*BORDER_THICKNESS*borderScalingScr.x);
+	if(sr1 > -1.0f){
 		//shadow region
 #if DRAW_SHADOW
 		if(stackIndex == 0) //only first in stack casts a shadow
-			return float4(0.0f,0.0f,0.0f,0.9f*saturate(1.0f-sr2/(0.0078f*borderScalingScr.x)));
+			return float4(0.0f,0.0f,0.0f,0.9f*saturate(1.0f-sr1/(0.0078f*borderScalingScr.x)));
 		else{
 #else
 		{
@@ -153,8 +164,9 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 			return 0.0f;
 		}
 	}
-	float br = RectangleMap(q,0.5f*d1);
-	if(br > -0.5f){
+#if DRAW_BORDER
+	float br1 = RectangleMap(q,0.5f*d1);
+	if(br1 > -1.0f){
 		//border region
 		if(flags & FLAGS_FOCUS)
 			return focusColor;
@@ -163,9 +175,11 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 
 		return borderColor;
 	}
+#endif //DRAW_BORDER
 #endif //STOCK_FRAME_STYLE
 
 	float2 a_content = screen*(0.5f*xy0+0.5f); //top-left corner in pixels, content area
+#if ENABLE_TITLE
 	float2 b_content = screen*(0.5f*xy1+0.5f); //bottom-right corner in pixels, content area
 	if(any(posh.xy < a_content) || any(posh.xy > b_content)){ //title region
 		bool1 tb = abs(titlePad.x) < abs(titlePad.y); //check whether the title bar is horizontal or vertical
@@ -176,6 +190,7 @@ float4 main(float4 posh : SV_Position, float2 texc : TEXCOORD) : SV_Target{
 			return focusColor;
 		return titleBackground[stackIndex%2];
 	}
+#endif
 	//content region
 	if(flags & FLAGS_CONTAINER_FOCUS){
 		float4 c = content.Load(float3(posh.xy-a_content,0));

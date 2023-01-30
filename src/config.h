@@ -221,7 +221,7 @@ class Loader{
 public:
 	Loader(const char *);
 	~Loader();
-	void Run(const char *, const char *);
+	bool Run(const char *, const char *);
 
 	//backend
 	static bool standaloneComp;
