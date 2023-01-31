@@ -183,6 +183,7 @@ public:
 	virtual ~CompositorInterface();
 	virtual bool OnRedirectExternal(std::string, std::string);
 
+	bool noCompositor;
 	sint deviceIndex;
 	bool debugLayers;
 	bool scissoring;
@@ -227,6 +228,7 @@ public:
 	static bool standaloneComp;
 
 	//compositor
+	static bool noCompositor;
 	static sint deviceIndex;
 	static bool debugLayers;
 	static bool scissoring;

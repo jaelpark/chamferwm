@@ -683,7 +683,7 @@ BackendConfig::~BackendConfig(){
 	pbackendInt->pbackend = 0;
 }
 
-CompositorInterface::CompositorInterface() : deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), memoryImportMode(Loader::memoryImportMode), unredirOnFullscreen(Loader::unredirOnFullscreen), enableAnimation(true), animationDuration(0.3f), fontName("Monospace"), fontSize(18), pcompositor(0){
+CompositorInterface::CompositorInterface() : noCompositor(Loader::noCompositor), deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), memoryImportMode(Loader::memoryImportMode), unredirOnFullscreen(Loader::unredirOnFullscreen), enableAnimation(true), animationDuration(0.3f), fontName("Monospace"), fontSize(18), pcompositor(0){
 	//
 }
 
@@ -1149,6 +1149,7 @@ BOOST_PYTHON_MODULE(chamfer){
 	
 	boost::python::class_<CompositorProxy,boost::noncopyable>("Compositor")
 		.def("OnRedirectExternal",&CompositorInterface::OnRedirectExternal)
+		.def_readwrite("noCompositor",&CompositorInterface::noCompositor)
 		.def_readwrite("deviceIndex",&CompositorInterface::deviceIndex)
 		.def_readwrite("debugLayers",&CompositorInterface::debugLayers)
 		.def_readwrite("scissoring",&CompositorInterface::scissoring)
@@ -1248,6 +1249,7 @@ bool Loader::Run(const char *pfilePath, const char *pfileLabel){
 
 bool Loader::standaloneComp;
 
+bool Loader::noCompositor;
 sint Loader::deviceIndex;
 bool Loader::debugLayers;
 bool Loader::scissoring;

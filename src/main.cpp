@@ -972,7 +972,7 @@ int main(sint argc, const char **pargv){
 	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
-	args::ValueFlag<uint> memoryImportMode(group_comp,"memoryImportMode","Memory import mode:\n0: DMA-buf import (fastest)\n1: Host memory import (default)\n2: CPU copy (slow, compatibility)",{"memory-import-mode",'m'});
+	args::ValueFlag<uint> memoryImportMode(group_comp,"memoryImportMode","Memory import mode:\n0: DMA-buf import (fastest, default)\n1: Host memory import (compatibility)\n2: CPU copy (slow, compatibility)",{"memory-import-mode",'m'});
 	args::Flag unredirOnFullscreenOpt(group_comp,"unredirOnFullscreen","Unredirect a fullscreen window bypassing the compositor to improve performance.",{"unredir-on-fullscreen"},false);
 	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified through multiple --shader-path, and the first specified paths will take priority over the later ones.",{"shader-path"},{"/usr/share/chamfer/shaders"});
 
@@ -989,6 +989,7 @@ int main(sint argc, const char **pargv){
 	}
 
 	Config::Loader::standaloneComp = staComp.Get();
+	Config::Loader::noCompositor = noComp.Get();
 	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
 	Config::Loader::debugLayers = debugLayersOpt.Get();
 	Config::Loader::scissoring = !noScissoringOpt.Get();
@@ -998,16 +999,23 @@ int main(sint argc, const char **pargv){
 			return 1;
 		}
 		Config::Loader::memoryImportMode = (Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get();
-	}else Config::Loader::memoryImportMode = Compositor::CompositorInterface::IMPORT_MODE_HOST_MEMORY;
+	}else Config::Loader::memoryImportMode = Compositor::CompositorInterface::IMPORT_MODE_DMABUF;
 	Config::Loader::unredirOnFullscreen = unredirOnFullscreenOpt.Get();
 
 	Config::Loader *pconfigLoader = new Config::Loader(pargv[0]);
 	if(!pconfigLoader->Run(configPath?configPath.Get().c_str():0,"config.py"))
 		return 1;
 
-	if(staComp.Get())
+	if(staComp.Get()){
+		if(noComp.Get()){
+			DebugPrintf(stderr,"Incompatible options: --no-compositor (-n) and --standalone-compositor (-C).\n");
+			return 1;
+		}
 		Config::BackendInterface::pbackendInt->standaloneComp = true;
+	}
 
+	if(noComp)
+		Config::CompositorInterface::pcompositorInt->noCompositor = noComp.Get();
 	if(deviceIndexOpt)
 		Config::CompositorInterface::pcompositorInt->deviceIndex = deviceIndexOpt.Get();
 	if(debugLayersOpt.Get())
@@ -1040,7 +1048,7 @@ int main(sint argc, const char **pargv){
 
 	RunCompositor *pcomp;
 	try{
-		if(noComp.Get())
+		if(Config::CompositorInterface::pcompositorInt->noCompositor)
 			pcomp = new NullCompositor(Config::CompositorInterface::pcompositorInt);
 		else
 		if(debugBackend.Get())
