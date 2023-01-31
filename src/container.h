@@ -126,7 +126,7 @@ public:
 	glm::mat2x2 titleTransform;
 	float absTitlePad;
 
-	glm::vec2 size; //size relative to the parent container
+	glm::vec2 size; //size relative to the parent container, V split and H split size. When floating, this is the actual size (rect).
 	glm::vec2 minSize; //min size, relative to screen
 	glm::vec2 maxSize; //max size, relative to screen
 

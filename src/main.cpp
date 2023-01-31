@@ -457,6 +457,10 @@ public:
 	}
 
 	void FloatContainer(WManager::Container *pcontainer){
+		if(!pcontainer->pclient){
+			DebugPrintf(stderr,"Only client containers can be floated.\n");
+			return; //who knows we'll fix this limitation someday
+		}
 		auto n1 = std::find_if(WManager::Container::tiledFocusQueue.begin(),WManager::Container::tiledFocusQueue.end(),[&](auto &p)->bool{
 			return p.first == pcontainer;
 		});
@@ -521,6 +525,8 @@ public:
 		static WManager::Client dummyClient(0); //base client being unavailable means that the client is stacked on top of everything else
 	
 		pcontainer->flags |= WManager::Container::FLAG_FLOATING;
+		pcontainer->p = pcontainer->p+0.5f*(pcontainer->e-glm::vec2(0.3f,0.4f));
+		pcontainer->SetSize(glm::vec2(0.3f,0.4f)); //TODO: this should be determined better or memorized
 		if(pcontainer->pclient)
 			stackAppendix.push_back(StackAppendixElement(&dummyClient,pcontainer->pclient));
 

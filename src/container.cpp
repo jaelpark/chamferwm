@@ -84,11 +84,14 @@ Container::Container(Container *_pParent, const Setup &setup) :
 
 		uint containerCount = 0;
 		for(Container *pcontainer = pParent->pch; pcontainer; ++containerCount, pcontainer = pcontainer->pnext);
-		size = glm::vec2(1.0f/(float)containerCount);
+		//size = glm::vec2(1.0f/(float)containerCount);
+		size = glm::max(glm::vec2(1.0f/(float)containerCount),glm::vec2(0.1f));
 
+		glm::vec2 sizeComp = glm::vec2(1.0f)-size;
 		for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
 			if(pcontainer != this)
-				pcontainer->size *= glm::vec2(1.0f)-size;
+				pcontainer->size = glm::max(pcontainer->size*sizeComp,glm::vec2(0.1f));
+				//pcontainer->size *= glm::vec2(1.0f)-size;
 
 	}
 
@@ -128,11 +131,13 @@ void Container::Place(Container *pParent1){
 
 	uint containerCount = 0;
 	for(Container *pcontainer = pParent->pch; pcontainer; ++containerCount, pcontainer = pcontainer->pnext);
-	size = glm::vec2(1.0f/(float)containerCount);
+	size = glm::max(glm::vec2(1.0f/(float)containerCount),glm::vec2(0.1f));
 
+	glm::vec2 sizeComp = glm::vec2(1.0f)-size;
 	for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
 		if(pcontainer != this)
-			pcontainer->size *= glm::vec2(1.0f)-size;
+			pcontainer->size = glm::max(pcontainer->size*sizeComp,glm::vec2(0.1f));
+			//pcontainer->size *= glm::vec2(1.0f)-size;
 	
 	GetRoot()->Stack();
 	pParent->Translate();
@@ -323,20 +328,36 @@ Container * Container::GetRoot(){
 	return proot;
 }
 
-void Container::SetSize(glm::vec2 size1){
+void Container::SetSize(glm::vec2 sizeNew){
+	if(glm::any(glm::lessThan(sizeNew,glm::vec2(0.1f))))
+		return; //ensure reasonable constraints
 	if(flags & FLAG_FLOATING){
-		p += 0.5f*(size-size1);
-		e = size1;
-		size = size1;
+		sizeNew = glm::max(sizeNew,glm::vec2(0.1f));
+		p += 0.5f*(size-sizeNew);
+		e = sizeNew;
+		size = sizeNew;
 		if(pclient)
 			pclient->UpdateTranslation();
 		return;
 	}
-	glm::vec2 sizeSum = glm::vec2(1.0f)-size;
-	size = size1;
+	glm::vec2 sizeCompRatio = (glm::vec2(1.0f)-sizeNew)/(glm::vec2(1.0f)-size);
+	if(size.x >= 1.0f){
+		sizeCompRatio.x = 1.0f;
+		sizeNew.x = 1.0f;
+	}
+	if(size.y >= 1.0f){
+		sizeCompRatio.y = 1.0f;
+		sizeNew.y = 1.0f;
+	}
+	//precheck - ensure the operation results in positive size for all windows
 	for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
 		if(pcontainer != this)
-			pcontainer->size *= (glm::vec2(1.0f)-size)/sizeSum;
+			if(glm::any(glm::lessThan(pcontainer->size*sizeCompRatio,glm::vec2(0.1f))))
+				return; //cancel the resize
+	for(Container *pcontainer = pParent->pch; pcontainer; pcontainer = pcontainer->pnext)
+		if(pcontainer != this)
+			pcontainer->size *= sizeCompRatio;
+	size = sizeNew;
 
 	pParent->Translate();
 }
