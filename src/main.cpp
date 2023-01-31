@@ -12,6 +12,7 @@
 
 #include <args.hxx>
 #include <iostream>
+#include <csignal>
 
 #include <boost/filesystem.hpp>
 #include <wordexp.h>
@@ -99,6 +100,12 @@ void DebugPrintf(FILE *pf, const char *pfmt, ...){
 	vfprintf(pf,pfmt,args);
 	//fclose(pf);
 	va_end(args);
+}
+
+static bool sigTerm = false;
+void SignalHandler(int sig){
+	if(sig == 15)
+		sigTerm = true;
 }
 
 typedef std::pair<const WManager::Client *, WManager::Client *> StackAppendixElement;
@@ -290,6 +297,19 @@ public:
 	}
 
 	void ReleaseContainers(){
+		for(auto &p : stackAppendix){
+			if(p.second->pcontainer->GetParent() != 0){ //check that it's not a root container
+				const Config::ContainerConfig *pcontainer1 = dynamic_cast<const Config::ContainerConfig *>(p.second->pcontainer);
+				if(pcontainer1 && pcontainer1->pcontainerInt->pcontainer == p.second->pcontainer)
+					pcontainer1->pcontainerInt->pcontainer = 0;
+
+				if(p.second->pcontainer)
+					delete p.second->pcontainer;
+			}
+			delete p.second;
+		}
+		stackAppendix.clear();
+		//
 		if(!WManager::Container::rootQueue.empty()){
 			WManager::Container *proot1 = WManager::Container::rootQueue.front();
 			WManager::Container *pRootNext = proot1->pRootNext;
@@ -300,17 +320,6 @@ public:
 				pRootNext = pRootNext->pRootNext;
 			}while(pRootNext != proot1);
 		}
-
-		for(auto &p : stackAppendix){
-			const Config::ContainerConfig *pcontainer1 = dynamic_cast<const Config::ContainerConfig *>(p.second->pcontainer);
-			if(pcontainer1 && pcontainer1->pcontainerInt->pcontainer == p.second->pcontainer)
-				pcontainer1->pcontainerInt->pcontainer = 0;
-
-			if(p.second->pcontainer)
-				delete p.second->pcontainer;
-			delete p.second;
-		}
-		stackAppendix.clear();
 	}
 
 	void PrintTree(WManager::Container *pcontainer, uint level) const{
@@ -388,7 +397,7 @@ public:
 		containerCreateInfo.floating = (pcreateInfo->hints & Backend::X11Client::CreateInfo::HINT_FLOATING) != 0;
 
 		if(pcreateInfo->mode == Backend::X11Client::CreateInfo::CREATE_AUTOMATIC){
-			//create a temporary container through which OnSetupClient() can be called. The container is discarded as soon as the call has been made. 
+			//create a temporary container through which (py) OnSetupClient() can be called. The container is discarded as soon as the call has been made. 
 			Config::ContainerInterface &containerInt = SetupContainer<Config::X11ContainerConfig,DefaultBackend>(&containerCreateInfo);
 
 			containerInt.OnSetupClient();
@@ -1046,10 +1055,12 @@ int main(sint argc, const char **pargv){
 
 	pbackend->SetCompositor(pcomp);
 
+	signal(SIGTERM,SignalHandler);
+
 	for(;;){
 		//TODO: can we wait for vsync before handling the event? Might help with the stuttering
 		sint result = pbackend11->HandleEvent(pcomp->IsAnimating());
-		if(result == -1)
+		if(result == -1 || sigTerm)
 			break;
 		else
 		if(result == 0 && !pcomp->IsAnimating())

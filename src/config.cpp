@@ -425,24 +425,6 @@ ContainerConfig::~ContainerConfig(){
 	pcontainerInt->pcontainer = 0;
 }
 
-/*template<typename T>
-BackendContainerConfig<T>::BackendContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, const WManager::Container::Setup &_setup, Backend::X11Backend *_pbackend) : T(_pParent,_setup,_pbackend), ContainerConfig(_pcontainerInt){
-	//
-}
-
-template<typename T>
-BackendContainerConfig<T>::BackendContainerConfig(Backend::X11Backend *_pbackend) : T(_pbackend), ContainerConfig(){
-	//
-	pcontainerInt->pcontainer = this;
-}
-
-template<typename T>
-BackendContainerConfig<T>::~BackendContainerConfig(){
-	//
-}
-
-class template BackendContainerConfig<Backend::X11Container>;*/
-
 X11ContainerConfig::X11ContainerConfig(ContainerInterface *_pcontainerInt, WManager::Container *_pParent, const WManager::Container::Setup &_setup, Backend::X11Backend *_pbackend) : Backend::X11Container(_pParent,_setup,_pbackend), ContainerConfig(_pcontainerInt,_pbackend){
 	//
 }

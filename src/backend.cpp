@@ -788,12 +788,14 @@ void Default::Start(){
 
 void Default::Stop(){
 	//cleanup
-	if(pcursorctx)
-		xcb_cursor_context_free(pcursorctx);
+	if(!standaloneComp){
+		if(pcursorctx)
+			xcb_cursor_context_free(pcursorctx);
+		xcb_set_input_focus(pcon,XCB_NONE,XCB_INPUT_FOCUS_POINTER_ROOT,XCB_CURRENT_TIME);
+	}
 	
 	xcb_destroy_window(pcon,ewmh_window);
 	xcb_ewmh_connection_wipe(&ewmh);
-	xcb_set_input_focus(pcon,XCB_NONE,XCB_INPUT_FOCUS_POINTER_ROOT,XCB_CURRENT_TIME);
 
 	xcb_key_symbols_free(psymbols);
 
