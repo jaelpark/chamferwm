@@ -1237,11 +1237,11 @@ void CompositorInterface::GenerateCommandBuffers(const std::deque<WManager::Clie
 				titlePosition.y += frame.extent.height;
 			glm::vec2 titlePadAbs = glm::abs(renderObject.pclient->titlePad1);
 			if(titlePadAbs.x > titlePadAbs.y){
-				titlePosition.y += renderObject.pclient->titleStackOffset.y+renderObject.pclientFrame->ptitle->GetTextLength()-(renderObject.pclientFrame->ptitle->GetTextLength()-renderObject.pclient->titleFrameExtent.y);
-				titlePosition.x += (ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)/2;
+				titlePosition.y += renderObject.pclient->titleStackOffset.y+renderObject.pclient->titleFrameExtent.y;
+				titlePosition.x += (renderObject.pclient->titleRect.w-ptextEngine->fontFace->size->metrics.height/128)/2;
 			}else{
 				titlePosition.x += renderObject.pclient->titleStackOffset.x;
-				titlePosition.y += (ptextEngine->fontFace->glyph->metrics.horiBearingY>>6)/2;
+				titlePosition.y += (renderObject.pclient->titleRect.h-ptextEngine->fontFace->size->metrics.height/128)/2;
 			}
 			titlePosition += 0.5f*renderObject.pclient->titlePad1;
 
