@@ -230,7 +230,7 @@ void ClientFrame::UpdateDescSets(){
 	vkUpdateDescriptorSets(pcomp->logicalDev,writeDescSets.size(),writeDescSets.data(),0,0);
 }
 
-CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), pfsApp(0), pfsAppPrev(0), frameApproval(false), suspended(false), unredirected(false), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), memoryImportMode(pconfig->memoryImportMode), unredirOnFullscreen(pconfig->unredirOnFullscreen), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration), pfontName(pconfig->pfontName), fontSize(pconfig->fontSize){
+CompositorInterface::CompositorInterface(const Configuration *pconfig) : physicalDevIndex(pconfig->deviceIndex), currentFrame(0), imageIndex(0), frameTag(0), pcolorBackground(0), pbackground(0), ptextEngine(0), pfsApp(0), pfsAppPrev(0), frameApproval(false), suspended(false), unredirected(false), playingAnimation(false), debugLayers(pconfig->debugLayers), scissoring(pconfig->scissoring), incrementalPresent(pconfig->incrementalPresent), memoryImportMode(pconfig->memoryImportMode), unredirOnFullscreen(pconfig->unredirOnFullscreen), enableAnimation(pconfig->enableAnimation), animationDuration(pconfig->animationDuration), pfontName(pconfig->pfontName), fontSize(pconfig->fontSize){
 	//
 }
 
@@ -467,62 +467,56 @@ void CompositorInterface::InitializeRenderEngine(){
 	VkExtensionProperties *pdevExtProps = new VkExtensionProperties[devExtCount];
 	vkEnumerateDeviceExtensionProperties(physicalDev,0,&devExtCount,pdevExtProps);
 
-	//device extensions
-	const char *pdevExtensionsDMABuf[] = {
+	std::set<const char *> requiredDevExtensionsSet = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-		VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
-		VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
-		VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME,
-		VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
-		VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,
-		VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,
-		VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME,
-		VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME,
-		VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
-		VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME
+		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME
 	};
-	const char *pdevExtensionsHostPointer[] = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-		VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
-		VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
-		VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
-		VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME
-	};
-	const char *pdevExtensionsCPUCopy[] = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-		VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
-		VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
-	};
-	const char **pdevExtensions;
-	uint requiredDevExtCount;
+
+	if(incrementalPresent)
+		requiredDevExtensionsSet.insert(VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME);
+
 	switch(memoryImportMode){
 	case IMPORT_MODE_DMABUF:
-		pdevExtensions = pdevExtensionsDMABuf;
-		requiredDevExtCount = sizeof(pdevExtensionsDMABuf)/sizeof(pdevExtensionsDMABuf[0]);
+		requiredDevExtensionsSet.insert(VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
 		break;
 	case IMPORT_MODE_HOST_MEMORY:
-		pdevExtensions = pdevExtensionsHostPointer;
-		requiredDevExtCount = sizeof(pdevExtensionsHostPointer)/sizeof(pdevExtensionsHostPointer[0]);
+		requiredDevExtensionsSet.insert(VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+		requiredDevExtensionsSet.insert(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
 		break;
-	case IMPORT_MODE_CPU_COPY:
-		pdevExtensions = pdevExtensionsCPUCopy;
-		requiredDevExtCount = sizeof(pdevExtensionsCPUCopy)/sizeof(pdevExtensionsCPUCopy[0]);
-		break;
+	/*case IMPORT_MODE_CPU_COPY:
+		requiredDevExtensionsSet.insert(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+		break;*/
 	}
 
+	std::vector<const char *> requiredDevExtensions(requiredDevExtensionsSet.begin(),requiredDevExtensionsSet.end());
+
+	bool allAvailable = true;
 	DebugPrintf(stdout,"Enumerating required device extensions\n");
-	uint devExtFound = 0;
-	for(uint i = 0; i < devExtCount; ++i)
-		for(uint j = 0; j < requiredDevExtCount; ++j)
-			if(strcmp(pdevExtProps[i].extensionName,pdevExtensions[j]) == 0){
-				printf("  %s\n",pdevExtensions[j]);
-				++devExtFound;
+	for(uint i = 0, n = requiredDevExtensions.size(); i < n; ++i){
+		bool found = false;
+		for(uint j = 0; j < devExtCount; ++j)
+			if(strcmp(pdevExtProps[j].extensionName,requiredDevExtensions[i]) == 0){
+				printf("  Found: %s\n",requiredDevExtensions[i]);
+				found = true;
+				break;
 			}
-	if(devExtFound < requiredDevExtCount)
+		if(!found){
+			printf("  NOT found: %s\n",requiredDevExtensions[i]);
+			allAvailable = false;
+		}
+	}
+	if(!allAvailable)
 		throw Exception("Could not find all required device extensions.");
 
 	VkDeviceCreateInfo devCreateInfo = {};
@@ -530,8 +524,8 @@ void CompositorInterface::InitializeRenderEngine(){
 	devCreateInfo.pQueueCreateInfos = queueCreateInfo;
 	devCreateInfo.queueCreateInfoCount = queueCount;
 	devCreateInfo.pEnabledFeatures = &physicalDevFeatures;
-	devCreateInfo.ppEnabledExtensionNames = pdevExtensions;
-	devCreateInfo.enabledExtensionCount = requiredDevExtCount;
+	devCreateInfo.ppEnabledExtensionNames = requiredDevExtensions.data();
+	devCreateInfo.enabledExtensionCount = requiredDevExtensions.size();
 	if(debugLayers){
 		devCreateInfo.ppEnabledLayerNames = players;
 		devCreateInfo.enabledLayerCount = sizeof(players)/sizeof(players[0]);
@@ -1121,9 +1115,7 @@ void CompositorInterface::GenerateCommandBuffers(const std::deque<WManager::Clie
 	if(pbackground1)
 		pbackground1->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 
-	//TODO: update only visible clients
 	for(ClientFrame *pclientFrame : updateQueue)
-		//if(pclientFrame->shaderFlags & ClientFrame::SHADER_FLAG_CONTAINER_FOCUS)
 		pclientFrame->UpdateContents(&pcopyCommandBuffers[currentFrame]);
 	updateQueue.clear();
 
@@ -1314,7 +1306,7 @@ void CompositorInterface::Present(){
 	presentInfo.pSwapchains = &swapChain;
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = 0;
-	presentInfo.pNext = presentRegion.rectangleCount > 0?&presentRegions:0;
+	presentInfo.pNext = (incrementalPresent && presentRegion.rectangleCount > 0)?&presentRegions:0;
 	vkQueuePresentKHR(queue[QUEUE_INDEX_PRESENT],&presentInfo);
 
 	presentRectLayers.clear();
@@ -1366,7 +1358,7 @@ template Pipeline * CompositorInterface::LoadPipeline<ClientPipeline>(const char
 template Pipeline * CompositorInterface::LoadPipeline<TextPipeline>(const char *[Pipeline::SHADER_MODULE_COUNT], const std::vector<std::pair<ShaderModule::INPUT,uint>> *);
 
 void CompositorInterface::ClearBackground(){
-	ClientFrame *pbackground1 = dynamic_cast<ClientFrame *>(pbackground);
+	ClientFrame *pbackground1 = dynamic_cast<ClientFrame *>(pbackground); //pixmap wallpaper
 	if(pbackground1)
 		delete pbackground1;
 	if(!pcolorBackground){
@@ -1442,6 +1434,7 @@ VkDescriptorSet * CompositorInterface::CreateDescSets(const ShaderModule *pshade
 		descSetAllocateInfo.descriptorPool = descPool;
 		descSetAllocateInfo.pSetLayouts = pshaderModule->pdescSetLayouts;
 		descSetAllocateInfo.descriptorSetCount = pshaderModule->setCount;
+		//Try to allocate in different pools until one succeeds.
 		if(vkAllocateDescriptorSets(logicalDev,&descSetAllocateInfo,pdescSets) == VK_SUCCESS){
 			descPoolReference.push_back(std::pair<VkDescriptorSet *, VkDescriptorPool>(pdescSets,descPool));
 			return pdescSets;
@@ -1532,7 +1525,7 @@ void X11ClientFrame::UpdateContents(const VkCommandBuffer *pcommandBuffer){
 		return rect.w < rect1.offset.x+rect1.extent.width || rect.h < rect1.offset.y+rect1.extent.height;
 	}),damageRegions.end());
 
-	if(!enabled || (!fullRegionUpdate && damageRegions.empty()) || !(shaderFlags & ClientFrame::SHADER_FLAG_CONTAINER_FOCUS))
+	if(!enabled || (ptexture->imageLayout != VK_IMAGE_LAYOUT_UNDEFINED && ((!fullRegionUpdate && damageRegions.empty()) || !(shaderFlags & ClientFrame::SHADER_FLAG_CONTAINER_FOCUS))))
 		return;
 
 	if(fullRegionUpdate){
@@ -2056,7 +2049,7 @@ void X11Compositor::CreateSurfaceKHR(VkSurfaceKHR *psurface) const{
 }
 
 void X11Compositor::SetBackgroundPixmap(const Backend::BackendPixmapProperty *pPixmapProperty){
-	if(pbackground){
+	if(dynamic_cast<ClientFrame *>(pbackground)){ //clear previous background if any
 		delete pbackground;
 		pbackground = pcolorBackground;
 	}

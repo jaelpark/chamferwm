@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <unistd.h>
 #include <libdrm/drm_fourcc.h>
+//#include <fcntl.h>
 
 #include "spirv_reflect.h"
 
@@ -218,7 +219,7 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 		free(pbuffersFromPixmapReply);
 		return false;
 	}
-	dmafd = pdmafds[0];
+	//dmafd = pdmafds[0];
 
 	uint *pstrides = xcb_dri3_buffers_from_pixmap_strides(pbuffersFromPixmapReply);
 	uint *poffsets = xcb_dri3_buffers_from_pixmap_offsets(pbuffersFromPixmapReply); //---
@@ -280,10 +281,10 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	VkSubresourceLayout subresourceLayout[256];
 	for(uint i = 0; i < pbuffersFromPixmapReply->nfd; ++i){
 		subresourceLayout[i].offset = poffsets[i];
-		subresourceLayout[i].size = pstrides[i]*pbuffersFromPixmapReply->height;
+		subresourceLayout[i].size = 0;
 		subresourceLayout[i].rowPitch = pstrides[i];
-		subresourceLayout[i].arrayPitch = subresourceLayout[i].size;
-		subresourceLayout[i].depthPitch = subresourceLayout[i].size;
+		subresourceLayout[i].arrayPitch = 0;
+		subresourceLayout[i].depthPitch = 0;
 	}
 
 	VkImageDrmFormatModifierExplicitCreateInfoEXT imageDrmFormatModifierExpCreateInfo = {};
@@ -321,7 +322,7 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	
 	VkMemoryFdPropertiesKHR memoryFdProps = {};
 	memoryFdProps.sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR;
-	if(((PFN_vkGetMemoryFdPropertiesKHR)vkGetInstanceProcAddr(pcomp11->instance,"vkGetMemoryFdPropertiesKHR"))(pcomp->logicalDev,VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,dmafd,&memoryFdProps) != VK_SUCCESS){
+	if(((PFN_vkGetMemoryFdPropertiesKHR)vkGetInstanceProcAddr(pcomp11->instance,"vkGetMemoryFdPropertiesKHR"))(pcomp->logicalDev,VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,pdmafds[0],&memoryFdProps) != VK_SUCCESS){
 		DebugPrintf(stderr,"Failed to get memory fd properties.\n");
 		free(pbuffersFromPixmapReply);
 		return false;
@@ -329,6 +330,13 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 
 	VkMemoryRequirements memoryRequirements;
 	vkGetImageMemoryRequirements(pcomp->logicalDev,image,&memoryRequirements);
+
+	/*if((dmafd = fcntl(pdmafds[0],F_DUPFD_CLOEXEC,0)) < 0){
+		DebugPrintf(stderr,"Failed to duplicate DMA FD %d. fcntl error %d.\n",pdmafds[0],dmafd);
+		free(pbuffersFromPixmapReply);
+		return false;
+	}*/
+	dmafd = pdmafds[0];
 	
 	VkMemoryDedicatedAllocateInfo memoryDedicatedAllocateInfo = {};
 	memoryDedicatedAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
@@ -351,11 +359,13 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	}
 	if(vkAllocateMemory(pcomp->logicalDev,&memoryAllocateInfo,0,&deviceMemory) != VK_SUCCESS){
 		DebugPrintf(stderr,"Failed to allocate transfer image memory.\n");
+		//close(dmafd);
 		free(pbuffersFromPixmapReply);
 		return false;
 	}
 	if(vkBindImageMemory(pcomp->logicalDev,image,deviceMemory,0) != VK_SUCCESS){
 		DebugPrintf(stderr,"Failed to bind transfer image memory.\n");
+		vkFreeMemory(pcomp->logicalDev,deviceMemory,0);
 		free(pbuffersFromPixmapReply);
 		return false;
 	}
@@ -366,13 +376,20 @@ bool TexturePixmap::Attach(xcb_pixmap_t pixmap){
 	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	imageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
 	imageViewCreateInfo.components = *pcomponentMapping;
+	/*imageViewCreateInfo.components = pbuffersFromPixmapReply->bpp == 24
+		?pixmapComponentMapping24
+		:pixmapComponentMapping;*/
 	imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
 	imageViewCreateInfo.subresourceRange.levelCount = 1;
 	imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
 	imageViewCreateInfo.subresourceRange.layerCount = 1;
-	if(vkCreateImageView(pcomp->logicalDev,&imageViewCreateInfo,0,&imageView) != VK_SUCCESS)
-		throw Exception("Failed to create texture image view.");
+	if(vkCreateImageView(pcomp->logicalDev,&imageViewCreateInfo,0,&imageView) != VK_SUCCESS){
+		vkFreeMemory(pcomp->logicalDev,deviceMemory,0);
+		free(pbuffersFromPixmapReply);
+		DebugPrintf(stderr,"Failed to create texture image view.\n");
+		return false;
+	}
 	
 	free(pbuffersFromPixmapReply);
 
@@ -394,7 +411,7 @@ void TexturePixmap::Detach(){
 		image = 0;
 	}
 
-	close(dmafd);
+	//close(dmafd); //closed by vkFreeMemory
 }
 
 void TexturePixmap::Update(const VkCommandBuffer *pcommandBuffer, const VkRect2D *prects, uint rectCount){

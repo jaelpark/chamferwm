@@ -683,7 +683,7 @@ BackendConfig::~BackendConfig(){
 	pbackendInt->pbackend = 0;
 }
 
-CompositorInterface::CompositorInterface() : noCompositor(Loader::noCompositor), deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), memoryImportMode(Loader::memoryImportMode), unredirOnFullscreen(Loader::unredirOnFullscreen), enableAnimation(true), animationDuration(0.3f), fontName("Monospace"), fontSize(18), pcompositor(0){
+CompositorInterface::CompositorInterface() : noCompositor(Loader::noCompositor), deviceIndex(Loader::deviceIndex), debugLayers(Loader::debugLayers), scissoring(Loader::scissoring), incrementalPresent(Loader::incrementalPresent), memoryImportMode(Loader::memoryImportMode), unredirOnFullscreen(Loader::unredirOnFullscreen), enableAnimation(true), animationDuration(0.3f), fontName("Monospace"), fontSize(18), pcompositor(0){
 	//
 }
 
@@ -1153,6 +1153,7 @@ BOOST_PYTHON_MODULE(chamfer){
 		.def_readwrite("deviceIndex",&CompositorInterface::deviceIndex)
 		.def_readwrite("debugLayers",&CompositorInterface::debugLayers)
 		.def_readwrite("scissoring",&CompositorInterface::scissoring)
+		.def_readwrite("incrementalPresent",&CompositorInterface::incrementalPresent)
 		//.def_readwrite("hostMemoryImport",&CompositorInterface::hostMemoryImport)
 		.def_readwrite("memoryImportMode",&CompositorInterface::memoryImportMode)
 		.def_readwrite("unredirOnFullscreen",&CompositorInterface::unredirOnFullscreen)
@@ -1253,6 +1254,7 @@ bool Loader::noCompositor;
 sint Loader::deviceIndex;
 bool Loader::debugLayers;
 bool Loader::scissoring;
+bool Loader::incrementalPresent;
 //bool Loader::hostMemoryImport;
 Compositor::CompositorInterface::IMPORT_MODE Loader::memoryImportMode;
 bool Loader::unredirOnFullscreen;

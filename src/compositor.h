@@ -123,6 +123,7 @@ public:
 		uint deviceIndex;
 		bool debugLayers;
 		bool scissoring;
+		bool incrementalPresent;
 		//bool hostMemoryImport;
 		IMPORT_MODE memoryImportMode;
 		bool unredirOnFullscreen;
@@ -274,6 +275,7 @@ protected:
 	//config
 	bool debugLayers;
 	bool scissoring;
+	bool incrementalPresent;
 	bool unredirOnFullscreen;
 	IMPORT_MODE memoryImportMode;
 
@@ -389,6 +391,7 @@ public:
 		.deviceIndex = 0,
 		.debugLayers = false,
 		.scissoring = true,
+		.incrementalPresent = true,
 		//.hostMemoryImport = true,
 		.memoryImportMode = IMPORT_MODE_DMABUF,
 		.enableAnimation = false,

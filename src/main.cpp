@@ -834,7 +834,7 @@ public:
 
 class DefaultCompositor : public Compositor::X11Compositor, public RunCompositor{
 public:
-	DefaultCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->memoryImportMode,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
+	DefaultCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11Compositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->incrementalPresent,_pcompositorInt->memoryImportMode,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
 		Start();
 
 		wordexp_t expResult;
@@ -889,7 +889,7 @@ public:
 
 class DebugCompositor : public Compositor::X11DebugCompositor, public RunCompositor{
 public:
-	DebugCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->memoryImportMode,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
+	DebugCompositor(std::vector<StackAppendixElement> *_pstackAppendix, Backend::X11Backend *pbackend, args::ValueFlagList<std::string> &shaderPaths, Config::CompositorInterface *_pcompositorInt) : X11DebugCompositor(pconfig = new Configuration{_pcompositorInt->deviceIndex,_pcompositorInt->debugLayers,_pcompositorInt->scissoring,_pcompositorInt->incrementalPresent,_pcompositorInt->memoryImportMode,_pcompositorInt->unredirOnFullscreen,_pcompositorInt->enableAnimation,_pcompositorInt->animationDuration,_pcompositorInt->fontName.c_str(),_pcompositorInt->fontSize},pbackend), RunCompositor(_pstackAppendix,_pcompositorInt){
 		Compositor::X11DebugCompositor::Start();
 
 		wordexp_t expResult;
@@ -978,6 +978,7 @@ int main(sint argc, const char **pargv){
 	args::ValueFlag<uint> deviceIndexOpt(group_comp,"id","GPU to use by its index. By default the first device in the list of enumerated GPUs will be used.",{"device-index"});
 	args::Flag debugLayersOpt(group_comp,"debugLayers","Enable Vulkan debug layers.",{"debug-layers",'l'},false);
 	args::Flag noScissoringOpt(group_comp,"noScissoring","Disable scissoring optimization.",{"no-scissoring"},false);
+	args::Flag noIncPresentOpt(group_comp,"noIncPresent","Disable incremental present support.",{"no-incremental-present"},false);
 	args::ValueFlag<uint> memoryImportMode(group_comp,"memoryImportMode","Memory import mode:\n0: DMA-buf import (fastest, default)\n1: Host memory import (compatibility)\n2: CPU copy (slow, compatibility)",{"memory-import-mode",'m'});
 	args::Flag unredirOnFullscreenOpt(group_comp,"unredirOnFullscreen","Unredirect a fullscreen window bypassing the compositor to improve performance.",{"unredir-on-fullscreen"},false);
 	args::ValueFlagList<std::string> shaderPaths(group_comp,"path","Shader lookup path. SPIR-V shader objects are identified by an '.spv' extension. Multiple paths may be specified through multiple --shader-path, and the first specified paths will take priority over the later ones.",{"shader-path"},{"/usr/share/chamfer/shaders"});
@@ -999,6 +1000,7 @@ int main(sint argc, const char **pargv){
 	Config::Loader::deviceIndex = deviceIndexOpt?deviceIndexOpt.Get():0;
 	Config::Loader::debugLayers = debugLayersOpt.Get();
 	Config::Loader::scissoring = !noScissoringOpt.Get();
+	Config::Loader::incrementalPresent = !noIncPresentOpt.Get();
 	if(memoryImportMode){
 		if(memoryImportMode.Get() >= Compositor::CompositorInterface::IMPORT_MODE_COUNT){
 			DebugPrintf(stderr,"Invalid memory import mode specified (%u). Mode specifier must be less than %u. See --help for available options.\n",memoryImportMode.Get(),Compositor::CompositorInterface::IMPORT_MODE_COUNT);
@@ -1028,6 +1030,8 @@ int main(sint argc, const char **pargv){
 		Config::CompositorInterface::pcompositorInt->debugLayers = true;
 	if(noScissoringOpt.Get())
 		Config::CompositorInterface::pcompositorInt->scissoring = false;
+	if(noIncPresentOpt.Get())
+		Config::CompositorInterface::pcompositorInt->incrementalPresent = false;
 	if(memoryImportMode)
 		Config::CompositorInterface::pcompositorInt->memoryImportMode = (Compositor::CompositorInterface::IMPORT_MODE)memoryImportMode.Get();
 	if(unredirOnFullscreenOpt.Get())
