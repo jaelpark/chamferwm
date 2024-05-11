@@ -168,20 +168,22 @@ void TextureStaged::Unmap(const VkCommandBuffer *pcommandBuffer, const VkRect2D 
 	vkCmdPipelineBarrier(*pcommandBuffer,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,
 		0,0,0,0,1,&imageMemoryBarrier);
 
-	//transfer "stage"
+	//transfer
+	bufferImageCopyBuffer.clear();
 	bufferImageCopyBuffer.reserve(rectCount);
 	for(uint i = 0; i < rectCount; ++i){
-		bufferImageCopyBuffer[i].imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		bufferImageCopyBuffer[i].imageSubresource.mipLevel = 0;
-		bufferImageCopyBuffer[i].imageSubresource.baseArrayLayer = 0;
-		bufferImageCopyBuffer[i].imageSubresource.layerCount = 1;
-		bufferImageCopyBuffer[i].imageExtent.width = prects[i].extent.width;//w/4; //w
-		bufferImageCopyBuffer[i].imageExtent.height = prects[i].extent.height;//h
-		bufferImageCopyBuffer[i].imageExtent.depth = 1;
-		bufferImageCopyBuffer[i].imageOffset = (VkOffset3D){prects[i].offset.x,prects[i].offset.y,0};//(VkOffset3D){w/4,0,0}; //x,y
-		bufferImageCopyBuffer[i].bufferOffset = (w*prects[i].offset.y+prects[i].offset.x)*formatSizeMap[formatIndex].second;//w/4*4; //(w*y+x)*format
-		bufferImageCopyBuffer[i].bufferRowLength = w;
-		bufferImageCopyBuffer[i].bufferImageHeight = h;
+		auto &m = bufferImageCopyBuffer.emplace_back();
+		m.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		m.imageSubresource.mipLevel = 0;
+		m.imageSubresource.baseArrayLayer = 0;
+		m.imageSubresource.layerCount = 1;
+		m.imageExtent.width = prects[i].extent.width;//w/4; //w
+		m.imageExtent.height = prects[i].extent.height;//h
+		m.imageExtent.depth = 1;
+		m.imageOffset = (VkOffset3D){prects[i].offset.x,prects[i].offset.y,0};//(VkOffset3D){w/4,0,0}; //x,y
+		m.bufferOffset = (w*prects[i].offset.y+prects[i].offset.x)*formatSizeMap[formatIndex].second;//w/4*4; //(w*y+x)*format
+		m.bufferRowLength = w;
+		m.bufferImageHeight = h;
 	}
 	vkCmdCopyBufferToImage(*pcommandBuffer,stagingBuffer,image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,rectCount,bufferImageCopyBuffer.data());
 
