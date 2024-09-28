@@ -844,7 +844,8 @@ public:
 				boost::filesystem::directory_iterator end;
 				for(boost::filesystem::directory_iterator di(expResult.we_wordv[0]); di != end; ++di){
 					if(boost::filesystem::is_regular_file(di->status()) &&
-						boost::filesystem::extension(di->path()) == ".spv"){
+						//boost::filesystem::extension(di->path()) == ".spv"){
+						di->path().extension() == ".spv"){
 						Blob blob(di->path().string().c_str());
 						AddShader(di->path().filename().string().c_str(),&blob);
 					}
@@ -899,7 +900,7 @@ public:
 				boost::filesystem::directory_iterator end;
 				for(boost::filesystem::directory_iterator di(expResult.we_wordv[0]); di != end; ++di){
 					if(boost::filesystem::is_regular_file(di->status()) &&
-						boost::filesystem::extension(di->path()) == ".spv"){
+						di->path().extension() == ".spv"){
 						Blob blob(di->path().string().c_str());
 						AddShader(di->path().filename().string().c_str(),&blob);
 					}
